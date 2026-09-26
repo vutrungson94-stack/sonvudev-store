@@ -24,7 +24,7 @@ const hasSupabaseProjectUrl = () => {
 };
 
 export const env = {
-  host: value("HOST", "127.0.0.1"),
+  host: value("HOST", "0.0.0.0"),
   port: numberValue("PORT", 3000),
   appUrl: value("APP_URL", "http://localhost:3000").replace(/\/$/, ""),
   adminToken: value("ADMIN_API_TOKEN"),
