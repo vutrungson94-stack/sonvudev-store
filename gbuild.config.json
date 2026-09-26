@@ -1,0 +1,32 @@
+{
+  "$schema": "D:/_Build/gbuild.config.schema.json",
+  "security": {
+    "sbom": {
+      "enabled": true,
+      "format": "cyclonedx",
+      "policy": {
+        "enabled": true,
+        "allowList": [],
+        "denyList": [
+          "commons-collections:3.2.1",
+          "commons-collections:3.2.2",
+          "org.apache.commons:commons-collections4:4.0",
+          "org.apache.commons:commons-collections4:4.1",
+          "log4j:1.2.17",
+          "org.apache.logging.log4j:log4j-core:2.0",
+          "org.apache.logging.log4j:log4j-core:2.17.0"
+        ],
+        "enforcement": "block"
+      }
+    },
+    "provenance": {
+      "enabled": false
+    },
+    "artifactSign": {
+      "enabled": false
+    },
+    "containerScan": {
+      "enabled": false
+    }
+  }
+}

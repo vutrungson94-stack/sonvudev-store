@@ -1,0 +1,18 @@
+# Dependencies
+node_modules/
+node_modules_stale_*/
+
+# Secrets and local environment
+.env
+.env.*
+!.env.example
+
+# Build/cache
+.gbuildcache/
+build-reports/
+
+# OS/editor
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/

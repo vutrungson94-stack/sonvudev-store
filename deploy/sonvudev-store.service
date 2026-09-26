@@ -1,0 +1,25 @@
+[Unit]
+Description=SonVuDev Store Node.js application
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=sonvudev
+Group=sonvudev
+WorkingDirectory=/opt/sonvudev-store/current
+Environment=NODE_ENV=production
+EnvironmentFile=/etc/sonvudev-store.env
+ExecStart=/usr/bin/node src/server.js
+Restart=on-failure
+RestartSec=5
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/opt/sonvudev-store/shared
+StandardOutput=append:/var/log/sonvudev-store.log
+StandardError=append:/var/log/sonvudev-store.error.log
+
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,42 @@
+import crypto from "node:crypto";
+import { promises as fs } from "node:fs";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
+import { env, isConfigured } from "./config.js";
+
+const root = process.env.DATA_DIR ? path.resolve(process.env.DATA_DIR) : path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
+const files = { products: path.join(root, "data", "products.json"), orders: path.join(root, "data", "orders.json") };
+let writeChain = Promise.resolve();
+const readJson = async (file, fallback) => { try { return JSON.parse(await fs.readFile(file, "utf8")); } catch { return fallback; } };
+const writeJson = (file, data) => { writeChain = writeChain.then(() => fs.writeFile(file, JSON.stringify(data, null, 2))); return writeChain; };
+
+const seedProducts = [
+  { id: "sonvu-starter", slug: "sonvu-starter", name: "SonVu Starter", shortDescription: "Bộ công cụ nền cho người mới bắt đầu.", description: "Sản phẩm mẫu. Thay nội dung này bằng mô tả phần mềm thật của bạn.", category: "Công cụ", platform: "Windows", version: "1.0.0", price: 149000, currency: "VND", badge: "Phổ biến", features: ["Giao diện tiếng Việt", "Cập nhật miễn phí trong 12 tháng", "Hỗ trợ qua email"], requirements: "Windows 10/11, 4 GB RAM", status: "active", fileKey: "", featured: true, createdAt: new Date().toISOString() },
+  { id: "sonvu-pro", slug: "sonvu-pro", name: "SonVu Pro", shortDescription: "Bộ tính năng nâng cao cho người dùng chuyên nghiệp.", description: "Sản phẩm mẫu cho gói Pro.", category: "Công cụ", platform: "Windows", version: "2.0.0", price: 349000, currency: "VND", badge: "Chuyên nghiệp", features: ["Đầy đủ tính năng Pro", "Ưu tiên hỗ trợ", "Cập nhật lâu dài"], requirements: "Windows 10/11, 8 GB RAM", status: "active", fileKey: "", featured: true, createdAt: new Date().toISOString() },
+  { id: "sonvu-lifetime", slug: "sonvu-lifetime", name: "SonVu Lifetime", shortDescription: "Một lần mua, sử dụng lâu dài.", description: "Sản phẩm mẫu cho gói Lifetime.", category: "Bundle", platform: "Windows", version: "1.0.0", price: 699000, currency: "VND", badge: "Tiết kiệm", features: ["Tất cả gói hiện có", "License cá nhân", "Ưu tiên cập nhật"], requirements: "Windows 10/11, 4 GB RAM", status: "active", fileKey: "", featured: false, createdAt: new Date().toISOString() },
+];
+
+export async function ensureSeed() { await fs.mkdir(path.join(root, "data"), { recursive: true }); if (local) { if (!(await fs.stat(files.products).catch(() => null))) await writeJson(files.products, seedProducts); if (!(await fs.stat(files.orders).catch(() => null))) await writeJson(files.orders, []); return; } try { const rows = await supabase("products?select=id&limit=1"); if (!rows?.length) await supabase("products", { method: "POST", body: JSON.stringify(seedProducts.map(toProduct)) }); } catch (error) { console.warn(`[store] Supabase unavailable, using local JSON fallback: ${error.message}`); local = true; persistenceMode = "local-json"; if (!(await fs.stat(files.products).catch(() => null))) await writeJson(files.products, seedProducts); if (!(await fs.stat(files.orders).catch(() => null))) await writeJson(files.orders, []); } }
+
+async function supabase(pathname, options = {}) {
+  const headers = { apikey: env.supabase.serviceRoleKey, "Content-Type": "application/json", Prefer: "return=representation", ...(options.headers || {}) };
+  if (env.supabase.serviceRoleKey.startsWith("eyJ")) headers.Authorization = `Bearer ${env.supabase.serviceRoleKey}`;
+  const response = await fetch(`${env.supabase.url}/rest/v1/${pathname}`, { ...options, headers });
+  if (!response.ok) throw new Error(`Supabase ${response.status}: ${await response.text()}`);
+  return response.status === 204 ? null : response.json();
+}
+const fromProduct = (row) => row ? { ...row, shortDescription: row.shortDescription ?? row.short_description ?? "", fileKey: row.fileKey ?? row.file_key ?? "", createdAt: row.createdAt ?? row.created_at, updatedAt: row.updatedAt ?? row.updated_at } : null;
+const fromOrder = (row) => row ? { ...row, orderNumber: row.orderNumber ?? row.order_number, accessTokenHash: row.accessTokenHash ?? row.access_token_hash, providerOrderId: row.providerOrderId ?? row.provider_order_id, customerEmail: row.customerEmail ?? row.customer_email, customerName: row.customerName ?? row.customer_name, paymentProvider: row.paymentProvider ?? row.payment_provider, paidAt: row.paidAt ?? row.paid_at, createdAt: row.createdAt ?? row.created_at, updatedAt: row.updatedAt ?? row.updated_at } : null;
+const toProduct = (p) => { const { shortDescription, fileKey, createdAt, updatedAt, ...columns } = p; return { ...columns, ...(shortDescription !== undefined ? { short_description: shortDescription } : {}), ...(fileKey !== undefined ? { file_key: fileKey } : {}), ...(createdAt !== undefined ? { created_at: createdAt } : {}), ...(updatedAt !== undefined ? { updated_at: updatedAt } : {}) }; };
+const toOrder = (o) => { const { orderNumber, accessTokenHash, providerOrderId, customerEmail, customerName, paymentProvider, paidAt, createdAt, updatedAt, ...columns } = o; return { ...columns, ...(orderNumber !== undefined ? { order_number: orderNumber } : {}), ...(accessTokenHash !== undefined ? { access_token_hash: accessTokenHash } : {}), ...(providerOrderId !== undefined ? { provider_order_id: providerOrderId } : {}), ...(customerEmail !== undefined ? { customer_email: customerEmail } : {}), ...(customerName !== undefined ? { customer_name: customerName } : {}), ...(paymentProvider !== undefined ? { payment_provider: paymentProvider } : {}), ...(paidAt !== undefined ? { paid_at: paidAt } : {}), ...(createdAt !== undefined ? { created_at: createdAt } : {}), ...(updatedAt !== undefined ? { updated_at: updatedAt } : {}) }; };
+let local = !isConfigured.supabase;
+
+export async function listProducts({ includeDrafts = false } = {}) { if (!local) { const query = includeDrafts ? "select=*" : "select=*&status=eq.active"; return (await supabase(`products?${query}&order=created_at.desc`)).map(fromProduct); } const items = await readJson(files.products, []); return includeDrafts ? items : items.filter((p) => p.status === "active"); }
+export async function getProduct(id) { if (!local) return fromProduct((await supabase(`products?id=eq.${encodeURIComponent(id)}&limit=1`))[0]); return (await readJson(files.products, [])).find((p) => p.id === id || p.slug === id) || null; }
+export async function createProduct(product) { if (!local) return fromProduct((await supabase("products", { method: "POST", body: JSON.stringify(toProduct({ ...product, id: product.id || crypto.randomUUID() })) }))[0]); const items = await readJson(files.products, []); const item = { ...product, id: product.id || crypto.randomUUID(), createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() }; await writeJson(files.products, [item, ...items]); return item; }
+export async function updateProduct(id, patch) { if (!local) return fromProduct((await supabase(`products?id=eq.${encodeURIComponent(id)}`, { method: "PATCH", body: JSON.stringify(toProduct(patch)) }))[0]); const items = await readJson(files.products, []); const item = items.find((p) => p.id === id); if (!item) return null; Object.assign(item, patch, { updatedAt: new Date().toISOString() }); await writeJson(files.products, items); return item; }
+export async function listOrders() { return local ? readJson(files.orders, []) : (await supabase("orders?select=*&order=created_at.desc")).map(fromOrder); }
+export async function getOrder(id) { return local ? (await readJson(files.orders, [])).find((o) => o.id === id) : fromOrder((await supabase(`orders?id=eq.${encodeURIComponent(id)}&limit=1`))[0]); }
+export async function createOrder(order) { if (!local) return fromOrder((await supabase("orders", { method: "POST", body: JSON.stringify(toOrder(order)) }))[0]); const orders = await readJson(files.orders, []); await writeJson(files.orders, [order, ...orders]); return order; }
+export async function updateOrder(id, patch) { if (!local) return fromOrder((await supabase(`orders?id=eq.${encodeURIComponent(id)}`, { method: "PATCH", body: JSON.stringify(toOrder(patch)) }))[0]); const orders = await readJson(files.orders, []); const order = orders.find((o) => o.id === id); if (!order) return null; Object.assign(order, patch, { updatedAt: new Date().toISOString() }); await writeJson(files.orders, orders); return order; }
+export let persistenceMode = local ? "local-json" : "supabase";

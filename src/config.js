@@ -1,0 +1,67 @@
+import dotenv from "dotenv";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
+
+const projectRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
+dotenv.config({ path: path.join(projectRoot, ".env") });
+
+const value = (name, fallback = "") => (process.env[name] || fallback).trim();
+const configured = (name) => {
+  const v = value(name);
+  const placeholders = ["your_", "your-project", "your-service", "your-account", "your-secret", "your_paypal", "your_bucket"];
+  return v.length > 0 && !placeholders.some((item) => v.toLowerCase().includes(item)) && !v.includes("replace-with");
+};
+const numberValue = (name, fallback) => {
+  const parsed = Number.parseInt(value(name), 10);
+  return Number.isFinite(parsed) ? parsed : fallback;
+};
+const hasSupabaseProjectUrl = () => {
+  const raw = value("SUPABASE_URL");
+  try {
+    const url = new URL(raw);
+    return url.protocol === "https:" && /^[a-z0-9-]+\.supabase\.co$/i.test(url.hostname);
+  } catch { return false; }
+};
+
+export const env = {
+  host: value("HOST", "127.0.0.1"),
+  port: numberValue("PORT", 3000),
+  appUrl: value("APP_URL", "http://localhost:3000").replace(/\/$/, ""),
+  adminToken: value("ADMIN_API_TOKEN"),
+  r2: {
+    accountId: value("R2_ACCOUNT_ID"),
+    accessKeyId: value("R2_ACCESS_KEY_ID"),
+    secretAccessKey: value("R2_SECRET_ACCESS_KEY"),
+    bucket: value("R2_BUCKET_NAME"),
+    uploadTtl: numberValue("R2_UPLOAD_URL_TTL_SECONDS", 900),
+    downloadTtl: numberValue("R2_DOWNLOAD_URL_TTL_SECONDS", 600),
+  },
+  supabase: {
+    url: value("SUPABASE_URL").replace(/\/$/, ""),
+    serviceRoleKey: value("SUPABASE_SERVICE_ROLE_KEY"),
+  },
+  paypal: {
+    environment: value("PAYPAL_ENVIRONMENT", "sandbox"),
+    currency: value("PAYPAL_CURRENCY", "USD").toUpperCase(),
+    vndToUsdRate: numberValue("PAYPAL_VND_TO_USD_RATE", 26000),
+    clientId: value("PAYPAL_CLIENT_ID"),
+    clientSecret: value("PAYPAL_CLIENT_SECRET"),
+    webhookId: value("PAYPAL_WEBHOOK_ID"),
+  },
+  bank: {
+    name: value("BANK_NAME", "Chưa cập nhật"),
+    accountName: value("BANK_ACCOUNT_NAME", "SonVuDev"),
+    accountNumber: value("BANK_ACCOUNT_NUMBER", "Chưa cập nhật"),
+    notePrefix: value("BANK_TRANSFER_NOTE_PREFIX", "SonVuDev"),
+  },
+};
+
+export const isConfigured = {
+  admin: configured("ADMIN_API_TOKEN"),
+  r2: configured("R2_ACCOUNT_ID") && configured("R2_ACCESS_KEY_ID") && configured("R2_SECRET_ACCESS_KEY") && configured("R2_BUCKET_NAME"),
+  supabase: hasSupabaseProjectUrl() && configured("SUPABASE_SERVICE_ROLE_KEY"),
+  paypal: configured("PAYPAL_CLIENT_ID") && configured("PAYPAL_CLIENT_SECRET") && ["USD", "EUR", "GBP", "AUD", "CAD", "SGD", "JPY"].includes(env.paypal.currency),
+  paypalWebhook: configured("PAYPAL_WEBHOOK_ID"),
+  bank: Boolean(env.bank.name && env.bank.accountName && env.bank.accountNumber)
+    && !/^(chưa cập nhật|not configured|replace-with)/i.test(`${env.bank.name} ${env.bank.accountNumber}`.trim()),
+};

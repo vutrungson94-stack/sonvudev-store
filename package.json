@@ -1,0 +1,33 @@
+{
+  "name": "sonvudev-store",
+  "version": "1.0.0",
+  "description": "SonVuDev software storefront with private R2 downloads and PayPal checkout",
+  "main": "src/server.js",
+  "type": "module",
+  "scripts": {
+    "build": "node scripts/build-web.mjs",
+    "check:production": "node scripts/production-check.mjs",
+    "lint": "node scripts/lint-web.mjs",
+    "start": "node src/server.js",
+    "dev": "node --watch src/server.js",
+    "test": "node --test"
+  },
+  "files": [
+    "src",
+    "public",
+    "scripts",
+    "supabase",
+    "cloudflare",
+    ".env.example",
+    "README.md"
+  ],
+  "engines": {
+    "node": ">=20"
+  },
+  "dependencies": {
+    "@aws-sdk/client-s3": "^3.600.0",
+    "@aws-sdk/s3-request-presigner": "^3.600.0",
+    "dotenv": "^16.4.5",
+    "express": "^4.19.2"
+  }
+}

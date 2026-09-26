@@ -1,0 +1,149 @@
+True
+True
+True
+True
+True
+True
+True
+True
+True
+True
+True
+True
+True
+True
+True
+True
+True
+True
+True
+True
+True
+[AUTO] Đã bật chế độ incremental cho CI/không tương tác
+[ENV] Môi trường: Cục bộ (CI=False, OS=Windows)
+[STRATEGY] Chiến lược build đang hoạt động: Tăng dần
+Đã bật ghi log: D:\_Build\logs\default\build_20260925_162747.log
+[BUILD] Bắt đầu quá trình build...
+[PROFILE] Hồ sơ đang hoạt động Release
+Đang kiểm tra .NET SDK...
+Đã tìm thấy .NET SDK từ biến môi trường: G:\TRUNG SON\Common\.sdk
+[SDK] DotnetCmd xác định: G:\TRUNG SON\Common\.sdk\dotnet.exe
+[SDK] DotnetCmd G:\TRUNG SON\Common\.sdk\dotnet.exe
+
+  +==============================================================+
+  |    gbuild - Hệ thống Build PowerShell    |
+  +==============================================================+
+
+True
+True
+[Đăng ký plugin ...]
+[PLUGIN] Đã tải: Docker v1.0.0 (Docker)
+[PLUGIN] Đã tải: Dotnet v1.0.0 (C#, F#, VB.NET)
+[PLUGIN] Đã tải: Go v1.0.0 (Go)
+[PLUGIN] Đã tải: Java v1.0.0 (Java, Kotlin, Scala)
+[PLUGIN] Đã tải: PowerShell v1.0.0 (PowerShell)
+[PLUGIN] Đã tải: Cpp v1.0.0 (C/C++, C)
+[PLUGIN] Đã tải: Node v1.0.0 (Node.js, TypeScript)
+[PLUGIN] Đã tải: PHP v1.0.0 (PHP)
+[PLUGIN] Đã tải: Ruby v1.0.0 (Ruby)
+[PLUGIN] Đã tải: Python v1.0.0 (Python)
+[PLUGIN] Đã tải: Rust v1.0.0 (Rust)
+[PLUGIN] Đã tải: Elixir v1.0.0 (Elixir)
+[PLUGIN] Đã tải: Swift v1.0.0 (Swift)
+[PLUGIN] Đã tải: Avalonia v1.0.0 (Avalonia, LinuxDesktop)
+[PLUGIN] Tổng đã đăng ký: 14 plugin
+True
+True
+[Quét project ...]
+
+  [ 25%] #####...............  > Tìm kiếm các tệp .csproj
+----------------------------------------------------------------------------------------------------
+  > Đang xử lý: Tìm kiếm các tệp .csproj...
+[PROJECT] Đang quét các tệp project...
+[PROJECT] Thư mục gốc từ tham số -Project: D:\SonVuDev-Upload
+[PROJECT] Thư mục gốc: D:\SonVuDev-Upload
+[PROJECT] Tìm thấy 0 project
+[PROJECT] Không tìm thấy tệp project nào tại đường dẫn -Project: D:\SonVuDev-Upload
+Không tìm thấy tệp .csproj; đang xác định ngôn ngữ project...
+[v] Đã phát hiện: TypeScript (package.json) - Hoàn thành
+True
+True
+[Kiểm tra trước build ...]
+[PREFLIGHT] Đã qua (4 kiểm tra)
+True
+True
+[Quét project bị ảnh hưởng ...]
+True
+True
+[Biên dịch ...]
+
+  [ 50%] ##########..........  > Building TypeScript
+----------------------------------------------------------------------------------------------------
+Running npm run build...
+Running npm test...
+Running npm run lint...
+  [OUTPUT] D:\SonVuDev-Upload\publish-output
+
+
+----------------------------------------------------------------------------------------------------
+  [DONE] HOÀN THÀNH                                         Tổng: 10.3 giây
+----------------------------------------------------------------------------------------------------
+True
+True
+[Tự tối ưu ...]
+True
+True
+[Chuỗi cung ứng ...]
+[SUPPLYCHAIN] Thất bại
+? [Pipeline step [Chuỗi cung ứng]] Failed (non-retryable - Unknown): [SUPPLYCHAIN] Supply-chain checks thất bại — chặn build
+True
+[Chuỗi cung ứng thất bại: [SUPPLYCHAIN] Supply-chain checks thất bại — chặn build]
+[FAIL] [SUPPLYCHAIN] Supply-chain checks thất bại — chặn build
+Stack: at <ScriptBlock>, D:\_Build\Modules\Orchestrator.psm1: line 2842
+at <ScriptBlock>, D:\_Build\Modules\Orchestrator.psm1: line 1601
+at Invoke-WithRetry, D:\_Build\Modules\ErrorHandling.psm1: line 202
+at Invoke-PipelineStep, D:\_Build\Modules\Orchestrator.psm1: line 1628
+at Invoke-GBuildPipeline, D:\_Build\Modules\Orchestrator.psm1: line 1737
+at Start-GBuild, D:\_Build\Modules\Orchestrator.psm1: line 2933
+at <ScriptBlock>, D:\_Build\gbuild.ps1: line 326
+True
+
+Name                           Value                                                                                   
+----                           -----                                                                                   
+Message                        Build failed: [SUPPLYCHAIN] Supply-chain checks thất bại — chặn build                   
+IsRetryable                    False                                                                                   
+Suggestion                                                                                                             
+Category                       Permanent                                                                               
+DocsLink                                                                                                               
+Timestamp                      2026-09-25 16:27:57                                                                     
+RelatedFiles                   {D:\SonVuDev-Upload\package.json, D:\SonVuDev-Upload}                                   
+Code                                                                                                                   
+Context                        {Module, ProjectType, Choice}                                                           
+StackTrace                                                                                                             
+True
+True
+??  No rollback actions to execute
+[FATAL] Xử lý không thể hoàn tất trong Start-GBuild: [SUPPLYCHAIN] Supply-chain checks thất bại — chặn build
+Stack: at <ScriptBlock>, D:\_Build\Modules\Orchestrator.psm1: line 2842
+at <ScriptBlock>, D:\_Build\Modules\Orchestrator.psm1: line 1601
+at Invoke-WithRetry, D:\_Build\Modules\ErrorHandling.psm1: line 202
+at Invoke-PipelineStep, D:\_Build\Modules\Orchestrator.psm1: line 1628
+at Invoke-GBuildPipeline, D:\_Build\Modules\Orchestrator.psm1: line 1737
+at Start-GBuild, D:\_Build\Modules\Orchestrator.psm1: line 2933
+at <ScriptBlock>, D:\_Build\gbuild.ps1: line 326
+True
+Message                        Build failed: [SUPPLYCHAIN] Supply-chain checks thất bại — chặn build                   
+IsRetryable                    False                                                                                   
+Suggestion                                                                                                             
+Category                       Permanent                                                                               
+DocsLink                                                                                                               
+Timestamp                      2026-09-25 16:27:57                                                                     
+RelatedFiles                                                                                                           
+Code                                                                                                                   
+Context                        {Module, ProjectType, Choice}                                                           
+StackTrace                                                                                                             
+??  No rollback actions to execute
+[HOOK] after-build: build thất bại
+[OTEL] Bỏ qua (chưa cấu hình biến môi trường endpoint)
+=== Kết thúc log lúc 2026-09-25 16:27:58 ===
+[FATAL] Start-GBuild failed: [SUPPLYCHAIN] Supply-chain checks thất bại — chặn build
