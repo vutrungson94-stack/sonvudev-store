@@ -3,7 +3,11 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 const projectRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
-dotenv.config({ path: path.join(projectRoot, ".env") });
+if (process.env.NODE_ENV !== "test") {
+  dotenv.config({ path: path.join(projectRoot, ".env"), override: true });
+} else {
+  dotenv.config({ path: path.join(projectRoot, ".env") });
+}
 
 const value = (name, fallback = "") => (process.env[name] || fallback).trim();
 const configured = (name) => {
@@ -47,12 +51,16 @@ export const env = {
     clientId: value("PAYPAL_CLIENT_ID"),
     clientSecret: value("PAYPAL_CLIENT_SECRET"),
     webhookId: value("PAYPAL_WEBHOOK_ID"),
+    accountEmail: value("PAYPAL_ACCOUNT_EMAIL"),
   },
   bank: {
     name: value("BANK_NAME", "Chưa cập nhật"),
     accountName: value("BANK_ACCOUNT_NAME", "SonVuDev"),
     accountNumber: value("BANK_ACCOUNT_NUMBER", "Chưa cập nhật"),
     notePrefix: value("BANK_TRANSFER_NOTE_PREFIX", "SonVuDev"),
+    bin: value("BANK_BIN", "970436"),
+    momo: value("MOMO_ACCOUNT_NUMBER"),
+    zalopay: value("ZALOPAY_ACCOUNT_NUMBER"),
   },
 };
 

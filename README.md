@@ -33,6 +33,7 @@ npm run check:production
 - `src/store.js`: Supabase REST; local JSON chỉ là fallback cho phát triển.
 - `src/r2.js`: presigned upload/download URL; bucket bắt buộc private.
 - `src/paypal.js`: PayPal Orders v2, chuyển VND sang USD và xác minh webhook.
+- `src/payments.js`: dựng hướng dẫn thanh toán trong nước (VietQR, MoMo, ZaloPay).
 - `public/`: storefront responsive, không cần build frontend.
 - `supabase/schema.sql`: schema PostgreSQL.
 - `cloudflare/r2-cors.json`: CORS cho upload trực tiếp từ trình duyệt.
@@ -48,14 +49,53 @@ npm run check:production
 
 Tên file tải về được giữ theo tên file đã upload, ví dụ `SparkCapacityTester.exe` không bị đổi thành `.zip`.
 
+## Thanh toán trong nước (VietQR, MoMo, ZaloPay)
+
+Sau khi tạo đơn `bank_transfer`, storefront nhận `payment` từ API và hiển thị mã QR động:
+
+```json
+{
+  "bankName": "Vietcombank",
+  "accountName": "VU TRUNG SON",
+  "accountNumber": "0XXXXXXXXXX",
+  "transferNote": "SonVuDev SVD-XXXXXX",
+  "amount": 149000,
+  "currency": "VND",
+  "qrUrl": "https://img.vietqr.io/image/970436-0XXXXXXXXXX-compact2.png?amount=...",
+  "wallets": [{ "label": "MoMo", "value": "0XXXXXXXXXX" }],
+  "paypalEmail": null
+}
+```
+
+Cấu hình liên quan trong `.env` (giá trị thật chỉ nằm trong file `.env`, không commit):
+
+```env
+BANK_NAME=Vietcombank
+BANK_ACCOUNT_NAME=VU TRUNG SON
+BANK_ACCOUNT_NUMBER=0XXXXXXXXXX
+BANK_BIN=970436            # BIN ngân hàng, Vietcombank = 970436
+BANK_TRANSFER_NOTE_PREFIX=SonVuDev
+MOMO_ACCOUNT_NUMBER=0XXXXXXXXXX
+ZALOPAY_ACCOUNT_NUMBER=0XXXXXXXXXX
+```
+
+- `src/payments.js` dựng URL VietQR; storefront không hard-code số tài khoản.
+- `BANK_BIN` phải là 6 chữ số; `check:production` sẽ báo `FAIL` nếu sai.
+- Nội dung chuyển khoản luôn ghi kèm mã đơn để đối soát. Admin vẫn xác nhận `paid` thủ công trong `/admin.html`.
+- Ảnh QR tải từ `img.vietqr.io`, nên CSP đã cho phép domain này trong `img-src`.
+
 ## Cấu hình PayPal
 
 PayPal không hỗ trợ VND. Giá VND trong sản phẩm được chuyển sang USD theo:
 
 ```env
+PAYPAL_ENVIRONMENT=sandbox
 PAYPAL_CURRENCY=USD
 PAYPAL_VND_TO_USD_RATE=26000
 ```
+
+`PAYPAL_CLIENT_ID`, `PAYPAL_CLIENT_SECRET`, `PAYPAL_WEBHOOK_ID` lấy từ https://developer.paypal.com/dashboard/applications.
+Email ví (`PAYPAL_ACCOUNT_EMAIL`) chỉ dùng để hiển thị thông tin liên hệ cho khách.
 
 Cập nhật tỷ giá trước khi bán. Webhook URL production:
 
@@ -64,6 +104,9 @@ https://sonvudev.com/api/paypal/webhook
 ```
 
 Webhook phải được xác minh và sự kiện phải khớp `custom_id`, currency và amount trước khi đơn chuyển `paid`.
+
+Khi `PAYPAL_CLIENT_ID`/`PAYPAL_CLIENT_SECRET` còn trống, storefront tự ẩn lựa chọn PayPal và
+`/api/health` trả `"paypal": false`. Cùng cơ chế này áp dụng cho `"bank"`, `"momo"`, `"zalopay"`.
 
 ## DNS và HTTPS
 

@@ -4,7 +4,7 @@ import { fileURLToPath } from "node:url";
 import dotenv from "dotenv";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
-dotenv.config({ path: path.join(root, ".env") });
+dotenv.config({ path: path.join(root, ".env"), override: true });
 const value = (key) => (process.env[key] || "").trim();
 const placeholder = (item) => !item || /^(your_|replace-with|example)/i.test(item);
 const checks = [];
@@ -19,6 +19,9 @@ add("Cloudflare R2", ["R2_ACCOUNT_ID", "R2_ACCESS_KEY_ID", "R2_SECRET_ACCESS_KEY
 add("PayPal", ["PAYPAL_CLIENT_ID", "PAYPAL_CLIENT_SECRET"].every((key) => !placeholder(value(key))), isConfigured(["PAYPAL_CLIENT_ID", "PAYPAL_CLIENT_SECRET"]) ? value("PAYPAL_ENVIRONMENT") || "sandbox" : "missing");
 add("PayPal webhook", !placeholder(value("PAYPAL_WEBHOOK_ID")), value("PAYPAL_WEBHOOK_ID") ? "configured" : "missing");
 add("Bank transfer", [value("BANK_NAME"), value("BANK_ACCOUNT_NAME"), value("BANK_ACCOUNT_NUMBER")].every((item) => item && !/^(chưa cập nhật|not configured|example|replace-with)/i.test(item)), [value("BANK_NAME"), value("BANK_ACCOUNT_NUMBER")].every((item) => item && !/^(chưa cập nhật|not configured|example|replace-with)/i.test(item)) ? "configured" : "missing");
+add("Bank BIN (VietQR)", /^\d{6}$/.test(value("BANK_BIN")), value("BANK_BIN") || "missing");
+add("MoMo wallet", !placeholder(value("MOMO_ACCOUNT_NUMBER")), value("MOMO_ACCOUNT_NUMBER") ? "configured" : "optional, missing");
+add("ZaloPay wallet", !placeholder(value("ZALOPAY_ACCOUNT_NUMBER")), value("ZALOPAY_ACCOUNT_NUMBER") ? "configured" : "optional, missing");
 
 function isConfigured(keys) { return keys.every((key) => !placeholder(value(key))); }
 if (appUrl) {

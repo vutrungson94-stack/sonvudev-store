@@ -6,6 +6,7 @@ import { env, isConfigured } from "./config.js";
 import { ensureSeed, getOrder, getProduct, listOrders, listProducts, createOrder, updateOrder, createProduct, updateProduct, persistenceMode } from "./store.js";
 import { createDownloadUrl, createUploadUrl } from "./r2.js";
 import { captureOrder, createOrder as createPayPalOrder, hashToken, newOrderId, newToken, paypalChargeFor, paymentMatchesOrder, verifyWebhook } from "./paypal.js";
+import { paymentInstructions } from "./payments.js";
 
 const app = express();
 const publicDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "public");
@@ -29,7 +30,7 @@ app.use((req, res, next) => {
   res.setHeader("Referrer-Policy", "strict-origin-when-cross-origin");
   res.setHeader("X-Frame-Options", "DENY");
   res.setHeader("Permissions-Policy", "camera=(), microphone=(), geolocation=()");
-  res.setHeader("Content-Security-Policy", "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self' https://*.r2.cloudflarestorage.com; frame-ancestors 'none'; base-uri 'self'; form-action 'self'");
+  res.setHeader("Content-Security-Policy", "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: https://img.vietqr.io; connect-src 'self' https://*.r2.cloudflarestorage.com; frame-ancestors 'none'; base-uri 'self'; form-action 'self'");
   if (req.secure) res.setHeader("Strict-Transport-Security", "max-age=15552000; includeSubDomains");
   next();
 });
@@ -41,7 +42,7 @@ app.use((req, res, next) => {
 });
 app.use(express.static(publicDir, { extensions: ["html"] }));
 
-app.get("/api/health", async (_req, res) => res.json({ ok: true, appUrl: env.appUrl, persistence: persistenceMode, r2: isConfigured.r2, paypal: isConfigured.paypal, paypalWebhook: isConfigured.paypalWebhook, bank: isConfigured.bank, admin: isConfigured.admin }));
+app.get("/api/health", async (_req, res) => res.json({ ok: true, appUrl: env.appUrl, persistence: persistenceMode, r2: isConfigured.r2, paypal: isConfigured.paypal, paypalWebhook: isConfigured.paypalWebhook, bank: isConfigured.bank, momo: Boolean(env.bank.momo), zalopay: Boolean(env.bank.zalopay), admin: isConfigured.admin }));
 app.get("/api/products", async (_req, res) => {
   try { res.json({ products: (await listProducts()).filter((product) => product.status === "active" && product.fileKey && isConfigured.r2).map(publicProduct) }); }
   catch (error) { console.error(error); res.status(500).json({ error: "Không thể tải danh mục" }); }
@@ -79,7 +80,7 @@ app.post("/api/checkout", json, async (req, res) => {
     await createOrder(order);
     if (method === "bank_transfer") {
       await updateOrder(order.id, { status: "pending_transfer", updatedAt: new Date().toISOString() });
-      return res.json({ order: publicOrder({ ...order, status: "pending_transfer" }), accessToken, bank: env.bank });
+      return res.json({ order: publicOrder({ ...order, status: "pending_transfer" }), accessToken, payment: paymentInstructions(order) });
     }
     const paypal = await createPayPalOrder({ orderId: order.id, product, customerEmail: email, returnUrl: `${env.appUrl}/paypal-return.html`, cancelUrl: `${env.appUrl}/?paypal=cancelled`, amount: paypalCharge.amount, currency: paypalCharge.currency });
     const approvalUrl = (paypal.links || []).find((link) => link.rel === "payer-action" || link.rel === "approve")?.href;
@@ -96,7 +97,7 @@ async function requireOrder(req, res) {
   return order;
 }
 app.get("/api/orders/:id", async (req, res) => {
-  try { const order = await requireOrder(req, res); if (order) res.json({ order: publicOrder(order), bank: order.paymentProvider === "bank_transfer" ? env.bank : undefined }); }
+  try { const order = await requireOrder(req, res); if (order) res.json({ order: publicOrder(order), payment: order.paymentProvider === "bank_transfer" ? paymentInstructions(order) : null }); }
   catch (error) { console.error(error); res.status(500).json({ error: "Không thể tải đơn hàng" }); }
 });
 app.get("/api/orders/:id/download", async (req, res) => {
