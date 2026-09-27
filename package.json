@@ -8,6 +8,7 @@
     "build": "node scripts/build-web.mjs",
     "check:production": "node scripts/production-check.mjs",
     "paypal:setup": "node scripts/setup-paypal.mjs",
+    "product:publish": "node scripts/publish-product.mjs",
     "render:sync": "node scripts/sync-render.mjs",
     "lint": "node scripts/lint-web.mjs",
     "start": "node src/server.js",
