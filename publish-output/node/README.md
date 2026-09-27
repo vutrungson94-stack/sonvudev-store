@@ -130,6 +130,14 @@ PAYPAL_RATE_MARGIN_PERCENT=0
 
 `PAYPAL_CLIENT_ID`, `PAYPAL_CLIENT_SECRET`, `PAYPAL_WEBHOOK_ID` lấy từ https://developer.paypal.com/dashboard/applications. Cần tài khoản PayPal **Business** để chạy production. Email ví (`PAYPAL_ACCOUNT_EMAIL`) chỉ dùng để hiển thị thông tin liên hệ cho khách, không thay thế credential.
 
+Sau khi điền `PAYPAL_CLIENT_ID` và `PAYPAL_CLIENT_SECRET` vào `.env`, chạy:
+
+```powershell
+npm run paypal:setup
+```
+
+Lệnh này xác thực credential, kiểm tra webhook đã tồn tại chưa và in ra `PAYPAL_WEBHOOK_ID` cần điền. Nếu chưa có webhook, nó tự tạo tại `{APP_URL}/api/paypal/webhook` với event `PAYMENT.CAPTURE.COMPLETED`. PayPal từ chối tạo webhook nếu URL chưa truy cập được, nên cần có DNS và HTTPS trước.
+
 Webhook URL production:
 
 ```text
