@@ -16,7 +16,34 @@ add("Admin token", !placeholder(value("ADMIN_API_TOKEN")), value("ADMIN_API_TOKE
 add("Supabase URL", /^https:\/\/[a-z0-9-]+\.supabase\.co$/i.test(value("SUPABASE_URL")), value("SUPABASE_URL") ? "configured" : "missing");
 add("Supabase secret key", !placeholder(value("SUPABASE_SERVICE_ROLE_KEY")), value("SUPABASE_SERVICE_ROLE_KEY") ? "configured" : "missing");
 add("Cloudflare R2", ["R2_ACCOUNT_ID", "R2_ACCESS_KEY_ID", "R2_SECRET_ACCESS_KEY", "R2_BUCKET_NAME"].every((key) => !placeholder(value(key))), isConfigured(["R2_ACCOUNT_ID", "R2_ACCESS_KEY_ID", "R2_SECRET_ACCESS_KEY", "R2_BUCKET_NAME"]) ? "configured" : "missing");
-add("PayPal", ["PAYPAL_CLIENT_ID", "PAYPAL_CLIENT_SECRET"].every((key) => !placeholder(value(key))), isConfigured(["PAYPAL_CLIENT_ID", "PAYPAL_CLIENT_SECRET"]) ? value("PAYPAL_ENVIRONMENT") || "sandbox" : "missing");
+// Validates the credentials for real. A non-empty string is not proof they work.
+const paypalClientId = value("PAYPAL_CLIENT_ID");
+const paypalClientSecret = value("PAYPAL_CLIENT_SECRET");
+const paypalEnvironment = value("PAYPAL_ENVIRONMENT") || "sandbox";
+const paypalBase = paypalEnvironment === "live" ? "https://api-m.paypal.com" : "https://api-m.sandbox.paypal.com";
+const paypalFilled = isConfigured(["PAYPAL_CLIENT_ID", "PAYPAL_CLIENT_SECRET"]);
+
+if (!paypalFilled) {
+  add("PayPal", false, "missing");
+} else if (paypalClientId === paypalClientSecret) {
+  add("PayPal", false, "Client ID and Secret are identical, copy-paste error");
+} else {
+  try {
+    const response = await fetch(`${paypalBase}/v1/oauth2/token`, {
+      method: "POST",
+      headers: {
+        Authorization: `Basic ${Buffer.from(`${paypalClientId}:${paypalClientSecret}`).toString("base64")}`,
+        "Content-Type": "application/x-www-form-urlencoded",
+      },
+      body: "grant_type=client_credentials",
+      signal: AbortSignal.timeout(10000),
+    });
+    const body = response.ok ? "authenticated" : `HTTP ${response.status} ${(await response.json().catch(() => ({}))).error_description || "rejected"}`;
+    add("PayPal", response.ok, `${paypalEnvironment}, ${body}`);
+  } catch (error) {
+    add("PayPal", false, `lookup failed: ${error.message}`);
+  }
+}
 add("PayPal webhook", !placeholder(value("PAYPAL_WEBHOOK_ID")), value("PAYPAL_WEBHOOK_ID") ? "configured" : "missing");
 add("Bank transfer", [value("BANK_NAME"), value("BANK_ACCOUNT_NAME"), value("BANK_ACCOUNT_NUMBER")].every((item) => item && !/^(chưa cập nhật|not configured|example|replace-with)/i.test(item)), [value("BANK_NAME"), value("BANK_ACCOUNT_NUMBER")].every((item) => item && !/^(chưa cập nhật|not configured|example|replace-with)/i.test(item)) ? "configured" : "missing");
 add("Bank BIN (VietQR)", /^\d{6}$/.test(value("BANK_BIN")), value("BANK_BIN") || "missing");
