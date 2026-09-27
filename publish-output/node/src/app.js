@@ -5,8 +5,9 @@ import crypto from "node:crypto";
 import { env, isConfigured } from "./config.js";
 import { ensureSeed, getOrder, getProduct, listOrders, listProducts, createOrder, updateOrder, createProduct, updateProduct, persistenceMode } from "./store.js";
 import { createDownloadUrl, createUploadUrl } from "./r2.js";
-import { captureOrder, createOrder as createPayPalOrder, hashToken, newOrderId, newToken, paypalChargeFor, paymentMatchesOrder, verifyWebhook } from "./paypal.js";
+import { captureOrder, createOrder as createPayPalOrder, hashToken, newOrderId, newToken, paypalChargeFor, paypalChargeForProduct, paymentMatchesOrder, verifyWebhook } from "./paypal.js";
 import { paymentInstructions } from "./payments.js";
+import { vndPerUsd } from "./rates.js";
 
 const app = express();
 const publicDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "public");
@@ -42,7 +43,15 @@ app.use((req, res, next) => {
 });
 app.use(express.static(publicDir, { extensions: ["html"] }));
 
-app.get("/api/health", async (_req, res) => res.json({ ok: true, appUrl: env.appUrl, persistence: persistenceMode, r2: isConfigured.r2, paypal: isConfigured.paypal, paypalWebhook: isConfigured.paypalWebhook, bank: isConfigured.bank, momo: Boolean(env.bank.momo), zalopay: Boolean(env.bank.zalopay), admin: isConfigured.admin }));
+app.get("/api/health", async (_req, res) => {
+  const rate = await vndPerUsd().catch(() => null);
+  res.json({
+    ok: true, appUrl: env.appUrl, persistence: persistenceMode,
+    r2: isConfigured.r2, paypal: isConfigured.paypal, paypalWebhook: isConfigured.paypalWebhook,
+    bank: isConfigured.bank, momo: Boolean(env.bank.momo), zalopay: Boolean(env.bank.zalopay), admin: isConfigured.admin,
+    vndPerUsd: rate ? { rate: Math.round(rate.rate * 100) / 100, source: rate.source, live: env.paypal.vndToUsdRate === "live" } : null,
+  });
+});
 app.get("/api/products", async (_req, res) => {
   try { res.json({ products: (await listProducts()).filter((product) => product.status === "active" && product.fileKey && isConfigured.r2).map(publicProduct) }); }
   catch (error) { console.error(error); res.status(500).json({ error: "Không thể tải danh mục" }); }
@@ -69,12 +78,13 @@ app.post("/api/checkout", json, async (req, res) => {
     if (method === "paypal" && !isConfigured.paypal) return res.status(503).json({ error: "PayPal chưa được cấu hình. Hãy chọn chuyển khoản hoặc cấu hình PayPal trên server." });
     const accessToken = newToken();
     const id = newOrderId();
-    const paypalCharge = method === "paypal" ? paypalChargeFor(product) : null;
+    const paypalQuote = method === "paypal" ? await paypalChargeForProduct(product) : null;
+    const paypalCharge = paypalQuote?.charge ?? null;
     const order = {
       id, orderNumber: id, accessTokenHash: hashToken(accessToken), customerEmail: email,
       customerName: text(req.body.customerName, 100), status: "pending", paymentProvider: method,
       providerOrderId: null, amount: Number(product.price), currency: product.currency || "VND",
-      items: [{ productId: product.id, name: product.name, version: product.version, price: product.price, currency: product.currency, fileKey: product.fileKey || "", paypalAmount: paypalCharge?.amount ?? null, paypalCurrency: paypalCharge?.currency ?? null }],
+      items: [{ productId: product.id, name: product.name, version: product.version, price: product.price, currency: product.currency, fileKey: product.fileKey || "", paypalAmount: paypalCharge?.amount ?? null, paypalCurrency: paypalCharge?.currency ?? null, paypalRate: paypalQuote?.rate?.vndPerUsd ?? null }],
       createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(),
     };
     await createOrder(order);

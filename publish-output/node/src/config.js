@@ -19,6 +19,12 @@ const numberValue = (name, fallback) => {
   const parsed = Number.parseInt(value(name), 10);
   return Number.isFinite(parsed) ? parsed : fallback;
 };
+const liveRateValue = (name, fallbackNumber) => {
+  const raw = value(name);
+  if (/^(live|auto|true|1)$/i.test(raw)) return "live";
+  const parsed = Number.parseInt(raw, 10);
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : fallbackNumber;
+};
 const hasSupabaseProjectUrl = () => {
   const raw = value("SUPABASE_URL");
   try {
@@ -47,7 +53,10 @@ export const env = {
   paypal: {
     environment: value("PAYPAL_ENVIRONMENT", "sandbox"),
     currency: value("PAYPAL_CURRENCY", "USD").toUpperCase(),
-    vndToUsdRate: numberValue("PAYPAL_VND_TO_USD_RATE", 26000),
+    vndToUsdRate: liveRateValue("PAYPAL_VND_TO_USD_RATE", 26000),
+    rateFallback: numberValue("PAYPAL_VND_TO_USD_FALLBACK", 26000),
+    rateTtlSeconds: numberValue("PAYPAL_RATE_TTL_SECONDS", 3600),
+    rateMarginPercent: numberValue("PAYPAL_RATE_MARGIN_PERCENT", 0),
     clientId: value("PAYPAL_CLIENT_ID"),
     clientSecret: value("PAYPAL_CLIENT_SECRET"),
     webhookId: value("PAYPAL_WEBHOOK_ID"),

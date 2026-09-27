@@ -1,5 +1,6 @@
 import crypto from "node:crypto";
 import { env, isConfigured } from "./config.js";
+import { rateForCharge, vndPerUsd } from "./rates.js";
 
 const base = () => env.paypal.environment === "live" ? "https://api-m.paypal.com" : "https://api-m.sandbox.paypal.com";
 const authHeader = () => `Basic ${Buffer.from(`${env.paypal.clientId}:${env.paypal.clientSecret}`).toString("base64")}`;
@@ -22,29 +23,42 @@ const validateCurrency = (currency) => {
   if (!supportedCurrencies.has(currency)) throw new Error(`PayPal currency is not supported: ${currency}`);
 };
 
-export function paypalChargeFor(product) {
+export function paypalChargeFor(product, vndPerUsd = env.paypal.vndToUsdRate) {
   const sourceCurrency = String(product.currency || "VND").toUpperCase();
   const price = Number(product.price);
   if (sourceCurrency === env.paypal.currency) return { currency: sourceCurrency, amount: price };
-  if (sourceCurrency === "VND" && env.paypal.currency === "USD" && env.paypal.vndToUsdRate > 0) {
-    return { currency: "USD", amount: Math.ceil((price / env.paypal.vndToUsdRate) * 100) / 100 };
+  if (sourceCurrency === "VND" && env.paypal.currency === "USD" && Number(vndPerUsd) > 0) {
+    return { currency: "USD", amount: Math.ceil((price / Number(vndPerUsd)) * 100) / 100 };
   }
   throw new Error(`Không thể chuyển giá ${sourceCurrency} sang ${env.paypal.currency} cho PayPal`);
+}
+
+/** Same as paypalChargeFor but resolves a live VND/USD rate first. */
+export async function paypalChargeForProduct(product) {
+  if (String(product.currency || "VND").toUpperCase() === env.paypal.currency) {
+    return { charge: paypalChargeFor(product), rate: null };
+  }
+  const { rate, source } = await vndPerUsd();
+  return { charge: paypalChargeFor(product, rateForCharge(rate)), rate: { vndPerUsd: rate, source } };
 }
 
 export function paymentMatchesOrder(resource, order) {
   const purchaseUnit = resource?.purchase_units?.[0] || {};
   const customId = purchaseUnit.custom_id || resource?.custom_id;
   if (customId !== order.id) return false;
+  const item = order.items?.[0] || {};
+  // The charged amount is frozen on the order at checkout, so verification never
+  // depends on the rate in effect right now.
+  if (item.paypalCurrency && item.paypalAmount !== null && item.paypalAmount !== undefined) {
+    const paid = purchaseUnit.amount || resource?.amount;
+    return paid?.currency_code === item.paypalCurrency
+      && Math.abs(Number(paid?.value) - Number(item.paypalAmount)) < 0.005;
+  }
   try {
-    const item = order.items?.[0] || {};
-    const expected = {
-      currency: item.paypalCurrency || paypalChargeFor({ price: order.amount, currency: order.currency }).currency,
-      amount: item.paypalAmount ?? paypalChargeFor({ price: order.amount, currency: order.currency }).amount
-    };
-    const amount = purchaseUnit.amount || resource?.amount;
-    return amount?.currency_code === expected.currency
-      && Math.abs(Number(amount?.value) - expected.amount) < 0.01;
+    const expected = paypalChargeFor({ price: order.amount, currency: order.currency }, env.paypal.rateFallback);
+    const paid = purchaseUnit.amount || resource?.amount;
+    return paid?.currency_code === expected.currency
+      && Math.abs(Number(paid?.value) - expected.amount) < 0.005;
   } catch { return false; }
 }
 

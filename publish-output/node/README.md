@@ -34,6 +34,7 @@ npm run check:production
 - `src/r2.js`: presigned upload/download URL; bucket bắt buộc private.
 - `src/paypal.js`: PayPal Orders v2, chuyển VND sang USD và xác minh webhook.
 - `src/payments.js`: dựng hướng dẫn thanh toán trong nước (VietQR, MoMo, ZaloPay).
+- `src/rates.js`: tỷ giá VND/USD, cache và fallback.
 - `public/`: storefront responsive, không cần build frontend.
 - `supabase/schema.sql`: schema PostgreSQL.
 - `cloudflare/r2-cors.json`: CORS cho upload trực tiếp từ trình duyệt.
@@ -86,18 +87,50 @@ ZALOPAY_ACCOUNT_NUMBER=0XXXXXXXXXX
 
 ## Cấu hình PayPal
 
-PayPal không hỗ trợ VND. Giá VND trong sản phẩm được chuyển sang USD theo:
+PayPal không hỗ trợ VND. Giá VND trong sản phẩm được chuyển sang USD theo tỷ giá trong `.env`:
 
 ```env
 PAYPAL_ENVIRONMENT=sandbox
 PAYPAL_CURRENCY=USD
-PAYPAL_VND_TO_USD_RATE=26000
+PAYPAL_VND_TO_USD_RATE=live
 ```
 
-`PAYPAL_CLIENT_ID`, `PAYPAL_CLIENT_SECRET`, `PAYPAL_WEBHOOK_ID` lấy từ https://developer.paypal.com/dashboard/applications.
-Email ví (`PAYPAL_ACCOUNT_EMAIL`) chỉ dùng để hiển thị thông tin liên hệ cho khách.
+### Tỷ giá động
 
-Cập nhật tỷ giá trước khi bán. Webhook URL production:
+`PAYPAL_VND_TO_USD_RATE` nhận hai kiểu giá trị:
+
+| Giá trị | Hành vi |
+| :--- | :--- |
+| Số, ví dụ `26000` | Ghim tỷ giá cố định, không gọi mạng |
+| `live` (hoặc `auto`) | Lấy tỷ giá VND/USD ở thời điểm checkout |
+
+Khi đặt `live`, `src/rates.js` hỏi lần lượt hai nguồn: `open.er-api.com` rồi `exchangerate-api.com`. Giá trị được cache trong `PAYPAL_RATE_TTL_SECONDS` giây (mặc định 3600) và các request đồng thời dùng chung một lần gọi.
+
+Số tiền quy đổi được ghi cứng vào đơn hàng (`items[0].paypalAmount`, `items[0].paypalRate`) ngay lúc tạo đơn. `paymentMatchesOrder` đối chiếu với số tiền đã ghi, nên tỷ giá biến động sau đó không làm hỏng đơn đang chờ.
+
+Khi cả hai nguồn đều lỗi, hệ thống rơi về `PAYPAL_VND_TO_USD_FALLBACK` rồi tới giá trị cache cũ nhất. Checkout không bao giờ bị chặn vì sự cố tỷ giá.
+
+```env
+PAYPAL_VND_TO_USD_FALLBACK=26000
+PAYPAL_RATE_TTL_SECONDS=3600
+PAYPAL_RATE_MARGIN_PERCENT=0
+```
+
+`PAYPAL_RATE_MARGIN_PERCENT` là biên đệm phần trăm, dùng để bù chênh lệch tỷ giá của PayPal. Đặt `0` nếu chấp nhận rủi ro tỷ giá.
+
+`/api/health` trả về tỷ giá đang dùng để đối soát:
+
+```json
+"vndPerUsd": { "rate": 25952.11, "source": "cache", "live": true }
+```
+
+`source` có thể là `live`, `cache`, `stale-cache` hoặc `fallback`.
+
+### Lấy credential API
+
+`PAYPAL_CLIENT_ID`, `PAYPAL_CLIENT_SECRET`, `PAYPAL_WEBHOOK_ID` lấy từ https://developer.paypal.com/dashboard/applications. Cần tài khoản PayPal **Business** để chạy production. Email ví (`PAYPAL_ACCOUNT_EMAIL`) chỉ dùng để hiển thị thông tin liên hệ cho khách, không thay thế credential.
+
+Webhook URL production:
 
 ```text
 https://sonvudev.com/api/paypal/webhook
