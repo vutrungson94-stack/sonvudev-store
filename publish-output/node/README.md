@@ -40,7 +40,9 @@ npm run render:sync -- --apply --deploy   # ghi xong trigger deploy moi
 
 Cần `RENDER_API_KEY` trong `.env`, lấy ở [Account Settings](https://dashboard.render.com/) → API Keys. Token này quyền truy cập toàn bộ tài khoản Render, chỉ giữ ở máy.
 
-Mặc định lệnh chỉ in ra diff. Thêm `--apply` mới ghi, và mỗi biến được ghi riêng qua `PUT /services/{id}/env-vars/{key}` nên không đụng vào `PORT` và các biến `RENDER_*` do Render tự sinh. Script bỏ qua `PORT` và ép `HOST=0.0.0.0` vì `.env` cấu hình cho localhost. Biến có trong `.env` mà chưa có trên Render sẽ được thêm mới.
+Mặc định lệnh chỉ in ra diff. Thêm `--apply` mới ghi, và mỗi biến được ghi riêng qua `PUT /services/{id}/env-vars/{key}` nên không đụng vào `PORT` và các biến `RENDER_*` do Render tự sinh.
+
+Script chỉ đẩy danh sách biến của ứng dụng (`ALLOWED`), không đẩy toàn bộ `process.env`. Nếu không giới hạn, trên Windows nó sẽ gửi cả `Path`, `USERNAME`, `ProgramFiles` và các biến khác của máy lên Render. `HOST` luôn được ép `0.0.0.0` vì `.env` cấu hình cho localhost. Biến trống trong `.env` được bỏ qua, giữ nguyên giá trị đang có trên Render.
 
 ## Kiến trúc
 
