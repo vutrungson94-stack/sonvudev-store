@@ -15,14 +15,18 @@ function getClient() {
 }
 
 const safeName = (name) => String(name || "download.bin").replace(/[^a-zA-Z0-9._-]/g, "_").slice(0, 120);
-const keyFor = (productId, version, fileName) => `products/${safeName(productId)}/${safeName(version)}/${Date.now()}-${safeName(fileName)}`;
+
+// Single source of truth for the R2 object key so the admin presign endpoint and
+// scripts/publish-product.mjs always produce the exact same layout.
+export const releaseKey = (productRef, version, fileName) =>
+  `products/${safeName(productRef)}/${safeName(version)}/${Date.now()}-${safeName(fileName)}`;
 const releaseNameFromKey = (key, fallback) => {
   const objectName = String(key || "").split("/").pop() || "";
   return safeName(objectName.replace(/^\d+-/, "") || fallback || "download.bin");
 };
 
-export async function createUploadUrl({ productId, version, fileName, contentType }) {
-  const key = keyFor(productId, version, fileName);
+export async function createUploadUrl({ productRef, version, fileName, contentType }) {
+  const key = releaseKey(productRef, version, fileName);
   const command = new PutObjectCommand({ Bucket: env.r2.bucket, Key: key, ContentType: contentType || "application/octet-stream" });
   return { key, url: await getSignedUrl(getClient(), command, { expiresIn: env.r2.uploadTtl }) };
 }

@@ -181,11 +181,11 @@ app.patch("/api/admin/products/:id", admin, json, async (req, res) => {
 });
 app.post("/api/admin/uploads/presign", admin, json, async (req, res) => {
   try {
-    const productId = text(req.body.productId, 80); const version = text(req.body.version, 30); const fileName = text(req.body.fileName, 140);
-    if (!productId || !version || !fileName) return res.status(400).json({ error: "Thiếu productId, version hoặc fileName" });
+    const productRef = text(req.body.productRef ?? req.body.productId, 80); const version = text(req.body.version, 30); const fileName = text(req.body.fileName, 140);
+    if (!productRef || !version || !fileName) return res.status(400).json({ error: "Thiếu productRef, version hoặc fileName" });
     if (!/\.(zip|exe|msi|7z)$/i.test(fileName)) return res.status(400).json({ error: "Chỉ hỗ trợ file .zip, .exe, .msi hoặc .7z" });
     if (!isConfigured.r2) return res.status(503).json({ error: "R2 chưa được cấu hình" });
-    res.json(await createUploadUrl({ productId, version, fileName, contentType: text(req.body.contentType, 120) }));
+    res.json(await createUploadUrl({ productRef, version, fileName, contentType: text(req.body.contentType, 120) }));
   } catch (error) { console.error(error); res.status(500).json({ error: "Không thể tạo link upload" }); }
 });
 app.patch("/api/admin/orders/:id", admin, json, async (req, res) => {

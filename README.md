@@ -59,12 +59,35 @@ Script chỉ đẩy danh sách biến của ứng dụng (`ALLOWED`), không đ�
 
 ## Quy trình phát hành sản phẩm
 
+Cách nhanh nhất, một lệnh là xong — upload thẳng lên R2 rồi ghi `file_key` vào Supabase:
+
+```powershell
+node scripts/publish-product.mjs <duong-dan-file.exe> --dry-run   # xem ke hoach
+node scripts/publish-product.mjs <duong-dan-file.exe>             # phat hanh that
+npm run product:publish -- <duong-dan-file.exe>                   # tuong duong
+```
+
+Không cần truyền `--id`/`--slug`: script tự nhận diện sản phẩm đang có file phát hành. Nếu bảng có nhiều sản phẩm cùng có file, script in danh sách để bạn chọn bằng `--slug` hoặc `--id`.
+
+Tùy chọn:
+
+| Cờ | Tác dụng |
+| :--- | :--- |
+| `--dry-run` | Chỉ in kế hoạch, không ghi R2/Supabase |
+| `--slug <slug>` / `--id <id>` | Chỉ định sản phẩm khi không tự nhận diện được |
+| `--version <x.y.z>` | Đặt bản phát hành mới (mặc định giữ version hiện tại) |
+| `--prune` | Xóa file cũ trên R2 sau khi gắn bản mới |
+
+Script kiểm tra lại kích thước file trên R2 và đọc lại row Supabase sau khi ghi, nên nếu log in báo `R2 OK` và `Supabase OK` thế giới thật đã khớp.
+
+Cách làm trong giao diện vẫn dùng được: `/admin.html` với `ADMIN_API_TOKEN`. Cả hai đường dùng chung `releaseKey()` trong `src/r2.js` nên key R2 luôn có cùng dạng.
+
 1. Cấu hình đầy đủ Cloudflare R2 trong `.env`; health phải có `"r2": true`.
 2. Mở `/admin.html`, đăng nhập bằng `ADMIN_API_TOKEN`.
 3. Nhập tên, giá VND, mô tả, yêu cầu hệ thống và chọn file `.zip/.exe/.msi/.7z`.
 4. Sản phẩm chỉ chuyển sang `active` sau khi upload R2 thành công.
 5. Sản phẩm không có file R2 sẽ không xuất hiện trên storefront và không thể checkout.
-6. Nếu phát hành bản mới, mở danh sách sản phẩm và chọn **Cập nhật file**.
+6. Nếu phát hành bản mới, chạy `product:publish` hoặc chọn **Cập nhật file** trong admin.
 
 Tên file tải về được giữ theo tên file đã upload, ví dụ `SparkCapacityTester.exe` không bị đổi thành `.zip`.
 
