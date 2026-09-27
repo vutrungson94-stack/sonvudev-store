@@ -64,7 +64,16 @@ if (appUrl) {
   try {
     const response = await fetch(`${appUrl}/api/health`, { redirect: "manual", signal: AbortSignal.timeout(8000) });
     const health = response.ok ? await response.json() : null;
-    add("HTTPS health", response.ok && health?.ok === true, response.ok ? JSON.stringify({ persistence: health.persistence, r2: health.r2, paypal: health.paypal, bank: health.bank }) : `HTTP ${response.status}`);
+    const summary = health ? JSON.stringify({ persistence: health.persistence, r2: health.r2, paypal: health.paypal, bank: health.bank }) : `HTTP ${response.status}`;
+    add("HTTPS health", response.ok && health?.ok === true, summary);
+    // A reachable server is not a store that can take money. Without R2 the
+    // catalog hides every product, without bank/paypal checkout cannot complete,
+    // and local-json means orders vanish on the next deploy.
+    if (health) {
+      add("Store is sellable", health.r2 === true, health.r2 ? "R2 connected, products are visible" : "r2=false, storefront hides every product");
+      add("Payments live", health.paypal === true && health.bank === true, `paypal=${health.paypal}, bank=${health.bank}`);
+      add("Database persistent", health.persistence === "supabase", health.persistence === "supabase" ? "supabase" : `${health.persistence}, orders are not durable`);
+    }
   } catch (error) { add("HTTPS health", false, error.name === "TimeoutError" ? "timeout" : error.message); }
 }
 

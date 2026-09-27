@@ -26,6 +26,22 @@ npm run check:production
 
 `check:production` kiểm tra cấu hình, DNS và HTTPS mà không in secret ra nội dung log. Chạy lệnh này trước khi nhận đơn hàng thật.
 
+Ngoài cấu hình local, lệnh còn gọi `/api/health` trên production và kiểm tra site thật sự bán được: `Store is sellable` (R2 đã nối, nếu không storefront ẩn toàn bộ sản phẩm), `Payments live` (PayPal và chuyển khoản) và `Database persistent` (`local-json` nghĩa là đơn hàng mất khi deploy lại).
+
+## Deploy lên Render
+
+Production chạy trên Render, DNS do Cloudflare giữ. `.env` bị `.gitignore` loại nên không bao giờ lên Render — biến môi trường phải khai báo trên Dashboard (Service → Environment) hoặc đẩy bằng script:
+
+```powershell
+npm run render:sync                    # kiem tra, in ra danh sach thay doi
+npm run render:sync -- --apply         # ghi len Render
+npm run render:sync -- --apply --deploy   # ghi xong trigger deploy moi
+```
+
+Cần `RENDER_API_KEY` trong `.env`, lấy ở [Account Settings](https://dashboard.render.com/) → API Keys. Token này quyền truy cập toàn bộ tài khoản Render, chỉ giữ ở máy.
+
+Mặc định lệnh chỉ in ra diff. Thêm `--apply` mới ghi, và mỗi biến được ghi riêng qua `PUT /services/{id}/env-vars/{key}` nên không đụng vào `PORT` và các biến `RENDER_*` do Render tự sinh. Script bỏ qua `PORT` và ép `HOST=0.0.0.0` vì `.env` cấu hình cho localhost. Biến có trong `.env` mà chưa có trên Render sẽ được thêm mới.
+
 ## Kiến trúc
 
 - `src/server.js`: khởi động HTTP server.
