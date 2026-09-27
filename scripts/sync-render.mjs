@@ -16,9 +16,22 @@ const env = (key) => (process.env[key] || "").trim();
 const token = env("RENDER_API_KEY");
 const api = "https://api.render.com/v1";
 
-// Render assigns PORT and injects its own RENDER_* vars. A blanket replace would
-// wipe them, so each key is written individually via PUT /env-vars/{key}.
-const SKIP = new Set(["PORT", "RENDER_API_KEY", "RENDER_SERVICE_ID"]);
+// Render assigns PORT and injects its own RENDER_* vars, so neither the Render
+// credentials nor PORT belong in this list. Each key is written individually
+// via PUT /env-vars/{key} rather than the collection endpoint, which replaces
+// every variable and would wipe those.
+const ALLOWED = [
+  "HOST", "APP_URL", "ADMIN_API_TOKEN", "NODE_ENV",
+  "R2_ACCOUNT_ID", "R2_ACCESS_KEY_ID", "R2_SECRET_ACCESS_KEY", "R2_BUCKET_NAME",
+  "R2_UPLOAD_URL_TTL_SECONDS", "R2_DOWNLOAD_URL_TTL_SECONDS",
+  "SUPABASE_URL", "SUPABASE_SERVICE_ROLE_KEY",
+  "PAYPAL_ENVIRONMENT", "PAYPAL_CURRENCY", "PAYPAL_VND_TO_USD_RATE", "PAYPAL_VND_TO_USD_FALLBACK",
+  "PAYPAL_RATE_TTL_SECONDS", "PAYPAL_RATE_MARGIN_PERCENT",
+  "PAYPAL_CLIENT_ID", "PAYPAL_CLIENT_SECRET", "PAYPAL_WEBHOOK_ID", "PAYPAL_ACCOUNT_EMAIL",
+  "BANK_NAME", "BANK_ACCOUNT_NAME", "BANK_ACCOUNT_NUMBER", "BANK_BIN", "BANK_TRANSFER_NOTE_PREFIX",
+  "MOMO_ACCOUNT_NUMBER", "MOMO_QR_IMAGE", "MOMO_QR_AMOUNT_IMAGE", "MOMO_DEEP_LINK",
+  "ZALOPAY_ACCOUNT_NUMBER", "ZALOPAY_QR_IMAGE",
+];
 
 // .env carries local-development values that are wrong on Render.
 const OVERRIDE = { HOST: "0.0.0.0" };
@@ -42,12 +55,28 @@ async function call(method, url, body) {
 async function findService() {
   const explicit = env("RENDER_SERVICE_ID");
   if (explicit) return { service: { id: explicit }, name: explicit };
-  const name = env("RENDER_SERVICE") || "sonvudev";
-  const data = await call("GET", `${api}/services?name=${encodeURIComponent(name)}&limit=20`);
-  const services = Array.isArray(data) ? data : [];
-  const match = services.find((item) => item.service?.name === name) || services[0];
-  if (!match) throw new Error(`Khong tim thay service ten "${name}". Kiem tra RENDER_SERVICE trong .env.`);
-  return match;
+  const wanted = env("RENDER_SERVICE") || "sonvudev";
+  // The ?name= filter only matches the exact service name and returns nothing
+  // when it differs, so list everything and match here where the naming can be
+  // normalised and the failure can show the user what actually exists.
+  const data = await call("GET", `${api}/services?limit=100`);
+  const services = (Array.isArray(data) ? data : []).map((item) => item.service || item);
+  const normalise = (item) => String(item || "").toLowerCase().replace(/[^a-z0-9]/g, "");
+  const match = services.find((item) => item.name === wanted)
+    || services.find((item) => normalise(item.name) === normalise(wanted))
+    || services.find((item) => normalise(item.name).includes(normalise(wanted)));
+  if (!match) {
+    console.error(`Khong tim thay service nao khop voi "${wanted}".`);
+    if (services.length) {
+      console.error("Cac service dang co trong tai khoan Render:");
+      for (const item of services) console.error(`  - ${item.name}  (${item.id})  ${item.type}`);
+      console.error(`\nDat RENDER_SERVICE trong .env bang mot trong cac ten tren.`);
+    } else {
+      console.error("Tai khoan Render chua co service nao. Hay tao service truoc.");
+    }
+    throw new Error("Khong xac dinh duoc service.");
+  }
+  return { service: match, name: match.name };
 }
 
 // The list endpoint paginates and wraps each entry as { envVar, cursor }.
@@ -55,13 +84,18 @@ async function readRemoteVars(serviceId) {
   const vars = new Map();
   let cursor = "";
   do {
-    const page = await call("GET", `${api}/services/${serviceId}/env-vars?limit=100${cursor ? `&cursor=${cursor}` : ""}`);
-    for (const entry of Array.isArray(page) ? page : []) {
+    const page = await call("GET", `${api}/services/${serviceId}/env-vars?limit=100${cursor ? `&cursor=${encodeURIComponent(cursor)}` : ""}`);
+    const entries = Array.isArray(page) ? page : [];
+    for (const entry of entries) {
       const item = entry.envVar || entry;
       if (item?.key) vars.set(item.key, item.value ?? "");
-      cursor = entry.cursor || "";
     }
-  } while (cursor);
+    // Take the cursor from the page itself, not from the loop body. An empty
+    // final page never runs the body, so reading it there would keep the old
+    // cursor and paginate forever.
+    const last = entries[entries.length - 1];
+    cursor = last?.cursor || "";
+  } while (cursor && vars.size <= 1000);
   return vars;
 }
 
@@ -79,13 +113,14 @@ async function main() {
 
   const remote = await readRemoteVars(serviceId);
   const wanted = new Map();
-  for (const [key, raw] of Object.entries(process.env)) {
-    if (SKIP.has(key) || /^(RENDER_|npm_|NODE_)/i.test(key) || /^\s*#/i.test(raw)) continue;
-    if (typeof raw !== "string" || !raw.trim()) continue;
-    wanted.set(key, OVERRIDE[key] || raw.trim());
+  const missing = [];
+  for (const key of ALLOWED) {
+    const value = env(key);
+    if (!value) { missing.push(key); continue; }
+    wanted.set(key, OVERRIDE[key] || value);
   }
-  // Render requires HOST=0.0.0.0 to accept traffic; .env is tuned for localhost.
-  if (wanted.has("HOST")) wanted.set("HOST", OVERRIDE.HOST);
+  console.log(`${wanted.size}/${ALLOWED.length} bien co gia tri trong .env`);
+  if (missing.length) console.log(`Bo trong .env, giu nguyen tren Render: ${missing.join(", ")}`);
 
   const changes = [];
   for (const [key, value] of wanted) {
