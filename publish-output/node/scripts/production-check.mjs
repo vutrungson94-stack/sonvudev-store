@@ -53,8 +53,14 @@ add("ZaloPay wallet", !placeholder(value("ZALOPAY_ACCOUNT_NUMBER")), value("ZALO
 function isConfigured(keys) { return keys.every((key) => !placeholder(value(key))); }
 if (appUrl) {
   const host = new URL(appUrl).hostname;
-  try { const addresses = await dns.resolve4(host); add("DNS A record", addresses.length > 0, addresses.join(", ")); }
-  catch { add("DNS A record", false, "No public A record found"); }
+  // dns.resolve4() queries DNS servers directly, so it fails whenever a local
+  // resolver blocks direct queries (127.0.0.1, AdGuard, corporate DNS).
+  // dns.lookup() goes through the OS resolver and matches what the browser sees.
+  try {
+    const addresses = await dns.lookup(host, { all: true });
+    const public4 = [...new Set(addresses.filter((entry) => entry.family === 4).map((entry) => entry.address))];
+    add("DNS A record", public4.length > 0, public4.join(", "));
+  } catch (error) { add("DNS A record", false, `lookup failed: ${error.message}`); }
   try {
     const response = await fetch(`${appUrl}/api/health`, { redirect: "manual", signal: AbortSignal.timeout(8000) });
     const health = response.ok ? await response.json() : null;
