@@ -70,9 +70,16 @@ async function main() {
     });
     const createBody = await createResponse.json();
     if (!createResponse.ok) {
+      const detail = (createBody.details || []).map((d) => `${d.field} ${d.issue}`).join("; ");
       console.error(`Tao webhook that bai (${createResponse.status}): ${createBody.message || "unknown"}`);
-      if (createResponse.status === 422 || createResponse.status === 400) {
-        console.error("PayPal can truy cap URL nay khong. Kiem tra DNS + HTTPS cua APP_URL truoc khi tao lai.");
+      if (detail) console.error(`Chi tiet: ${detail}`);
+      if (createResponse.status === 400) {
+        console.error("PayPal tu choi event_types cho app nay. Nguyen nhan thuong gap:");
+        console.error("  - Tai khoan Personal chua nang ky webhook qua REST API.");
+        console.error("  - Hay tao webhook thu cong trong Developer Dashboard > Apps & Credentials > Webhooks.");
+        console.error("  - Sau khi co Webhook ID, dien vao .env roi chay lai check:production.");
+      } else if (createResponse.status === 422 || createResponse.status === 404) {
+        console.error("PayPal khong truy cap duoc URL nay. Kiem tra DNS + HTTPS cua APP_URL truoc khi tao lai.");
       }
       process.exitCode = 1;
       return;

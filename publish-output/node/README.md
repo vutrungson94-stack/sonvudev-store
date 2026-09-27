@@ -52,23 +52,24 @@ Tên file tải về được giữ theo tên file đã upload, ví dụ `SparkC
 
 ## Thanh toán trong nước (VietQR, MoMo, ZaloPay)
 
-Sau khi tạo đơn `bank_transfer`, storefront nhận `payment` từ API và hiển thị mã QR động:
+Sau khi tạo đơn `bank_transfer`, storefront nhận `payment` từ API. Mỗi kênh thanh toán là một phần tử trong `payment.channels`:
 
 ```json
 {
-  "bankName": "Vietcombank",
-  "accountName": "VU TRUNG SON",
-  "accountNumber": "0XXXXXXXXXX",
-  "transferNote": "SonVuDev SVD-XXXXXX",
-  "amount": 149000,
-  "currency": "VND",
-  "qrUrl": "https://img.vietqr.io/image/970436-0XXXXXXXXXX-compact2.png?amount=...",
-  "wallets": [{ "label": "MoMo", "value": "0XXXXXXXXXX" }],
-  "paypalEmail": null
+  "channels": [
+    { "id": "bank", "qrUrl": "https://img.vietqr.io/image/970436-0XXXXXXXXXX-compact2.png?amount=...",
+      "account": "0XXXXXXXXXX", "amount": 149000, "transferNote": "SonVuDev SVD-XXXXXX" },
+    { "id": "momo", "qrImage": null, "account": "0XXXXXXXXXX" },
+    { "id": "zalopay", "qrImage": null, "account": "0XXXXXXXXXX" }
+  ]
 }
 ```
 
-Cấu hình liên quan trong `.env` (giá trị thật chỉ nằm trong file `.env`, không commit):
+Trên giao diện, các kênh hiển thị thành tab nên khách chọn kênh thanh toán thuận tiện nhất.
+
+### Kênh ngân hàng
+
+QR sinh tự động từ `src/payments.js`, **số tiền và nội dung chuyển khoản đã điền sẵn** trong mã. Đây là kênh nên ưu tiên vì khách không phải tự nhập gì.
 
 ```env
 BANK_NAME=Vietcombank
@@ -76,14 +77,31 @@ BANK_ACCOUNT_NAME=VU TRUNG SON
 BANK_ACCOUNT_NUMBER=0XXXXXXXXXX
 BANK_BIN=970436            # BIN ngân hàng, Vietcombank = 970436
 BANK_TRANSFER_NOTE_PREFIX=SonVuDev
-MOMO_ACCOUNT_NUMBER=0XXXXXXXXXX
-ZALOPAY_ACCOUNT_NUMBER=0XXXXXXXXXX
 ```
+
+### Kênh ví (MoMo, ZaloPay)
+
+Mã QR ví là mã tĩnh nên **không mang theo số tiền của đơn**. Khách phải tự nhập số tiền khi quét. Muốn hiện cảnh báo này, hãy khai báo mã QR:
+
+```env
+MOMO_ACCOUNT_NUMBER=0XXXXXXXXXX
+MOMO_QR_IMAGE=/img/momo-qr.png
+MOMO_QR_AMOUNT_IMAGE=
+MOMO_DEEP_LINK=
+ZALOPAY_ACCOUNT_NUMBER=0XXXXXXXXXX
+ZALOPAY_QR_IMAGE=
+```
+
+- Lưu file ảnh vào `public/img/`, rồi trỏ biến tới đường dẫn đó (tương đối so với thư mục `public`).
+- `MOMO_QR_AMOUNT_IMAGE` dành cho mã QR có sẵn ô nhập số tiền, ví dụ loại có nút **Thêm số tiền**. Khi đặt biến này, cảnh báo "khách phải tự nhập số tiền" sẽ không hiện.
+- Nếu không khai báo ảnh, kênh ví vẫn hiện với số tài khoản để khách chuyển tay.
+
+Biến kiểm tra bởi `check:production`; giá trị thật chỉ nằm trong `.env`, không commit.
 
 - `src/payments.js` dựng URL VietQR; storefront không hard-code số tài khoản.
 - `BANK_BIN` phải là 6 chữ số; `check:production` sẽ báo `FAIL` nếu sai.
 - Nội dung chuyển khoản luôn ghi kèm mã đơn để đối soát. Admin vẫn xác nhận `paid` thủ công trong `/admin.html`.
-- Ảnh QR tải từ `img.vietqr.io`, nên CSP đã cho phép domain này trong `img-src`.
+- Ảnh QR ngân hàng tải từ `img.vietqr.io`, nên CSP đã cho phép domain này trong `img-src`. Ảnh QR ví nằm trong `public/img/` và được phục vụ cùng origin nên không cần mở CSP.
 
 ## Cấu hình PayPal
 

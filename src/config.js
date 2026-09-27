@@ -69,7 +69,11 @@ export const env = {
     notePrefix: value("BANK_TRANSFER_NOTE_PREFIX", "SonVuDev"),
     bin: value("BANK_BIN", "970436"),
     momo: value("MOMO_ACCOUNT_NUMBER"),
+    momoQr: value("MOMO_QR_IMAGE"),
+    momoQrAmount: value("MOMO_QR_AMOUNT_IMAGE"),
+    momoDeepLink: value("MOMO_DEEP_LINK"),
     zalopay: value("ZALOPAY_ACCOUNT_NUMBER"),
+    zalopayQr: value("ZALOPAY_QR_IMAGE"),
   },
 };
 
