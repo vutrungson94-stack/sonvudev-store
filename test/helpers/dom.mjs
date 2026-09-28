@@ -1,0 +1,139 @@
+// Minimal DOM stand-in so public/app.js can be executed in Node. It implements
+// only what the storefront touches: element lookups, innerHTML, dataset, class
+// and addEventListener. A stub that is too permissive hides real bugs, so every
+// access goes through a getter that throws when the script touches something
+// that does not exist on the page.
+export class El {
+  constructor(tag = 'div', id = '') {
+    this.tagName = tag.toUpperCase();
+    this.id = id;
+    this.children = [];
+    this._html = '';
+    this._text = '';
+    this.hidden = false;
+    this.className = '';
+    this.dataset = {};
+    this.attrs = {};
+    this.style = {};
+    this.files = [];
+    this.listeners = {};
+  }
+  get innerHTML() { return this._html; }
+  set innerHTML(v) { this._html = String(v); this.textContent = String(v).replace(/<[^>]*>/g, ''); }
+  get textContent() { return this._text; }
+  set textContent(v) { this._text = String(v); }
+  get classList() {
+    const self = this;
+    return {
+      add(...c) { self.className = [...new Set([...self.className.split(' ').filter(Boolean), ...c])].join(' '); },
+      remove(...c) { self.className = self.className.split(' ').filter((x) => x && !c.includes(x)).join(' '); },
+      toggle(c, force) { const has = self.className.split(' ').includes(c); const on = force === undefined ? !has : force; if (on) self.classList.add(c); else self.classList.remove(c); return on; },
+      contains(c) { return self.className.split(' ').includes(c); },
+    };
+  }
+  querySelector() { return null; }
+  querySelectorAll() { return []; }
+  setAttribute(k, v) { this.attrs[k] = String(v); }
+  getAttribute(k) { return this.attrs[k] ?? null; }
+  hasAttribute(k) { return k in this.attrs; }
+  addEventListener(type, fn) { (this.listeners[type] ||= []).push(fn); }
+  removeEventListener() {}
+  get elements() { return this; }
+  reset() { return this; }
+  getContext() { return null; }
+  closest() { return null; }
+  appendChild(c) { this.children.push(c); return c; }
+  remove() {}
+  focus() {}
+  click() {}
+  getBoundingClientRect() { return { top: 0, left: 0, width: 0, height: 0, right: 0, bottom: 0 }; }
+}
+
+export function createDom(ids) {
+  const nodes = new Map();
+  for (const id of ids) nodes.set(id, new El('div', id));
+  // The storefront finds its language button with querySelector, so the stub
+  // has to resolve data-i18n and data-lang-toggle attributes rather than always
+  // returning null.
+  const findAttr = (attr) => {
+    for (const el of nodes.values()) if (el.attrs?.[attr] !== undefined) return el;
+    return null;
+  };
+  const document = {
+    readyState: 'complete',
+    documentElement: new El('html'),
+    body: new El('body'),
+    title: '',
+    querySelector: (sel) => {
+      if (typeof sel === 'string' && sel.includes('data-lang-toggle')) return nodes.get('lang-toggle');
+      if (typeof sel === 'string' && sel.includes('data-i18n')) return findAttr('data-i18n');
+      return null;
+    },
+    querySelectorAll: (sel) => {
+      if (typeof sel === 'string' && sel.startsWith('[')) {
+        const attr = sel.slice(1, sel.indexOf(']'));
+        return [...nodes.values()].filter((el) => el.attrs?.[attr] !== undefined);
+      }
+      return [];
+    },
+    getElementById: (id) => nodes.get(id) || null,
+    createElement: (t) => new El(t),
+    addEventListener() {},
+    removeEventListener() {},
+    dispatchEvent() {},
+  };
+  return { document, nodes, El };
+}
+
+// Evaluates a browser script against a stubbed global environment. Returns the
+// captured console output plus any thrown error so a test can assert on both.
+export async function runScript(code, { document, window: winOverrides = {}, ...rest } = {}) {
+  const logs = [];
+  const errors = [];
+  const documentListeners = {};
+  const windowListeners = {};
+  const win = {
+    ...winOverrides,
+    document,
+    localStorage: winOverrides.localStorage || {
+      _v: {},
+      getItem(k) { return this._v[k] ?? null; },
+      setItem(k, v) { this._v[k] = String(v); },
+      removeItem(k) { delete this._v[k]; },
+    },
+    addEventListener(type, fn) { (windowListeners[type] ||= []).push(fn); },
+    removeEventListener() {},
+    dispatchEvent(e) { (windowListeners[e.type] || []).forEach((f) => f(e)); },
+  };
+  win.window = win;
+  win.globalThis = win;
+  win.self = win;
+  const ctx = {
+    window: win,
+    document,
+    console: { log: (...a) => logs.push(a.join(' ')), error: (...a) => errors.push(a.join(' ')), warn: () => {} },
+    fetch: async () => { throw new Error('fetch not stubbed'); },
+    navigator: { language: 'vi-VN', clipboard: { writeText: async () => {} } },
+    location: { href: '' },
+    setTimeout: (fn, ms) => setTimeout(fn, ms),
+    clearTimeout: (id) => clearTimeout(id),
+    Intl, URL, CustomEvent: class { constructor(t, o) { this.type = t; this.detail = o?.detail; } },
+    ...rest,
+  };
+  ctx.globalThis = ctx;
+  const names = Object.keys(ctx);
+  const values = names.map((n) => ctx[n]);
+  try {
+    // eslint-disable-next-line no-new-func
+    const fn = new Function(...names, `"use strict";\n${code}`);
+    fn(...values);
+  } catch (error) {
+    errors.push(`${error.name}: ${error.message}`);
+  }
+  // The storefront kicks off its fetches at the end of the file. Draining the
+  // microtask queue lets those promises settle before assertions run, otherwise
+  // a perfectly good render is judged as empty.
+  await new Promise((r) => setTimeout(r, 0));
+  await new Promise((r) => setTimeout(r, 0));
+  return { logs, errors, window: win, documentListeners, windowListeners };
+}

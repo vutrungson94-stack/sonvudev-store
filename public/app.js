@@ -250,6 +250,9 @@ function showOrder(order, token, payment) {
   };
   document.getElementById('check-order').onclick = () => checkOrder(order.id, token);
   const dl = document.getElementById('download-order');
+  dl.hidden = order.status !== 'paid';
+  dl.onclick = () => downloadOrder(order.id, token);
+}
 
 async function checkOrder(id, token) {
   const button = document.getElementById('check-order');
@@ -322,7 +325,3 @@ window.I18N.onChange(() => {
 
 loadProducts();
 loadPayOptions();
-
-  dl.hidden = order.status !== 'paid';
-  dl.onclick = () => downloadOrder(order.id, token);
-}
