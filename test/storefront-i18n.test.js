@@ -368,3 +368,76 @@ test('data-i18n trong index.html deu co khoa trong bang dich', async () => {
   assert.ok(keys.length > 30, `index.html phai co nhieu data-i18n, thuc te co ${keys.length}`);
   for (const k of new Set(keys)) assert.notEqual(I18N.t(k), k, `khoa "${k}" dung o HTML nhung khong co trong bang dich`);
 });
+
+// The scrolling sheet used to be broken while every other layout test stayed
+// green, because they all asserted CSS text on rules that were never applied.
+// #modal-content is a wrapper div between .modal and the sections app.js writes
+// into it, so when it stayed display:block the flex declarations below it were
+// inert: the description kept its full height, nothing scrolled, and
+// .modal{overflow:hidden} cut the buy bar off. These tests pin the chain the
+// layout actually depends on rather than the presence of any one property.
+
+// Pulls the top-level declaration block for a selector, skipping the minified
+// block at the top of the file and any rule indented inside @media. The
+// selector is matched within one line on purpose: an earlier version let the
+// pattern cross newlines and happily matched a class named inside a comment.
+function baseRule(css, token) {
+  const esc = token.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const m = css.match(new RegExp(`^([^\\n@{}]*${esc}[^\\n@{}]*)\\{([^}]*)\\}`, 'm'));
+  return m ? m[2] : null;
+}
+
+test('#modal-content phai la flex column, va la noi app.js ghi vao', () => {
+  const css = read('styles.css');
+  const wrapper = baseRule(css, '#modal-content');
+  assert.ok(wrapper, 'can co rule cho #modal-content');
+  assert.match(wrapper, /display:flex/, 'wrapper phai la flex container de cac phan ben trong chia duoc chieu cao');
+  assert.match(wrapper, /flex-direction:column/, 'wrapper phai xep cot');
+  assert.match(wrapper, /min-height:0/, 'can min-height:0 de wrapper co the bi ep xuong trong modal');
+  assert.match(wrapper, /flex:1 1 auto/, 'wrapper phai nhan phan con lai cua .modal');
+
+  // The CSS is only useful while it describes the node the JS fills in.
+  const html = read('index.html');
+  const modal = html.match(/<div class="modal"[\s\S]*?<\/div>\s*<\/div>/);
+  assert.ok(modal, 'can tim thay .modal trong index.html');
+  assert.ok(modal[0].includes('id="modal-content"'), '#modal-content phai nam trong .modal');
+  const source = read('app.js');
+  assert.match(source, /getElementById\('modal-content'\)/, 'app.js phai ghi vao #modal-content');
+  // Every section that has to scroll has to be a child of that wrapper.
+  for (const cls of ['detail-body', 'detail-footer', 'checkout-head', 'checkout-form', 'success-state']) {
+    assert.ok(source.includes(`class="${cls}"`), `app.js phai render .${cls} trong sheet`);
+  }
+});
+
+test('vung cuon phai co overflow va min-height:0 ngay o rule co ban', () => {
+  const css = read('styles.css');
+  // These have to hold on a desktop too, where the 700px query never applies.
+  // A scroll region that is not allowed to shrink below its content is just a
+  // tall block, and the sheet clips it instead of scrolling.
+  for (const cls of ['.detail-body', '.checkout-form', '.success-state']) {
+    const rule = baseRule(css, cls);
+    assert.ok(rule, `can co rule co ban cho ${cls}`);
+    assert.match(rule, /overflow-y:auto/, `${cls} phai cuon duoc o rule co ban`);
+    assert.match(rule, /min-height:0/, `${cls} can min-height:0 o rule co ban`);
+    assert.match(rule, /flex:1 1/, `${cls} phai la flex item de nhan phan con lai cua wrapper`);
+  }
+  const footer = baseRule(css, '.detail-footer');
+  assert.match(footer, /flex:0 0 auto/, 'thanh nut mua phai ghim khong co');
+  assert.match(footer, /margin-top:0/, 'thanh nut mua phai sat vung cuon, khong de khe 27px');
+});
+
+test('flex-basis cua vung cuon dung theo cach tinh chieu cao cua tung man hinh', () => {
+  const css = read('styles.css');
+  // On a desktop .modal is height:auto with only a max-height, so it sizes to
+  // its content and a 0-basis child has no free space to grow into: the scroll
+  // region collapsed to 0px tall. `auto` lets a short sheet shrink to fit and a
+  // long one push the overflow into the region that is allowed to shrink.
+  assert.match(baseRule(css, '.detail-body'), /flex:1 1 auto/, 'vung cuon tren may tinh phai flex-basis auto');
+  // On a phone the backdrop pins a real height, so basis 0 is correct there and
+  // is what lets the middle take exactly the leftover space.
+  const block = css.match(/@media\(max-width:700px\)\{([\s\S]*?)\n\}/);
+  assert.ok(block, 'can co media query 700px');
+  assert.match(block[1], /\.detail-body\{[^}]*flex:1 1 0/, 'vung cuen tren dien thoai phai flex-basis 0');
+  assert.match(block[1], /\.checkout-form\{[^}]*flex:1 1 0/, 'form thanh toan tren dien thoai phai flex-basis 0');
+});
+

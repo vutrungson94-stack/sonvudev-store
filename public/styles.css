@@ -109,11 +109,37 @@
    just on phones: otherwise a swipe over the modal scrolls the store instead. */
 body.modal-open{overflow:hidden}
 
+/* #modal-content is the single wrapper between .modal and every section the
+   sheet renders, so the column layout has to be declared on it. While it stayed
+   a plain block the flex rules below never applied: .detail-body kept its full
+   content height and scrolled nowhere, and .modal{overflow:hidden} simply cut
+   the buy bar off the bottom. Nothing below this rule takes effect without it. */
+#modal-content{display:flex;flex-direction:column;flex:1 1 auto;min-width:0;min-height:0}
+
 /* The scrollable middle of the product sheet. The buy bar below it stays put,
    so it is a flex child with its own padding rather than sitting inside the
-   scrolling block. On a phone it is the only part that scrolls. */
-.detail-body{flex:1 1 0;min-height:0;overflow-y:auto;overscroll-behavior:contain;padding:0 25px}
-.detail-footer{flex:0 0 auto;padding:0 25px 28px;background:var(--paper)}
+   scrolling block. On a phone it is the only part that scrolls.
+
+   The basis is `auto`, not 0, and that matters on a desktop: .modal there is
+   height:auto with only a max-height, so it sizes to its content and there is
+   no free space for a 0-basis child to grow into, and the body collapsed to
+   nothing. With `auto` a short description lets the sheet shrink to fit, and a
+   long one overruns max-height, the overflow goes to this child (the only one
+   allowed past its minimum by min-height:0) and it scrolls. The phone rule
+   below keeps basis 0 because there the backdrop pins a real height. */
+.detail-body{flex:1 1 auto;min-height:0;overflow-y:auto;overscroll-behavior:contain;padding:0 25px}
+
+/* The buy bar sits under the scroll area now, so the old 27px gap above it read
+   as a rendering fault. Zero it and draw the same hairline the phone uses, so
+   it looks pinned on both. */
+.detail-footer{flex:0 0 auto;margin-top:0;padding:13px 25px 28px;background:var(--paper);border-top:1px solid var(--line)}
+
+/* The checkout and success steps share #modal-content, so they need the same
+   split: a pinned header over a scrolling body. Without it a short desktop
+   window pushed the pay button past the bottom of the sheet, where
+   .modal{overflow:hidden} made it unreachable. */
+.checkout-head{flex:0 0 auto}
+.checkout-form,.success-state{flex:1 1 auto;min-height:0;overflow-y:auto;overscroll-behavior:contain}
 
 /* Phone sheet. The height is pinned with explicit insets instead of
    max-height, because a flex column with only a max-height has no definite
