@@ -47,13 +47,14 @@ Script chỉ đẩy danh sách biến của ứng dụng (`ALLOWED`), không đ�
 ## Kiến trúc
 
 - `src/server.js`: khởi động HTTP server.
-- `src/app.js`: API, SEO routes, kiểm tra thanh toán/download.
+- `src/app.js`: API, SEO routes, tra cứu đơn, kiểm tra thanh toán/download.
 - `src/store.js`: Supabase REST; local JSON chỉ là fallback cho phát triển.
 - `src/r2.js`: presigned upload/download URL; bucket bắt buộc private.
 - `src/paypal.js`: PayPal Orders v2, chuyển VND sang USD và xác minh webhook.
 - `src/payments.js`: dựng hướng dẫn thanh toán trong nước (VietQR, MoMo, ZaloPay).
 - `src/rates.js`: tỷ giá VND/USD, cache và fallback.
 - `public/`: storefront responsive, không cần build frontend.
+- `public/lookup.html` + `public/order.html`: tra cứu đơn và trang đơn hàng.
 - `supabase/schema.sql`: schema PostgreSQL.
 - `cloudflare/r2-cors.json`: CORS cho upload trực tiếp từ trình duyệt.
 
@@ -226,4 +227,57 @@ Sau đó cấu hình reverse proxy và chứng thư HTTPS cho `sonvudev.com` và
 - Không thu tiền sản phẩm chưa có file phát hành.
 - Admin dùng token dài; production nên đổi sang Supabase Auth + role admin.
 - Cần chính sách bảo mật, điều khoản, hoàn tiền và thuế phù hợp trước khi vận hành lâu dài.
+
+## Tra cứu đơn hàng
+
+Mã tra cứu sinh ra lúc checkout chỉ nằm trong trình duyệt của người mua, nên nếu họ đóng tab
+là mất quyền tải. Trang `/lookup` giải quyết việc này mà không cần dịch vụ gửi email:
+
+```text
+POST /api/orders/lookup   { "orderId": "SVD-...", "email": "..." }
+```
+
+Server đối chiếu mã đơn với email đã dùng lúc thanh toán, rồi **cấp lại một mã mới và vô hiệu
+mã cũ**. Cách này miễn phí, không cần SMTP, nhưng lưu ý khi vận hành thật:
+
+- Mã đơn ngắn nên không thể dò mã, vì vậy endpoint giới hạn 10 lượt / 15 phút / IP.
+- Sai email và không tồn tại đơn trả về **cùng một thông báo**, để không lộ đơn nào có thật.
+- Email là yếu tố xác thực duy nhất, nên chỉ dùng được khi đơn đã nhập đúng email của người mua.
+- Khách cần email đó còn đọc được. Nếu giao dịch đi qua PayPal, email nhập ở checkout là
+  email của khách, không phải email PayPal.
+
+Sau khi tra cứu, người mua được chuyển tới `/order/:id` — trang này đọc mã từ
+`sessionStorage`, nên mở bằng trình duyệt khác hoặc thiết bị khác sẽ phải tra cứu lại.
+
+## Các trang pháp lý
+
+`public/terms.html`, `public/privacy.html` và `public/refund.html` là file tĩnh, phục vụ
+qua `express.static`. Thêm link trong footer của `public/index.html` và trong câu pháp lý
+của checkout (`public/app.js`). `sitemap.xml` được sinh tự động từ danh sách file trong
+`public/`, nên trang mới thêm vào danh sách đó là được index — `/lookup` và `/admin.html`
+cố tình không có trong sitemap.
+
+## Vận hành miễn phí
+
+Toàn bộ stack hiện tại chạy trên gói miễn phí, không có khoản chi nào:
+
+| Thành phần | Gói | Giới hạn cần biết |
+| :--- | :--- | :--- |
+| Render | Free | Ngủ sau ~15 phút không truy cập, cold start 30–50 giây; Render thu hồi service không hoạt động 90 ngày |
+| Cloudflare R2 | Free | 10 GB lưu trữ, **không tính phí băng thông tải xuống** |
+| Supabase | Free | 500 MB DB, project bị dừng nếu không hoạt động 1 tuần |
+| Cloudflare DNS | Free | Không giới hạn |
+| PayPal Business | Free | Chỉ mất phí giao dịch khi có khách, không có phí tháng |
+| Cloudflare Email Routing | Free | Chuyển tiếp `hello@sonvudev.com` về một hộp thư đã có |
+
+Hai việc cần làm khi vẫn ở gói free:
+
+1. **MX cho email hỗ trợ.** `hello@sonvudev.com` xuất hiện ở footer nhưng không có bản ghi
+   MX nên thư gửi tới đó sẽ thất lạc. Cloudflare Email Routing miễn phí, trỏ về một địa chỉ
+   Gmail/Outlook bạn đang dùng.
+2. **Sống sót qua đợt ngủ của Render.** Khách vào đúng lúc service đang ngủ sẽ chờ vài
+   chục giây. Nâng lên gói `starter` khi đã có doanh thu; hiện tại chấp nhận để miễn phí.
+
+Chưa làm vì cần chi phí hoặc tài khoản: gửi email tự động (SMTP), code signing cho tệp
+`.exe`, nâng cấp Render. Ba việc này nên để lại cho khi có thu nhập.
 

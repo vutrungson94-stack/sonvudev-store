@@ -1,6 +1,0 @@
-
-> sonvudev-store@1.0.0 start
-> node src/server.js
-
-SonVuDev Store running at https://sonvudev.com
-Persistence: supabase

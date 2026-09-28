@@ -10,6 +10,14 @@ node_modules_stale_*/
 # Build/cache
 .gbuildcache/
 build-reports/
+publish-output/
+.gbuild-state.gbuildstate
+--help/
+
+# Local runtime scratch
+logs/
+data/
+.tmp-*
 
 # OS/editor
 .DS_Store

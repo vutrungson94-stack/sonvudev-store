@@ -1,0 +1,20 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="description" content="Tra cứu đơn hàng SonVuDev bằng mã đơn và email đã dùng khi thanh toán."><meta name="robots" content="noindex,follow"><title>Tra cứu đơn hàng — SonVuDev</title><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet"><link rel="stylesheet" href="styles.css">
+</head>
+<body class="lookup-page">
+<main class="lookup-card">
+<p class="eyebrow"><span>✦</span> Hỗ trợ</p>
+<h1>Tra cứu đơn hàng</h1>
+<p>Nhập mã đơn và email bạn đã dùng khi thanh toán. Chúng tôi sẽ đưa bạn thẳng tới trang tải sản phẩm.</p>
+<form id="lookup-form">
+<label>Mã đơn hàng<input name="orderId" required autocomplete="off" placeholder="SVD-XXXXXX-XXXXXX"></label>
+<label>Email đã thanh toán<input name="email" type="email" required autocomplete="email" placeholder="ban@example.com"></label>
+<button class="button button-primary" type="submit" id="lookup-submit">Tra cứu đơn hàng <span>→</span></button>
+<p class="form-message" id="lookup-status"></p>
+</form>
+<a class="lookup-back" href="/">← Về cửa hàng</a>
+</main>
+<script src="lookup.js"></script>
+</body></html>

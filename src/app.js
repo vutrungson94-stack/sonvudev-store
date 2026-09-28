@@ -1,5 +1,6 @@
 import express from "express";
 import path from "node:path";
+import { promises as fs } from "node:fs";
 import { fileURLToPath } from "node:url";
 import crypto from "node:crypto";
 import { env, isConfigured } from "./config.js";
@@ -24,6 +25,20 @@ const isAdmin = (req) => {
 };
 const admin = (req, res, next) => { if (!isAdmin(req)) return res.status(401).json({ error: "Unauthorized" }); next(); };
 
+// Order ids are short, so a lookup endpoint without a limit would let anyone
+// walk the id space. A per-IP window is enough here: the app runs as a single
+// process and this only needs to make guessing impractical, not bulletproof.
+const attempts = new Map();
+const tooManyAttempts = (req) => {
+  const key = req.ip || "unknown";
+  const now = Date.now();
+  const recent = (attempts.get(key) || []).filter((time) => now - time < 15 * 60 * 1000);
+  recent.push(now);
+  attempts.set(key, recent);
+  if (attempts.size > 5000) attempts.clear();
+  return recent.length > 10;
+};
+
 app.set("trust proxy", 1);
 app.disable("x-powered-by");
 app.use((req, res, next) => {
@@ -36,11 +51,24 @@ app.use((req, res, next) => {
   next();
 });
 app.get("/robots.txt", (_req, res) => res.type("text/plain").send("User-agent: *\nAllow: /\nDisallow: /admin.html\nDisallow: /api/\nSitemap: https://sonvudev.com/sitemap.xml\n"));
-app.get("/sitemap.xml", (_req, res) => res.type("application/xml").send('<?xml version="1.0" encoding="UTF-8"?><urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"><url><loc>https://sonvudev.com/</loc><changefreq>weekly</changefreq><priority>1.0</priority></url></urlset>'));
+// Built from the public directory so a new page is indexed without a second
+// list to keep in sync. The lookup and admin pages are deliberately absent.
+app.get("/sitemap.xml", async (_req, res) => {
+  const pages = await fs.readdir(publicDir);
+  const urls = pages
+    .filter((file) => /^(index|terms|privacy|refund)\.html$/.test(file))
+    .map((file) => `<url><loc>https://sonvudev.com/${file === "index.html" ? "" : file.replace(/\.html$/, "")}</loc><changefreq>monthly</changefreq><priority>${file === "index.html" ? "1.0" : "0.3"}</priority></url>`)
+    .join("");
+  res.type("application/xml").send(`<?xml version="1.0" encoding="UTF-8"?><urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">${urls}</urlset>`);
+});
+
 app.use((req, res, next) => {
   if (req.hostname === "www.sonvudev.com") return res.redirect(308, `https://sonvudev.com${req.originalUrl}`);
   next();
 });
+// Short link for buyers, e.g. /order/SVD-XXXX. The page reads the token from
+// sessionStorage, so it is a viewer rather than an entry point.
+app.get("/order/:id", (_req, res) => res.sendFile(path.join(publicDir, "order.html")));
 app.use(express.static(publicDir, { extensions: ["html"] }));
 
 app.get("/api/health", async (_req, res) => {
@@ -120,6 +148,25 @@ app.get("/api/orders/:id/download", async (req, res) => {
     if (!isConfigured.r2) return res.status(503).json({ error: "R2 chưa được cấu hình" });
     res.json({ url: await createDownloadUrl(item.fileKey, `${item.name}-${item.version}.zip`), expiresIn: env.r2.downloadTtl });
   } catch (error) { console.error(error); res.status(500).json({ error: "Không thể tạo link tải" }); }
+});
+
+app.post("/api/orders/lookup", json, async (req, res) => {
+  try {
+    if (tooManyAttempts(req)) return res.status(429).json({ error: "Bạn đã tra cứu quá nhiều lần. Vui lòng thử lại sau 15 phút." });
+    const id = text(req.body.orderId, 80).toUpperCase();
+    const email = text(req.body.email, 160).toLowerCase();
+    if (!id || !isEmail(email)) return res.status(400).json({ error: "Mã đơn hoặc email không hợp lệ" });
+    const order = await getOrder(id);
+    // One message for "no such order" and "email does not match", so the
+    // endpoint never reveals which order ids exist.
+    const invalid = { error: "Không tìm thấy đơn hàng với mã và email này" };
+    if (!order || String(order.customerEmail || order.customer_email || "").toLowerCase() !== email) return res.status(404).json(invalid);
+    // The original token only ever existed in the buyer's browser, so recovery
+    // means issuing a new one and invalidating the old.
+    const accessToken = newToken();
+    await updateOrder(order.id, { accessTokenHash: hashToken(accessToken), updatedAt: new Date().toISOString() });
+    res.json({ order: publicOrder(await getOrder(order.id)), accessToken });
+  } catch (error) { console.error(error); res.status(500).json({ error: "Không thể tra cứu đơn hàng" }); }
 });
 
 app.post("/api/paypal/webhook", express.raw({ type: "application/json" }), async (req, res) => {
