@@ -73,11 +73,26 @@ function visibleProducts() {
   return products.filter((p) => activeFilter === 'all' || p.category === activeFilter || p.platform === activeFilter);
 }
 
+// Products carry an optional English copy. When the visitor switches to English
+// we prefer those fields but always fall back to the Vietnamese text, so a
+// product that has not been translated yet never shows an empty description.
+function localized(p) {
+  if (window.I18N.lang !== 'en') return p;
+  const hasEn = typeof p.descriptionEn === 'string' && p.descriptionEn.trim();
+  if (!hasEn) return p;
+  return {
+    ...p,
+    shortDescription: p.shortDescriptionEn || p.shortDescription,
+    description: p.descriptionEn,
+    features: (p.featuresEn && p.featuresEn.length ? p.featuresEn : p.features) || [],
+  };
+}
+
 function render() {
   const list = visibleProducts();
   count.textContent = `${list.length.toString().padStart(2, '0')} ${T('products.count')}`;
   grid.innerHTML = list.length
-    ? list.map(card).join('')
+    ? list.map((p) => card(localized(p))).join('')
     : `<div class="empty-state"><b>${esc(T('products.emptyTitle'))}</b><p>${esc(T('products.emptyText'))}</p></div>`;
   grid.querySelectorAll('.product-card').forEach((c) => { c.onclick = () => openProduct(c.dataset.id); });
 }
@@ -104,8 +119,9 @@ function card(p) {
   </article>`;
 
 function openProduct(id) {
-  const p = products.find((x) => x.id === id);
-  if (!p) return;
+  const raw = products.find((x) => x.id === id);
+  if (!raw) return;
+  const p = localized(raw);
   modalContent.innerHTML = `<div class="detail-art">
       <div class="product-logo large">${initials(p.name)}</div>
       <span>${esc(p.badge || 'SonVuDev')}</span>
