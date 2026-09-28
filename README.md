@@ -228,6 +228,32 @@ Sau đó cấu hình reverse proxy và chứng thư HTTPS cho `sonvudev.com` và
 - Admin dùng token dài; production nên đổi sang Supabase Auth + role admin.
 - Cần chính sách bảo mật, điều khoản, hoàn tiền và thuế phù hợp trước khi vận hành lâu dài.
 
+## Không bỏ sót đơn hàng
+
+Đơn chuyển khoản không tự động thành công — phải có người bấm xác nhận. Trước đây đơn nằm im
+trong bảng cho đến khi chủ cửa hàng tự mở `/admin.html`, nên khách đã chuyển tiền có thể phải
+chờ cả buổi. Nay `/admin.html` tự hỏi server mỗi 30 giây:
+
+```text
+GET /api/admin/orders/pending   ->  { latest, pending, newest }
+```
+
+Khi có đơn mới, trang quản trị phản ứng bằng nhiều kênh cùng lúc:
+
+- Thanh **màu cam nhấp nháy** ở đầu bảng, kèm nút *Xem đơn*
+- **Âm báo** phát ra loa
+- **Tiêu đề tab** đổi thành `(NEW) SonVuDev Admin` để thấy được khi đang ở tab khác
+- **Thông báo desktop** của hệ điều hành nếu đã cấp quyền và tab đang ẩn
+
+Endpoint này chỉ trả về số đơn đang chờ và mã đơn mới nhất, không kèm thông tin khách — nhẹ
+hơn nhiều so với tải cả danh sách, nên poll thường xuyên không tốn đáng kể.
+
+Cảnh báo tự tắt khi bạn bấm *Xem đơn* hoặc khi không còn đơn nào chờ. Polling dừng khi bấm
+*Đăng xuất* và tạm dừng khi bạn chuyển sang tab khác, tự chạy lại khi quay lại.
+
+Giới hạn cần biết: trình duyệt phải **đang mở** thì cảnh báo mới hoạt động. Muốn báo qua
+email thì cần dịch vụ gửi mail trả phí — xem mục *Vận hành miễn phí*.
+
 ## Tra cứu đơn hàng
 
 Mã tra cứu sinh ra lúc checkout chỉ nằm trong trình duyệt của người mua, nên nếu họ đóng tab

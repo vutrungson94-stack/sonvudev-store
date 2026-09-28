@@ -224,6 +224,24 @@ app.post("/api/paypal/capture", json, async (req, res) => {
   } catch (error) { console.error(error); res.status(502).json({ error: "Không thể xác nhận thanh toán PayPal" }); }
 });
 
+// Cheap poll target for the admin badge. The full order list carries customer
+// details and is much heavier, so the notification loop hits this instead and
+// only downloads rows when something actually changed.
+app.get("/api/admin/orders/pending", admin, async (_req, res) => {
+  try {
+    const orders = await listOrders();
+    const at = (order) => new Date(order.createdAt || order.created_at || 0).getTime();
+    const latest = orders.length ? at(orders[0]) : 0;
+    res.json({
+      latest,
+      pending: orders.filter((order) => order.status === "pending_transfer").length,
+      // The newest order is echoed back so a new arrival can be named in the
+      // alert without a second request.
+      newest: orders[0] ? { id: orders[0].id, status: orders[0].status, createdAt: orders[0].createdAt || orders[0].created_at || null } : null,
+    });
+  } catch (error) { console.error(error); res.status(500).json({ error: "Không kiểm tra được đơn hàng" }); }
+});
+
 app.get("/api/admin/orders", admin, async (_req, res) => {
   try { res.json({ orders: (await listOrders()).map(publicOrder) }); }
   catch (error) { console.error(error); res.status(500).json({ error: "Không thể tải đơn hàng" }); }
