@@ -196,7 +196,7 @@ async function clickThroughCheckout() {
   const base = document.getElementById.bind(document);
   document.getElementById = (id) => base(id) || cache.get(id) || null;
   const fetch = async (url) => (String(url).includes('/api/products')
-    ? { ok: true, json: async () => ({ products }) }
+    ? { ok: true, json: async () => ({ products: [...products, longProduct] }) }
     : { ok: true, json: async () => ({ country: 'VN', options: [{ id: 'bank_transfer', label: 'Chuyen khoan', hint: 'h', account: '1', amount: 1, currency: 'VND', transferNote: 'n' }] }) });
   const ls = { _v: {}, getItem: () => null, setItem() {}, removeItem() {} };
   const i18n = await runScript(read('i18n.js'), { document, window: {}, fetch, localStorage: ls });
@@ -278,13 +278,49 @@ test('modal tren dien thoai cuon tung phan, khong phai ca trang', () => {
   const rules = block[1];
   assert.ok(/\.modal\{[^}]*flex-direction:column/.test(rules), 'modal phai la flex column de tach phan');
   assert.ok(/\.checkout-form\{[^}]*overflow-y:auto/.test(rules), 'form thanh toan phai cuon rieng');
-  assert.ok(/\.detail-copy\{[^}]*overflow-y:auto/.test(rules), 'noi dung san pham phai cuon rieng');
-  assert.ok(/\.detail-copy\{[^}]*min-height:0/.test(rules), 'can min-height:0 de flex con cuon dung');
+  assert.ok(/\.detail-body\{[^}]*overflow-y:auto/.test(rules), 'noi dung san pham phai cuon rieng');
+  assert.ok(/\.detail-body\{[^}]*min-height:0/.test(rules), 'can min-height:0 de flex con cuon dung');
   // Full-bleed sheet with rounded top reads better than a boxed dialog.
   assert.ok(/\.modal-backdrop\{[^}]*padding:0/.test(rules), 'backdrop phai full man hinh tren dien thoai');
   assert.ok(/\.modal\{[^}]*max-height:94dvh/.test(rules), 'dung dvh de tranh bi che khi thanh dia phap');
   // The decorative banner eats a lot of vertical space on a small screen.
   assert.ok(/\.detail-art\{display:none\}/.test(rules), 'anh banner nen an di tren dien thoai');
+  // The header must not scroll away, and the buy bar must not either.
+  assert.ok(/\.detail-copy\{[^}]*flex:0 0 auto/.test(rules), 'ten san pham phai ghim khong cuon');
+  assert.ok(/\.detail-footer\{[^}]*flex:0 0 auto/.test(rules), 'nut mua phai ghim o day duoi');
+  assert.ok(/\.detail-footer\{[^}]*position|sticky/.test(rules) || /\.detail-footer\{[^}]*flex:0 0 auto/.test(rules), 'than cua nut mua phai khong bi cuon');
+  // Swiping inside the sheet must not drag the store page along.
+  assert.ok(/overscroll-behavior:contain/.test(rules), 'can chan lan truyen cuon sang trang nen');
+});
+
+test('mo mo phai khoa trang nen lai', () => {
+  const css = read('styles.css');
+  // Without a body lock the page behind keeps its own scroll offset, so a swipe
+  // over the sheet moved the store instead of the modal.
+  assert.ok(/body\.modal-open\{[^}]*overflow:hidden/.test(css), 'mo phai khoa cuon trang nen');
+  assert.ok(/body\.modal-open\{[^}]*position:fixed/.test(css), 'tren dien thoai phai gan body de khong doi vi tri');
+  const source = read('app.js');
+  assert.ok(/document\.body\.classList\.add\('modal-open'\)/.test(source), 'mo modal phai them class modal-open');
+  assert.ok(/document\.body\.classList\.remove\('modal-open'\)/.test(source), 'dong modal phai go class modal-open');
+});
+
+test('nut mua nam ngoai vung cuon, luon nhin thay', async () => {
+  const { run, document, get } = await clickThroughCheckout();
+  assert.deepEqual(run.errors, [], `app.js nem loi: ${run.errors.join(' | ')}`);
+  run.window.openProduct('p3');
+  const html = document.getElementById('modal-content').innerHTML;
+  // Structure order matters: art, header, scrolling body, then the buy bar.
+  const iBody = html.indexOf('detail-body');
+  const iFooter = html.indexOf('detail-footer');
+  const iTitle = html.indexOf('detail-copy');
+  assert.ok(iTitle >= 0 && iBody > iTitle, 'ten san pham phai tren phan noi dung');
+  assert.ok(iFooter > iBody, 'thanh nut mua phai duoi phan noi dung');
+  // The buy button must be a sibling of the scrolling area, not inside it,
+  // otherwise it scrolls off screen with the description.
+  const body = html.slice(iBody, iFooter);
+  assert.ok(!body.includes('buy-product'), 'nut mua khong duoc nam trong vung cuon');
+  assert.ok(html.slice(iFooter).includes('buy-product'), 'nut mua phai nam trong detail-footer');
+  assert.equal(typeof get('buy-product').onclick, 'function', 'nut mua van bam duoc');
 });
 
 test('data-i18n trong index.html deu co khoa trong bang dich', async () => {

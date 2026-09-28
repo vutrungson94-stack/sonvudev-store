@@ -140,16 +140,18 @@ function openProduct(id) {
     <div class="detail-copy">
       <p class="eyebrow">${esc(p.platform)} · ${esc(T('product.version'))} ${esc(p.version)}</p>
       <h2 id="modal-title">${esc(p.name)}</h2>
+    </div>
+    <div class="detail-body">
       <div class="detail-description">${paragraphs(p.description || p.shortDescription)}</div>
       <ul class="feature-list">${(p.features || []).map((f) => `<li><span>✓</span>${esc(f)}</li>`).join('')}</ul>
       <div class="detail-requirements">
         <b>${esc(T('product.requirements'))}</b>
         <span>${esc(p.requirements || T('product.seeGuide'))}</span>
       </div>
-      <div class="detail-footer">
-        <div><small>${esc(T('product.priceOnce'))}</small><strong>${money(p.price, p.currency)}</strong></div>
-        <button class="button button-primary" id="buy-product">${esc(T('product.buyNow'))} <span>→</span></button>
-      </div>
+    </div>
+    <div class="detail-footer">
+      <div><small>${esc(T('product.priceOnce'))}</small><strong>${money(p.price, p.currency)}</strong></div>
+      <button class="button button-primary" id="buy-product">${esc(T('product.buyNow'))} <span>→</span></button>
     </div>`;
   modal.hidden = false;
   document.body.classList.add('modal-open');
