@@ -78,6 +78,53 @@ export function paymentChannels(order) {
 }
 
 /**
+ * Builds the checkout options for a visitor, given their resolved country.
+ *
+ * Nothing is ever hidden. A domestic buyer can still pick PayPal and an
+ * overseas buyer can still pick a bank transfer; the country only changes the
+ * order and the explanation next to each option, so nobody is ever shown a
+ * method that has silently disappeared.
+ */
+export function paymentOptions(country, { bank, momo, zalopay, paypal } = {}) {
+  // An unknown country must stay permissive, so the domestic hint is used and
+  // every rail stays selectable: not knowing must never cost someone a way to
+  // pay. This also drives which rail is listed first.
+  const domestic = !country || isVietnam(country);
+  const options = [];
+
+  if (bank) {
+    options.push({
+      id: "bank_transfer",
+      label: "Chuyển khoản ngân hàng / Quét mã QR",
+      // VietQR, MoMo and ZaloPay are domestic rails, so for a buyer outside
+      // Vietnam they are worth flagging rather than burying.
+      hint: domestic
+        ? (momo || zalopay ? "Hỗ trợ MoMo, ZaloPay và quét mã VietQR" : "Quét mã VietQR trong app ngân hàng")
+        : "Cần tài khoản ngân hàng Việt Nam. Phù hợp hơn nếu bạn đang ở trong nước.",
+      available: domestic,
+    });
+  }
+
+  if (paypal) {
+    options.push({
+      id: "paypal",
+      label: "PayPal",
+      hint: domestic
+        ? "Thanh toán quốc tế bằng ví PayPal, trừ thẻ và tài khoản quốc tế"
+        : "Thanh toán bằng thẻ quốc tế hoặc tài khoản PayPal. Nên dùng nhất nếu bạn ở nước ngoài.",
+      available: true,
+    });
+  }
+
+  // Put the recommended rail first without removing anything. An unknown country
+  // keeps the domestic default, since that is what the majority of visitors are.
+  const preferred = domestic ? "bank_transfer" : "paypal";
+  return options.sort((a, b) => (a.id === preferred ? -1 : b.id === preferred ? 1 : 0));
+}
+
+const isVietnam = (country) => String(country || "").toUpperCase() === "VN";
+
+/**
  * Payment instructions returned to the storefront after checkout.
  * Only channels that are actually configured are exposed.
  */

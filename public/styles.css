@@ -50,6 +50,10 @@
 .lookup-back{display:inline-block;margin-top:18px;color:var(--muted);font-size:11px}
 .lookup-back:hover{color:var(--green)}
 
+/* Advisory note in checkout about which rail fits the visitor's country */
+.geo-note{background:#eef6f1;border:1px solid #cfe3d7;border-radius:8px;padding:10px 12px;margin:0 0 14px;color:#3d5a4e;font-size:11px;line-height:1.6}
+.geo-note b{color:var(--green)}
+
 /* Standalone order page reached from /order/:id or the lookup form */
 .order-shell{padding:60px 0 80px;max-width:720px}
 .order-title{font:600 clamp(30px,3.6vw,42px)/1.08 'Space Grotesk';letter-spacing:-.06em;margin:0 0 8px}

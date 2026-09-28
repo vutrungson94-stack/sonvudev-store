@@ -50,6 +50,12 @@ export const env = {
     url: value("SUPABASE_URL").replace(/\/$/, ""),
     serviceRoleKey: value("SUPABASE_SERVICE_ROLE_KEY"),
   },
+  geo: {
+    // "off" disables the country lookup entirely and the storefront falls back
+    // to listing every payment method without a recommendation.
+    lookup: /^off$/i.test(value("GEO_LOOKUP", "auto")) ? "off" : "auto",
+    cacheHours: numberValue("GEO_CACHE_HOURS", 24),
+  },
   paypal: {
     environment: value("PAYPAL_ENVIRONMENT", "sandbox"),
     currency: value("PAYPAL_CURRENCY", "USD").toUpperCase(),

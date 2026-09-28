@@ -257,6 +257,47 @@ của checkout (`public/app.js`). `sitemap.xml` được sinh tự động từ 
 `public/`, nên trang mới thêm vào danh sách đó là được index — `/lookup` và `/admin.html`
 cố tình không có trong sitemap.
 
+## Phương thức thanh toán theo vị trí khách
+
+Checkout gọi `GET /api/checkout/options`, server tra quốc gia của khách qua IP rồi sắp xếp
+lại danh sách phương thức:
+
+```json
+{
+  "country": "US",
+  "inVietnam": false,
+  "options": [
+    { "id": "paypal",        "label": "PayPal", "hint": "...nên dùng nhất nếu bạn ở nước ngoài.", "available": true },
+    { "id": "bank_transfer", "label": "Chuyển khoản ngân hàng / Quét mã QR", "hint": "Cần tài khoản ngân hàng Việt Nam...", "available": false }
+  ]
+}
+```
+
+**Nguyên tắc quan trọng: không bao giờ ẩn phương thức nào.** Quốc gia chỉ quyết định thứ tự
+hiển thị và dòng ghi chú. Cả hai phương thức luôn hiện đủ:
+
+- Khách ở nước ngoài → PayPal lên đầu, chuyển khoản vẫn hiện kèm ghi chú "cần tài khoản
+  ngân hàng Việt Nam"
+- Khách ở Việt Nam → chuyển khoản lên đầu, **PayPal vẫn hiện** kèm ghi chú nên dùng thẻ quốc tế
+
+`available` chỉ là gợi ý cho giao diện. `/api/checkout` vẫn nhận mọi phương thức đã cấu
+hình, nên khi tra cứu quốc gia sai hoặc không trả được, khách vẫn thanh toán bình thường.
+
+Cơ chế an toàn khi tra cứu hỏng:
+
+| Tình huống | Hành vi |
+| :--- | :--- |
+| Cả hai nhà cung cấp đều lỗi hoặc hết giờ (1,5 giây) | `country: null`, dùng bố cục nội địa, không hiện ghi chú |
+| IP riêng / loopback / IPv6 nội bộ | Bỏ qua, không gọi ra ngoài |
+| `GEO_LOOKUP=off` | Tắt hoàn toàn, luôn dùng bố cục nội địa |
+| Kết quả được cache theo IP trong `GEO_CACHE_HOURS` giờ (mặc định 24) | Mỗi IP chỉ gọi ra ngoài một lần |
+
+Render tự kết thúc TLS nên không có header `CF-IPCountry`; tra cứu phải gọi ra ngoài qua
+Https tới `ipapi.co`, dự phòng `ipwho.is`. Cả hai không cần API key.
+
+`test/geo.test.js` kiểm chứng đúng điều quan trọng nhất: với mọi giá trị quốc gia kể cả
+`null`, danh sách phương thức không bao giờ bị rút bớt.
+
 ## Vận hành miễn phí
 
 Toàn bộ stack hiện tại chạy trên gói miễn phí, không có khoản chi nào:

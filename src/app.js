@@ -7,7 +7,8 @@ import { env, isConfigured } from "./config.js";
 import { ensureSeed, getOrder, getProduct, listOrders, listProducts, createOrder, updateOrder, createProduct, updateProduct, persistenceMode } from "./store.js";
 import { createDownloadUrl, createUploadUrl } from "./r2.js";
 import { captureOrder, createOrder as createPayPalOrder, hashToken, newOrderId, newToken, paypalChargeFor, paypalChargeForProduct, paymentMatchesOrder, verifyWebhook } from "./paypal.js";
-import { paymentInstructions } from "./payments.js";
+import { paymentInstructions, paymentOptions } from "./payments.js";
+import { resolveCountry } from "./geo.js";
 import { vndPerUsd } from "./rates.js";
 
 const app = express();
@@ -91,6 +92,27 @@ app.get("/api/products/:id", async (req, res) => {
     if (!product.fileKey || !isConfigured.r2) return res.status(404).json({ error: "Sản phẩm chưa sẵn sàng" });
     res.json({ product: publicProduct(product) });
   } catch (error) { console.error(error); res.status(500).json({ error: "Không thể tải sản phẩm" }); }
+});
+
+// Tells the storefront where the visitor is, so checkout can put the sensible
+// rail first. It is advisory only: the client renders whatever comes back and
+// the /api/checkout endpoint still accepts any configured method, so a blocked
+// or wrong guess can never stop someone from paying.
+app.get("/api/checkout/options", async (req, res) => {
+  try {
+    const country = await resolveCountry(req);
+    res.set("Cache-Control", "private, max-age=3600");
+    res.json({
+      country: country || null,
+      inVietnam: !country || country === "VN",
+      options: paymentOptions(country, {
+        bank: isConfigured.bank,
+        momo: Boolean(env.bank.momo),
+        zalopay: Boolean(env.bank.zalopay),
+        paypal: isConfigured.paypal,
+      }),
+    });
+  } catch (error) { console.error(error); res.status(500).json({ error: "Không tải được phương thức thanh toán" }); }
 });
 
 app.post("/api/checkout", json, async (req, res) => {
