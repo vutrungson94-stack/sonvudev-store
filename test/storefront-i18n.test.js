@@ -280,18 +280,48 @@ test('modal tren dien thoai cuon tung phan, khong phai ca trang', () => {
   assert.ok(/\.checkout-form\{[^}]*overflow-y:auto/.test(rules), 'form thanh toan phai cuon rieng');
   assert.ok(/\.detail-body\{[^}]*overflow-y:auto/.test(rules), 'noi dung san pham phai cuon rieng');
   assert.ok(/\.detail-body\{[^}]*min-height:0/.test(rules), 'can min-height:0 de flex con cuon dung');
-  // Full-bleed sheet with rounded top reads better than a boxed dialog.
-  assert.ok(/\.modal-backdrop\{[^}]*padding:0/.test(rules), 'backdrop phai full man hinh tren dien thoai');
-  assert.ok(/\.modal\{[^}]*max-height:94dvh/.test(rules), 'dung dvh de tranh bi che khi thanh dia phap');
+  // Inset padding gives the sheet a visible margin from the screen edges.
+  assert.ok(/\.modal-backdrop\{[^}]*padding:10px 10px 14px/.test(rules), 'backdrop phai de khe 10-15px nhu ban goi y');
   // The decorative banner eats a lot of vertical space on a small screen.
   assert.ok(/\.detail-art\{display:none\}/.test(rules), 'anh banner nen an di tren dien thoai');
   // The header must not scroll away, and the buy bar must not either.
   assert.ok(/\.detail-copy\{[^}]*flex:0 0 auto/.test(rules), 'ten san pham phai ghim khong cuon');
   assert.ok(/\.detail-footer\{[^}]*flex:0 0 auto/.test(rules), 'nut mua phai ghim o day duoi');
-  assert.ok(/\.detail-footer\{[^}]*position|sticky/.test(rules) || /\.detail-footer\{[^}]*flex:0 0 auto/.test(rules), 'than cua nut mua phai khong bi cuon');
   // Swiping inside the sheet must not drag the store page along.
   assert.ok(/overscroll-behavior:contain/.test(rules), 'can chan lan truyen cuon sang trang nen');
 });
+
+test('chieu cao modal phai xac dinh o ca may tinh va dien thoai', () => {
+  const css = read('styles.css');
+  // The sheet must have a definite height, not just a max-height: in a flex
+  // column a max-height alone gives the children no height to shrink into, so
+  // the scrolling area ended up pushed off screen and the buy bar vanished.
+  const block = css.match(/@media\(max-width:700px\)\{([\s\S]*?)\n\}/);
+  const rules = block[1];
+  assert.ok(/\.modal-backdrop\{[^}]*position:fixed[^}]*inset:0/.test(rules), 'backdrop phai gan vao 4 canh man hinh');
+  assert.ok(/\.modal\{[^}]*height:100%/.test(rules), 'modal phai co chieu cao xac dinh, khong duoc chi dua vao max-height');
+  assert.ok(/\.modal\{[^}]*max-height:none/.test(rules), 'phai bo max-height tren dien thoai');
+  assert.ok(/\.detail-body\{[^}]*flex:1 1 0/.test(rules), 'vung cuon phai flex-basis 0 de nhan phan con lai');
+  assert.ok(/\.checkout-form\{[^}]*flex:1 1 0/.test(rules), 'form thanh toan cung phan nay');
+  assert.ok(/\.success-state\{[^}]*flex:1 1 0/.test(rules), 'trang thanh cong cung phan nay');
+
+  // Desktop .modal used max-height + overflow:auto, so the whole sheet scrolled
+  // and the buy bar scrolled out of view. It has to be a flex column with an
+  // inner scroll region on every screen size.
+  const base = css.match(/\.modal\{position:relative;[^}]*\}/);
+  assert.ok(base, 'can co rule .modal co ban');
+  assert.ok(base[0].includes('display:flex'), 'modal phai la flex column');
+  assert.ok(base[0].includes('flex-direction:column'), 'modal phai xep cot');
+  assert.ok(!base[0].includes('overflow:auto'), 'modal khong duoc cuon toan bo');
+  const body = css.match(/^\.detail-body\{[^}]*\}/m);
+  assert.ok(body, 'can co rule .detail-body');
+  assert.ok(body[0].includes('overflow-y:auto'), 'chi detail-body moi cuon');
+  assert.ok(body[0].includes('min-height:0'), 'can min-height:0 de flex con co the co');
+  const footer = css.match(/^\.detail-footer\{[^}]*\}/m);
+  assert.ok(footer, 'can co rule .detail-footer');
+  assert.ok(footer[0].includes('flex:0 0 auto'), 'thanh nut mua phai co dinh khong co');
+});
+
 
 test('mo mo phai khoa trang nen lai', () => {
   const css = read('styles.css');
@@ -315,8 +345,6 @@ test('nut mua nam ngoai vung cuon, luon nhin thay', async () => {
   const iTitle = html.indexOf('detail-copy');
   assert.ok(iTitle >= 0 && iBody > iTitle, 'ten san pham phai tren phan noi dung');
   assert.ok(iFooter > iBody, 'thanh nut mua phai duoi phan noi dung');
-  // The buy button must be a sibling of the scrolling area, not inside it,
-  // otherwise it scrolls off screen with the description.
   const body = html.slice(iBody, iFooter);
   assert.ok(!body.includes('buy-product'), 'nut mua khong duoc nam trong vung cuon');
   assert.ok(html.slice(iFooter).includes('buy-product'), 'nut mua phai nam trong detail-footer');
