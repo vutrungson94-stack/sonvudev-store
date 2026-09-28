@@ -44,6 +44,13 @@ create index if not exists orders_customer_email_idx on public.orders(customer_e
 create index if not exists orders_provider_order_id_idx on public.orders(provider_order_id);
 create index if not exists products_status_idx on public.products(status);
 
+-- English copy for the storefront language switch. Kept optional: a product with
+-- no *_en value simply falls back to the Vietnamese text, so existing rows and
+-- new ones work without a backfill.
+alter table public.products add column if not exists short_description_en text not null default '';
+alter table public.products add column if not exists description_en text not null default '';
+alter table public.products add column if not exists features_en jsonb not null default '[]'::jsonb;
+
 alter table public.products enable row level security;
 alter table public.orders enable row level security;
 

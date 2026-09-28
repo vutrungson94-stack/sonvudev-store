@@ -257,7 +257,7 @@ app.post("/api/admin/products", admin, json, async (req, res) => {
     const item = await createProduct({
       slug: text(req.body.slug, 80) || name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, ""), name,
       shortDescription: text(req.body.shortDescription, 180), description: text(req.body.description, 2000), category: text(req.body.category, 50) || "Khác", platform: text(req.body.platform, 50) || "Windows", version: text(req.body.version, 30) || "1.0.0", price, currency: text(req.body.currency, 8) || "VND",
-      features: Array.isArray(req.body.features) ? req.body.features.map((v) => text(v, 120)).filter(Boolean) : [], requirements: text(req.body.requirements, 240), status: text(req.body.fileKey, 500) ? (req.body.status === "draft" ? "draft" : "active") : "draft", fileKey: text(req.body.fileKey, 500), badge: text(req.body.badge, 40) || null, featured: Boolean(req.body.featured),
+      features: Array.isArray(req.body.features) ? req.body.features.map((v) => text(v, 120)).filter(Boolean) : [], featuresEn: Array.isArray(req.body.featuresEn) ? req.body.featuresEn.map((v) => text(v, 200)).filter(Boolean) : [], shortDescriptionEn: text(req.body.shortDescriptionEn, 180), descriptionEn: text(req.body.descriptionEn, 4000), requirements: text(req.body.requirements, 240), status: text(req.body.fileKey, 500) ? (req.body.status === "draft" ? "draft" : "active") : "draft", fileKey: text(req.body.fileKey, 500), badge: text(req.body.badge, 40) || null, featured: Boolean(req.body.featured),
     });
     res.status(201).json({ product: item });
   } catch (error) { console.error(error); res.status(500).json({ error: "Không thể tạo sản phẩm" }); }
