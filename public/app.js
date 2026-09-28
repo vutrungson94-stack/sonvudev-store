@@ -117,6 +117,7 @@ function card(p) {
       </div>
     </div>
   </article>`;
+}
 
 function openProduct(id) {
   const raw = products.find((x) => x.id === id);
@@ -197,9 +198,6 @@ async function submitCheckout(event, p) {
     button.innerHTML = `${esc(T('cart.continue'))} <span>→</span>`;
   }
 }
-
-}
-
 
 const channelCard = (c, first) => `<section class="pay-channel${first ? ' is-active' : ''}" data-channel="${esc(c.id)}">
   <header class="pay-channel-head"><b>${esc(c.label)}</b><span>${esc(c.hint || '')}</span></header>

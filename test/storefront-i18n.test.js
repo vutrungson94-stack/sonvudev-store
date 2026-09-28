@@ -176,6 +176,62 @@ test('nut chuyen ngon ngu nam trong header cua index.html', () => {
 });
 
 
+// End-to-end click path, the one a customer actually walks: tap a product,
+// then tap the buy button. The extra modal nodes are cached so getElementById
+// keeps returning the same object, exactly like a browser would after the
+// innerHTML has inserted them.
+async function clickThroughCheckout() {
+  const { document } = createDom(IDS);
+  const cache = new Map();
+  for (const id of ['modal-title', 'buy-product', 'back-product', 'checkout-form']) cache.set(id, new El('div', id));
+  const base = document.getElementById.bind(document);
+  document.getElementById = (id) => base(id) || cache.get(id) || null;
+  const fetch = async (url) => (String(url).includes('/api/products')
+    ? { ok: true, json: async () => ({ products }) }
+    : { ok: true, json: async () => ({ country: 'VN', options: [{ id: 'bank_transfer', label: 'Chuyen khoan', hint: 'h', account: '1', amount: 1, currency: 'VND', transferNote: 'n' }] }) });
+  const ls = { _v: {}, getItem: () => null, setItem() {}, removeItem() {} };
+  const i18n = await runScript(read('i18n.js'), { document, window: {}, fetch, localStorage: ls });
+  const run = await runScript(read('app.js'), { document, window: { I18N: i18n.window.I18N }, fetch, localStorage: ls });
+  return { run, document, get: (id) => cache.get(id) };
+}
+
+test('bam san pham -> mo duyet chi tiet -> bam mua -> den trang thanh toan', async () => {
+  const { run, document, get } = await clickThroughCheckout();
+  assert.deepEqual(run.errors, [], `app.js nem loi: ${run.errors.join(' | ')}`);
+  assert.equal(typeof run.window.openProduct, 'function', 'openProduct phai la ham global');
+  assert.equal(typeof run.window.openCheckout, 'function', 'openCheckout phai la ham global');
+
+  run.window.openProduct('p1');
+  const detail = document.getElementById('modal-content').innerHTML;
+  assert.ok(detail.includes('Sản phẩm A'), 'modal chi tiet phai hien ten san pham');
+  assert.ok(detail.includes('buy-product'), 'modal chi tiet phai co nut mua');
+
+  const buy = get('buy-product');
+  assert.equal(typeof buy.onclick, 'function', 'nut mua phai gan su kien onclick');
+  buy.onclick();
+
+  const checkout = document.getElementById('modal-content').innerHTML;
+  assert.ok(checkout.includes('checkout-form'), 'buoc sau phai ra form thanh toan');
+  assert.ok(checkout.includes('bank_transfer'), 'form thanh toan phai liet ke phuong thuc');
+  assert.ok(checkout.includes('checkout-form'), 'phai co form');
+  assert.deepEqual(run.errors, [], 'khong duoc nem loi sau khi bam');
+});
+
+test('openProduct va openCheckout phai nam o cap global', () => {
+  // A stray brace once turned these into a bare block, which parses fine and
+  // silently hides the functions from the rest of the page: tapping a product
+  // then did nothing. Assert they are reachable, not merely present in the file.
+  const source = read('app.js');
+  assert.ok(/^function openProduct\(/m.test(source), 'openProduct phai khai bao o dau dong');
+  assert.ok(/^function openCheckout\(/m.test(source), 'openCheckout phai khai bao o dau dong');
+  // Every top-level function must be balanced: no function may be swallowed by
+  // an unclosed brace before it.
+  const topLevel = [...source.matchAll(/^(?:async )?function (\w+)/gm)].map((m) => m[1]);
+  for (const name of ['card', 'openProduct', 'closeModal', 'openCheckout', 'submitCheckout', 'showOrder', 'checkOrder', 'downloadOrder']) {
+    assert.ok(topLevel.includes(name), `${name} phai la ham cap cao`);
+  }
+});
+
 test('data-i18n trong index.html deu co khoa trong bang dich', async () => {
   const html = read('index.html');
   const { document } = createDom(IDS);

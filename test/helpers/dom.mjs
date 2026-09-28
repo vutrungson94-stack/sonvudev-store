@@ -1,3 +1,6 @@
+import vm from 'node:vm';
+
+
 // Minimal DOM stand-in so public/app.js can be executed in Node. It implements
 // only what the storefront touches: element lookups, innerHTML, dataset, class
 // and addEventListener. A stub that is too permissive hides real bugs, so every
@@ -92,15 +95,19 @@ export async function runScript(code, { document, window: winOverrides = {}, ...
   const errors = [];
   const documentListeners = {};
   const windowListeners = {};
+  // `localStorage` arrives via the rest parameter, not inside `window`, so it
+  // has to be read from there. Using the wrong one made a stored language choice
+  // look ignored even though the real page honours it.
+  const storage = rest.localStorage || winOverrides.localStorage || {
+    _v: {},
+    getItem(k) { return this._v[k] ?? null; },
+    setItem(k, v) { this._v[k] = String(v); },
+    removeItem(k) { delete this._v[k]; },
+  };
   const win = {
     ...winOverrides,
     document,
-    localStorage: winOverrides.localStorage || {
-      _v: {},
-      getItem(k) { return this._v[k] ?? null; },
-      setItem(k, v) { this._v[k] = String(v); },
-      removeItem(k) { delete this._v[k]; },
-    },
+    localStorage: storage,
     addEventListener(type, fn) { (windowListeners[type] ||= []).push(fn); },
     removeEventListener() {},
     dispatchEvent(e) { (windowListeners[e.type] || []).forEach((f) => f(e)); },
@@ -120,13 +127,33 @@ export async function runScript(code, { document, window: winOverrides = {}, ...
     Intl, URL, CustomEvent: class { constructor(t, o) { this.type = t; this.detail = o?.detail; } },
     ...rest,
   };
-  ctx.globalThis = ctx;
-  const names = Object.keys(ctx);
-  const values = names.map((n) => ctx[n]);
+  // A classic <script> tag publishes top-level function declarations on the
+  // global object, so the harness has to as well. `new Function` hides them in
+  // its own scope and a `with` block makes them block-scoped in sloppy mode, so
+  // neither reproduces browser behaviour. Node's vm evaluates the source in a
+  // context we own end to end, which is the faithful equivalent.
+  //
+  // `win` itself is the sandbox: the script assigns `window.I18N` and declares
+  // `function openProduct`, and both must land on the very object the test
+  // inspects. Handing vm a separate wrapper and copying back afterwards is
+  // what made openProduct look missing.
+  win.window = win;
+  win.document = document;
+  win.fetch = ctx.fetch;
+  win.console = ctx.console;
+  win.navigator = ctx.navigator;
+  win.location = ctx.location;
+  win.setTimeout = ctx.setTimeout;
+  win.clearTimeout = ctx.clearTimeout;
+  win.Intl = Intl;
+  win.URL = URL;
+  win.CustomEvent = ctx.CustomEvent;
+  win.localStorage = winOverrides.localStorage || win.localStorage || { _v: {}, getItem: () => null, setItem() {}, removeItem() {} };
+  win.globalThis = win;
+  win.self = win;
   try {
-    // eslint-disable-next-line no-new-func
-    const fn = new Function(...names, `"use strict";\n${code}`);
-    fn(...values);
+    const script = new vm.Script(code, { filename: 'storefront.js' });
+    script.runInContext(vm.createContext(win));
   } catch (error) {
     errors.push(`${error.name}: ${error.message}`);
   }
