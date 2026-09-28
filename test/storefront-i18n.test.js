@@ -287,6 +287,13 @@ test('modal tren dien thoai cuon tung phan, khong phai ca trang', () => {
   // The header must not scroll away, and the buy bar must not either.
   assert.ok(/\.detail-copy\{[^}]*flex:0 0 auto/.test(rules), 'ten san pham phai ghim khong cuon');
   assert.ok(/\.detail-footer\{[^}]*flex:0 0 auto/.test(rules), 'nut mua phai ghim o day duoi');
+  // The base .modal-backdrop is a centred grid (`place-items:center`), which
+  // leaves the sheet with no height to divide among its rows, so the scroll area
+  // froze and the buy bar vanished. The phone rule has to switch it to flex.
+  assert.ok(/\.modal-backdrop\{[^}]*display:flex/.test(rules), 'backdrop phai doi tu grid sang flex tren dien thoai');
+  assert.ok(/\.modal-backdrop\{[^}]*align-items:stretch/.test(rules), 'backdrop phai keo theo chieu cao');
+  assert.ok(/\.modal\{[^}]*flex:1 1 auto/.test(rules), 'modal phai nhan phan con lai cua backdrop');
+  assert.ok(/\.modal\{[^}]*min-width:0/.test(rules), 'can min-width:0 de modal co lai duoc');
   // Swiping inside the sheet must not drag the store page along.
   assert.ok(/overscroll-behavior:contain/.test(rules), 'can chan lan truyen cuon sang trang nen');
 });
@@ -299,7 +306,6 @@ test('chieu cao modal phai xac dinh o ca may tinh va dien thoai', () => {
   const block = css.match(/@media\(max-width:700px\)\{([\s\S]*?)\n\}/);
   const rules = block[1];
   assert.ok(/\.modal-backdrop\{[^}]*position:fixed[^}]*inset:0/.test(rules), 'backdrop phai gan vao 4 canh man hinh');
-  assert.ok(/\.modal\{[^}]*height:100%/.test(rules), 'modal phai co chieu cao xac dinh, khong duoc chi dua vao max-height');
   assert.ok(/\.modal\{[^}]*max-height:none/.test(rules), 'phai bo max-height tren dien thoai');
   assert.ok(/\.detail-body\{[^}]*flex:1 1 0/.test(rules), 'vung cuon phai flex-basis 0 de nhan phan con lai');
   assert.ok(/\.checkout-form\{[^}]*flex:1 1 0/.test(rules), 'form thanh toan cung phan nay');
