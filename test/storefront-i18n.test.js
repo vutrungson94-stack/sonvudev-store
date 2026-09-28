@@ -18,6 +18,15 @@ const products = [
   { id: 'p2', slug: 'p2', name: 'Product B', shortDescription: 'Mô tả ngắn', description: 'Mô tả dài', category: 'Bundle', platform: 'Windows', version: '2.0.0', price: 149000, currency: 'VND' },
 ];
 
+// Long-form copy arrives with blank lines between paragraphs. A customer
+// complained it rendered as one unreadable wall, so this fixture is realistic.
+const longCopy = 'DÒNG MỞ ĐẦU.\n\nÝ NGHĨA THỨ NHẤT.\nVẫn thuộc đoạn một.\n\nÝ NGHĨA THỨ HAI.\n\nKẾT THÚC.';
+const longProduct = {
+  id: 'p3', slug: 'p3', name: 'Sản phẩm mô tả dài', shortDescription: 'Tóm tắt',
+  description: longCopy, category: 'Công cụ', platform: 'Windows', version: '1.0.0',
+  price: 99000, currency: 'VND', features: ['f1'], requirements: '',
+};
+
 // Boots the real public/i18n.js then public/app.js against a stubbed DOM, so a
 // truncation or a throw inside the storefront shows up here instead of on a phone.
 async function boot({ lang = 'vi' } = {}) {
@@ -230,6 +239,52 @@ test('openProduct va openCheckout phai nam o cap global', () => {
   for (const name of ['card', 'openProduct', 'closeModal', 'openCheckout', 'submitCheckout', 'showOrder', 'checkOrder', 'downloadOrder']) {
     assert.ok(topLevel.includes(name), `${name} phai la ham cap cao`);
   }
+});
+
+test('mo ta san pham tach thanh doan, khong bien mot khoi lien dong', async () => {
+  const { document } = createDom(IDS);
+  const cache = new Map();
+  for (const id of ['modal-title', 'buy-product']) cache.set(id, new El('div', id));
+  const base = document.getElementById.bind(document);
+  document.getElementById = (id) => base(id) || cache.get(id) || null;
+  const fetch = async (url) => (String(url).includes('/api/products')
+    ? { ok: true, json: async () => ({ products: [longProduct] }) }
+    : { ok: true, json: async () => ({ country: 'VN', options: [] }) });
+  const ls = { _v: {}, getItem: () => null, setItem() {}, removeItem() {} };
+  const i18n = await runScript(read('i18n.js'), { document, window: {}, fetch, localStorage: ls });
+  const run = await runScript(read('app.js'), { document, window: { I18N: i18n.window.I18N }, fetch, localStorage: ls });
+  assert.deepEqual(run.errors, [], 'app.js khong duoc nem loi');
+  run.window.openProduct('p3');
+  const html = document.getElementById('modal-content').innerHTML;
+  const block = html.slice(html.indexOf('detail-description'), html.indexOf('</div>', html.indexOf('detail-description')));
+  // The fixture has four blank-line separated blocks.
+  const paras = (block.match(/<p>/g) || []).length;
+  assert.equal(paras, 4, `mo ta phai tach thanh 4 doan, thuc te co ${paras}`);
+  assert.ok(block.includes('DÒNG MỞ ĐẦU'), 'doan dau phai hien');
+  assert.ok(block.includes('KẾT THÚC'), 'doan cuoi phai hien');
+  // A single newline inside one block becomes <br> before the next line.
+  assert.ok(block.includes('Ý NGHĨA THỨ NHẤT.<br>Vẫn thuộc'), 'xuong dong trong mot doan phai thanh <br>');
+  // Separate blocks must each get their own <p>, with no raw newline left.
+  assert.ok(block.includes('MỞ ĐẦU.</p><p>Ý NGHĨA'), 'hai doan phai tach bang the p');
+  assert.ok(!block.includes('\n'), 'khong duoc con xuong dong tho trong HTML');
+});
+
+test('modal tren dien thoai cuon tung phan, khong phai ca trang', () => {
+  const css = read('styles.css');
+  // The whole modal used to scroll as one 90vh block, forcing a long page of
+  // scrolling on a phone. The body must scroll on its own instead.
+  const block = css.match(/@media\(max-width:700px\)\{([\s\S]*?)\n\}/);
+  assert.ok(block, 'can co media query 700px cho modal dien thoai');
+  const rules = block[1];
+  assert.ok(/\.modal\{[^}]*flex-direction:column/.test(rules), 'modal phai la flex column de tach phan');
+  assert.ok(/\.checkout-form\{[^}]*overflow-y:auto/.test(rules), 'form thanh toan phai cuon rieng');
+  assert.ok(/\.detail-copy\{[^}]*overflow-y:auto/.test(rules), 'noi dung san pham phai cuon rieng');
+  assert.ok(/\.detail-copy\{[^}]*min-height:0/.test(rules), 'can min-height:0 de flex con cuon dung');
+  // Full-bleed sheet with rounded top reads better than a boxed dialog.
+  assert.ok(/\.modal-backdrop\{[^}]*padding:0/.test(rules), 'backdrop phai full man hinh tren dien thoai');
+  assert.ok(/\.modal\{[^}]*max-height:94dvh/.test(rules), 'dung dvh de tranh bi che khi thanh dia phap');
+  // The decorative banner eats a lot of vertical space on a small screen.
+  assert.ok(/\.detail-art\{display:none\}/.test(rules), 'anh banner nen an di tren dien thoai');
 });
 
 test('data-i18n trong index.html deu co khoa trong bang dich', async () => {

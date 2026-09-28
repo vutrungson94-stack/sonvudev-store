@@ -14,6 +14,16 @@ let lastToken = null;
 
 const T = (key, fallback) => window.I18N.t(key, fallback);
 const esc = (v) => String(v ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+// Product copy is authored with blank lines between paragraphs. HTML collapses
+// every newline, so a plain esc() turned a wall of text into one solid block.
+// Escaping first and then turning the newlines into <p> keeps the structure
+// without letting any markup through.
+const paragraphs = (text) => String(text || '')
+  .split(/\n{2,}/)
+  .map((block) => block.trim())
+  .filter(Boolean)
+  .map((block) => `<p>${esc(block).replace(/\n/g, '<br>')}</p>`)
+  .join('');
 const initials = (n) => String(n || 'SV').split(/\s+/).map((p) => p[0]).join('').slice(0, 2).toUpperCase();
 const money = (v, c = 'VND') => new Intl.NumberFormat(
   window.I18N.lang === 'en' ? 'en-US' : 'vi-VN',
@@ -130,7 +140,7 @@ function openProduct(id) {
     <div class="detail-copy">
       <p class="eyebrow">${esc(p.platform)} · ${esc(T('product.version'))} ${esc(p.version)}</p>
       <h2 id="modal-title">${esc(p.name)}</h2>
-      <p>${esc(p.description || p.shortDescription || '')}</p>
+      <div class="detail-description">${paragraphs(p.description || p.shortDescription)}</div>
       <ul class="feature-list">${(p.features || []).map((f) => `<li><span>✓</span>${esc(f)}</li>`).join('')}</ul>
       <div class="detail-requirements">
         <b>${esc(T('product.requirements'))}</b>

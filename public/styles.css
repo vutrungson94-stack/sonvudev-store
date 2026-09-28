@@ -99,3 +99,31 @@
 @media(max-width:800px){.lang-toggle{padding:5px 10px;font-size:11px;margin-left:auto}.site-header .header-cta{margin-left:0}}
 @media(max-width:420px){.lang-toggle{padding:4px 8px;font-size:10px;letter-spacing:.04em}}
 
+/* Long product copy used to collapse into one unreadable wall of text. The
+   markup is split into <p> blocks in app.js; this just spaces them out. */
+.detail-description p{margin:0 0 14px}
+.detail-description p:last-child{margin-bottom:0}
+.detail-description p+p{margin-top:2px}
+
+/* Phone: the modal filled the screen and forced a long page of scrolling
+   because the whole thing scrolled at once. Pin the header, let only the body
+   scroll, and trim the chrome so more of the actual form stays on screen. */
+@media(max-width:700px){
+  .modal-backdrop{padding:0;align-items:flex-end}
+  .modal{width:100%;max-width:100%;max-height:94dvh;border-radius:16px 16px 0 0;display:flex;flex-direction:column;overflow:hidden}
+  .modal-close{position:sticky;top:8px;float:right;margin:8px 10px 0 0;box-shadow:0 2px 10px rgba(0,0,0,.12)}
+  .detail-art{display:none}
+  .detail-copy,.checkout-head{padding-left:18px;padding-right:18px}
+  .checkout-head{padding-top:22px;padding-bottom:14px}
+  .checkout-head h2{font-size:21px;line-height:1.25}
+  .checkout-form{padding:6px 18px 24px;gap:13px;overflow-y:auto;-webkit-overflow-scrolling:touch;flex:1;min-height:0}
+  .detail-copy{overflow-y:auto;-webkit-overflow-scrolling:touch;flex:1;min-height:0}
+  .back-button{margin-bottom:18px}
+  .detail-footer{padding:14px 18px calc(16px + env(safe-area-inset-bottom))}
+  .success-state{padding:0 18px calc(22px + env(safe-area-inset-bottom));overflow-y:auto;-webkit-overflow-scrolling:touch;flex:1;min-height:0}
+}
+@media(max-width:400px){
+  .checkout-form input,.checkout-form textarea{font-size:16px}
+  .detail-description p{margin-bottom:12px}
+}
+
