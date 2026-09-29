@@ -117,6 +117,32 @@ test('sitemap lấy sản phẩm từ dữ liệu sống, không phải danh sá
   assert.ok(updated.includes(`<lastmod>${stamp}</lastmod>`), `lastmod phải theo ngày sửa sản phẩm (${stamp})`);
 });
 
+test('sản phẩm không bán được không được lập chỉ mục', async () => {
+  // The seed rows that never got a file attached are active in the database but
+  // hidden from the storefront. Listing them in the sitemap would hand Google
+  // three URLs that lead nowhere.
+  const ghost = await fetch(`${base}/api/admin/products`, {
+    method: 'POST', headers: jsonHeaders,
+    body: JSON.stringify({ name: 'Ghost Product', slug: 'ghost-product', price: 100, currency: 'VND', status: 'active' }),
+  });
+  const created = (await ghost.json()).product;
+  const body = await text('/sitemap.xml');
+  assert.ok(!body.includes('ghost-product'), 'sản phẩm chưa có file không được vào sitemap');
+  assert.equal((await get('/product/ghost-product')).status, 404, 'và cũng không được mở trang');
+  await updateProduct(created.id, { status: 'archived' });
+});
+
+test('chỉ có một route robots.txt, và nó là bản đầy đủ', async () => {
+  const source = await fs.readFile(new URL('../src/app.js', import.meta.url), 'utf8');
+  // Two routes on the same path: Express answers with the first one registered,
+  // so a second, better one silently does nothing.
+  assert.equal((source.match(/app\.get\("\/robots\.txt"/g) || []).length, 1, 'chỉ được đăng ký một route robots.txt');
+  const body = await text('/robots.txt');
+  assert.ok(body.includes('Disallow: /order/'), 'phải chặn trang đơn hàng');
+  assert.ok(body.includes('Disallow: /lookup'));
+  assert.ok(!body.includes('/admin.html'), 'bản cũ đã bị thay');
+});
+
 test('ảnh preview sinh theo từng sản phẩm', async () => {
   const response = await get(`/og/${product.slug}.svg`);
   assert.equal(response.status, 200);

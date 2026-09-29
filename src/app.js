@@ -60,7 +60,6 @@ app.use((req, res, next) => {
   if (req.secure) res.setHeader("Strict-Transport-Security", "max-age=15552000; includeSubDomains");
   next();
 });
-app.get("/robots.txt", (_req, res) => res.type("text/plain").send("User-agent: *\nAllow: /\nDisallow: /admin.html\nDisallow: /api/\nSitemap: https://sonvudev.com/sitemap.xml\n"));
 app.get("/robots.txt", (_req, res) => {
   res.type("text/plain").send([
     "User-agent: *",
@@ -84,7 +83,7 @@ app.get("/og/:slug.svg", async (req, res) => {
     return res.set("Cache-Control", "public, max-age=3600").type("image/svg+xml").send(renderOgImage({ name: "Phần mềm Windows cho công việc", platform: "Windows", version: "1.0", price: 0, currency: "VND", priceLabel: "Từ 99.000₫" }));
   }
   const product = await getProductBySlug(req.params.slug);
-  if (!product || product.status !== "active") return res.status(404).type("text/plain").send("Not found");
+  if (!product || product.status !== "active" || !product.fileKey || !isConfigured.r2) return res.status(404).type("text/plain").send("Not found");
   res.set("Cache-Control", "public, max-age=3600");
   res.type("image/svg+xml").send(renderOgImage(product));
 });
@@ -92,9 +91,11 @@ app.get("/og/:slug.svg", async (req, res) => {
 app.get("/product/:slug", async (req, res) => {
   try {
     const product = await getProductBySlug(req.params.slug);
-    // A retired product is a 404, not a page marked "noindex": the old URL then
-    // stops competing with the products that are still for sale.
-    if (!product || product.status !== "active") return res.status(404).sendFile(path.join(publicDir, "404.html"));
+    // A product the storefront would not show is a 404 here too. The seed rows
+    // that never got a file attached would otherwise be reachable and indexable
+    // even though nobody can buy them.
+    const sellable = product && product.status === "active" && product.fileKey && isConfigured.r2;
+    if (!sellable) return res.status(404).sendFile(path.join(publicDir, "404.html"));
     res.set("Cache-Control", "public, max-age=300");
     res.type("html").send(renderProductPage(product));
   } catch (error) { console.error(error); res.status(500).type("text/plain").send("Lỗi máy chủ"); }
@@ -108,8 +109,10 @@ app.get("/sitemap.xml", async (_req, res) => {
     .map((file) => `<url><loc>${base}/${file === "index.html" ? "" : file.replace(/\.html$/, "")}</loc><changefreq>monthly</changefreq><priority>${file === "index.html" ? "1.0" : "0.3"}</priority></url>`);
   // A product that is not on the sitemap cannot be found, so this is built from
   // the live catalogue rather than from a list someone has to remember to edit.
-  const products = (await listProducts()).filter((item) => item.status === "active" && item.slug);
-  for (const product of products) {
+  // The filter is the storefront's own: a product with no file attached cannot
+  // be bought, so listing it would submit pages to Google that lead nowhere.
+  const sellable = (product) => product.status === "active" && product.slug && product.fileKey && isConfigured.r2;
+  for (const product of (await listProducts()).filter(sellable)) {
     const updated = product.updatedAt || product.updated_at;
     urls.push(`<url><loc>${base}/product/${encodeURIComponent(product.slug)}</loc>${updated ? `<lastmod>${new Date(updated).toISOString().slice(0, 10)}</lastmod>` : ""}<changefreq>weekly</changefreq><priority>0.8</priority></url>`);
   }
