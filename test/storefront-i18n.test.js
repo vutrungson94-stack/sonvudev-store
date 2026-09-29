@@ -81,9 +81,14 @@ test('showOrder viet tron mot khoi, khong bi cat lung giua duong', async () => {
   const end = source.indexOf('\nasync function checkOrder(', start);
   assert.ok(end > start, 'showOrder phai ket thuc truoc checkOrder');
   const body = source.slice(start, end);
-  assert.ok(body.includes('dl.hidden'), 'showOrder phai kiem tra trang thai nut tai');
+  assert.ok(body.includes('dl.disabled'), 'showOrder phai khoa nut tai khi chua thanh toan');
   assert.ok(body.includes('dl.onclick'), 'showOrder phai gan su kien cho nut tai');
   assert.ok(body.includes('download-order'), 'showOrder phai lay nut download-order');
+  assert.ok(!body.includes('dl.hidden'), 'nut tai phai luon hien, chi bi khoa chu khong bien mat');
+  // The deadline the form promises and the countdown the buyer reads have to
+  // come from the same place, or the form and the sweep disagree.
+  assert.ok(source.includes('expiryNote'), 'form thanh toan phai bao het han');
+  assert.ok(source.includes('paymentWindowHours'), 'so gio phai lay tu server');
 });
 
 test('showOrder chay duoc va day du thong tin don hang', async () => {

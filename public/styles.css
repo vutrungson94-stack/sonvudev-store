@@ -64,6 +64,27 @@
 .order-row>span{color:var(--muted)}
 .order-row>b{text-align:right}
 .order-hint{color:#4c5b63;font-size:13px;line-height:1.7;background:#fff;border:1px solid var(--line);border-radius:10px;padding:14px 16px;margin:0 0 16px}
+/* The countdown is the one piece of information a buyer acts on, so it is the
+   only thing on the page allowed to change every second. */
+.expiry-note{background:#fff8e8;border:1px solid #f0dcb0;border-radius:8px;padding:11px 13px;margin:0 0 16px;color:#7a5a12;font-size:11px;line-height:1.6}
+.order-deadline{font:600 13px 'Space Grotesk';letter-spacing:.02em;color:#247653;background:#e8f7ef;border-radius:8px;padding:9px 13px;margin:0 0 14px;text-align:center;font-variant-numeric:tabular-nums}
+.order-deadline.is-over{color:#a03226;background:#fdeceb;border-color:#f3cdc9}
+.revenue-panel{margin-bottom:34px}
+.admin-warn{background:#fff4e5;border:1px solid #f0c68a;border-radius:12px;padding:16px 18px;margin-bottom:22px}
+.admin-warn b{display:block;font:600 14px 'Space Grotesk';color:#8a4b06;margin-bottom:5px}
+.admin-warn p{margin:0;font-size:12px;line-height:1.7;color:#7a5a12}
+.admin-warn code{background:rgba(0,0,0,.05);padding:1px 5px;border-radius:4px}
+.revenue-totals{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:14px;margin-bottom:16px}
+.revenue-totals>div{background:#fff;border:1px solid var(--line);border-radius:12px;padding:17px 19px}
+.revenue-totals b{display:block;font:600 25px 'Space Grotesk';letter-spacing:-.04em;margin-bottom:3px}
+.revenue-totals small{color:var(--muted);font-size:10px}
+.order-offline{background:#fff8e8;border:1px solid #f0dcb0;border-radius:8px;padding:11px 13px;margin:0 0 16px;color:#7a5a12;font-size:12px}
+.safety-note{color:var(--muted);font-size:11px;line-height:1.6;margin:0 0 16px;padding-left:11px;border-left:2px solid var(--line)}
+.token-note{color:var(--muted);font-size:10px;line-height:1.6;margin:8px 0 0}
+.token-link{display:inline-block;margin-top:7px;font-size:11px;color:var(--green)}
+.order-recover{margin-top:22px;padding-top:20px;border-top:1px solid var(--line)}
+.order-recover p{color:var(--muted);font-size:12px;line-height:1.7;margin:0 0 12px}
+.button[disabled],.button:disabled{opacity:.45;cursor:not-allowed;pointer-events:none}
 .order-channel{display:grid;gap:6px;background:#fff;border:1px solid var(--line);border-radius:12px;padding:18px;margin-bottom:14px;font-size:13px}
 .order-channel>b{font:600 15px 'Space Grotesk'}
 .order-channel span{color:#4c5b63}

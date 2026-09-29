@@ -1,4 +1,11 @@
 const form=document.getElementById('lookup-form'),status=document.getElementById('lookup-status'),submit=document.getElementById('lookup-submit');
+// The order screen links here with the id already attached. Retyping a code from
+// a receipt onto a phone keyboard is exactly the step that stops people
+// recovering, so the one value we already know arrives filled in.
+try{
+  const prefilled=new URLSearchParams(location.search).get('order');
+  if(prefilled)form.elements.orderId.value=prefilled.toUpperCase().slice(0,80);
+}catch(error){}
 // The checkout token only ever lives in the browser session, so this page
 // recovers access by order id + email. The server re-issues a fresh token and
 // invalidates the old one, which is why this stays safe without emailing anyone.
