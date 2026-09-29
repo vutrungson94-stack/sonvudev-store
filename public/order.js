@@ -1,7 +1,7 @@
 const title=document.getElementById('order-title'),lead=document.getElementById('order-lead'),body=document.getElementById('order-body');
 const esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const money=(v,c='VND')=>new Intl.NumberFormat('vi-VN',c==='USD'?{style:'currency',currency:c}:{maximumFractionDigits:0}).format(Number(v||0));
-const statusLabels={pending:'Đang xử lý',pending_transfer:'Đang chờ chuyển khoản',paid:'Đã thanh toán',payment_failed:'Thất bại',cancelled:'Đã hủy'};
+const statusLabels={pending:'Đang xử lý',pending_transfer:'Đang chờ chuyển khoản',paid:'Đã thanh toán',payment_failed:'Thất bại',cancelled:'Đã hủy',refunded:'Đã hoàn tiền'};
 const state=JSON.parse(sessionStorage.getItem('sonvudev_order')||'null');
 function missing(){title.textContent='Chưa tìm thấy phiên đơn hàng';lead.textContent='Vì lý do bảo mật, mã tra cứu chỉ được giữ trong trình duyệt này. Nếu bạn mở trang này ở thiết bị khác, hãy tra cứu lại bằng mã đơn và email.';body.innerHTML='<a class="button button-primary" href="/lookup">Tra cứu đơn hàng <span>→</span></a>'}
 // A dead device leaves no session, so the order id has to be the one thing the
@@ -48,6 +48,7 @@ function scheduleWatch(delay=10000){
 // money leave their account that nothing happened is the one answer that turns a
 // glitch into a chargeback.
 function hintFor(o){
+  if(o.status==='refunded')return `Chúng tôi đã hoàn lại tiền cho đơn này. Lý do: ${o.refundReason||'không rõ'}. Quyền tải sản phẩm đã được thu hồi. Nếu bạn cho là nhầm lẫn, hãy liên hệ hello@sonvudev.com kèm mã đơn.`;
   if(o.status==='paid')return'Thanh toán đã được xác nhận. Bạn có thể tải sản phẩm ngay. Nếu tải bị gián đoạn, bấm tải lại là được, đơn vẫn còn hiệu lực.';
   if(closed(o))return'Bạn đã tải sản phẩm và đơn đã hoàn tất. Nếu tệp tải về bị hỏng hoặc thiếu, gửi email cho chúng tôi kèm mã đơn, chúng tôi mở lại đơn ngay.';
   if(o.status==='cancelled'){
@@ -108,7 +109,7 @@ async function render(){
   // succeeds if PayPal already has an approval, and an already-captured order is
   // reconciled rather than charged twice. A successful capture re-renders, so the
   // caller must stop here or this stale pending view would repaint over it.
-  if(order.paymentProvider==='paypal'&&order.status!=='paid'&&!closed(order)&&order.providerOrderId&&await resumePayPalCapture()) return;
+  if(order.paymentProvider==='paypal'&&order.status!=='paid'&&order.status!=='refunded'&&!closed(order)&&order.providerOrderId&&await resumePayPalCapture()) return;
   title.textContent='Đơn '+order.id;
   const paid=order.status==='paid',done=closed(order);
   lead.textContent=done?'Đã hoàn tất':(statusLabels[order.status]||order.status);

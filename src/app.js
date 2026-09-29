@@ -8,7 +8,7 @@ import { ensureSeed, findOrderByIdempotencyKey, getOrder, getProduct, listOrders
 import { createDownloadUrl, createUploadUrl } from "./r2.js";
 import { captureOrder, createOrder as createPayPalOrder, hashToken, newOrderId, newToken, paypalChargeFor, paypalChargeForProduct, paymentMatchesOrder, readOrder, verifyWebhook } from "./paypal.js";
 import { paymentInstructions, paymentOptions } from "./payments.js";
-import { isClosed, isUnpaid, markOrderDelivered, markOrderPaid, paymentDeadline } from "./orders.js";
+import { isClosed, isUnpaid, markOrderDelivered, markOrderPaid, paymentDeadline, voidPayment } from "./orders.js";
 import { notifyOrder, notifyMode } from "./notify.js";
 import { resolveCountry } from "./geo.js";
 import { vndPerUsd } from "./rates.js";
@@ -367,39 +367,63 @@ app.get("/api/admin/revenue", admin, async (_req, res) => {
   try {
     const orders = await listOrders();
     const products = new Map();
-    let total = { VND: 0, USD: 0 };
+    let gross = { VND: 0, USD: 0 };
+    let moneyBack = { VND: 0, USD: 0 };
     let paidOrders = 0;
+    let refundedOrders = 0;
     let outstanding = 0;
     for (const order of orders) {
       const item = order.items?.[0] || {};
       // paidCount is what makes a delivered order still count as revenue.
       const count = Number(order.paidCount || 0);
-      if (count <= 0) {
+      const back = Number(order.refundedCount || 0);
+      if (count <= 0 && back <= 0) {
         if (isUnpaid(order) && !isClosed(order) && paymentDeadline(order) && paymentDeadline(order) > Date.now()) outstanding += Number(order.amount || 0);
         continue;
       }
       paidOrders += count;
+      refundedOrders += back;
+      const collected = Number(order.paidAmount || 0) || Number(order.amount || 0);
+      const returned = Number(order.refundedAmount || 0);
+      const providerCollected = Number(order.paidProviderAmount || 0);
+      const providerReturned = Number(order.refundedProviderAmount || 0);
       const key = item.productId || item.name || "unknown";
-      const entry = products.get(key) || { productId: key, name: item.name || key, version: item.version || "", price: Number(order.amount || 0), currency: order.currency || "VND", units: 0, revenue: 0, provider: 0, orders: 0 };
+      const entry = products.get(key) || { productId: key, name: item.name || key, version: item.version || "", price: Number(order.amount || 0), currency: order.currency || "VND", units: 0, revenue: 0, refunds: 0, provider: 0, orders: 0 };
       entry.units += count;
       entry.orders += 1;
-      entry.revenue += Number(order.paidAmount || 0) || Number(order.amount || 0);
-      const providerAmount = Number(order.paidProviderAmount || 0);
-      if (providerAmount > 0) entry.provider += providerAmount;
+      entry.revenue += collected;
+      entry.refunds += returned;
+      if (providerCollected > 0) entry.provider += providerCollected;
       products.set(key, entry);
       // The currency bucket is decided per order, never per product. Two buyers
       // can pay the same product in different currencies, and reading the bucket
       // off the shared product row would drop one of the two totals on the
       // floor the moment the second kind of order arrived.
-      const paid = Number(order.paidAmount || 0) || Number(order.amount || 0);
-      if (order.paidProviderCurrency && providerAmount > 0) total[order.paidProviderCurrency] = (total[order.paidProviderCurrency] || 0) + providerAmount;
-      else total[order.currency || "VND"] = (total[order.currency || "VND"] || 0) + paid;
+      //
+      // A PayPal order counts as USD only. Adding its VND shelf price as well
+      // would book one sale twice in two currencies and quietly inflate the
+      // report by the price of every foreign order.
+      if (order.paidProviderCurrency && providerCollected > 0) {
+        gross[order.paidProviderCurrency] = (gross[order.paidProviderCurrency] || 0) + providerCollected;
+        moneyBack[order.paidProviderCurrency] = (moneyBack[order.paidProviderCurrency] || 0) + providerReturned;
+      } else {
+        const currency = order.currency || "VND";
+        gross[currency] = (gross[currency] || 0) + collected;
+        moneyBack[currency] = (moneyBack[currency] || 0) + returned;
+      }
     }
     // A mixed list of VND and USD cannot be summed honestly, so each is kept
     // separate and the UI shows them side by side rather than inventing a total.
     const rows = [...products.values()].sort((a, b) => b.units - a.units);
-    for (const row of rows) row.avg = row.units ? Math.round(row.revenue / row.units) : 0;
-    res.json({ currency: env.paypal.currency, total, paidOrders, outstanding, products: rows, generatedAt: new Date().toISOString() });
+    for (const row of rows) {
+      row.avg = row.units ? Math.round(row.revenue / row.units) : 0;
+      row.net = row.revenue - row.refunds;
+    }
+    const net = {};
+    for (const currency of new Set([...Object.keys(gross), ...Object.keys(moneyBack)])) {
+      net[currency] = (gross[currency] || 0) - (moneyBack[currency] || 0);
+    }
+    res.json({ currency: env.paypal.currency, gross, refunds: moneyBack, net, paidOrders, refundedOrders, outstanding, products: rows, generatedAt: new Date().toISOString() });
   } catch (error) { console.error(error); res.status(500).json({ error: "Không tổng hợp được doanh thu" }); }
 });
 
@@ -419,7 +443,16 @@ app.patch("/api/admin/orders/:id", admin, json, async (req, res) => {
       const now = new Date().toISOString();
       return res.json({ order: publicOrder(await updateOrder(existing.id, { status: "paid", paidAt: existing.paidAt || now, deliveredAt: null, updatedAt: now })) });
     }
-    if (!["pending", "pending_transfer", "paid", "payment_failed", "cancelled"].includes(status)) return res.status(400).json({ error: "Trạng thái không hợp lệ" });
+    // Money going back: a refund, a chargeback, or a confirmation made by
+    // mistake. Recorded as its own figure rather than subtracted from the sale,
+    // so the gross number still matches a bank statement.
+    if (req.body.refund === true) {
+      if (existing.status !== "paid") return res.status(409).json({ error: "Chỉ hoàn tiền được đơn đã thanh toán" });
+      const reason = typeof req.body.reason === "string" ? req.body.reason.trim() : "";
+      if (!reason) return res.status(400).json({ error: "Cần ghi lý do hoàn tiền" });
+      return res.json({ order: publicOrder(await voidPayment(existing, { reason })) });
+    }
+    if (!["pending", "pending_transfer", "paid", "payment_failed", "cancelled", "refunded"].includes(status)) return res.status(400).json({ error: "Trạng thái không hợp lệ" });
     // Confirming by hand goes through the same path as a webhook, so the buyer
     // still gets the mail and paid_count still reflects the real revenue.
     if (status === "paid") return res.json({ order: publicOrder(await markOrderPaid(existing, { source: "admin" })) });

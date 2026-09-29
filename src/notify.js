@@ -49,6 +49,7 @@ function context(order) {
     currency: order.currency || "VND",
     deadline: stamp(order.expiresAt),
     paidAt: stamp(order.paidAt),
+    refundReason: order.refundReason || "không rõ",
     lookupUrl: `${env.appUrl}/lookup`,
     support: env.email.supportEmail,
   };
@@ -111,6 +112,19 @@ const TEMPLATES = {
       `Mở ${c.lookupUrl} và nhập mã đơn <b>${c.id}</b> cùng email này để tải sản phẩm. Liên kết tải có thời hạn ngắn, nhưng bạn luôn có thể tạo lại.`,
       `Go to ${c.lookupUrl} with order ${c.id} and this email to download. Download links are short lived, but you can always generate a new one.`,
       `Cần trợ giúp: ${c.support}.`,
+    ],
+  }),
+  refunded: (c) => ({
+    subject: `Đã hoàn tiền · Order ${c.id} refunded`,
+    heading: "Đơn hàng đã được hoàn tiền",
+    headingEn: "Your order was refunded",
+    lines: [
+      `Chúng tôi đã hoàn lại ${c.amount} cho đơn ${c.id}. Lý do: ${c.refundReason}`,
+      `We refunded ${c.amount} for order ${c.id}. Reason: ${c.refundReason}`,
+    ],
+    blocks: [
+      `Quyền tải sản phẩm của đơn này đã bị thu hồi. Nếu bạn cho rằng đây là nhầm lẫn, hãy trả lời thư này hoặc liên hệ ${c.support} kèm mã đơn.`,
+      `Access to this release has been revoked. If you think this is a mistake, reply to this email or contact ${c.support} with the order id.`,
     ],
   }),
 };

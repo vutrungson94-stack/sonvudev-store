@@ -29,7 +29,11 @@ create table if not exists public.orders (
   access_token_hash text not null,
   customer_email text not null,
   customer_name text not null default '',
-  status text not null default 'pending' check (status in ('pending', 'pending_transfer', 'paid', 'payment_failed', 'cancelled')),
+ -- 'refunded' means the money went back to the buyer. It is kept separate from
+-- 'cancelled' because cancelling an unpaid order and giving back a paid one are
+-- different events, and the revenue report has to tell them apart.
+alter table public.orders drop constraint if exists orders_status_check;
+alter table public.orders add constraint orders_status_check check (status in ('pending', 'pending_transfer', 'paid', 'payment_failed', 'cancelled', 'refunded'));
   payment_provider text not null default 'bank_transfer',
   provider_order_id text,
   amount numeric(12, 2) not null,
@@ -69,6 +73,14 @@ alter table public.orders add column if not exists paid_provider_amount numeric(
 alter table public.orders add column if not exists paid_provider_currency text;
 -- Set once per checkout attempt so a lost response cannot create a duplicate.
 alter table public.orders add column if not exists idempotency_key text;
+-- What went back out. Kept alongside paid_amount rather than subtracted from
+-- it, so the gross figure survives and a report can show collected, refunded
+-- and net instead of quietly losing the history of a sale.
+alter table public.orders add column if not exists refunded_at timestamptz;
+alter table public.orders add column if not exists refund_reason text;
+alter table public.orders add column if not exists refunded_count integer not null default 0;
+alter table public.orders add column if not exists refunded_amount numeric(12, 2) not null default 0;
+alter table public.orders add column if not exists refunded_provider_amount numeric(12, 2) not null default 0;
 -- One entry per sent message per order, so retries and the webhook/capture race
 -- cannot send a buyer two of the same mail.
 alter table public.orders add column if not exists notifications jsonb not null default '{}'::jsonb;

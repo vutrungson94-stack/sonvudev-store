@@ -49,7 +49,8 @@ function statements(sql) {
 /** Columns the running code writes. A missing one is what breaks checkout. */
 const REQUIRED_COLUMNS = {
   orders: ["id", "order_number", "access_token_hash", "customer_email", "customer_name", "status", "payment_provider", "provider_order_id", "amount", "currency", "items", "paid_at", "created_at", "updated_at",
-    "expires_at", "cancelled_at", "cancel_reason", "delivered_at", "paid_count", "paid_amount", "paid_provider_amount", "paid_provider_currency", "idempotency_key", "notifications"],
+    "expires_at", "cancelled_at", "cancel_reason", "delivered_at", "paid_count", "paid_amount", "paid_provider_amount", "paid_provider_currency", "idempotency_key", "notifications",
+    "refunded_at", "refund_reason", "refunded_count", "refunded_amount", "refunded_provider_amount"],
   products: ["id", "slug", "name", "short_description", "description", "category", "platform", "version", "price", "currency", "badge", "features", "requirements", "status", "file_key", "featured", "created_at", "updated_at",
     "short_description_en", "description_en", "features_en"],
 };

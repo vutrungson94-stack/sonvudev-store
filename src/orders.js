@@ -9,6 +9,9 @@ import { notifyOrder } from "./notify.js";
 const UNPAID = new Set(["pending", "pending_transfer"]);
 const HOUR = 60 * 60 * 1000;
 
+/** Money that left the account back towards the buyer. */
+export const refunds = (order) => Number(order?.refundedAmount || 0) + Number(order?.refundedProviderAmount || 0);
+
 const windowMs = () => Math.max(1, Number(env.orders.paymentWindowHours) || 24) * HOUR;
 const warnMs = () => Math.max(0, Number(env.orders.expiringWarnHours) || 0) * HOUR;
 
@@ -87,6 +90,34 @@ export async function markOrderDelivered(order) {
   if (!order || order.status !== "paid") return order;
   const now = new Date().toISOString();
   return updateOrder(order.id, { status: "pending", paidAt: null, deliveredAt: now, updatedAt: now });
+}
+
+/**
+ * Records money going back to the buyer: a refund, a PayPal chargeback, or an
+ * order confirmed by mistake.
+ *
+ * It does not subtract from paidAmount. A report that quietly shrinks a sale
+ * looks like a bug the next time the owner compares it with a bank statement,
+ * so the refund is recorded as its own number and the report shows collected,
+ * refunded and net side by side.
+ */
+export async function voidPayment(order, { reason = "refunded", source = "admin" } = {}) {
+  if (!order || order.status !== "paid") return null;
+  const now = new Date().toISOString();
+  const update = {
+    status: "refunded",
+    refundedAt: now,
+    refundReason: String(reason).slice(0, 200),
+    refundedCount: Number(order.refundedCount || 0) + 1,
+    refundedAmount: Number(order.refundedAmount || 0) + Number(order.paidAmount || order.amount || 0),
+    deliveredAt: null,
+    updatedAt: now,
+  };
+  if (Number(order.paidProviderAmount || 0) > 0) update.refundedProviderAmount = Number(order.refundedProviderAmount || 0) + Number(order.paidProviderAmount);
+  const updated = await updateOrder(order.id, update);
+  await notifyOrder(updated, "refunded", `refunded:${update.refundedCount}`);
+  console.log(`[orders] ${order.id} refunded via ${source}: ${update.refundReason}`);
+  return updated;
 }
 
 async function cancelOrder(order, reason) {

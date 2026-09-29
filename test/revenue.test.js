@@ -85,7 +85,7 @@ test('một đơn chuyển khoản đã thu tính vào doanh thu sản phẩm', 
   assert.equal(row.orders, 1);
   assert.equal(row.revenue, 99000);
   assert.equal(row.avg, 99000);
-  assert.equal(data.total.VND, 99000);
+  assert.equal(data.gross.VND, 99000);
 });
 
 test('đơn đã giao vẫn còn trong doanh thu', async () => {
@@ -99,7 +99,7 @@ test('đơn đã giao vẫn còn trong doanh thu', async () => {
   const data = await revenue();
   const row = data.products.find((p) => p.productId === tool.id);
   assert.equal(row.units, 2, 'đơn đã giao vẫn phải được tính');
-  assert.equal(data.total.VND, 198000);
+  assert.equal(data.gross.VND, 198000);
 });
 
 test('đơn PayPal ghi tiền thực nhận theo USD, không cộng chung với VND', async () => {
@@ -109,8 +109,8 @@ test('đơn PayPal ghi tiền thực nhận theo USD, không cộng chung với 
   await createOrder(o);
   await markOrderPaid(await getOrder(o.id), { source: 'webhook', providerAmount: 3.81, providerCurrency: 'USD' });
   const data = await revenue();
-  assert.equal(data.total.USD, 3.81, 'tiền USD phải nằm riêng');
-  assert.equal(data.total.VND, 198000, 'tiền VND của đơn chuyển khoản cùng sản phẩm không được mất');
+  assert.equal(data.gross.USD, 3.81, 'tiền USD phải nằm riêng');
+  assert.equal(data.gross.VND, 198000, 'tiền VND của đơn chuyển khoản cùng sản phẩm không được mất');
   const row = data.products.find((p) => p.productId === tool.id);
   assert.equal(row.provider, 3.81, 'phải có cột thực nhận PayPal');
   assert.equal(row.revenue, 297000, 'cột VND là tổng giá niêm yết của cả ba đơn');

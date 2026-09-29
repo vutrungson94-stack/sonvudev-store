@@ -419,6 +419,28 @@ Server không nhìn thấy tệp tải về máy người mua, nên trình duy�
 
 Cột mới trong Supabase nằm ở cuối `supabase/schema.sql`, đều là `add column if not exists` nên chạy lại không sao. Nếu chưa chạy migration mà server báo lỗi cột không tồn tại, chạy lại file là xong.
 
+## Hoàn tiền
+
+Đơn đã thu tiền rồi bị hoàn lại — vì khách đổi ý, vì chargeback, hoặc vì admin xác nhận nhầm — cần ghi vào sổ, nếu không báo cáo doanh thu sẽ khớp mãi với một đơn đã không còn tiền.
+
+Admin bấm **Hoàn tiền** ở `/admin.html`, nhập lý do. Lý do đó bắt buộc vì nó được gửi thẳng cho khách trong email.
+
+`voidPayment()` **không trừ khỏi `paidAmount`**. Báo cáo nói rõ chỗ nào số tiền đã gộp vào, chỗ nào đã hoàn, và còn lại bao nhiêu. Trừ thẳng thì lần sau đối chiếu với sao kê ngân hàng sẽ thấy thiếu mà không hiểu vì sao.
+
+Đơn đã hoàn thì nút tải khoá lại, và quét hết hạn không đụng tới vì nó không phải đơn chờ. Nếu hoàn nhầm thì bấm **Mở lại đơn**; lịch sử hoàn vẫn còn nguyên trong báo cáo.
+
+Cột mới trong Supabase, cần chạy lại `supabase/schema.sql` **trước khi deploy**:
+
+```sql
+alter table public.orders add column if not exists refunded_at timestamptz;
+alter table public.orders add column if not exists refund_reason text;
+alter table public.orders add column if not exists refunded_count integer not null default 0;
+alter table public.orders add column if not exists refunded_amount numeric(12, 2) not null default 0;
+alter table public.orders add column if not exists refunded_provider_amount numeric(12, 2) not null default 0;
+alter table public.orders drop constraint if exists orders_status_check;
+alter table public.orders add constraint orders_status_check check (status in ('pending', 'pending_transfer', 'paid', 'payment_failed', 'cancelled', 'refunded'));
+```
+
 ## Các trang pháp lý
 
 `public/terms.html`, `public/privacy.html` và `public/refund.html` là file tĩnh, phục vụ
