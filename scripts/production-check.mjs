@@ -50,6 +50,34 @@ add("Bank BIN (VietQR)", /^\d{6}$/.test(value("BANK_BIN")), value("BANK_BIN") ||
 add("MoMo wallet", !placeholder(value("MOMO_ACCOUNT_NUMBER")), value("MOMO_ACCOUNT_NUMBER") ? "configured" : "optional, missing");
 add("ZaloPay wallet", !placeholder(value("ZALOPAY_ACCOUNT_NUMBER")), value("ZALOPAY_ACCOUNT_NUMBER") ? "configured" : "optional, missing");
 
+// Order mail is what tells a buyer their order exists, when it expires and when
+// the money arrived. Unconfigured, all three mails are silently written to
+// data/outbox instead of being delivered, so a green run here still needs it.
+const resendKey = value("RESEND_API_KEY");
+if (!resendKey) {
+  add("Order email", false, "RESEND_API_KEY missing, mail is only written to data/outbox");
+} else {
+  try {
+    const response = await fetch("https://api.resend.com/domains", { headers: { Authorization: `Bearer ${resendKey}` }, signal: AbortSignal.timeout(10000) });
+    const body = await response.json().catch(() => ({}));
+    if (response.ok) {
+      add("Order email", true, `resend, ${body.length || 0} domain(s)`);
+    } else if (response.status === 401 && /only send/i.test(String(body.message || ""))) {
+      // A key scoped to sending cannot list domains, and that is the setting we
+      // want. Reporting this as a failure would push the owner towards handing
+      // back full access to their whole Resend account.
+      add("Order email", true, "resend, key giới hạn quyền gửi (đúng cấu hình). Xác minh thật: npm run email:check -- <email của bạn> created");
+    } else {
+      add("Order email", false, `HTTP ${response.status} ${body.message || "rejected"}`);
+    }
+  } catch (error) {
+    add("Order email", false, `lookup failed: ${error.message}`);
+  }
+}
+add("Email sender", /^[^<]+<[^>]+>$/.test(value("EMAIL_FROM") || "SonVuDev <no-reply@sonvudev.com>"), value("EMAIL_FROM") || "SonVuDev <no-reply@sonvudev.com>");
+const windowHours = Number(value("ORDER_PAYMENT_WINDOW_HOURS") || "24");
+add("Order payment window", Number.isFinite(windowHours) && windowHours >= 1, `${windowHours}h before an unpaid order is cancelled`);
+
 function isConfigured(keys) { return keys.every((key) => !placeholder(value(key))); }
 if (appUrl) {
   const host = new URL(appUrl).hostname;

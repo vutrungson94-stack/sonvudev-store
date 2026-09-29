@@ -23,6 +23,7 @@ export class El {
   }
   get innerHTML() { return this._html; }
   set innerHTML(v) { this._html = String(v); this.textContent = String(v).replace(/<[^>]*>/g, ''); }
+  insertAdjacentHTML(_position, html) { this._html = String(html) + this._html; }
   get textContent() { return this._text; }
   set textContent(v) { this._text = String(v); }
   get classList() {
@@ -104,10 +105,20 @@ export async function runScript(code, { document, window: winOverrides = {}, ...
     setItem(k, v) { this._v[k] = String(v); },
     removeItem(k) { delete this._v[k]; },
   };
+  // sessionStorage is a separate global from localStorage, and the order page
+  // keeps the buyer's access token in it. Leaving it off `win` made the page
+  // look broken in a way it never is in a browser.
+  const session = rest.sessionStorage || winOverrides.sessionStorage || {
+    _v: {},
+    getItem(k) { return this._v[k] ?? null; },
+    setItem(k, v) { this._v[k] = String(v); },
+    removeItem(k) { delete this._v[k]; },
+  };
   const win = {
     ...winOverrides,
     document,
     localStorage: storage,
+    sessionStorage: session,
     addEventListener(type, fn) { (windowListeners[type] ||= []).push(fn); },
     removeEventListener() {},
     dispatchEvent(e) { (windowListeners[e.type] || []).forEach((f) => f(e)); },
@@ -122,9 +133,12 @@ export async function runScript(code, { document, window: winOverrides = {}, ...
     fetch: async () => { throw new Error('fetch not stubbed'); },
     navigator: { language: 'vi-VN', clipboard: { writeText: async () => {} } },
     location: { href: '' },
-    setTimeout: (fn, ms) => setTimeout(fn, ms),
+    // A browser forgets its timers when the tab goes away; the test runner does
+    // not, so an unref'd timer is what keeps a page that polls every ten
+    // seconds from holding the whole run open after its assertions finished.
+    setTimeout: (fn, ms) => { const t = setTimeout(fn, ms); t.unref?.(); return t; },
     clearTimeout: (id) => clearTimeout(id),
-    Intl, URL, CustomEvent: class { constructor(t, o) { this.type = t; this.detail = o?.detail; } },
+    Intl, URL, URLSearchParams, CustomEvent: class { constructor(t, o) { this.type = t; this.detail = o?.detail; } },
     ...rest,
   };
   // A classic <script> tag publishes top-level function declarations on the
@@ -147,8 +161,10 @@ export async function runScript(code, { document, window: winOverrides = {}, ...
   win.clearTimeout = ctx.clearTimeout;
   win.Intl = Intl;
   win.URL = URL;
+  win.URLSearchParams = URLSearchParams;
   win.CustomEvent = ctx.CustomEvent;
   win.localStorage = winOverrides.localStorage || win.localStorage || { _v: {}, getItem: () => null, setItem() {}, removeItem() {} };
+  win.sessionStorage = winOverrides.sessionStorage || session;
   win.globalThis = win;
   win.self = win;
   try {

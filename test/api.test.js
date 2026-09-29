@@ -25,6 +25,8 @@ process.env.ZALOPAY_QR_IMAGE = '/img/test-zalopay-qr.png';
 process.env.PAYPAL_CURRENCY = 'USD';
 process.env.PAYPAL_VND_TO_USD_RATE = '26000';
 process.env.ADMIN_API_TOKEN = 'test-admin-token';
+// Never let a real key in .env turn a test run into real email.
+process.env.RESEND_API_KEY = '';
 const { createApp } = await import('../src/app.js');
 let server;
 let base;

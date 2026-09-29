@@ -18,6 +18,8 @@ process.env.BANK_ACCOUNT_NAME = 'SonVuDev Test';
 process.env.BANK_ACCOUNT_NUMBER = '0123456789';
 process.env.BANK_BIN = '970436';
 process.env.ADMIN_API_TOKEN = 'test-admin-token';
+// Never let a real key in .env turn a test run into real email.
+process.env.RESEND_API_KEY = '';
 
 const { createApp } = await import('../src/app.js');
 let server;

@@ -32,6 +32,8 @@ const ALLOWED = [
   "BANK_NAME", "BANK_ACCOUNT_NAME", "BANK_ACCOUNT_NUMBER", "BANK_BIN", "BANK_TRANSFER_NOTE_PREFIX",
   "MOMO_ACCOUNT_NUMBER", "MOMO_QR_IMAGE", "MOMO_QR_AMOUNT_IMAGE", "MOMO_DEEP_LINK",
   "ZALOPAY_ACCOUNT_NUMBER", "ZALOPAY_QR_IMAGE",
+  "ORDER_PAYMENT_WINDOW_HOURS", "ORDER_EXPIRY_WARN_HOURS", "ORDER_SWEEP_INTERVAL_MS",
+  "RESEND_API_KEY", "EMAIL_FROM", "SUPPORT_EMAIL",
 ];
 
 // .env carries local-development values that are wrong on Render.
@@ -131,6 +133,15 @@ async function main() {
 
   if (!changes.length) {
     console.log(`Khong co thay doi. ${wanted.size} bien da khop voi Render.`);
+    // A redeploy is worth doing even with nothing to write: env vars only reach
+    // a running process on restart, which is the whole reason --deploy exists.
+    // Returning here would make the script tell the user to run --apply --deploy
+    // and then silently do nothing when they did.
+    if (apply && redeploy) {
+      const deploy = await call("POST", `${api}/services/${serviceId}/deploys`, { clearCache: "do_not_clear" });
+      console.log(`Da trigger deploy: ${deploy?.deploy?.id || deploy?.id || "unknown"}`);
+      console.log("Deploy mat vai phut. Kiem tra bang: npm run check:production");
+    }
     return;
   }
 

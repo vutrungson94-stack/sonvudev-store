@@ -28,6 +28,67 @@ npm run check:production
 
 Ngoài cấu hình local, lệnh còn gọi `/api/health` trên production và kiểm tra site thật sự bán được: `Store is sellable` (R2 đã nối, nếu không storefront ẩn toàn bộ sản phẩm), `Payments live` (PayPal và chuyển khoản) và `Database persistent` (`local-json` nghĩa là đơn hàng mất khi deploy lại).
 
+`Order email` cũng là điều kiện bắt buộc. Không có `RESEND_API_KEY` thì bốn email giao dịch chỉ được ghi ra `data/outbox` chứ không tới tay khách, nên lệnh báo `FAIL` dù mọi thứ khác đều xanh.
+
+**Sau khi đổi code có đụng tới cột database, chạy lại `supabase/schema.sql` trong Supabase SQL editor trước khi deploy.** Thiếu cột làm server lỗi ngay khi tạo đơn, chứ không phải lỗi im lặng.
+
+## Chạy lại schema.sql
+
+`npm run db:check` báo chính xác cột nào còn thiếu, chỉ cần `SUPABASE_SERVICE_ROLE_KEY` nên chạy được ở bất cứ máy nào:
+
+```powershell
+npm run db:check
+```
+
+```
+Thiếu 10 cột, chạy lại schema.sql:
+  - orders.expires_at
+  - orders.cancelled_at
+  ...
+```
+
+Có hai đường để vá.
+
+**Cách nhanh — dán vào SQL editor.** Mở https://supabase.com/dashboard/project/`<project-ref>`/sql, dán toàn bộ nội dung `supabase/schema.sql`, bấm Run. Toàn bộ câu lệnh đều là `create table if not exists` và `add column if not exists` nên chạy lại trên bảng cũ không ghi đè dữ liệu và không lỗi. Đây là cách an toàn nhất khi production đang có đơn hàng.
+
+**Cách tự động — `npm run db:migrate`.** Cần thêm `SUPABASE_ACCESS_TOKEN` (personal access token tại https://supabase.com/dashboard/account/tokens, chỉ đặt trong `.env` ở máy bạn, **không** đẩy lên Render):
+
+```powershell
+npm run db:migrate              # in ra câu lệnh sẽ chạy, không ghi gì
+npm run db:migrate -- --apply   # chạy thật qua Management API
+npm run db:check                # xác nhận đã khớp
+```
+
+Script tự tách từng câu và gửi một câu một request. Nên xem trước khi `--apply`.
+
+## Khách mất nguồn sau khi thanh toán
+
+Máy tắt đúng lúc đang thanh toán là chuyện hay xảy ra trên điện thoại, và mỗi kênh hành xử khác nhau.
+
+**Chuyển khoản ngân hàng** — an toàn nhất. Tiền nằm ở tài khoản, đơn vẫn `pending_transfer` cho tới khi bạn bấm xác nhận trong admin. Mất session thì khách vào `/lookup` bằng mã đơn và email là vào lại được đơn cũ, không mất gì.
+
+**PayPal** — có hai khoảnh thời gian nguy hiểm:
+
+- *Mất nguồn ở trang PayPal, trước khi bấm Pay.* PayPal mới chỉ *authorize*, chưa trừ tiền. Đơn treo `pending` và hết hạn sau 24h, khách đặt đơn mới. Không mất tiền của ai.
+- *Mất nguồn sau khi PayPal chạy, trước khi capture trả về.* Đây là ca nguy hiểm: tiền có thể đã trừ mà đơn vẫn `pending`. Ba lớp cứu:
+  1. `paypal-return.js` retry 5 lần backoff rồi poll trạng thái 8 lần.
+  2. Webhook `PAYMENT.CAPTURE.COMPLETED` tự tới và mở khoá đơn.
+  3. Trang `/order/:id` tự gọi lại `capture` một lần mỗi lần mở. Gọi lại capture là an toàn: nó chỉ thành công khi PayPal đã có approval, và đơn đã capture rồi được đối soát chứ không bị thu phí hai lần.
+
+Ngoài ra email `created` và `paid` đều chứa mã đơn và link tra cứu, nên ngay cả khi mất cả session lẫn lịch sử trình duyệt, khách vẫn tự vào lại được đơn của mình.
+
+**Hướng dẫn nằm ở cả hai chỗ, vì chúng phủ hai thời điểm khác nhau.** Trước khi bấm thanh toán, khách còn ở trên trang của bạn nên dòng `cart.safety` và khối mã tra cứu chỉ việc đọc trên màn hình. Sau khi trả tiền mà máy tắt, trang đã mất và chỉ còn email là tới được.
+
+Hành động quyết định khách lấy lại được đơn là lưu mã tra cứu, và họ chỉ làm được nếu biết điều đó quan trọng *trước* khi thanh toán — nên phần "lưu lại mã này" phải nằm ở trang mua, không chỉ ở email. Vì vậy link tra cứu mang sẵn mã đơn: `/lookup?order=SVD-...` điền sẵn ô nhập, thay vì bắt khách gõ tay mã từ ảnh chụp màn hình trên bàn phím điện thoại.
+
+Lưu ý: nếu `RESEND_API_KEY` còn trống thì email chỉ nằm trong `data/outbox` và **không khách nào nhận được**. Kênh cứu trên trang vẫn chạy, nhưng kênh cứu sau khi mất máy thì không. Lấy key tại resend.com → API Keys, rồi `npm run render:sync -- --apply`.
+
+## Doanh thu trong admin
+
+`GET /api/admin/revenue` và một panel trong `/admin.html`. Đặt trong admin chứ không tách trang riêng: cùng token, cùng bảng đơn hàng ngay bên dưới, và chủ cửa hàng chỉ mở một chỗ. Trang thứ hai nghĩa là thêm một chỗ phải bảo vệ và thêm một chỗ để cũ.
+
+Báo cáo tính theo `paidCount` chứ không theo `status`, nên đơn đã tải xong và đã đóng vẫn còn trong doanh thu. Cột USD lấy từ `paidProviderAmount` — số tiền PayPal thực capture, chứ không phải giá niêm yết VND — để bạn đối chiếu với sao kê PayPal. VND và USD tách riêng, không cộng chung.
+
 ## Deploy lên Render
 
 Production chạy trên Render, DNS do Cloudflare giữ. `.env` bị `.gitignore` loại nên không bao giờ lên Render — biến môi trường phải khai báo trên Dashboard (Service → Environment) hoặc đẩy bằng script:
@@ -48,6 +109,8 @@ Script chỉ đẩy danh sách biến của ứng dụng (`ALLOWED`), không đ�
 
 - `src/server.js`: khởi động HTTP server.
 - `src/app.js`: API, SEO routes, tra cứu đơn, kiểm tra thanh toán/download.
+- `src/orders.js`: vòng đời đơn hàng — hạn thanh toán, quét hủy đơn cũ, mở khoá khi có tiền, đóng đơn sau khi giao.
+- `src/notify.js`: bốn email giao dịch (tạo đơn, sắp hết hạn, hủy, đã thanh toán), Resend hoặc ghi ra `data/outbox`.
 - `src/store.js`: Supabase REST; local JSON chỉ là fallback cho phát triển.
 - `src/r2.js`: presigned upload/download URL; bucket bắt buộc private.
 - `src/paypal.js`: PayPal Orders v2, chuyển VND sang USD và xác minh webhook.
@@ -274,6 +337,87 @@ mã cũ**. Cách này miễn phí, không cần SMTP, nhưng lưu ý khi vận h
 
 Sau khi tra cứu, người mua được chuyển tới `/order/:id` — trang này đọc mã từ
 `sessionStorage`, nên mở bằng trình duyệt khác hoặc thiết bị khác sẽ phải tra cứu lại.
+
+## Hạn thanh toán và thông báo tự động
+
+Đơn chưa thanh toán bị hủy tự động. Thời hạn được ghi vào đơn ngay lúc tạo và hiển thị cả trên biểu mẫu thanh toán lẫn trang `/order/:id`, nên người mua luôn biết mình còn bao lâu.
+
+```env
+ORDER_PAYMENT_WINDOW_HOURS=24    # số giờ trước khi đơn chưa thanh toán bị hủy
+ORDER_EXPIRY_WARN_HOURS=1        # gửi email nhắc trước khi hết hạn bao lâu
+ORDER_SWEEP_INTERVAL_MS=60000    # chu kỳ quét đơn
+```
+
+`src/orders.js` giữ toàn bộ luật: `paymentDeadline()` tính hạn, `isExpired()` quyết định, `sweepOrders()` chạy mỗi tick và ngay lúc khởi động (nên server chết qua một hạn vẫn bắt kịp khi bật lại), `markOrderPaid()` mở nút tải, `markOrderDelivered()` đóng đơn. Bộ quét không giữ tiến trình sống (`unref`) và dừng sạch khi nhận SIGINT/SIGTERM.
+
+Hai điều kiện mà người mua hay gặp, xử lý tại chỗ:
+
+- **Tiền về muộn sau khi đơn đã hủy.** `markOrderPaid()` không giới hạn trạng thái đầu vào, nên webhook hoặc capture vẫn mở lại đơn đã hủy và gửi mail. Đã vào ví thì không được bắt mua hai lần.
+- **Mất mạng giữa chừng.** `/api/checkout` nhận `idempotencyKey`; gửi lại cùng khoá sẽ trả về đúng đơn cũ kèm mã tra cứu mới thay vì tạo đơn thứ hai. Phía PayPal, `/api/paypal/capture` bắt lỗi capture rồi hỏi lại PayPal xem đơn đã `COMPLETED` chưa, vì capture thành công mà mất response là chuyện thường.
+
+## Khách mất mạng hoặc mất nguồn
+
+Ba thời điểm, mỗi thời điểm một hậu quả khác nhau. Bảng này là hợp đồng giữa code và những gì khách thực sự nhìn thấy.
+
+### Trước khi thanh toán
+
+| Tình huống | Đơn hàng | Khách được báo |
+| :-- | :-- | :-- |
+| Mất mạng khi gọi `/api/checkout`, request chưa tới server | Không có đơn | `cart.errNetwork`: đơn có thể đã tạo, kiểm tra email hoặc thử lại |
+| Mất mạng, request đã tới server nhưng phản hồi mất | Có đơn | Thử lại với cùng `idempotencyKey` sẽ nhận lại **đúng đơn cũ** kèm mã tra cứu mới |
+| Mất nguồn ở form, chưa bấm thanh toán | Không có đơn | Không mất gì, quay lại điền form |
+
+### Trong khi thanh toán
+
+| Tình huống | Đơn hàng | Khách được báo |
+| :-- | :-- | :-- |
+| Chuyển khoản, app ngân hàng treo hoặc máy tắt | `pending_transfer`, còn nguyên hạn | Thao tác nằm ở app ngân hàng; mở lại app kiểm tra giao dịch đã thực hiện chưa; đơn được giữ nguyên |
+| PayPal, mất nguồn ở trang PayPal **chưa** bấm Pay | `pending`, PayPal mới authorize | **Chưa bị trừ tiền**, có thể thanh toán lại bình thường |
+
+### Sau khi thanh toán
+
+| Tình huống | Đơn hàng | Khách được báo |
+| :-- | :-- | :-- |
+| PayPal đã trừ tiền, capture chưa trả về | Webhook và `/order/:id` tự mở khoá | Nút tải mở, không cần làm gì |
+| Mất mạng lúc gọi capture | `paypal-return.js` retry 5 lần, rồi poll 8 lần | "Đang xác nhận thanh toán", có nút thử lại |
+| Mất nguồn sau khi PayPal chạy | Trang đơn tự gọi lại capture một lần | Không cần làm gì |
+| Đã thanh toán, tải bị gián đoạn | Vẫn `paid` | Bấm tải lại được, đơn còn hiệu lực |
+| Tải xong, máy tắt ngay sau đó | `pending` + `deliveredAt` | Đã hoàn tất; file hỏng thì liên hệ, mở lại đơn ngay |
+| Tiền về muộn sau khi đơn đã hết hạn | Mở lại `paid` | Đơn đã được mở lại |
+| Hết hạn, chưa có tiền | `cancelled` | **Chưa bị trừ tiền**, đặt đơn mới được |
+
+Hai hàng cuối là lý do hai nhánh thông báo không được dùng chung: cùng một trạng thái `cancelled` nhưng một bên đã mất tiền, một bên thì không. Nói nhầm là nguyên nhân khiến lỗi kỹ thuật hoá thành khiếu nại hoàn tiền.
+
+### Một giới hạn cần biết
+
+Server **không nhìn thấy tệp tải về tới máy khách**, nên `POST /api/orders/:id/delivered` được gọi ngay khi nút tải được bấm chứ không phải khi tải xong. Một lần tải chết giữa chừng vẫn đóng đơn. Vì vậy admin có nút **"Mở lại đơn"** cho đơn đã giao, và trang đơn của khách nói rõ gửi email nếu file hỏng. `paidCount` và `paidAmount` được giữ nguyên qua lần đóng/mở nên doanh thu không bị ảnh hưởng.
+
+### Email đơn hàng
+
+Bốn thư tự động, mỗi thư mỗi đơn chỉ gửi đúng một lần (khoá lưu trên dòng đơn nên retry hay webhook chạy đua cũng không gửi trùng):
+
+| Sự kiện | Nội dung |
+| :--- | :--- |
+| `created` | Mã đơn, số tiền, thời hạn thanh toán, đường dẫn tra cứu |
+| `expiring` | Còn 1 giờ, kèm link tra cứu để thanh toán ngay |
+| `cancelled` | Đơn đã bị hủy, kèm hướng dẫn gửi biên lai nếu đã chuyển khoản |
+| `paid` | Đã nhận đủ tiền, nút tải mở khóa, link tra cứu |
+
+```env
+RESEND_API_KEY=
+EMAIL_FROM=SonVuDev <no-reply@sonvudev.com>
+SUPPORT_EMAIL=hello@sonvudev.com
+```
+
+Resend là REST API thuần nên không cần máy chủ SMTP và không thêm dependency. **Chưa có key vẫn chạy được**: mọi thư được ghi ra `data/outbox/*.html` và `*.txt` để kiểm tra toàn bộ luồng ngoại tuyến. `/api/health` báo `"email": "outbox"` cho tới khi có key. Một lần gửi lỗi được thử lại ở tick sau với độ trễ nới dần, tối đa 3 lần, rồi dừng để một địa chỉ hỏng không lặp vô hạn.
+
+Thư viết song ngữ: biểu mẫu có chuyển ngôn ngữ nhưng dòng đơn không nhớ lựa chọn đó, và đoán sai trên thư thanh toán tệ hơn một đoạn tiếng Anh ngắn bên dưới.
+
+### Đóng đơn sau khi tải
+
+Server không nhìn thấy tệp tải về máy người mua, nên trình duyệt gọi `POST /api/orders/:id/delivered` ngay khi nút tải được bấm. `markOrderDelivered()` đưa đơn về `pending` như một đơn mới, nhưng `paidCount`, `paidAmount` và `deliveredAt` được giữ lại nên doanh thu không mất. Đơn đã giao không bị quét hủy và không bị tính vào cảnh báo đơn chờ của admin.
+
+Cột mới trong Supabase nằm ở cuối `supabase/schema.sql`, đều là `add column if not exists` nên chạy lại không sao. Nếu chưa chạy migration mà server báo lỗi cột không tồn tại, chạy lại file là xong.
 
 ## Các trang pháp lý
 
