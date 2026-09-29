@@ -83,7 +83,28 @@ export async function captureOrder(providerOrderId) {
   const accessToken = await token();
   const response = await fetch(`${base()}/v2/checkout/orders/${encodeURIComponent(providerOrderId)}/capture`, { method: "POST", headers: { Authorization: `Bearer ${accessToken}`, "Content-Type": "application/json" } });
   const data = await response.json();
-  if (!response.ok) throw new Error(data.message || `PayPal capture ${response.status}`);
+  if (!response.ok) {
+    const error = new Error(data.message || `PayPal capture ${response.status}`);
+    // PayPal refuses to capture an order it already captured. That is exactly
+    // the shape of a lost response, so the caller needs to tell it apart from a
+    // payment that genuinely never happened.
+    error.name = data.name || `PAYPAL_${response.status}`;
+    error.details = data.details || [];
+    throw error;
+  }
+  return data;
+}
+
+/**
+ * Reads the current state of a PayPal order without changing it. Used to
+ * reconcile when a capture call failed: the money may already be captured even
+ * though the buyer never saw a response, and only the provider can settle that.
+ */
+export async function readOrder(providerOrderId) {
+  const accessToken = await token();
+  const response = await fetch(`${base()}/v2/checkout/orders/${encodeURIComponent(providerOrderId)}`, { headers: { Authorization: `Bearer ${accessToken}` } });
+  const data = await response.json().catch(() => ({}));
+  if (!response.ok) throw new Error(data.message || `PayPal order ${response.status}`);
   return data;
 }
 

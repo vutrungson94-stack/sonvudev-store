@@ -4,10 +4,12 @@ import { promises as fs } from "node:fs";
 import { fileURLToPath } from "node:url";
 import crypto from "node:crypto";
 import { env, isConfigured } from "./config.js";
-import { ensureSeed, getOrder, getProduct, listOrders, listProducts, createOrder, updateOrder, createProduct, updateProduct, persistenceMode } from "./store.js";
+import { ensureSeed, findOrderByIdempotencyKey, getOrder, getProduct, listOrders, listProducts, createOrder, updateOrder, createProduct, updateProduct, persistenceMode } from "./store.js";
 import { createDownloadUrl, createUploadUrl } from "./r2.js";
-import { captureOrder, createOrder as createPayPalOrder, hashToken, newOrderId, newToken, paypalChargeFor, paypalChargeForProduct, paymentMatchesOrder, verifyWebhook } from "./paypal.js";
+import { captureOrder, createOrder as createPayPalOrder, hashToken, newOrderId, newToken, paypalChargeFor, paypalChargeForProduct, paymentMatchesOrder, readOrder, verifyWebhook } from "./paypal.js";
 import { paymentInstructions, paymentOptions } from "./payments.js";
+import { isClosed, isUnpaid, markOrderDelivered, markOrderPaid, paymentDeadline } from "./orders.js";
+import { notifyOrder, notifyMode } from "./notify.js";
 import { resolveCountry } from "./geo.js";
 import { vndPerUsd } from "./rates.js";
 
@@ -15,7 +17,13 @@ const app = express();
 const publicDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "public");
 const json = express.json({ limit: "1mb" });
 const publicProduct = (product) => { if (!product) return null; const { fileKey, file_key, ...safe } = product; return safe; };
-const publicOrder = (order) => { if (!order) return null; const { accessTokenHash, access_token_hash, ...safe } = order; return { ...safe, items: (safe.items || []).map(({ fileKey, file_key, ...item }) => item) }; };
+const publicOrder = (order) => { if (!order) return null; const { accessTokenHash, access_token_hash, idempotencyKey, idempotency_key, notifications, ...safe } = order; return { ...safe, items: (safe.items || []).map(({ fileKey, file_key, ...item }) => item) }; };
+// A countdown is only correct if it is measured against the server's clock, so
+// the deadline and the server's own time always travel together.
+const deadlinePayload = (order) => {
+  const at = isUnpaid(order) && !isClosed(order) ? paymentDeadline(order) : null;
+  return { expiresAt: at ? new Date(at).toISOString() : null, serverTime: new Date().toISOString() };
+};
 const text = (value, max = 180) => String(value || "").trim().slice(0, max);
 const isEmail = (value) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
 const isAdmin = (req) => {
@@ -78,6 +86,9 @@ app.get("/api/health", async (_req, res) => {
     ok: true, appUrl: env.appUrl, persistence: persistenceMode,
     r2: isConfigured.r2, paypal: isConfigured.paypal, paypalWebhook: isConfigured.paypalWebhook,
     bank: isConfigured.bank, momo: Boolean(env.bank.momo), zalopay: Boolean(env.bank.zalopay), admin: isConfigured.admin,
+    // "outbox" means there is no mail provider yet: order mail is being written
+    // to data/outbox instead of being delivered.
+    email: notifyMode(), orderWindowHours: env.orders.paymentWindowHours, sweeper: Boolean(process.env.ORDER_SWEEP_DISABLED) ? false : true,
     vndPerUsd: rate ? { rate: Math.round(rate.rate * 100) / 100, source: rate.source, live: env.paypal.vndToUsdRate === "live" } : null,
   });
 });
@@ -105,6 +116,9 @@ app.get("/api/checkout/options", async (req, res) => {
     res.json({
       country: country || null,
       inVietnam: !country || country === "VN",
+      // The checkout form promises this window, so it comes from the same place
+      // the sweeper enforces it rather than being written into the markup twice.
+      paymentWindowHours: env.orders.paymentWindowHours,
       options: paymentOptions(country, {
         bank: isConfigured.bank,
         momo: Boolean(env.bank.momo),
@@ -115,12 +129,39 @@ app.get("/api/checkout/options", async (req, res) => {
   } catch (error) { console.error(error); res.status(500).json({ error: "Không tải được phương thức thanh toán" }); }
 });
 
+// Re-issues the access token for an order the buyer already started. Without
+// this, a lost response to /api/checkout leaves the buyer with an order they
+// can never open, and retrying creates a second order for one purchase.
+async function resumeOrder(order) {
+  const accessToken = newToken();
+  const now = new Date().toISOString();
+  let current = await updateOrder(order.id, { accessTokenHash: hashToken(accessToken), updatedAt: now });
+  const item = (current.items || [])[0];
+  if (current.paymentProvider === "paypal" && current.status !== "paid" && item?.paypalAmount) {
+    const product = await getProduct(item.productId);
+    if (product) {
+      // PayPal keys the request on the order id, so this returns the same
+      // approval the buyer already has. The old one is simply left uncaptured.
+      const paypal = await createPayPalOrder({ orderId: current.id, product, customerEmail: current.customerEmail, returnUrl: `${env.appUrl}/paypal-return.html`, cancelUrl: `${env.appUrl}/?paypal=cancelled`, amount: item.paypalAmount, currency: item.paypalCurrency });
+      current = await updateOrder(order.id, { providerOrderId: paypal.id, updatedAt: now });
+      const approvalUrl = (paypal.links || []).find((link) => link.rel === "payer-action" || link.rel === "approve")?.href;
+      return { order: publicOrder(current), accessToken, approvalUrl, ...deadlinePayload(current) };
+    }
+  }
+  return { order: publicOrder(current), accessToken, payment: current.paymentProvider === "bank_transfer" ? paymentInstructions(current) : null, ...deadlinePayload(current) };
+}
+
 app.post("/api/checkout", json, async (req, res) => {
   try {
     const email = text(req.body.email, 160).toLowerCase();
     const productId = text(req.body.productId, 80);
     const method = req.body.paymentMethod === "paypal" ? "paypal" : "bank_transfer";
+    const idempotencyKey = text(req.body.idempotencyKey, 64);
     if (!isEmail(email)) return res.status(400).json({ error: "Email không hợp lệ" });
+    // A buyer whose connection dropped mid-request may already have an order.
+    // Handing it back beats silently opening a second one.
+    const repeated = idempotencyKey ? await findOrderByIdempotencyKey(idempotencyKey) : null;
+    if (repeated) return res.json(await resumeOrder(repeated));
     const product = await getProduct(productId);
     if (!product || product.status !== "active") return res.status(404).json({ error: "Sản phẩm không khả dụng" });
     if (!product.fileKey || !isConfigured.r2) return res.status(503).json({ error: "Sản phẩm chưa sẵn sàng để nhận thanh toán" });
@@ -128,24 +169,32 @@ app.post("/api/checkout", json, async (req, res) => {
     if (method === "paypal" && !isConfigured.paypal) return res.status(503).json({ error: "PayPal chưa được cấu hình. Hãy chọn chuyển khoản hoặc cấu hình PayPal trên server." });
     const accessToken = newToken();
     const id = newOrderId();
+    const now = new Date().toISOString();
     const paypalQuote = method === "paypal" ? await paypalChargeForProduct(product) : null;
     const paypalCharge = paypalQuote?.charge ?? null;
     const order = {
       id, orderNumber: id, accessTokenHash: hashToken(accessToken), customerEmail: email,
       customerName: text(req.body.customerName, 100), status: "pending", paymentProvider: method,
       providerOrderId: null, amount: Number(product.price), currency: product.currency || "VND",
+      // The deadline the buyer is shown on the form is written down here, so the
+      // countdown they read and the moment the sweep acts on cannot drift apart.
+      expiresAt: new Date(Date.now() + Math.max(1, env.orders.paymentWindowHours) * 60 * 60 * 1000).toISOString(),
+      idempotencyKey: idempotencyKey || null, notifications: {},
       items: [{ productId: product.id, name: product.name, version: product.version, price: product.price, currency: product.currency, fileKey: product.fileKey || "", paypalAmount: paypalCharge?.amount ?? null, paypalCurrency: paypalCharge?.currency ?? null, paypalRate: paypalQuote?.rate?.vndPerUsd ?? null }],
-      createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(),
+      createdAt: now, updatedAt: now,
     };
     await createOrder(order);
+    // The mail carries the deadline and the order id, which is what makes the
+    // order recoverable after a lost browser session.
+    await notifyOrder(order, "created");
     if (method === "bank_transfer") {
-      await updateOrder(order.id, { status: "pending_transfer", updatedAt: new Date().toISOString() });
-      return res.json({ order: publicOrder({ ...order, status: "pending_transfer" }), accessToken, payment: paymentInstructions(order) });
+      const saved = await updateOrder(order.id, { status: "pending_transfer", updatedAt: now });
+      return res.json({ order: publicOrder(saved), accessToken, payment: paymentInstructions(saved), ...deadlinePayload(saved) });
     }
     const paypal = await createPayPalOrder({ orderId: order.id, product, customerEmail: email, returnUrl: `${env.appUrl}/paypal-return.html`, cancelUrl: `${env.appUrl}/?paypal=cancelled`, amount: paypalCharge.amount, currency: paypalCharge.currency });
     const approvalUrl = (paypal.links || []).find((link) => link.rel === "payer-action" || link.rel === "approve")?.href;
-    await updateOrder(order.id, { providerOrderId: paypal.id, updatedAt: new Date().toISOString() });
-    res.json({ order: publicOrder({ ...order, providerOrderId: paypal.id }), accessToken, approvalUrl });
+    const saved = await updateOrder(order.id, { providerOrderId: paypal.id, updatedAt: now });
+    res.json({ order: publicOrder(saved), accessToken, approvalUrl, ...deadlinePayload(saved) });
   } catch (error) { console.error(error); res.status(500).json({ error: "Không thể tạo đơn hàng" }); }
 });
 
@@ -157,19 +206,31 @@ async function requireOrder(req, res) {
   return order;
 }
 app.get("/api/orders/:id", async (req, res) => {
-  try { const order = await requireOrder(req, res); if (order) res.json({ order: publicOrder(order), payment: order.paymentProvider === "bank_transfer" ? paymentInstructions(order) : null }); }
+  try { const order = await requireOrder(req, res); if (order) res.json({ order: publicOrder(order), payment: order.paymentProvider === "bank_transfer" ? paymentInstructions(order) : null, ...deadlinePayload(order) }); }
   catch (error) { console.error(error); res.status(500).json({ error: "Không thể tải đơn hàng" }); }
 });
 app.get("/api/orders/:id/download", async (req, res) => {
   try {
     const order = await requireOrder(req, res);
     if (!order) return;
-    if (order.status !== "paid") return res.status(409).json({ error: "Đơn hàng chưa được thanh toán" });
+    // The only gate that matters is here. The button state in the browser is a
+    // convenience; this is what actually decides whether bytes leave R2.
+    if (order.status !== "paid") return res.status(409).json({ error: isClosed(order) ? "Đơn hàng đã được giao, không thể tải lại" : "Đơn hàng chưa được thanh toán" });
     const item = order.items?.[0];
     if (!item?.fileKey) return res.status(409).json({ error: "Sản phẩm chưa có file phát hành" });
     if (!isConfigured.r2) return res.status(503).json({ error: "R2 chưa được cấu hình" });
     res.json({ url: await createDownloadUrl(item.fileKey, `${item.name}-${item.version}.zip`), expiresIn: env.r2.downloadTtl });
   } catch (error) { console.error(error); res.status(500).json({ error: "Không thể tạo link tải" }); }
+});
+// Called once the browser has actually started the transfer. The server cannot
+// observe the file arriving, so the client is what tells it the release is out.
+app.post("/api/orders/:id/delivered", json, async (req, res) => {
+  try {
+    const order = await requireOrder(req, res);
+    if (!order) return;
+    const updated = await markOrderDelivered(order);
+    res.json({ order: publicOrder(updated), ...deadlinePayload(updated) });
+  } catch (error) { console.error(error); res.status(500).json({ error: "Không thể cập nhật đơn hàng" }); }
 });
 
 app.post("/api/orders/lookup", json, async (req, res) => {
@@ -187,7 +248,7 @@ app.post("/api/orders/lookup", json, async (req, res) => {
     // means issuing a new one and invalidating the old.
     const accessToken = newToken();
     await updateOrder(order.id, { accessTokenHash: hashToken(accessToken), updatedAt: new Date().toISOString() });
-    res.json({ order: publicOrder(await getOrder(order.id)), accessToken });
+    res.json({ order: publicOrder(await getOrder(order.id)), accessToken, ...deadlinePayload(await getOrder(order.id)) });
   } catch (error) { console.error(error); res.status(500).json({ error: "Không thể tra cứu đơn hàng" }); }
 });
 
@@ -200,8 +261,11 @@ app.post("/api/paypal/webhook", express.raw({ type: "application/json" }), async
       const customId = resource.purchase_units?.[0]?.custom_id || resource.custom_id;
       if (customId) {
         const order = await getOrder(customId);
+        // A capture that lands after the expiry sweep still has to grant the
+        // download: the money is in the account, so the order is not a lost sale.
         if (order && paymentMatchesOrder(resource, order) && order.status !== "paid") {
-          await updateOrder(order.id, { status: "paid", paidAt: new Date().toISOString(), updatedAt: new Date().toISOString() });
+          const paid = resource.purchase_units?.[0]?.payments?.captures?.[0] || resource.payments?.captures?.[0] || resource;
+          await markOrderPaid(order, { source: "webhook", providerAmount: Number(paid?.amount?.value || 0), providerCurrency: paid?.amount?.currency_code || null });
         }
       }
     }
@@ -214,13 +278,24 @@ app.post("/api/paypal/capture", json, async (req, res) => {
     if (!order) return;
     if (order.paymentProvider !== "paypal" || !order.providerOrderId) return res.status(400).json({ error: "Đơn hàng không dùng PayPal" });
     if (order.status === "paid") return res.json({ order: publicOrder(order) });
-    const capture = await captureOrder(order.providerOrderId);
+    let capture;
+    try {
+      capture = await captureOrder(order.providerOrderId);
+    } catch (error) {
+      // The capture may already have succeeded and the buyer simply never saw
+      // the answer. Only PayPal can settle that, so ask it what really happened
+      // before telling a paying buyer their payment failed.
+      const remote = await readOrder(order.providerOrderId).catch(() => null);
+      if (!remote || remote.status !== "COMPLETED" || !paymentMatchesOrder(remote, order)) throw error;
+      console.warn(`[paypal] capture failed but the order is already COMPLETED; reconciling ${order.id}`);
+      capture = remote;
+    }
     if (capture.status !== "COMPLETED" || !paymentMatchesOrder(capture, order)) {
       return res.status(409).json({ error: "PayPal chưa xác nhận đúng đơn hàng hoặc số tiền" });
     }
-    const status = "paid";
-    await updateOrder(order.id, { status, paidAt: new Date().toISOString(), updatedAt: new Date().toISOString() });
-    res.json({ order: publicOrder(await getOrder(order.id)) });
+    const capture0 = capture.purchase_units?.[0]?.payments?.captures?.[0] || capture;
+    const updated = await markOrderPaid(order, { source: "capture", providerAmount: Number(capture0.amount?.value || 0), providerCurrency: capture0.amount?.currency_code || null });
+    res.json({ order: publicOrder(updated), ...deadlinePayload(updated) });
   } catch (error) { console.error(error); res.status(502).json({ error: "Không thể xác nhận thanh toán PayPal" }); }
 });
 
@@ -234,7 +309,7 @@ app.get("/api/admin/orders/pending", admin, async (_req, res) => {
     const latest = orders.length ? at(orders[0]) : 0;
     res.json({
       latest,
-      pending: orders.filter((order) => order.status === "pending_transfer").length,
+      pending: orders.filter((order) => order.status === "pending_transfer" && !isClosed(order)).length,
       // The newest order is echoed back so a new arrival can be named in the
       // alert without a second request.
       newest: orders[0] ? { id: orders[0].id, status: orders[0].status, createdAt: orders[0].createdAt || orders[0].created_at || null } : null,
@@ -275,12 +350,81 @@ app.post("/api/admin/uploads/presign", admin, json, async (req, res) => {
     res.json(await createUploadUrl({ productRef, version, fileName, contentType: text(req.body.contentType, 120) }));
   } catch (error) { console.error(error); res.status(500).json({ error: "Không thể tạo link upload" }); }
 });
+/**
+ * Sums revenue per product, in the currency the buyer actually paid in.
+ *
+ * The order amount is the shelf price, so for a PayPal order the number that
+ * matters is the captured USD minus nothing else yet. Reporting the VND list
+ * price as "revenue" would hide both the currency conversion and the ~3-4%
+ * PayPal fee, and a store owner reconciling against a PayPal statement needs
+ * the figure that lands in the account.
+ *
+ * Delivered orders are counted, not just ones still sitting in "paid": closing
+ * an order after delivery resets its status but keeps paidAmount, so a report
+ * that filtered on status would shrink the day a customer downloads.
+ */
+app.get("/api/admin/revenue", admin, async (_req, res) => {
+  try {
+    const orders = await listOrders();
+    const products = new Map();
+    let total = { VND: 0, USD: 0 };
+    let paidOrders = 0;
+    let outstanding = 0;
+    for (const order of orders) {
+      const item = order.items?.[0] || {};
+      // paidCount is what makes a delivered order still count as revenue.
+      const count = Number(order.paidCount || 0);
+      if (count <= 0) {
+        if (isUnpaid(order) && !isClosed(order) && paymentDeadline(order) && paymentDeadline(order) > Date.now()) outstanding += Number(order.amount || 0);
+        continue;
+      }
+      paidOrders += count;
+      const key = item.productId || item.name || "unknown";
+      const entry = products.get(key) || { productId: key, name: item.name || key, version: item.version || "", price: Number(order.amount || 0), currency: order.currency || "VND", units: 0, revenue: 0, provider: 0, orders: 0 };
+      entry.units += count;
+      entry.orders += 1;
+      entry.revenue += Number(order.paidAmount || 0) || Number(order.amount || 0);
+      const providerAmount = Number(order.paidProviderAmount || 0);
+      if (providerAmount > 0) entry.provider += providerAmount;
+      products.set(key, entry);
+      // The currency bucket is decided per order, never per product. Two buyers
+      // can pay the same product in different currencies, and reading the bucket
+      // off the shared product row would drop one of the two totals on the
+      // floor the moment the second kind of order arrived.
+      const paid = Number(order.paidAmount || 0) || Number(order.amount || 0);
+      if (order.paidProviderCurrency && providerAmount > 0) total[order.paidProviderCurrency] = (total[order.paidProviderCurrency] || 0) + providerAmount;
+      else total[order.currency || "VND"] = (total[order.currency || "VND"] || 0) + paid;
+    }
+    // A mixed list of VND and USD cannot be summed honestly, so each is kept
+    // separate and the UI shows them side by side rather than inventing a total.
+    const rows = [...products.values()].sort((a, b) => b.units - a.units);
+    for (const row of rows) row.avg = row.units ? Math.round(row.revenue / row.units) : 0;
+    res.json({ currency: env.paypal.currency, total, paidOrders, outstanding, products: rows, generatedAt: new Date().toISOString() });
+  } catch (error) { console.error(error); res.status(500).json({ error: "Không tổng hợp được doanh thu" }); }
+});
+
 app.patch("/api/admin/orders/:id", admin, json, async (req, res) => {
   try {
     const status = req.body.status;
+    const existing = await getOrder(req.params.id);
+    if (!existing) return res.status(404).json({ error: "Không tìm thấy đơn hàng" });
+    // Closes a paid order the same way the buyer's browser does, for the times
+    // the download link was handed over by hand.
+    if (req.body.delivered === true) return res.json({ order: publicOrder(await markOrderDelivered(existing)) });
+    // The mirror image. A download that dies halfway still counts as handed
+    // over, because the server cannot see a file arrive, so the owner needs one
+    // click to undo it when a customer says the file never made it.
+    if (req.body.reopen === true) {
+      if (!isClosed(existing)) return res.status(409).json({ error: "Đơn này chưa đóng" });
+      const now = new Date().toISOString();
+      return res.json({ order: publicOrder(await updateOrder(existing.id, { status: "paid", paidAt: existing.paidAt || now, deliveredAt: null, updatedAt: now })) });
+    }
     if (!["pending", "pending_transfer", "paid", "payment_failed", "cancelled"].includes(status)) return res.status(400).json({ error: "Trạng thái không hợp lệ" });
-    const item = await updateOrder(req.params.id, { status, paidAt: status === "paid" ? new Date().toISOString() : null, updatedAt: new Date().toISOString() });
-    if (!item) return res.status(404).json({ error: "Không tìm thấy đơn hàng" }); res.json({ order: publicOrder(item) });
+    // Confirming by hand goes through the same path as a webhook, so the buyer
+    // still gets the mail and paid_count still reflects the real revenue.
+    if (status === "paid") return res.json({ order: publicOrder(await markOrderPaid(existing, { source: "admin" })) });
+    const item = await updateOrder(req.params.id, { status, paidAt: null, updatedAt: new Date().toISOString() });
+    res.json({ order: publicOrder(item) });
   } catch (error) { console.error(error); res.status(500).json({ error: "Không thể cập nhật đơn hàng" }); }
 });
 

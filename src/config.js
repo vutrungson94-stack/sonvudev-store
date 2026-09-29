@@ -56,6 +56,21 @@ export const env = {
     lookup: /^off$/i.test(value("GEO_LOOKUP", "auto")) ? "off" : "auto",
     cacheHours: numberValue("GEO_CACHE_HOURS", 24),
   },
+  orders: {
+    // Unpaid orders are cancelled once this many hours have passed. The window
+    // is what the checkout form promises the buyer, so it is shown in the UI
+    // and in the terms page rather than being a silent server rule.
+    paymentWindowHours: numberValue("ORDER_PAYMENT_WINDOW_HOURS", 24),
+    // How long before the deadline the "about to expire" notice is sent.
+    expiringWarnHours: numberValue("ORDER_EXPIRY_WARN_HOURS", 1),
+    sweepIntervalMs: numberValue("ORDER_SWEEP_INTERVAL_MS", 60000),
+  },
+  email: {
+    // Resend is a plain REST API, so no dependency and no SMTP server is needed.
+    resendKey: value("RESEND_API_KEY"),
+    from: value("EMAIL_FROM", "SonVuDev <no-reply@sonvudev.com>"),
+    supportEmail: value("SUPPORT_EMAIL", "hello@sonvudev.com"),
+  },
   paypal: {
     environment: value("PAYPAL_ENVIRONMENT", "sandbox"),
     currency: value("PAYPAL_CURRENCY", "USD").toUpperCase(),
@@ -89,6 +104,9 @@ export const isConfigured = {
   supabase: hasSupabaseProjectUrl() && configured("SUPABASE_SERVICE_ROLE_KEY"),
   paypal: configured("PAYPAL_CLIENT_ID") && configured("PAYPAL_CLIENT_SECRET") && ["USD", "EUR", "GBP", "AUD", "CAD", "SGD", "JPY"].includes(env.paypal.currency),
   paypalWebhook: configured("PAYPAL_WEBHOOK_ID"),
+  // Without a key the mailer falls back to writing each message to
+  // data/outbox, so the flow is testable end to end before an account exists.
+  email: configured("RESEND_API_KEY"),
   bank: Boolean(env.bank.name && env.bank.accountName && env.bank.accountNumber)
     && !/^(chưa cập nhật|not configured|replace-with)/i.test(`${env.bank.name} ${env.bank.accountNumber}`.trim()),
 };

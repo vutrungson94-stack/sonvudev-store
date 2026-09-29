@@ -51,6 +51,32 @@ alter table public.products add column if not exists short_description_en text n
 alter table public.products add column if not exists description_en text not null default '';
 alter table public.products add column if not exists features_en jsonb not null default '[]'::jsonb;
 
+-- Order lifecycle. An unpaid order stops being payable at expires_at and is
+-- cancelled by the background sweep; a proven payment sets paid_at and bumps
+-- paid_count, and the release being handed over records delivered_at.
+-- paid_count/paid_amount survive the reset back to a fresh order state, so the
+-- revenue record is never lost when an order closes.
+alter table public.orders add column if not exists expires_at timestamptz;
+alter table public.orders add column if not exists cancelled_at timestamptz;
+alter table public.orders add column if not exists cancel_reason text;
+alter table public.orders add column if not exists delivered_at timestamptz;
+alter table public.orders add column if not exists paid_count integer not null default 0;
+alter table public.orders add column if not exists paid_amount numeric(12, 2) not null default 0;
+-- What actually reached the account, in the provider's currency. For a PayPal
+-- order that is USD net of nothing yet, not the VND shelf price, and revenue
+-- reporting has to reconcile against a PayPal statement rather than a price tag.
+alter table public.orders add column if not exists paid_provider_amount numeric(12, 2) not null default 0;
+alter table public.orders add column if not exists paid_provider_currency text;
+-- Set once per checkout attempt so a lost response cannot create a duplicate.
+alter table public.orders add column if not exists idempotency_key text;
+-- One entry per sent message per order, so retries and the webhook/capture race
+-- cannot send a buyer two of the same mail.
+alter table public.orders add column if not exists notifications jsonb not null default '{}'::jsonb;
+
+create index if not exists orders_idempotency_key_idx on public.orders(idempotency_key);
+-- The sweep only ever asks for rows it could act on.
+create index if not exists orders_open_idx on public.orders(status, expires_at);
+
 alter table public.products enable row level security;
 alter table public.orders enable row level security;
 
