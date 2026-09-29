@@ -8,6 +8,7 @@
     "build": "node scripts/build-web.mjs",
     "check:production": "node scripts/production-check.mjs",
     "paypal:setup": "node scripts/setup-paypal.mjs",
+    "paypal:detect": "node scripts/setup-paypal.mjs --detect",
     "db:check": "node scripts/db-migrate.mjs --check",
     "db:migrate": "node scripts/db-migrate.mjs",
     "email:check": "node scripts/mail-check.mjs",

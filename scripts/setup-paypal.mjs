@@ -1,5 +1,7 @@
 // Verifies the PayPal credentials in .env and makes sure a webhook exists.
 // Usage: npm run paypal:setup
+//        npm run paypal:setup -- --detect   (find out which environment the
+//        credentials belong to, instead of trusting the dashboard toggle)
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import dotenv from "dotenv";
@@ -8,10 +10,57 @@ const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 dotenv.config({ path: path.join(root, ".env"), override: true });
 
 const env = (key) => (process.env[key] || "").trim();
-const environment = env("PAYPAL_ENVIRONMENT") || "sandbox";
-const apiBase = environment === "live" ? "https://api-m.paypal.com" : "https://api-m.sandbox.paypal.com";
+const detect = process.argv.slice(2).includes("--detect");
+const BASES = { live: "https://api-m.paypal.com", sandbox: "https://api-m.sandbox.paypal.com" };
 const clientId = env("PAYPAL_CLIENT_ID");
 const clientSecret = env("PAYPAL_CLIENT_SECRET");
+
+async function authenticate(apiBase) {
+  const response = await fetch(`${apiBase}/v1/oauth2/token`, {
+    method: "POST",
+    headers: {
+      Authorization: `Basic ${Buffer.from(`${clientId}:${clientSecret}`).toString("base64")}`,
+      "Content-Type": "application/x-www-form-urlencoded",
+    },
+    body: "grant_type=client_credentials",
+    signal: AbortSignal.timeout(15000),
+  });
+  return { ok: response.ok, status: response.status, body: await response.json().catch(() => ({})) };
+}
+
+/**
+ * The dashboard toggle is disabled while a business account is still being
+ * verified, so which environment a set of credentials belongs to cannot be read
+ * off the screen. Asking the API is the only honest answer.
+ */
+async function detectEnvironment() {
+  console.log("Thu xac thuc credential voi ca hai moi truong PayPal...\n");
+  for (const [name, base] of Object.entries(BASES)) {
+    const result = await authenticate(base);
+    console.log(`  ${name.padEnd(8)} ${result.ok ? "XAC THUC THANH CONG" : `that bai (HTTP ${result.status}: ${result.body.error_description || result.body.error || "unknown"})`}`);
+    if (result.ok) {
+      console.log(`\nCredential nay thuoc moi truong: ${name.toUpperCase()}`);
+      console.log(`Dat PAYPAL_ENVIRONMENT=${name} trong .env roi chay lai: npm run paypal:setup`);
+      return name;
+    }
+  }
+  console.error("\nKhong xac thuc duoc o ca hai moi truong.");
+  console.error("Kiem tra lai Client ID / Secret co dung app khong, va co copy thieu ky tu khong.");
+  process.exitCode = 1;
+  return null;
+}
+
+if (detect) {
+  if (!clientId || !clientSecret) {
+    console.error("Can PAYPAL_CLIENT_ID va PAYPAL_CLIENT_SECRET trong .env truoc khi do moi truong.");
+    process.exit(1);
+  }
+  const found = await detectEnvironment();
+  process.exit(found ? 0 : 1);
+}
+
+const environment = env("PAYPAL_ENVIRONMENT") || "sandbox";
+const apiBase = BASES[environment];
 const webhookUrl = `${env("APP_URL").replace(/\/$/, "")}/api/paypal/webhook`;
 const eventTypes = ["PAYMENT.CAPTURE.COMPLETED"];
 
