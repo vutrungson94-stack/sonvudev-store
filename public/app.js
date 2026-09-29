@@ -464,5 +464,14 @@ window.addEventListener('online', () => { if (lastOrder && lastToken) checkOrder
 document.addEventListener('visibilitychange', () => { if (!document.hidden && lastOrder && lastToken) checkOrder(lastOrder.id, lastToken, true); });
 modal.addEventListener('click', (e) => { if (e.target === modal || e.target.hasAttribute('data-close')) closeModal(); });
 
-loadProducts();
+loadProducts().then(() => {
+  // A product page links here as /?buy=<id> so the buyer lands with the checkout
+  // already open. The product page itself carries no checkout code, which is
+  // what keeps a single implementation of the flow instead of two that drift.
+  const wanted = new URLSearchParams(location.search).get('buy');
+  if (wanted) {
+    openProduct(wanted);
+    history.replaceState(null, '', location.pathname + location.hash);
+  }
+});
 loadPayOptions();

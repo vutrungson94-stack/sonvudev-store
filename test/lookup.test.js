@@ -114,7 +114,10 @@ test('the sitemap lists the storefront and the legal pages but not the lookup', 
   for (const loc of ['<loc>https://sonvudev.com/</loc>', '<loc>https://sonvudev.com/terms</loc>', '<loc>https://sonvudev.com/privacy</loc>', '<loc>https://sonvudev.com/refund</loc>']) {
     assert.ok(sitemap.includes(loc), `sitemap should contain ${loc}`);
   }
-  assert.ok(!sitemap.includes('/lookup'), 'the lookup page is not for search engines');
+  // Matched exactly rather than as a substring: a product whose slug happens to
+  // contain the word "lookup" is still a product and belongs in the sitemap.
+  assert.ok(!sitemap.includes('<loc>https://sonvudev.com/lookup</loc>'), 'the lookup page is not for search engines');
+  assert.ok(sitemap.includes('<loc>https://sonvudev.com/product/lookup-tester</loc>'), 'products belong in the sitemap');
 });
 
 test('the order page and lookup page are served', async () => {

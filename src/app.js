@@ -4,10 +4,11 @@ import { promises as fs } from "node:fs";
 import { fileURLToPath } from "node:url";
 import crypto from "node:crypto";
 import { env, isConfigured } from "./config.js";
-import { ensureSeed, findOrderByIdempotencyKey, getOrder, getProduct, listOrders, listProducts, createOrder, updateOrder, createProduct, updateProduct, persistenceMode } from "./store.js";
+import { ensureSeed, findOrderByIdempotencyKey, getOrder, getProduct, getProductBySlug, listOrders, listProducts, createOrder, updateOrder, createProduct, updateProduct, persistenceMode } from "./store.js";
 import { createDownloadUrl, createUploadUrl } from "./r2.js";
 import { captureOrder, createOrder as createPayPalOrder, hashToken, newOrderId, newToken, paypalChargeFor, paypalChargeForProduct, paymentMatchesOrder, readOrder, verifyWebhook } from "./paypal.js";
 import { paymentInstructions, paymentOptions } from "./payments.js";
+import { renderOgImage, renderProductPage } from "./pages.js";
 import { isClosed, isUnpaid, markOrderDelivered, markOrderPaid, paymentDeadline, voidPayment } from "./orders.js";
 import { notifyOrder, notifyMode } from "./notify.js";
 import { resolveCountry } from "./geo.js";
@@ -60,15 +61,59 @@ app.use((req, res, next) => {
   next();
 });
 app.get("/robots.txt", (_req, res) => res.type("text/plain").send("User-agent: *\nAllow: /\nDisallow: /admin.html\nDisallow: /api/\nSitemap: https://sonvudev.com/sitemap.xml\n"));
-// Built from the public directory so a new page is indexed without a second
-// list to keep in sync. The lookup and admin pages are deliberately absent.
+app.get("/robots.txt", (_req, res) => {
+  res.type("text/plain").send([
+    "User-agent: *",
+    "Allow: /",
+    // Private by design: the admin panel, and the order and lookup pages that
+    // hold a buyer's access token in the URL or the session.
+    "Disallow: /admin",
+    "Disallow: /api/",
+    "Disallow: /order/",
+    "Disallow: /lookup",
+    "Disallow: /paypal-return",
+    "",
+    `Sitemap: ${env.appUrl.replace(/\/$/, "")}/sitemap.xml`,
+    "",
+  ].join("\n"));
+});
+
+app.get("/og/:slug.svg", async (req, res) => {
+  // A clean site-wide card, so a link shared without a product still previews.
+  if (req.params.slug === "sonvudev") {
+    return res.set("Cache-Control", "public, max-age=3600").type("image/svg+xml").send(renderOgImage({ name: "Phần mềm Windows cho công việc", platform: "Windows", version: "1.0", price: 0, currency: "VND", priceLabel: "Từ 99.000₫" }));
+  }
+  const product = await getProductBySlug(req.params.slug);
+  if (!product || product.status !== "active") return res.status(404).type("text/plain").send("Not found");
+  res.set("Cache-Control", "public, max-age=3600");
+  res.type("image/svg+xml").send(renderOgImage(product));
+});
+
+app.get("/product/:slug", async (req, res) => {
+  try {
+    const product = await getProductBySlug(req.params.slug);
+    // A retired product is a 404, not a page marked "noindex": the old URL then
+    // stops competing with the products that are still for sale.
+    if (!product || product.status !== "active") return res.status(404).sendFile(path.join(publicDir, "404.html"));
+    res.set("Cache-Control", "public, max-age=300");
+    res.type("html").send(renderProductPage(product));
+  } catch (error) { console.error(error); res.status(500).type("text/plain").send("Lỗi máy chủ"); }
+});
+
 app.get("/sitemap.xml", async (_req, res) => {
+  const base = env.appUrl.replace(/\/$/, "");
   const pages = await fs.readdir(publicDir);
   const urls = pages
     .filter((file) => /^(index|terms|privacy|refund)\.html$/.test(file))
-    .map((file) => `<url><loc>https://sonvudev.com/${file === "index.html" ? "" : file.replace(/\.html$/, "")}</loc><changefreq>monthly</changefreq><priority>${file === "index.html" ? "1.0" : "0.3"}</priority></url>`)
-    .join("");
-  res.type("application/xml").send(`<?xml version="1.0" encoding="UTF-8"?><urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">${urls}</urlset>`);
+    .map((file) => `<url><loc>${base}/${file === "index.html" ? "" : file.replace(/\.html$/, "")}</loc><changefreq>monthly</changefreq><priority>${file === "index.html" ? "1.0" : "0.3"}</priority></url>`);
+  // A product that is not on the sitemap cannot be found, so this is built from
+  // the live catalogue rather than from a list someone has to remember to edit.
+  const products = (await listProducts()).filter((item) => item.status === "active" && item.slug);
+  for (const product of products) {
+    const updated = product.updatedAt || product.updated_at;
+    urls.push(`<url><loc>${base}/product/${encodeURIComponent(product.slug)}</loc>${updated ? `<lastmod>${new Date(updated).toISOString().slice(0, 10)}</lastmod>` : ""}<changefreq>weekly</changefreq><priority>0.8</priority></url>`);
+  }
+  res.type("application/xml").send(`<?xml version="1.0" encoding="UTF-8"?><urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">${urls.join("")}</urlset>`);
 });
 
 app.use((req, res, next) => {
@@ -459,6 +504,14 @@ app.patch("/api/admin/orders/:id", admin, json, async (req, res) => {
     const item = await updateOrder(req.params.id, { status, paidAt: null, updatedAt: new Date().toISOString() });
     res.json({ order: publicOrder(item) });
   } catch (error) { console.error(error); res.status(500).json({ error: "Không thể cập nhật đơn hàng" }); }
+});
+
+// Anything that fell through is a 404 page, not Express's bare error. It is
+// declared noindex, so broken links a crawler discovers do not become thin
+// duplicate pages competing with the products.
+app.use((req, res) => {
+  if (req.path.startsWith("/api/")) return res.status(404).json({ error: "Not found" });
+  res.status(404).sendFile(path.join(publicDir, "404.html"));
 });
 
 app.use((error, _req, res, _next) => { console.error(error); res.status(500).json({ error: "Internal server error" }); });

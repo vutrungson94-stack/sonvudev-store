@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Không tìm thấy trang — SonVuDev</title>
+<meta name="description" content="Đường dẫn này không tồn tại. Quay lại danh sách phần mềm của SonVuDev.">
+<!-- A 404 that says "found" would be invited into the index. -->
+<meta name="robots" content="noindex,follow">
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/styles.css">
+</head>
+<body class="page-404">
+<header class="site-header"><a class="brand" href="/"><span class="brand-mark">S</span><span>SonVu<span>Dev</span></span></a><a class="header-cta" href="/">Về trang chủ <span>↗</span></a></header>
+<main class="wrap">
+<div class="notfound">
+<p class="eyebrow">Lỗi 404</p>
+<h1>Không tìm thấy trang này</h1>
+<p class="notfound-text">Có thể đường dẫn bị sai chính tả, hoặc sản phẩm bạn tìm đã ngừng bán. Danh sách dưới đây là những gì đang có.</p>
+<div class="notfound-links" id="notfound-links"><p class="related-empty">Đang tải sản phẩm…</p></div>
+<div class="notfound-actions"><a class="button button-primary" href="/">Về trang chủ <span>→</span></a><a class="button button-secondary" href="/lookup">Tra cứu đơn hàng</a></div>
+</div>
+</main>
+<footer class="site-footer wrap"><p>© 2026 SonVuDev · <a href="/terms">Điều khoản</a> · <a href="/refund">Hoàn tiền</a> · <a href="/privacy">Bảo mật</a></p></footer>
+<script>
+fetch('/api/products').then((r) => r.json()).then((data) => {
+  const box = document.getElementById('notfound-links');
+  const items = data.products || [];
+  box.innerHTML = items.length
+    ? items.map((p) => '<a class="related-card" href="/product/' + encodeURIComponent(p.slug) + '"><b>' + p.name + '</b><span>v' + p.version + ' · ' + p.platform + '</span><span>' + new Intl.NumberFormat('vi-VN', { maximumFractionDigits: 0 }).format(p.price) + ' ' + p.currency + '</span></a>').join('')
+    : '<p class="related-empty">Hiện chưa có sản phẩm nào.</p>';
+}).catch(() => { document.getElementById('notfound-links').textContent = ''; });
+</script>
+</body>
+</html>
