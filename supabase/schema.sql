@@ -54,6 +54,10 @@ create index if not exists products_status_idx on public.products(status);
 alter table public.products add column if not exists short_description_en text not null default '';
 alter table public.products add column if not exists description_en text not null default '';
 alter table public.products add column if not exists features_en jsonb not null default '[]'::jsonb;
+-- How the product should read in a search result. Left blank, the page falls
+-- back to the product name, which nobody outside this site is searching for.
+alter table public.products add column if not exists seo_title text not null default '';
+alter table public.products add column if not exists seo_description text not null default '';
 
 -- Order lifecycle. An unpaid order stops being payable at expires_at and is
 -- cancelled by the background sweep; a proven payment sets paid_at and bumps

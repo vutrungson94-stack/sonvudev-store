@@ -143,6 +143,21 @@ test('chỉ có một route robots.txt, và nó là bản đầy đủ', async (
   assert.ok(!body.includes('/admin.html'), 'bản cũ đã bị thay');
 });
 
+test('tiêu đề trang lấy theo từ khoá khi sản phẩm có, không thì tự suy ra', async () => {
+  // A page titled after the product name can only be found by people who
+  // already know the product. The owner can override it with the phrase people
+  // actually type.
+  await updateProduct(product.id, { seoTitle: 'Bật macro Excel — thêm thư mục tin cậy | SonVuDev', seoDescription: 'Excel bị chặn macro khi mở file .xlsm? Script tự thêm thư mục bạn chọn vào Trusted Locations.' });
+  const html = await text(`/product/${product.slug}`);
+  assert.ok(html.includes('<title>Bật macro Excel'), 'phải dùng seo_title');
+  const graph = [...html.matchAll(/<script type="application\/ld\+json">([\s\S]*?)<\/script>/g)].flatMap((m) => { const p = JSON.parse(m[1].replace(/\\u003c/g, '<')); return p['@graph'] || p; });
+  const software = graph.find((n) => n['@type'] === 'SoftwareApplication');
+  assert.equal(software.alternateName, 'Bật macro Excel — thêm thư mục tin cậy | SonVuDev');
+  await updateProduct(product.id, { seoTitle: '', seoDescription: '' });
+  const fallback = await text(`/product/${product.slug}`);
+  assert.ok(fallback.includes(`<title>SEO Tester Pro v2.1`), 'không có seo_title thì tự suy ra từ tên sản phẩm');
+});
+
 test('ảnh preview sinh theo từng sản phẩm', async () => {
   const response = await get(`/og/${product.slug}.svg`);
   assert.equal(response.status, 200);
@@ -164,7 +179,11 @@ test('trang chủ có nội dung tiếng Việt ngay trong HTML, không cần ch
   const heading = html.match(/<h1[^>]*>([\s\S]*?)<\/h1>/);
   assert.ok(heading && /[a-zA-Zà-ỹ]/.test(heading[1]), 'thẻ h1 phải chứa chữ, không chỉ thẻ rỗng bọc ngoài');
   assert.ok(html.includes('application/ld+json'), 'phải có dữ liệu có cấu trúc');
-  assert.ok(html.includes('name="description" content="Tiện ích'), 'mô tả phải có từ khoá thật');
+  const description = html.match(/name="description" content="([^"]+)"/)?.[1] || '';
+  assert.ok(description.length > 70 && description.length < 175, `mô tả phải đủ dài mà không bị cắt (${description.length} ký tự)`);
+  // The copy has to name what the products do, not what the shop is.
+  assert.ok(/macro Excel/.test(description) && /USB/.test(description), 'mô tả phải chứa từ khoá người ta gõ');
+  assert.ok(!/Kho phần mềm và tiện ích/.test(description), 'câu chung chung cũ không tìm được ai');
   // Structure that app.js depends on must survive the text injection.
   for (const id of ['product-grid', 'product-count', 'product-modal', 'modal-content', 'toast']) {
     assert.ok(html.includes(`id="${id}"`), `thiếu id ${id} mà app.js cần`);

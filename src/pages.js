@@ -48,7 +48,10 @@ export const productSchema = (product) => ({
   "@type": "SoftwareApplication",
   "@id": absolute(`/product/${product.slug}#software`),
   name: `${product.name} ${product.version ? `v${product.version}` : ""}`.trim(),
-  description: productSummary(product),
+  // altText and the description both take the search phrasing, so the product
+  // is findable by the problem it solves and not only by its product name.
+  description: product.seoDescription || productSummary(product),
+  alternateName: product.seoTitle || undefined,
   url: absolute(`/product/${product.slug}`),
   applicationCategory: product.category || "UtilitiesApplication",
   operatingSystem: product.platform || "Windows",
@@ -140,8 +143,12 @@ export function renderProductPage(product) {
   const url = absolute(`/product/${product.slug}`);
   const { intro, groups } = sections(product.description);
   const features = product.features || [];
-  const title = `${product.name} v${product.version} — ${product.platform || "Windows"} | SonVuDev`;
-  const description = productSummary(product);
+  // The headline leads with what someone types into a search box, not with the
+  // product's own name, which nobody outside this site has heard of. The two are
+  // the same sentence read differently: "bật macro Excel" is the problem, "Excel
+  // Trusted Locations Setup" is the thing that solves it.
+  const title = product.seoTitle || `${product.name} v${product.version} — ${product.platform || "Windows"} | SonVuDev`;
+  const description = product.seoDescription || productSummary(product);
 
   return `<!doctype html>
 <html lang="vi">

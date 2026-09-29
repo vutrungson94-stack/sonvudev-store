@@ -52,7 +52,7 @@ const REQUIRED_COLUMNS = {
     "expires_at", "cancelled_at", "cancel_reason", "delivered_at", "paid_count", "paid_amount", "paid_provider_amount", "paid_provider_currency", "idempotency_key", "notifications",
     "refunded_at", "refund_reason", "refunded_count", "refunded_amount", "refunded_provider_amount"],
   products: ["id", "slug", "name", "short_description", "description", "category", "platform", "version", "price", "currency", "badge", "features", "requirements", "status", "file_key", "featured", "created_at", "updated_at",
-    "short_description_en", "description_en", "features_en"],
+    "short_description_en", "description_en", "features_en", "seo_title", "seo_description"],
 };
 
 // Read-only check first: this needs nothing but the service role key the server
