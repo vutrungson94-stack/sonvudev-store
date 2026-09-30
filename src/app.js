@@ -133,6 +133,14 @@ app.get(/^\/[0-9a-z-]{8,128}\.txt$/i, (req, res, next) => {
   res.type("text/plain").send(key);
 });
 
+// The admin panel is an internal page opened rarely, so a cached copy of its
+// script sits in a browser for weeks. When a fix finally lands, the owner keeps
+// running the old one and the panel silently does the wrong thing with no error
+// anywhere. Freshness beats caching for a page nobody but the owner visits.
+app.get(["/admin", "/admin.html", "/admin.js"], (_req, res) => {
+  res.set("Cache-Control", "no-store").sendFile(path.join(publicDir, _req.path === "/admin" ? "admin.html" : _req.path.slice(1)));
+});
+
 // The pages a search engine is meant to index, and what the server has to decide
 // about each one. Everything else in public/ is a static file served untouched.
 //

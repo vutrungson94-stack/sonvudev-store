@@ -29,11 +29,6 @@ create table if not exists public.orders (
   access_token_hash text not null,
   customer_email text not null,
   customer_name text not null default '',
- -- 'refunded' means the money went back to the buyer. It is kept separate from
--- 'cancelled' because cancelling an unpaid order and giving back a paid one are
--- different events, and the revenue report has to tell them apart.
-alter table public.orders drop constraint if exists orders_status_check;
-alter table public.orders add constraint orders_status_check check (status in ('pending', 'pending_transfer', 'paid', 'payment_failed', 'cancelled', 'refunded'));
   payment_provider text not null default 'bank_transfer',
   provider_order_id text,
   amount numeric(12, 2) not null,
@@ -47,6 +42,15 @@ alter table public.orders add constraint orders_status_check check (status in ('
 create index if not exists orders_customer_email_idx on public.orders(customer_email);
 create index if not exists orders_provider_order_id_idx on public.orders(provider_order_id);
 create index if not exists products_status_idx on public.products(status);
+
+-- These two were sitting inside the create table block above, where Postgres was
+-- still reading column definitions and gave up at the word "table". A constraint
+-- can only be attached after the table it belongs to has been closed.
+-- 'refunded' means the money went back to the buyer. It is kept separate from
+-- 'cancelled' because cancelling an unpaid order and giving back a paid one are
+-- different events, and the revenue report has to tell them apart.
+alter table public.orders drop constraint if exists orders_status_check;
+alter table public.orders add constraint orders_status_check check (status in ('pending', 'pending_transfer', 'paid', 'payment_failed', 'cancelled', 'refunded'));
 
 -- English copy for the storefront language switch. Kept optional: a product with
 -- no *_en value simply falls back to the Vietnamese text, so existing rows and
