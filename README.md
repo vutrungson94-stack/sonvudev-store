@@ -514,13 +514,19 @@ chưa được đăng ký với ai cả.
 
 ### 2. Bing Webmaster Tools
 
-Lặp lại đúng như trên tại <https://www.bing.com/webmasters>. Chọn site trong danh sách
-góc trên bên trái, rồi bấm **Verification code** để lấy token.
+Lặp lại đúng như trên tại <https://www.bing.com/webmasters>.
 
-Đặt token đó vào `BING_SITE_VERIFICATION` — đó là chuỗi trong `content="..."` của thẻ
-`msvalidate.01`, không có tiền tố `ms`. Server sẽ tự chèn thẻ vào `<head>` trang chủ.
+**Cách dễ nhất: import từ Google Search Console.** Trang Add a site có nút *Import
+from Google Search Console*. Bing nhận luôn chứng minh sở hữu từ Google, nên xong ngay
+— nhưng đổi lại Bing **không cấp token nào**, và bấm *Verification code* chỉ ra đúng
+một dòng giải thích rằng token là không cần thiết. Đừng tìm token.
 
-Bing còn hai cách nữa mà server này **không** phục vụ, và không nên tự đoán: file
+Chỉ khi thêm site thủ công thì Bing mới cấp token: chọn site trong danh sách góc trên
+bên trái, bấm **Verification code**, rồi copy chuỗi trong `content="..."` của thẻ
+`msvalidate.01` (không có tiền tố `ms`) vào `BING_SITE_VERIFICATION`. Server sẽ tự
+chèn thẻ vào `<head>` trang chủ.
+
+Hai cách nữa mà server này **không** phục vụ, và không nên tự đoán: file
 `BingSiteAuth.xml` ở thư mục gốc (nội dung do Bing sinh riêng cho từng site) và bản ghi
 DNS. Dùng thẻ meta là đủ và là cách chắc chắn nhất.
 
