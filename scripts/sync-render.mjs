@@ -53,7 +53,13 @@ async function call(method, url, body) {
     const detail = await response.text().catch(() => "");
     throw new Error(`${method} ${url.replace(api, "")} -> HTTP ${response.status} ${detail.slice(0, 300)}`);
   }
-  return response.status === 204 ? null : response.json();
+  // Render answers a deploy request with 200 and no body at all. Calling
+  // response.json() on that throws "Unexpected end of JSON input" *after* the
+  // deploy has been created, which reads like the deploy failed and invites
+  // triggering a second one. An empty body is a success with nothing to report.
+  const text = await response.text();
+  if (!text.trim()) return null;
+  try { return JSON.parse(text); } catch { return null; }
 }
 
 async function findService() {

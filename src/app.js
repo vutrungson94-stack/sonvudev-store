@@ -94,12 +94,19 @@ app.get("/robots.txt", (_req, res) => {
 
 // Site ownership for the search engines that will actually crawl this thing.
 //
-// Google and Bing both accept either a meta tag or a file at the site root, and
-// the two are derived from the same string, so whichever method the dashboard
-// hands out works here without a code change. Only the exact configured name is
-// answered: a catch-all that served every /google*.html would publish an
-// unbounded set of files that exist for nobody, and would hand a wrong token a
-// plausible-looking proof of ownership.
+// Google accepts a meta tag or an HTML file at the site root, and the two are
+// derived from the same string, so whichever method the dashboard hands out
+// works here without a code change. Only the exact configured name is answered:
+// a catch-all that served every /google*.html would publish an unbounded set of
+// files that exist for nobody, and would hand a wrong token a plausible-looking
+// proof of ownership.
+//
+// Bing is served the same way, with two differences worth knowing. Its meta tag
+// is the method Bing's own help documents as reliable, and its file method is
+// BingSiteAuth.xml whose body Bing generates per site — so there is nothing here
+// to serve for that without guessing at the token's format. The ms<token>.txt
+// route below is the older Bing format, kept because it costs nothing and only
+// answers the exact configured name.
 app.get(/^\/(google[0-9a-z]+\.html|ms[0-9a-z]+\.txt)$/i, (req, res, next) => {
   const name = req.path.slice(1);
   const google = verificationFile("google", ".html", env.site.googleVerification);

@@ -514,8 +514,15 @@ chưa được đăng ký với ai cả.
 
 ### 2. Bing Webmaster Tools
 
-Lặp lại đúng như trên tại <https://www.bing.com/webmasters> với
-`BING_SITE_VERIFICATION`. Bing phục vụ `/ms<token>.txt`.
+Lặp lại đúng như trên tại <https://www.bing.com/webmasters>. Chọn site trong danh sách
+góc trên bên trái, rồi bấm **Verification code** để lấy token.
+
+Đặt token đó vào `BING_SITE_VERIFICATION` — đó là chuỗi trong `content="..."` của thẻ
+`msvalidate.01`, không có tiền tố `ms`. Server sẽ tự chèn thẻ vào `<head>` trang chủ.
+
+Bing còn hai cách nữa mà server này **không** phục vụ, và không nên tự đoán: file
+`BingSiteAuth.xml` ở thư mục gốc (nội dung do Bing sinh riêng cho từng site) và bản ghi
+DNS. Dùng thẻ meta là đủ và là cách chắc chắn nhất.
 
 Đừng bỏ qua chỉ vì đã có Google. Bing và IndexNow là con đường nhanh nhất tới khách
 quốc tế, mà đó đúng là nhóm khách PayPal.
