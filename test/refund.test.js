@@ -21,6 +21,9 @@ process.env.BANK_BIN = '970436';
 process.env.ADMIN_API_TOKEN = 'test-admin-token';
 process.env.PAYPAL_CURRENCY = 'USD';
 process.env.RESEND_API_KEY = '';
+// A real IndexNow key in .env would make every product created in these
+// tests fire a real ping at api.indexnow.org. Same trap as the mail key above.
+process.env.INDEXNOW_KEY = '';
 
 const { createApp } = await import('../src/app.js');
 const { getOrder } = await import('../src/store.js');

@@ -92,6 +92,14 @@ alter table public.orders add column if not exists notifications jsonb not null 
 create index if not exists orders_idempotency_key_idx on public.orders(idempotency_key);
 -- The sweep only ever asks for rows it could act on.
 create index if not exists orders_open_idx on public.orders(status, expires_at);
+-- The admin history and the badge poll both order by created_at, and neither
+-- index above covers that, so Postgres was sorting the whole table on every
+-- request. Descending matters here: the queries only ever read the newest end.
+create index if not exists orders_created_at_idx on public.orders(created_at desc);
+-- The storefront asks for active products newest first on every page load and
+-- on every crawl. One index answers both halves of that instead of filtering and
+-- sorting separately.
+create index if not exists products_active_idx on public.products(status, created_at desc);
 
 alter table public.products enable row level security;
 alter table public.orders enable row level security;

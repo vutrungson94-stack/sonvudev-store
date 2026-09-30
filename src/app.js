@@ -4,7 +4,7 @@ import { promises as fs } from "node:fs";
 import { fileURLToPath } from "node:url";
 import crypto from "node:crypto";
 import { env, isConfigured } from "./config.js";
-import { ensureSeed, findOrderByIdempotencyKey, getOrder, getProduct, getProductBySlug, isSellable, listOrders, listProducts, createOrder, updateOrder, createProduct, updateProduct, persistenceMode } from "./store.js";
+import { ensureSeed, findOrderByIdempotencyKey, getOrder, getProduct, getProductBySlug, isSellable, latestOrder, listExpiringOrders, listOpenOrders, listOrders, listOrdersForRevenue, listProducts, createOrder, updateOrder, createProduct, updateProduct, persistenceMode } from "./store.js";
 import { createDownloadUrl, createUploadUrl } from "./r2.js";
 import { captureOrder, createOrder as createPayPalOrder, hashToken, newOrderId, newToken, paypalChargeFor, paypalChargeForProduct, paymentMatchesOrder, readOrder, verifyWebhook } from "./paypal.js";
 import { paymentInstructions, paymentOptions } from "./payments.js";
@@ -37,18 +37,26 @@ const isAdmin = (req) => {
 const admin = (req, res, next) => { if (!isAdmin(req)) return res.status(401).json({ error: "Unauthorized" }); next(); };
 
 // Order ids are short, so a lookup endpoint without a limit would let anyone
-// walk the id space. A per-IP window is enough here: the app runs as a single
+// walk the id space. A per-key window is enough here: the app runs as a single
 // process and this only needs to make guessing impractical, not bulletproof.
+//
+// Keyed rather than counted by IP alone, on purpose. Vietnamese mobile carriers
+// put a lot of unrelated buyers behind one public address, so a limit read only
+// by IP starts refusing real orders to whoever happens to be the eleventh buyer on
+// that address. Counting the email as well splits the two abuse cases apart: one
+// script on one machine walks many emails, and many machines behind one address
+// hammer the same one. Each has its own budget, so blocking one does not starve
+// the other.
 const attempts = new Map();
-const tooManyAttempts = (req) => {
-  const key = req.ip || "unknown";
+const tooMany = (key, limit) => {
   const now = Date.now();
   const recent = (attempts.get(key) || []).filter((time) => now - time < 15 * 60 * 1000);
   recent.push(now);
   attempts.set(key, recent);
-  if (attempts.size > 5000) attempts.clear();
-  return recent.length > 10;
+  if (attempts.size > 20000) attempts.clear();
+  return recent.length > limit;
 };
+const tooManyAttempts = (req) => tooMany(`ip:${req.ip || "unknown"}`, 10);
 
 app.set("trust proxy", 1);
 app.disable("x-powered-by");
@@ -298,6 +306,22 @@ async function resumeOrder(order) {
   return { order: publicOrder(current), accessToken, payment: current.paymentProvider === "bank_transfer" ? paymentInstructions(current) : null, ...deadlinePayload(current) };
 }
 
+// Checkout is the one public endpoint that writes a row and calls a paid API, so
+// it needs a guard of its own. The address gets a generous budget because one
+// carrier address legitimately serves many buyers; each email gets a tighter one,
+// because nobody opens six real orders in fifteen minutes.
+//
+// The check sits after the duplicate lookup and the availability checks, not on
+// the route. It counts orders created rather than requests received, which is the
+// only thing worth bounding: a buyer on a bad connection who taps Mua lần thứ hai
+// sends the same idempotency key, gets their original order handed back, and is
+// never near a limit. Charging them for the retry would lose the sale and fix
+// nothing. The IP budget stays generous for the same CGNAT reason as the lookup
+// form: one public address can legitimately be many different buyers.
+function checkoutThrottled(req, email) {
+  return tooMany(`checkout-ip:${req.ip || "unknown"}`, 30) || Boolean(email) && tooMany(`checkout-email:${email}`, 12);
+}
+
 app.post("/api/checkout", json, async (req, res) => {
   try {
     const email = text(req.body.email, 160).toLowerCase();
@@ -314,6 +338,9 @@ app.post("/api/checkout", json, async (req, res) => {
     if (!product.fileKey || !isConfigured.r2) return res.status(503).json({ error: "Sản phẩm chưa sẵn sàng để nhận thanh toán" });
     if (method === "bank_transfer" && !isConfigured.bank) return res.status(503).json({ error: "Phương thức chuyển khoản chưa được cấu hình" });
     if (method === "paypal" && !isConfigured.paypal) return res.status(503).json({ error: "PayPal chưa được cấu hình. Hãy chọn chuyển khoản hoặc cấu hình PayPal trên server." });
+    // Placed here, after everything above has already proved this request is a
+    // genuinely new order. See checkoutThrottled for why the position matters.
+    if (checkoutThrottled(req, email)) return res.status(429).json({ error: "Bạn đã tạo quá nhiều đơn hàng. Vui lòng thử lại sau 15 phút." });
     const accessToken = newToken();
     const id = newOrderId();
     const now = new Date().toISOString();
@@ -446,26 +473,34 @@ app.post("/api/paypal/capture", json, async (req, res) => {
   } catch (error) { console.error(error); res.status(502).json({ error: "Không thể xác nhận thanh toán PayPal" }); }
 });
 
-// Cheap poll target for the admin badge. The full order list carries customer
-// details and is much heavier, so the notification loop hits this instead and
-// only downloads rows when something actually changed.
+// Poll target for the admin badge. It used to read the whole order table every
+// few seconds just to work out how many were waiting: the cost grew with the shop
+// while the answer did not. Now it asks for the newest row on its own and counts
+// the open ones, and both answers come off the (status, expires_at) index.
 app.get("/api/admin/orders/pending", admin, async (_req, res) => {
   try {
-    const orders = await listOrders();
-    const at = (order) => new Date(order.createdAt || order.created_at || 0).getTime();
-    const latest = orders.length ? at(orders[0]) : 0;
+    const [newest, open] = await Promise.all([latestOrder(), listOpenOrders()]);
+    const at = (order) => new Date(order?.createdAt || order?.created_at || 0).getTime();
     res.json({
-      latest,
-      pending: orders.filter((order) => order.status === "pending_transfer" && !isClosed(order)).length,
+      latest: newest ? at(newest) : 0,
+      pending: open.filter((order) => order.status === "pending_transfer" && !isClosed(order)).length,
       // The newest order is echoed back so a new arrival can be named in the
       // alert without a second request.
-      newest: orders[0] ? { id: orders[0].id, status: orders[0].status, createdAt: orders[0].createdAt || orders[0].created_at || null } : null,
+      newest: newest ? { id: newest.id, status: newest.status, createdAt: newest.createdAt || newest.created_at || null } : null,
     });
   } catch (error) { console.error(error); res.status(500).json({ error: "Không kiểm tra được đơn hàng" }); }
 });
 
-app.get("/api/admin/orders", admin, async (_req, res) => {
-  try { res.json({ orders: (await listOrders()).map(publicOrder) }); }
+// The history view, paged. Capping it matters for the same reason: an admin
+// panel that silently stops showing older orders is a trap, so the total count
+// travels with the page and the panel can say what it is not showing.
+app.get("/api/admin/orders", admin, async (req, res) => {
+  try {
+    const limit = Math.min(200, Math.max(1, Number(req.query.limit) || 50));
+    const offset = Math.max(0, Number(req.query.offset) || 0);
+    const [orders, open] = await Promise.all([listOrders({ limit, offset }), listOpenOrders()]);
+    res.json({ orders: orders.map(publicOrder), live: open.length, limit, offset, hasMore: orders.length === limit });
+  }
   catch (error) { console.error(error); res.status(500).json({ error: "Không thể tải đơn hàng" }); }
 });
 app.get("/api/admin/products", admin, async (_req, res) => {
@@ -532,7 +567,7 @@ app.post("/api/admin/uploads/presign", admin, json, async (req, res) => {
  */
 app.get("/api/admin/revenue", admin, async (_req, res) => {
   try {
-    const orders = await listOrders();
+    const orders = await listOrdersForRevenue();
     const products = new Map();
     let gross = { VND: 0, USD: 0 };
     let moneyBack = { VND: 0, USD: 0 };

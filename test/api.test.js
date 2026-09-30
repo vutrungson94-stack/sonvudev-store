@@ -27,6 +27,9 @@ process.env.PAYPAL_VND_TO_USD_RATE = '26000';
 process.env.ADMIN_API_TOKEN = 'test-admin-token';
 // Never let a real key in .env turn a test run into real email.
 process.env.RESEND_API_KEY = '';
+// A real IndexNow key in .env would make every product created in these
+// tests fire a real ping at api.indexnow.org. Same trap as the mail key above.
+process.env.INDEXNOW_KEY = '';
 const { createApp } = await import('../src/app.js');
 let server;
 let base;

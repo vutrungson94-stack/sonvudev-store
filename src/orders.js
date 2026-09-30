@@ -1,5 +1,5 @@
 import { env } from "./config.js";
-import { getOrder, listOrders, updateOrder } from "./store.js";
+import { getOrder, listExpiringOrders, updateOrder } from "./store.js";
 import { notifyOrder } from "./notify.js";
 
 // A store has to answer two questions the raw status column cannot: when does an
@@ -137,7 +137,11 @@ async function cancelOrder(order, reason) {
  * and so tests can assert on them.
  */
 export async function sweepOrders(now = Date.now()) {
-  const orders = await listOrders();
+  // Only the orders that can still change are read. Everything past the warning
+  // window can never be warned about or cancelled, so fetching it would be
+  // fetching history to throw it away, once a minute, for ever.
+  const horizon = now + warnMs();
+  const orders = await listExpiringOrders({ before: new Date(horizon).toISOString() });
   const result = { expired: [], warned: [] };
   for (const order of orders) {
     if (isExpired(order, now)) {

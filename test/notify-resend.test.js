@@ -14,6 +14,9 @@ process.env.ADMIN_API_TOKEN = 'test-admin-token';
 // Set before importing, because config decides once at load time whether mail
 // goes to Resend or to the outbox. That decision is the whole point here.
 process.env.RESEND_API_KEY = 're_test_key_123';
+// A real IndexNow key in .env would make every product created in these
+// tests fire a real ping at api.indexnow.org. Same trap as the mail key above.
+process.env.INDEXNOW_KEY = '';
 process.env.EMAIL_FROM = 'SonVuDev <no-reply@sonvudev.com>';
 process.env.SUPPORT_EMAIL = 'hello@sonvudev.com';
 

@@ -128,6 +128,7 @@ Script chỉ đẩy danh sách biến của ứng dụng (`ALLOWED`), không đ�
 - `src/r2.js`: presigned upload/download URL; bucket bắt buộc private.
 - `src/paypal.js`: PayPal Orders v2, chuyển VND sang USD và xác minh webhook.
 - `src/payments.js`: dựng hướng dẫn thanh toán trong nước (VietQR, MoMo, ZaloPay).
+- `src/store.js`: các truy vấn đều giới hạn theo đúng mức cần — đơn còn mở cho quét hết hạn, đơn mới nhất cho badge quản trị, chỉ cột tiền cho báo cáo doanh thu, và có phân trang cho lịch sử. Không nơi nào đọc cả bảng đơn trong một vòng lặp.
 - `src/rates.js`: tỷ giá VND/USD, cache và fallback.
 - `src/indexnow.js`: báo URL đổi cho Bing/Yandex/Naver; bắn-thả, không bao giờ chặn lưu sản phẩm.
 - `public/`: storefront responsive, không cần build frontend.

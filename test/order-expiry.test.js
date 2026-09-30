@@ -25,6 +25,9 @@ process.env.ORDER_EXPIRY_WARN_HOURS = '1';
 // A real key in .env must never turn a test run into real email to a real
 // inbox, and this file asserts on the outbox path anyway.
 process.env.RESEND_API_KEY = '';
+// The same trap as the mail key: a real one in .env would make every product
+// created in before() fire a real IndexNow ping over the network.
+process.env.INDEXNOW_KEY = '';
 
 const { createApp } = await import('../src/app.js');
 const { createOrder, getOrder, listOrders, updateOrder } = await import('../src/store.js');
@@ -48,12 +51,17 @@ test.before(async () => {
 });
 test.after(async () => { server?.close(); await fs.rm(tempDir, { recursive: true, force: true }); });
 
+let buyerSeq = 0;
 const checkout = async (overrides = {}) => {
+  // Every call is a different buyer. Seventeen orders from one inbox inside a
+  // quarter of an hour is not shopping, it is the abuse the checkout limit
+  // exists to stop, so a shared placeholder email would test the wrong thing.
+  const email = overrides.email || `buyer${(buyerSeq += 1)}@example.com`;
   const response = await fetch(`${base}/api/checkout`, {
     method: 'POST', headers: { 'content-type': 'application/json' },
-    body: JSON.stringify({ productId: product.id, email: 'buyer@example.com', customerName: 'Test User', paymentMethod: 'bank_transfer', ...overrides }),
+    body: JSON.stringify({ productId: product.id, email, customerName: 'Test User', paymentMethod: 'bank_transfer', ...overrides }),
   });
-  return { response, data: await response.json() };
+  return { response, data: await response.json(), email };
 };
 
 const age = async (id, hours) => {
@@ -96,7 +104,7 @@ test('checkout lai voi cung idempotencyKey tra ve chinh don do, khong tao don mo
 });
 
 test('don chua thanh toan het han se bi huy va gui mail', async () => {
-  const { data } = await checkout();
+  const { data, email } = await checkout();
   await age(data.order.id, 25);
   const result = await sweepOrders();
   assert.ok(result.expired.includes(data.order.id), 'don 25 gio phai bi huy');
@@ -111,7 +119,7 @@ test('don chua thanh toan het han se bi huy va gui mail', async () => {
 });
 
 test('quet khong huy don da duoc giao', async () => {
-  const { data } = await checkout();
+  const { data, email } = await checkout();
   await updateOrder(data.order.id, { status: 'paid', paidAt: new Date().toISOString(), paidCount: 1 });
   await markOrderDelivered(await getOrder(data.order.id));
   await age(data.order.id, 50);
@@ -125,7 +133,7 @@ test('quet khong huy don da duoc giao', async () => {
 });
 
 test('thanh toan den sau khi don da bi huy van mo duoc nut tai', async () => {
-  const { data } = await checkout();
+  const { data, email } = await checkout();
   await age(data.order.id, 25);
   await sweepOrders();
   assert.equal((await getOrder(data.order.id)).status, 'cancelled');
@@ -139,7 +147,7 @@ test('thanh toan den sau khi don da bi huy van mo duoc nut tai', async () => {
 });
 
 test('markOrderPaid chay lai nhieu lan chi gui mot mail', async () => {
-  const { data } = await checkout();
+  const { data, email } = await checkout();
   const first = await markOrderPaid(await getOrder(data.order.id), { source: 'admin' });
   const second = await markOrderPaid(first, { source: 'webhook' });
   assert.equal(second.paidCount, 1, 'thanh toan trung khong duoc tinh lai');
@@ -147,7 +155,7 @@ test('markOrderPaid chay lai nhieu lan chi gui mot mail', async () => {
 });
 
 test('nut tai bi khoa truoc khi thanh toan va se mo khi da thanh toan', async () => {
-  const { data } = await checkout();
+  const { data, email } = await checkout();
   const locked = await fetch(`${base}/api/orders/${data.order.id}/download`, { headers: { 'x-order-token': data.accessToken } });
   assert.equal(locked.status, 409, 'chua thanh toan thi server phai tu choi');
   await markOrderPaid(await getOrder(data.order.id), { source: 'capture' });
@@ -156,7 +164,7 @@ test('nut tai bi khoa truoc khi thanh toan va se mo khi da thanh toan', async ()
 });
 
 test('sau khi giao, don quay ve trang thai don moi va khoa lai', async () => {
-  const { data } = await checkout();
+  const { data, email } = await checkout();
   await markOrderPaid(await getOrder(data.order.id), { source: 'admin' });
   const response = await fetch(`${base}/api/orders/${data.order.id}/delivered`, { method: 'POST', headers: { 'x-order-token': data.accessToken } });
   assert.equal(response.status, 200);
@@ -168,7 +176,7 @@ test('sau khi giao, don quay ve trang thai don moi va khoa lai', async () => {
 });
 
 test('admin xac nhan tay cung gui mail cho khach', async () => {
-  const { data } = await checkout();
+  const { data, email } = await checkout();
   const response = await fetch(`${base}/api/admin/orders/${data.order.id}`, { method: 'PATCH', headers: jsonHeaders, body: JSON.stringify({ status: 'paid' }) });
   assert.equal(response.status, 200);
   const order = (await response.json()).order;
@@ -177,7 +185,7 @@ test('admin xac nhan tay cung gui mail cho khach', async () => {
 });
 
 test('admin dong don thu cong bang giao da', async () => {
-  const { data } = await checkout();
+  const { data, email } = await checkout();
   await fetch(`${base}/api/admin/orders/${data.order.id}`, { method: 'PATCH', headers: jsonHeaders, body: JSON.stringify({ status: 'paid' }) });
   const response = await fetch(`${base}/api/admin/orders/${data.order.id}`, { method: 'PATCH', headers: jsonHeaders, body: JSON.stringify({ delivered: true }) });
   assert.equal(response.status, 200);
@@ -187,7 +195,7 @@ test('admin dong don thu cong bang giao da', async () => {
 });
 
 test('quet khong huy don da duoc chuyen sang paid', async () => {
-  const { data } = await checkout();
+  const { data, email } = await checkout();
   await markOrderPaid(await getOrder(data.order.id), { source: 'admin' });
   await age(data.order.id, 30);
   const result = await sweepOrders();
@@ -196,7 +204,7 @@ test('quet khong huy don da duoc chuyen sang paid', async () => {
 });
 
 test('canh bao het han chi gui mot lan', async () => {
-  const { data } = await checkout();
+  const { data, email } = await checkout();
   // 23 hours old with a 24 hour window: inside the one hour warning, not expired.
   const created = new Date(Date.now() - 23 * 60 * 60 * 1000).toISOString();
   const expires = new Date(Date.now() + 1 * 60 * 60 * 1000).toISOString();
@@ -209,7 +217,7 @@ test('canh bao het han chi gui mot lan', async () => {
 });
 
 test('paymentDeadline dung expiresAt da ghi, khong dung lai bien moi', async () => {
-  const { data } = await checkout();
+  const { data, email } = await checkout();
   await age(data.order.id, 5);
   const order = await getOrder(data.order.id);
   const expected = new Date(order.expiresAt).getTime();
@@ -219,10 +227,10 @@ test('paymentDeadline dung expiresAt da ghi, khong dung lai bien moi', async () 
 });
 
 test('tra cuu don cua người đã giao van tra ve duoc', async () => {
-  const { data } = await checkout();
+  const { data, email } = await checkout();
   await markOrderPaid(await getOrder(data.order.id), { source: 'admin' });
   await markOrderDelivered(await getOrder(data.order.id));
-  const response = await fetch(`${base}/api/orders/lookup`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ orderId: data.order.id, email: 'buyer@example.com' }) });
+  const response = await fetch(`${base}/api/orders/lookup`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ orderId: data.order.id, email }) });
   assert.equal(response.status, 200);
   const payload = await response.json();
   assert.equal(payload.order.status, 'pending');
@@ -237,7 +245,7 @@ test('health bao cao trang thai gui mail', async () => {
 });
 
 test('mở lại đơn đã giao để khách tải lại được', async () => {
-  const { data } = await checkout();
+  const { data, email } = await checkout();
   await markOrderPaid(await getOrder(data.order.id), { source: 'admin' });
   await markOrderDelivered(await getOrder(data.order.id));
   // The server cannot see a file finish downloading, so a transfer that dies at
@@ -253,7 +261,7 @@ test('mở lại đơn đã giao để khách tải lại được', async () =>
 });
 
 test('không mở lại được đơn chưa đóng', async () => {
-  const { data } = await checkout();
+  const { data, email } = await checkout();
   const response = await fetch(`${base}/api/admin/orders/${data.order.id}`, { method: 'PATCH', headers: jsonHeaders, body: JSON.stringify({ reopen: true }) });
   assert.equal(response.status, 409, 'đơn chưa giao thì không có gì để mở lại');
 });

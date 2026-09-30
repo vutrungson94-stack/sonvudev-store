@@ -2,6 +2,9 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 
 process.env.NODE_ENV = 'test';
+// A real IndexNow key in .env would make every product created in these
+// tests fire a real ping at api.indexnow.org. Same trap as the mail key above.
+process.env.INDEXNOW_KEY = '';
 process.env.PAYPAL_VND_TO_USD_RATE = 'live';
 process.env.PAYPAL_VND_TO_USD_FALLBACK = '26000';
 

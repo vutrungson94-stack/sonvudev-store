@@ -54,7 +54,100 @@ export async function getProduct(id) { if (!local) return fromProduct((await sup
 export async function getProductBySlug(slug) { if (!local) return fromProduct((await supabase(`products?slug=eq.${encodeURIComponent(slug)}&select=*&limit=2`))[0] || null); return (await readJson(files.products, [])).find((p) => p.slug === slug) || null; }
 export async function createProduct(product) { if (!local) return fromProduct((await supabase("products", { method: "POST", body: JSON.stringify(toProduct({ ...product, id: product.id || crypto.randomUUID() })) }))[0]); const items = await readJson(files.products, []); const item = { ...product, id: product.id || crypto.randomUUID(), createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() }; await writeJson(files.products, [item, ...items]); return item; }
 export async function updateProduct(id, patch) { if (!local) return fromProduct((await supabase(`products?id=eq.${encodeURIComponent(id)}`, { method: "PATCH", body: JSON.stringify(toProduct(patch)) }))[0]); const items = await readJson(files.products, []); const item = items.find((p) => p.id === id); if (!item) return null; Object.assign(item, patch, { updatedAt: new Date().toISOString() }); await writeJson(files.products, items); return item; }
-export async function listOrders() { return local ? readJson(files.orders, []) : (await supabase("orders?select=*&order=created_at.desc")).map(fromOrder); }
+// Every order ever written, newest first. This is deliberately the wide one: the
+// admin history view shows the lot. Anything on a timer or a poll must use one of
+// the narrow queries below instead, because the cost of this one grows forever
+// while the work those callers do does not.
+export async function listOrders({ limit = 200, offset = 0 } = {}) {
+  if (local) {
+    const items = (await readJson(files.orders, [])).slice().sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0));
+    return items.slice(offset, offset + limit);
+  }
+  return (await supabase(`orders?select=*&order=created_at.desc&limit=${limit}&offset=${offset}`)).map(fromOrder);
+}
+
+/**
+ * Unpaid orders that nobody has been handed the file for yet.
+ *
+ * The expiry sweep used to read the whole table once a minute to find these. An
+ * order from last year can never expire again, so that query grew with history
+ * while its actual work stayed flat — a shop with a few thousand orders ended up
+ * moving a few thousand fat rows a minute, for ever, to look at rows it had
+ * already dealt with. The (status, expires_at) index answers this shape exactly,
+ * so the cost now tracks the orders open right now rather than every order ever
+ * created.
+ *
+ * The null branch keeps legacy rows written before expires_at existed, whose
+ * deadline is derived from their creation time. A range comparison never matches
+ * null, so without it those orders would quietly stop being cancelled.
+ *
+ * The bound is inclusive. An order sitting exactly one warning window from its
+ * deadline is at the very start of the window and is owed a reminder, and an
+ * exclusive bound silently dropped it — the one order a buyer was closest to
+ * losing.
+ */
+export async function listExpiringOrders({ before } = {}) {
+  if (local) {
+    const cutoff = before ? new Date(before).getTime() : Infinity;
+    return (await readJson(files.orders, [])).filter((order) => !isSettled(order)
+      && (Number.isFinite(cutoff) ? deadlineOf(order) <= cutoff : true));
+  }
+  const deadline = before ? new Date(before).toISOString() : new Date(8.64e15).toISOString();
+  return (await supabase(`orders?status=eq.pending_transfer&delivered_at=is.null&or=(expires_at.lte.${deadline},expires_at.is.null)&select=*&order=expires_at.asc`)).map(fromOrder);
+}
+
+/** Unpaid and not yet delivered, with no deadline bound. Bounded by open orders. */
+export async function listOpenOrders() {
+  const columns = { accessTokenHash: 0, access_token_hash: 0, idempotencyKey: 0, idempotency_key: 0, notifications: 0 };
+  const strip = (order) => Object.fromEntries(Object.entries(order).filter(([key]) => !(key in columns)));
+  if (local) return (await readJson(files.orders, [])).filter((order) => !isSettled(order)).map(strip);
+  return (await supabase("orders?status=eq.pending_transfer&delivered_at=is.null&select=id,status,amount,currency,created_at,expires_at&order=created_at.desc")).map(fromOrder);
+}
+
+/**
+ * The newest single order, for the admin badge poll that runs while the tab is open.
+ *
+ * Projected rather than handed over whole, in both backends. The Supabase path
+ * can ask for columns and the local path cannot, and a function that returns
+ * three fields on one backend and every field on the other is a trap for whoever
+ * reads it next — especially when one of those fields is the buyer's access
+ * token hash.
+ */
+export async function latestOrder() {
+  if (local) {
+    const row = (await readJson(files.orders, []))[0];
+    // An empty store is the normal first state of a new install, not an error,
+    // and the badge poll asks this every few seconds from the moment the admin
+    // panel opens.
+    if (!row) return null;
+    const { accessTokenHash, access_token_hash, idempotencyKey, idempotency_key, notifications, ...rest } = row;
+    return rest;
+  }
+  return fromOrder((await supabase("orders?select=id,status,created_at&order=created_at.desc&limit=1"))[0]);
+}
+
+/**
+ * Every order, but only the columns the revenue report reads.
+ *
+ * A full row carries the access-token hash, the per-order notification log and
+ * the line items. The report needs none of them, and skipping them turns a
+ * multi-megabyte response into a few kilobytes once the shop has history.
+ */
+export async function listOrdersForRevenue() {
+  if (local) return (await readJson(files.orders, [])).map(({ accessTokenHash, idempotencyKey, notifications, ...rest }) => rest);
+  const columns = "id,status,amount,currency,items,delivered_at,created_at,expires_at,paid_count,refunded_count,paid_amount,refunded_amount,paid_provider_amount,refunded_provider_amount";
+  return (await supabase(`orders?select=${columns}`)).map(fromOrder);
+}
+
+const isSettled = (order) => Boolean(order?.deliveredAt) || !order || !UNPAID.has(order.status);
+const UNPAID = new Set(["pending", "pending_transfer"]);
+const deadlineOf = (order) => {
+  const stored = order?.expiresAt ? new Date(order.expiresAt).getTime() : NaN;
+  if (Number.isFinite(stored)) return stored;
+  const created = new Date(order?.createdAt || "").getTime();
+  return Number.isFinite(created) ? created : Infinity;
+};
+
 export async function getOrder(id) { return local ? (await readJson(files.orders, [])).find((o) => o.id === id) : fromOrder((await supabase(`orders?id=eq.${encodeURIComponent(id)}&limit=1`))[0]); }
 // Lets a buyer who lost the response to checkout find the order they already
 // created, instead of opening a second one for the same purchase.

@@ -42,15 +42,20 @@ export function createGeoResolver({ fetchImpl = fetch, timeoutMs = 1500 } = {}) 
   const ttlMs = Math.max(1, env.geo.cacheHours) * 60 * 60 * 1000;
 
   async function lookup(ip) {
-    for (const provider of providers(ip)) {
-      try {
-        const response = await fetchImpl(provider.url, { headers: { accept: "text/plain, application/json" }, signal: AbortSignal.timeout(timeoutMs) });
-        if (!response.ok) continue;
-        const code = provider.read(await response.text());
-        if (code) return code;
-      } catch { /* try the next provider */ }
-    }
-    return null;
+    // Both providers are asked at once rather than one after the other. The
+    // answer only decides the order the payment methods are listed in, and the
+    // buyer is waiting on that list to appear — so paying the full timeout of a
+    // provider that is merely slow before trying the second one turned a cache
+    // miss into three seconds of nothing on the checkout screen. Racing them
+    // makes the wait the slower of the two, or the timeout, never the sum.
+    const answers = await Promise.any(providers(ip).map(async (provider) => {
+      const response = await fetchImpl(provider.url, { headers: { accept: "text/plain, application/json" }, signal: AbortSignal.timeout(timeoutMs) });
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      const code = provider.read(await response.text());
+      if (!code) throw new Error("no country code");
+      return code;
+    })).catch(() => null);
+    return answers || null;
   }
 
   return async function resolveCountry(req) {
