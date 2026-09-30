@@ -479,7 +479,7 @@ app.post("/api/admin/products", admin, json, async (req, res) => {
     const item = await createProduct({
       slug: text(req.body.slug, 80) || name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, ""), name,
       shortDescription: text(req.body.shortDescription, 180), description: text(req.body.description, 2000), category: text(req.body.category, 50) || "Khác", platform: text(req.body.platform, 50) || "Windows", version: text(req.body.version, 30) || "1.0.0", price, currency: text(req.body.currency, 8) || "VND",
-      features: Array.isArray(req.body.features) ? req.body.features.map((v) => text(v, 120)).filter(Boolean) : [], featuresEn: Array.isArray(req.body.featuresEn) ? req.body.featuresEn.map((v) => text(v, 200)).filter(Boolean) : [], shortDescriptionEn: text(req.body.shortDescriptionEn, 180), descriptionEn: text(req.body.descriptionEn, 4000), requirements: text(req.body.requirements, 240), seoTitle: text(req.body.seoTitle, 70), seoDescription: text(req.body.seoDescription, 200), status: text(req.body.fileKey, 500) ? (req.body.status === "draft" ? "draft" : "active") : "draft", fileKey: text(req.body.fileKey, 500), badge: text(req.body.badge, 40) || null, featured: Boolean(req.body.featured),
+      features: Array.isArray(req.body.features) ? req.body.features.map((v) => text(v, 120)).filter(Boolean) : [], featuresEn: Array.isArray(req.body.featuresEn) ? req.body.featuresEn.map((v) => text(v, 200)).filter(Boolean) : [], shortDescriptionEn: text(req.body.shortDescriptionEn, 180), descriptionEn: text(req.body.descriptionEn, 4000), requirements: text(req.body.requirements, 240), seoTitle: text(req.body.seoTitle, 70), seoDescription: text(req.body.seoDescription, 175), status: text(req.body.fileKey, 500) ? (req.body.status === "draft" ? "draft" : "active") : "draft", fileKey: text(req.body.fileKey, 500), badge: text(req.body.badge, 40) || null, featured: Boolean(req.body.featured),
     });
     // Publishing a product is the one event a crawler cannot guess at: the
     // sitemap is only re-read on its own schedule, so without this a new page
@@ -491,7 +491,15 @@ app.post("/api/admin/products", admin, json, async (req, res) => {
 });
 app.patch("/api/admin/products/:id", admin, json, async (req, res) => {
   try {
-    const item = await updateProduct(req.params.id, { ...req.body, updatedAt: new Date().toISOString() });
+    // The admin's SEO editor sends only these two fields. Passing the body
+    // through as-is is deliberate: toProduct() sends only the keys it was
+    // given, so a partial edit cannot blank out the description or features.
+    // The one exception is the two SEO fields, which are trimmed and capped
+    // here so no caller can store a title longer than a search result shows.
+    const patch = { ...req.body, updatedAt: new Date().toISOString() };
+    if (req.body.seoTitle !== undefined) patch.seoTitle = text(req.body.seoTitle, 70);
+    if (req.body.seoDescription !== undefined) patch.seoDescription = text(req.body.seoDescription, 175);
+    const item = await updateProduct(req.params.id, patch);
     if (!item) return res.status(404).json({ error: "Không tìm thấy sản phẩm" });
     // Price and description are what a search result shows, so an edit here is
     // exactly as indexable as a new page.
