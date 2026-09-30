@@ -462,16 +462,23 @@ window.I18N.onChange(() => {
 // open, instead of leaving the buyer on a stale screen until the next poll.
 window.addEventListener('online', () => { if (lastOrder && lastToken) checkOrder(lastOrder.id, lastToken, true); });
 document.addEventListener('visibilitychange', () => { if (!document.hidden && lastOrder && lastToken) checkOrder(lastOrder.id, lastToken, true); });
-modal.addEventListener('click', (e) => { if (e.target === modal || e.target.hasAttribute('data-close')) closeModal(); });
 
 loadProducts().then(() => {
   // A product page links here as /?buy=<id> so the buyer lands with the checkout
   // already open. The product page itself carries no checkout code, which is
   // what keeps a single implementation of the flow instead of two that drift.
-  const wanted = new URLSearchParams(location.search).get('buy');
+  const query = new URLSearchParams(location.search);
+  const wanted = query.get('buy');
+  // PayPal sends a buyer who backed out to /?paypal=cancelled. Nothing used to
+  // read it, so the one moment a worried buyer needs an answer was the one moment
+  // the page said nothing at all. It matters twice: they need to know they have
+  // not been charged, and an order left pending expires on its own.
+  if (query.get('paypal') === 'cancelled') {
+    toastMsg(`${T('paypal.cancelled')}. ${T('paypal.cancelledHint')}`);
+  }
   if (wanted) {
     openProduct(wanted);
-    history.replaceState(null, '', location.pathname + location.hash);
   }
+  if (query.get('buy') || query.get('paypal')) history.replaceState(null, '', location.pathname + location.hash);
 });
 loadPayOptions();

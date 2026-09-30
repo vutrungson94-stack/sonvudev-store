@@ -96,6 +96,21 @@ export const env = {
     zalopay: value("ZALOPAY_ACCOUNT_NUMBER"),
     zalopayQr: value("ZALOPAY_QR_IMAGE"),
   },
+  // Search engine ownership. All three are optional and independent: leaving
+  // them blank changes nothing at all, and each one switches on exactly one
+  // mechanism. They are read from config rather than written into the markup so
+  // a token can be rotated without editing a file and redeploying.
+  site: {
+    // Google Search Console and Bing Webmaster Tools each hand out a token. The
+    // same value works for the meta-tag method and the HTML-file method, so
+    // whichever the dashboard offers can be used without changing the code.
+    googleVerification: value("GOOGLE_SITE_VERIFICATION"),
+    bingVerification: value("BING_SITE_VERIFICATION"),
+    // IndexNow key file. Also proves ownership for IndexNow, and is what lets a
+    // product change be pushed to Bing, Yandex and Naver the moment it happens
+    // rather than waiting for the next crawl.
+    indexNowKey: value("INDEXNOW_KEY"),
+  },
 };
 
 export const isConfigured = {

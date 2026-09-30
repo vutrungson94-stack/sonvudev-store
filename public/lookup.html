@@ -5,16 +5,22 @@
 </head>
 <body class="lookup-page">
 <main class="lookup-card">
-<p class="eyebrow"><span>✦</span> Hỗ trợ</p>
-<h1>Tra cứu đơn hàng</h1>
-<p>Nhập mã đơn và email bạn đã dùng khi thanh toán. Chúng tôi sẽ đưa bạn thẳng tới trang tải sản phẩm.</p>
+<!-- The copy lives in i18n.js, not here. It used to be typed into this file and
+     into lookup.js as well, so the same sentence existed in three places and
+     changing one of them changed nothing. Recovery is the one page an overseas
+     buyer reaches after a PayPal payment, so it has to follow the language they
+     arrived in. -->
+<p class="eyebrow"><span>✦</span> <span data-i18n="lookup.eyebrow">Hỗ trợ</span></p>
+<h1 data-i18n="lookup.title">Tra cứu đơn hàng</h1>
+<p data-i18n="lookup.lead">Nhập mã đơn và email bạn đã dùng khi thanh toán. Chúng tôi sẽ đưa bạn thẳng tới trang tải sản phẩm.</p>
 <form id="lookup-form">
-<label>Mã đơn hàng<input name="orderId" required autocomplete="off" placeholder="SVD-XXXXXX-XXXXXX"></label>
-<label>Email đã thanh toán<input name="email" type="email" required autocomplete="email" placeholder="ban@example.com"></label>
-<button class="button button-primary" type="submit" id="lookup-submit">Tra cứu đơn hàng <span>→</span></button>
+<label><span data-i18n="lookup.orderLabel">Mã đơn hàng</span><input name="orderId" required autocomplete="off" placeholder="SVD-XXXXXX-XXXXXX"></label>
+<label><span data-i18n="lookup.emailLabel">Email đã thanh toán</span><input name="email" type="email" required autocomplete="email" placeholder="ban@example.com"></label>
+<button class="button button-primary" type="submit" id="lookup-submit"><span data-i18n="lookup.submit">Tra cứu đơn hàng</span> <span>→</span></button>
 <p class="form-message" id="lookup-status"></p>
 </form>
-<a class="lookup-back" href="/">← Về cửa hàng</a>
+<a class="lookup-back" href="/"><span data-i18n="lookup.back">Về cửa hàng</span> ←</a>
 </main>
+<script src="i18n.js"></script>
 <script src="lookup.js"></script>
 </body></html>

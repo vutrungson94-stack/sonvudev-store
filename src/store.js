@@ -31,6 +31,21 @@ const toProduct = (p) => { const { shortDescription, fileKey, shortDescriptionEn
 const toOrder = (o) => { const { orderNumber, accessTokenHash, providerOrderId, customerEmail, customerName, paymentProvider, paidAt, expiresAt, cancelledAt, cancelReason, deliveredAt, paidCount, paidAmount, paidProviderAmount, paidProviderCurrency, refundedAt, refundReason, refundedCount, refundedAmount, refundedProviderAmount, idempotencyKey, notifications, createdAt, updatedAt, ...columns } = o; return { ...columns, ...(orderNumber !== undefined ? { order_number: orderNumber } : {}), ...(accessTokenHash !== undefined ? { access_token_hash: accessTokenHash } : {}), ...(providerOrderId !== undefined ? { provider_order_id: providerOrderId } : {}), ...(customerEmail !== undefined ? { customer_email: customerEmail } : {}), ...(customerName !== undefined ? { customer_name: customerName } : {}), ...(paymentProvider !== undefined ? { payment_provider: paymentProvider } : {}), ...(paidAt !== undefined ? { paid_at: paidAt } : {}), ...(expiresAt !== undefined ? { expires_at: expiresAt } : {}), ...(cancelledAt !== undefined ? { cancelled_at: cancelledAt } : {}), ...(cancelReason !== undefined ? { cancel_reason: cancelReason } : {}), ...(deliveredAt !== undefined ? { delivered_at: deliveredAt } : {}), ...(paidCount !== undefined ? { paid_count: paidCount } : {}), ...(paidAmount !== undefined ? { paid_amount: paidAmount } : {}), ...(paidProviderAmount !== undefined ? { paid_provider_amount: paidProviderAmount } : {}), ...(paidProviderCurrency !== undefined ? { paid_provider_currency: paidProviderCurrency } : {}), ...(refundedAt !== undefined ? { refunded_at: refundedAt } : {}), ...(refundReason !== undefined ? { refund_reason: refundReason } : {}), ...(refundedCount !== undefined ? { refunded_count: refundedCount } : {}), ...(refundedAmount !== undefined ? { refunded_amount: refundedAmount } : {}), ...(refundedProviderAmount !== undefined ? { refunded_provider_amount: refundedProviderAmount } : {}), ...(idempotencyKey !== undefined ? { idempotency_key: idempotencyKey } : {}), ...(notifications !== undefined ? { notifications } : {}), ...(createdAt !== undefined ? { created_at: createdAt } : {}), ...(updatedAt !== undefined ? { updated_at: updatedAt } : {}) }; };
 let local = !isConfigured.supabase;
 
+/**
+ * Whether a product can actually be bought.
+ *
+ * Four places used to ask this separately — the catalogue API, the product page,
+ * the sitemap and the homepage — and they did not agree. The sitemap counted a
+ * product as sellable while the storefront filtered it out, which handed Google
+ * three URLs that lead to a 404. One rule, used by all of them, is the only way
+ * "listed" and "buyable" can stay the same set.
+ */
+export const isSellable = (product) => Boolean(product)
+  && product.status === "active"
+  && Boolean(product.slug)
+  && Boolean(product.fileKey)
+  && isConfigured.r2;
+
 export async function listProducts({ includeDrafts = false } = {}) { if (!local) { const query = includeDrafts ? "select=*" : "select=*&status=eq.active"; return (await supabase(`products?${query}&order=created_at.desc`)).map(fromProduct); } const items = await readJson(files.products, []); return includeDrafts ? items : items.filter((p) => p.status === "active"); }
 export async function getProduct(id) { if (!local) return fromProduct((await supabase(`products?id=eq.${encodeURIComponent(id)}&limit=1`))[0]); return (await readJson(files.products, [])).find((p) => p.id === id || p.slug === id) || null; }
 // Product pages are addressed by slug because it is what goes in a URL and in

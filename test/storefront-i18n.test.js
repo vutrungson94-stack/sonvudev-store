@@ -139,7 +139,11 @@ test('moi khoa i18n ton tai o ca hai ngon ngu', async () => {
   });
   const I18N = res.window.I18N;
   assert.ok(I18N, 'phai export I18N');
-  const keys = ['nav.products', 'hero.title1', 'faq.q1', 'products.count', 'cart.pay', 'order.download', 'pay.bank', 'geo.outside', 'lookup.title', 'legal.back'];
+  // Sampled across every page that now reads the dictionary: the storefront, the
+  // order page, the recovery form and the PayPal return. A key that no page
+  // renders would pass here and still be dead copy, which is what
+  // scripts/audit-web.mjs now fails on.
+  const keys = ['nav.products', 'hero.title1', 'faq.q1', 'products.count', 'order.download', 'pay.bank', 'geo.outside', 'lookup.title', 'paypal.pending', 'order.eyebrow'];
   const vi = new Map(), en = new Map();
   for (const lang of ['vi', 'en']) {
     I18N.set(lang);

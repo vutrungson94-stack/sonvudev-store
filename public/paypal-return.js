@@ -1,10 +1,13 @@
 const state=JSON.parse(sessionStorage.getItem('sonvudev_order')||'null');
 const title=document.getElementById('title'),message=document.getElementById('message'),actions=document.getElementById('actions'),loader=document.getElementById('loader'),eyebrow=document.getElementById('eyebrow');
+// PayPal buyers are the overseas half of the shop, so this page follows the same
+// dictionary as the storefront instead of carrying its own fixed copy.
+const T=key=>window.I18N.t(key);
 function goHome(){location.href='/'}
-function showMissing(){title.textContent='Không tìm thấy đơn hàng';message.textContent='Mã tra cứu PayPal không có trong phiên trình duyệt này.';loader.hidden=true;actions.innerHTML='<a class="button button-primary" href="/">Về cửa hàng</a>'}
-function link(token){const dl=document.createElement('button');dl.className='button button-primary';dl.id='download';dl.textContent='Tải sản phẩm ↓';dl.onclick=async()=>{try{const result=await fetch('/api/orders/'+encodeURIComponent(state.id)+'/download',{headers:{'x-order-token':token}}),payload=await result.json();if(result.ok){location.href=payload.url;fetch('/api/orders/'+encodeURIComponent(state.id)+'/delivered',{method:'POST',headers:{'x-order-token':token,'content-type':'application/json'}}).catch(()=>{})}else message.textContent=payload.error||'Chưa thể tải sản phẩm.'}catch(error){message.textContent='Mất kết nối. Bạn có thể thử lại, đơn vẫn còn hiệu lực.'}};return dl}
-function showPaid(){eyebrow.textContent='Thành công';title.textContent='Thanh toán hoàn tất!';message.textContent='Đơn '+state.id+' đã được thanh toán. Bạn có thể tải sản phẩm ngay.';actions.innerHTML='';actions.appendChild(link(state.token));const back=document.createElement('a');back.className='button button-secondary';back.href='/';back.textContent='Về cửa hàng';actions.appendChild(back);loader.hidden=true}
-function showRetry(text){eyebrow.textContent='Đang chờ';title.textContent='Đang xác nhận thanh toán…';message.textContent=text;actions.innerHTML='';const retry=document.createElement('button');retry.className='button button-primary';retry.textContent='Kiểm tra lại ↻';retry.onclick=()=>{retry.disabled=true;start()};const order=document.createElement('a');order.className='button button-secondary';order.href='/order/'+encodeURIComponent(state.id);order.textContent='Mở đơn hàng';actions.appendChild(retry);actions.appendChild(order)}
+function showMissing(){eyebrow.textContent=T('paypal.eyebrow');title.textContent=T('order.notFound');message.textContent=T('paypal.noSession');loader.hidden=true;actions.innerHTML=`<a class="button button-primary" href="/lookup">${T('nav.lookup')}</a>`}
+function link(token){const dl=document.createElement('button');dl.className='button button-primary';dl.id='download';dl.textContent=T('order.download')+' ↓';dl.onclick=async()=>{try{const result=await fetch('/api/orders/'+encodeURIComponent(state.id)+'/download',{headers:{'x-order-token':token}}),payload=await result.json();if(result.ok){location.href=payload.url;fetch('/api/orders/'+encodeURIComponent(state.id)+'/delivered',{method:'POST',headers:{'x-order-token':token,'content-type':'application/json'}}).catch(()=>{})}else message.textContent=T('order.errDownload')}catch(error){message.textContent=T('order.errOffline')}};return dl}
+function showPaid(){eyebrow.textContent=T('paypal.success');title.textContent=T('paypal.success');message.textContent=T('paypal.successHint');actions.innerHTML='';actions.appendChild(link(state.token));const back=document.createElement('a');back.className='button button-secondary';back.href='/';back.textContent=T('paypal.back');actions.appendChild(back);loader.hidden=true}
+function showRetry(text){eyebrow.textContent=T('paypal.pending');title.textContent=T('paypal.pending');message.textContent=text;actions.innerHTML='';const retry=document.createElement('button');retry.className='button button-primary';retry.textContent=T('order.check')+' ↻';retry.onclick=()=>{retry.disabled=true;start()};const order=document.createElement('a');order.className='button button-secondary';order.href='/order/'+encodeURIComponent(state.id);order.textContent=T('paypal.myOrders');actions.appendChild(retry);actions.appendChild(order)}
 const wait=(ms)=>new Promise(r=>setTimeout(r,ms));
 // The webhook may have already marked the order paid while this tab had no
 // connection, so a failed capture is never proof the money did not arrive.
@@ -13,7 +16,7 @@ async function alreadyPaid(){
 }
 async function start(){
   if(!state)return showMissing();
-  showRetry('Bạn vừa thanh toán. Trang đang chờ PayPal xác nhận, vui lòng không đóng.');
+  showRetry(T('paypal.pending'));
   // A dropped connection is the common case here, and a single attempt turned it
   // into "payment failed" for a buyer who had already been charged. Retry with
   // backoff, then fall back to asking our own server whether the order cleared.
@@ -35,13 +38,16 @@ async function start(){
     await wait(5000);
   }
   if(await alreadyPaid())return showPaid();
-  eyebrow.textContent='Chưa hoàn tất';
-  title.textContent='Chưa xác nhận được thanh toán';
-  message.textContent='PayPal chưa báo thành công. Nếu bạn đã bị trừ tiền, hãy thử lại sau ít phút hoặc liên hệ hello@sonvudev.com kèm mã đơn '+state.id+'.';
+  eyebrow.textContent=T('paypal.err');
+  title.textContent=T('paypal.err');
+  // The order id and the support address are the only two things that let a
+  // buyer who was actually charged get their money or their file, so they stay
+  // in the sentence even though the sentence now comes from the dictionary.
+  message.textContent=T('paypal.errHint').replace('{id}',state.id).replace('{support}','hello@sonvudev.com');
   actions.innerHTML='';
-  const retry=document.createElement('button');retry.className='button button-primary';retry.textContent='Kiểm tra lại ↻';retry.onclick=()=>{retry.disabled=true;start()};
-  const order=document.createElement('a');order.className='button button-secondary';order.href='/order/'+encodeURIComponent(state.id);order.textContent='Mở đơn hàng';
-  const home=document.createElement('a');home.className='button button-secondary';home.href='/';home.textContent='Về cửa hàng';
+  const retry=document.createElement('button');retry.className='button button-primary';retry.textContent=T('order.check')+' ↻';retry.onclick=()=>{retry.disabled=true;start()};
+  const order=document.createElement('a');order.className='button button-secondary';order.href='/order/'+encodeURIComponent(state.id);order.textContent=T('paypal.myOrders');
+  const home=document.createElement('a');home.className='button button-secondary';home.href='/';home.textContent=T('paypal.back');
   actions.appendChild(retry);actions.appendChild(order);actions.appendChild(home);
   loader.hidden=true;
 }

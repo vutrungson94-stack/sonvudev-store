@@ -1,4 +1,5 @@
 import { env } from "./config.js";
+import { isSellable } from "./store.js";
 
 // Product pages are rendered here, on the server, rather than in the browser.
 // The storefront ships an empty skeleton and fills it in with JavaScript, which
@@ -28,12 +29,19 @@ export function productSummary(product, max = 155) {
   return `${cut.slice(0, cut.lastIndexOf(" "))}…`;
 }
 
-const organization = () => ({
+/**
+ * The one logo URL the whole site uses. It was previously /logo.svg, a file that
+ * has never existed: every product page told Google the brand's logo was a 404,
+ * and only the homepage named the file that is really there.
+ */
+export const LOGO_PATH = "/favicon.svg";
+
+export const organization = () => ({
   "@type": "Organization",
   "@id": `${site()}/#organization`,
   name: "SonVuDev",
   url: `${site()}/`,
-  logo: absolute("/logo.svg"),
+  logo: absolute(LOGO_PATH),
   description: "Công cụ và tiện ích phần mềm cho doanh nghiệp và cá nhân tại Việt Nam.",
   address: { "@type": "PostalAddress", addressCountry: "VN" },
 });
@@ -76,6 +84,12 @@ export const breadcrumbSchema = (product) => ({
   ],
 });
 
+// Google retired the sitelinks search box in November 2024, so a SearchAction
+// earns nothing any more. What it used to point at was worse than useless: the
+// only page this site has that takes a query string is /lookup, the order
+// recovery form, which robots.txt disallows and which serves noindex. Telling a
+// search engine the site's search feature is a page it must not read is a
+// contradiction in the markup, so the action is gone.
 export const websiteSchema = () => ({
   "@type": "WebSite",
   "@id": `${site()}/#website`,
@@ -83,14 +97,40 @@ export const websiteSchema = () => ({
   url: `${site()}/`,
   inLanguage: "vi-VN",
   publisher: { "@id": `${site()}/#organization` },
-  potentialAction: {
-    "@type": "SearchAction",
-    target: { "@type": "EntryPoint", urlTemplate: `${site()}/lookup?q={search_term_string}` },
-    "query-input": "required name=search_term_string",
-  },
 });
 
 const jsonLd = (data) => `<script type="application/ld+json">${JSON.stringify(data).replace(/</g, "\\u003c")}</script>`;
+
+/**
+ * Search engine ownership tokens, as meta tags.
+ *
+ * Google and Bing each hand out one string and offer two ways to present it: a
+ * tag in the head, or a file at the site root. Both are served from the same env
+ * var so whichever the dashboard offers works without touching the code.
+ * Returns an empty string when nothing is configured, which is not an error:
+ * a store that has not claimed the domain in Search Console still works.
+ */
+export const verificationMeta = () => {
+  const tags = [];
+  if (env.site.googleVerification) tags.push(`<meta name="google-site-verification" content="${esc(env.site.googleVerification)}">`);
+  if (env.site.bingVerification) tags.push(`<meta name="msvalidate.01" content="${esc(env.site.bingVerification)}">`);
+  return tags.join("\n");
+};
+
+/**
+ * The verification file a search engine fetches from the site root.
+ *
+ * Google names it google<token>.html and wants a one-line body naming itself;
+ * Bing names it ms<token>.txt and wants the bare token. Both names come out of
+ * the same string the meta tag uses, so one env var satisfies either method.
+ * Returns null when the token is not configured, which is not an error.
+ */
+export const verificationFile = (prefix, suffix, token) => {
+  const value = String(token || "").trim();
+  if (!value || !/^[0-9a-z]+$/i.test(value)) return null;
+  const name = `${prefix}${value}${suffix}`;
+  return { name, body: prefix === "google" ? `google-site-verification: ${name}` : value };
+};
 
 /** Meta block shared by every indexable page. */
 const meta = ({ title, description, url, image, type = "website", published }) => [
@@ -112,8 +152,62 @@ const meta = ({ title, description, url, image, type = "website", published }) =
   published ? `<meta property="article:published_time" content="${esc(published)}">` : "",
 ].filter(Boolean).join("\n");
 
-/** Splits the long form description on the === heading === markers. */
-function sections(description) {
+/**
+ * The product grid, rendered on the server into the homepage.
+ *
+ * The storefront fills this in with JavaScript, which is fine for a person but
+ * means a crawler reads a landing page with a hero, a slogan and no products: no
+ * names, no prices, and not one link to a product page. Internal links are how a
+ * search engine discovers and judges the rest of a site, so a store that only
+ * advertises its products in the sitemap is a store that is one crawl away from
+ * being invisible.
+ *
+ * The classes and fields are the ones public/app.js produces, so the swap when
+ * the page's own script runs is a repaint rather than a layout change. The name
+ * and the arrow are real links, which is what makes the page usable with
+ * JavaScript turned off.
+ */
+export function renderIndexGrid(products) {
+  const cards = (products || []).filter(isSellable).map((product) => {
+    const art = esc(String(product.category || "khac").toLowerCase().replace(/\s+/g, "-"));
+    const url = absolute(`/product/${encodeURIComponent(product.slug)}`);
+    const features = (product.features || []).slice(0, 2)
+      .map((item) => `<li>✓ ${esc(item)}</li>`).join("");
+    return `<article class="product-card" data-id="${esc(product.id)}">
+    <div class="product-art art-${art}">
+      <span class="product-badge">${esc(product.badge || "Mới")}</span>
+      <div class="product-logo">${esc(initials(product.name))}</div>
+      <div class="art-grid"></div>
+      <span class="art-spark">✦</span>
+    </div>
+    <div class="product-info">
+      <div class="product-meta"><span>${esc(product.platform || "Windows")} · v${esc(product.version || "1.0")}</span><span>${esc(product.category || "")}</span></div>
+      <h3><a href="${esc(url)}">${esc(product.name)}</a></h3>
+      <p>${esc(product.shortDescription || product.short_description || product.description || "")}</p>
+      <ul>${features}</ul>
+      <div class="product-buy">
+        <strong>${esc(money(product.price, product.currency))}</strong>
+        <a class="round-arrow" href="${esc(url)}" aria-label="Mua ${esc(product.name)}">↗</a>
+      </div>
+    </div>
+  </article>`;
+  });
+  // An empty catalogue still has to say so in words a crawler reads, rather than
+  // leaving three grey placeholder rectangles in the markup.
+  return cards.length
+    ? cards.join("\n")
+    : `<div class="empty-state"><b>Chưa có sản phẩm</b><p>Hãy thử bộ lọc khác.</p></div>`;
+}
+
+/** The "02 sản phẩm" counter above the grid, in the same shape the client writes. */
+export const renderIndexCount = (products) => {
+  const total = (products || []).filter(isSellable).length;
+  return `${String(total).padStart(2, "0")} sản phẩm`;
+};
+
+const initials = (name) => String(name || "SV").split(/\s+/).map((part) => part[0]).join("").slice(0, 2).toUpperCase();
+
+/** Splits the long form description on the === heading === markers. */function sections(description) {
   const parts = String(description || "").split(/\n={3,}\n?/);
   if (parts.length > 1) {
     const [head, ...rest] = parts;

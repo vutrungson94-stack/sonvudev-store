@@ -47,6 +47,11 @@ function context(order) {
     version: product.version || "",
     amount: money(order.amount, order.currency),
     currency: order.currency || "VND",
+    // The deadline the buyer was promised is the one the sweep enforces. Reading
+    // the number from config is the whole point: an email that says "24 hours"
+    // while the server cancels at 12 tells the buyer to stop waiting for an
+    // order that is already gone.
+    windowHours: Math.max(1, Number(env.orders.paymentWindowHours) || 24),
     deadline: stamp(order.expiresAt),
     paidAt: stamp(order.paidAt),
     refundReason: order.refundReason || "không rõ",
@@ -64,8 +69,8 @@ const TEMPLATES = {
     heading: "Đơn hàng đã được tạo",
     headingEn: "Your order was created",
     lines: [
-      `Bạn cần thanh toán trước ${c.deadline}. Đơn chưa thanh toán sẽ tự động bị hủy sau 24 giờ.`,
-      `Pay before ${c.deadline}. Unpaid orders are cancelled automatically after 24 hours.`,
+      `Bạn cần thanh toán trước ${c.deadline}. Đơn chưa thanh toán sẽ tự động bị hủy sau ${c.windowHours} giờ.`,
+      `Pay before ${c.deadline}. Unpaid orders are cancelled automatically after ${c.windowHours} hours.`,
     ],
     blocks: [
       `Thanh toán đúng số tiền và ghi nội dung chuyển khoản là <b>SonVuDev ${c.id}</b> để chúng tôi đối soát.`,
@@ -91,8 +96,8 @@ const TEMPLATES = {
     heading: "Đơn hàng đã bị hủy",
     headingEn: "Your order was cancelled",
     lines: [
-      `Đơn ${c.id} không được thanh toán trong 24 giờ nên đã bị hủy tự động.`,
-      `Order ${c.id} was not paid within 24 hours and has been cancelled automatically.`,
+      `Đơn ${c.id} không được thanh toán trong ${c.windowHours} giờ nên đã bị hủy tự động.`,
+      `Order ${c.id} was not paid within ${c.windowHours} hours and has been cancelled automatically.`,
     ],
     blocks: [
       `Bạn vẫn có thể đặt đơn mới bất cứ lúc nào. Nếu bạn đã chuyển khoản, hãy gửi ảnh biên lai để chúng tôi đối soát hoặc hoàn lại.`,

@@ -15,6 +15,8 @@
     "product:publish": "node scripts/publish-product.mjs",
     "render:sync": "node scripts/sync-render.mjs",
     "lint": "node scripts/lint-web.mjs",
+    "audit": "node scripts/audit-web.mjs",
+    "seo:check": "node scripts/seo-check.mjs",
     "start": "node src/server.js",
     "dev": "node --watch src/server.js",
     "test": "node --test test/**/*.test.js"

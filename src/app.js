@@ -4,14 +4,15 @@ import { promises as fs } from "node:fs";
 import { fileURLToPath } from "node:url";
 import crypto from "node:crypto";
 import { env, isConfigured } from "./config.js";
-import { ensureSeed, findOrderByIdempotencyKey, getOrder, getProduct, getProductBySlug, listOrders, listProducts, createOrder, updateOrder, createProduct, updateProduct, persistenceMode } from "./store.js";
+import { ensureSeed, findOrderByIdempotencyKey, getOrder, getProduct, getProductBySlug, isSellable, listOrders, listProducts, createOrder, updateOrder, createProduct, updateProduct, persistenceMode } from "./store.js";
 import { createDownloadUrl, createUploadUrl } from "./r2.js";
 import { captureOrder, createOrder as createPayPalOrder, hashToken, newOrderId, newToken, paypalChargeFor, paypalChargeForProduct, paymentMatchesOrder, readOrder, verifyWebhook } from "./paypal.js";
 import { paymentInstructions, paymentOptions } from "./payments.js";
-import { renderOgImage, renderProductPage } from "./pages.js";
+import { esc, renderIndexCount, renderIndexGrid, renderOgImage, renderProductPage, verificationFile, verificationMeta } from "./pages.js";
 import { isClosed, isUnpaid, markOrderDelivered, markOrderPaid, paymentDeadline, voidPayment } from "./orders.js";
 import { notifyOrder, notifyMode } from "./notify.js";
 import { resolveCountry } from "./geo.js";
+import { pingIndexNow, isIndexNowConfigured } from "./indexnow.js";
 import { vndPerUsd } from "./rates.js";
 
 const app = express();
@@ -51,6 +52,20 @@ const tooManyAttempts = (req) => {
 
 app.set("trust proxy", 1);
 app.disable("x-powered-by");
+
+// Where the site canonically lives, read from APP_URL instead of written out.
+// The same file also serves localhost and the test suite, so a redirect bound to
+// one hard-coded domain stops matching the moment APP_URL changes, and the www
+// copy quietly keeps serving a duplicate of every page.
+const canonicalOrigin = (() => {
+  try { return new URL(env.appUrl).origin; } catch { return ""; }
+})();
+const canonicalHost = (() => {
+  try { return new URL(env.appUrl).hostname; } catch { return ""; }
+})();
+// localhost and IP hosts have no meaningful www twin, so nothing is redirected.
+const wwwHost = canonicalHost && !/^(localhost|127\.|0\.0\.0\.0|\[?::1|.*\.local)$/i.test(canonicalHost) ? `www.${canonicalHost}` : "";
+
 app.use((req, res, next) => {
   res.setHeader("X-Content-Type-Options", "nosniff");
   res.setHeader("Referrer-Policy", "strict-origin-when-cross-origin");
@@ -77,6 +92,80 @@ app.get("/robots.txt", (_req, res) => {
   ].join("\n"));
 });
 
+// Site ownership for the search engines that will actually crawl this thing.
+//
+// Google and Bing both accept either a meta tag or a file at the site root, and
+// the two are derived from the same string, so whichever method the dashboard
+// hands out works here without a code change. Only the exact configured name is
+// answered: a catch-all that served every /google*.html would publish an
+// unbounded set of files that exist for nobody, and would hand a wrong token a
+// plausible-looking proof of ownership.
+app.get(/^\/(google[0-9a-z]+\.html|ms[0-9a-z]+\.txt)$/i, (req, res, next) => {
+  const name = req.path.slice(1);
+  const google = verificationFile("google", ".html", env.site.googleVerification);
+  const bing = verificationFile("ms", ".txt", env.site.bingVerification);
+  const file = [google, bing].find((item) => item && item.name.toLowerCase() === name.toLowerCase());
+  // Anything else falls through, so a real file in public/ that happens to match
+  // the pattern is still served from there.
+  if (!file) return next();
+  res.type("text/plain").send(file.body);
+});
+// IndexNow proves ownership the same way: Bing fetches /<key>.txt and compares
+// the body with the key it issued.
+app.get(/^\/[0-9a-z-]{8,128}\.txt$/i, (req, res, next) => {
+  const key = req.path.slice(1, -4);
+  if (!env.site.indexNowKey || key.toLowerCase() !== env.site.indexNowKey.toLowerCase()) return next();
+  res.type("text/plain").send(key);
+});
+
+// The pages a search engine is meant to index, and what the server has to decide
+// about each one. Everything else in public/ is a static file served untouched.
+//
+// Three things are filled in at serve time because none of them should be
+// committed to a file: the origin every canonical and Open Graph URL is built
+// from, the search engine ownership tags, and — on the homepage — the catalogue.
+// A crawler reads the bytes this sends, so what it gets has to be the real
+// products rather than three grey placeholders.
+const indexablePages = {
+  "index.html": { catalog: true },
+  "terms.html": {},
+  "privacy.html": {},
+  "refund.html": {},
+};
+const renderedPages = new Map();
+// Short-lived on purpose. A price change in the admin panel has to reach the
+// bytes a crawler reads: a search result that shows last week's price is worse
+// than no price, and the storefront's own script only ever sees the fresh copy.
+const PAGE_TTL_MS = 60000;
+
+async function renderPage(file) {
+  const cached = renderedPages.get(file);
+  if (cached && Date.now() - cached.at < PAGE_TTL_MS) return cached.html;
+  const template = await fs.readFile(path.join(publicDir, file), "utf8");
+  const products = indexablePages[file].catalog ? await listProducts() : [];
+  const html = template
+    .replaceAll("{{site}}", env.appUrl)
+    .replace("</head>", `${verificationMeta()}\n</head>`)
+    .replace(/(<span class="product-count" id="product-count">)[\s\S]*?(<\/span>)/, `$1${esc(renderIndexCount(products))}$2`)
+    .replace(/<!--catalog:start-->[\s\S]*?<!--catalog:end-->/, `<!--catalog:start-->${renderIndexGrid(products)}<!--catalog:end-->`);
+  renderedPages.set(file, { at: Date.now(), html });
+  return html;
+}
+
+const sendPage = (file) => async (_req, res) => {
+  try {
+    res.set("Cache-Control", "public, max-age=300").type("html").send(await renderPage(file));
+  } catch (error) {
+    console.error(error);
+    // A broken template must not take the storefront down with it.
+    res.sendFile(path.join(publicDir, file));
+  }
+};
+for (const file of Object.keys(indexablePages)) {
+  app.get(file === "index.html" ? "/" : `/${file}`, sendPage(file));
+  if (file !== "index.html") app.get(`/${file.replace(/\.html$/, "")}`, sendPage(file));
+}
+
 app.get("/og/:slug.svg", async (req, res) => {
   // A clean site-wide card, so a link shared without a product still previews.
   if (req.params.slug === "sonvudev") {
@@ -94,8 +183,7 @@ app.get("/product/:slug", async (req, res) => {
     // A product the storefront would not show is a 404 here too. The seed rows
     // that never got a file attached would otherwise be reachable and indexable
     // even though nobody can buy them.
-    const sellable = product && product.status === "active" && product.fileKey && isConfigured.r2;
-    if (!sellable) return res.status(404).sendFile(path.join(publicDir, "404.html"));
+    if (!isSellable(product)) return res.status(404).sendFile(path.join(publicDir, "404.html"));
     res.set("Cache-Control", "public, max-age=300");
     res.type("html").send(renderProductPage(product));
   } catch (error) { console.error(error); res.status(500).type("text/plain").send("Lỗi máy chủ"); }
@@ -109,10 +197,9 @@ app.get("/sitemap.xml", async (_req, res) => {
     .map((file) => `<url><loc>${base}/${file === "index.html" ? "" : file.replace(/\.html$/, "")}</loc><changefreq>monthly</changefreq><priority>${file === "index.html" ? "1.0" : "0.3"}</priority></url>`);
   // A product that is not on the sitemap cannot be found, so this is built from
   // the live catalogue rather than from a list someone has to remember to edit.
-  // The filter is the storefront's own: a product with no file attached cannot
-  // be bought, so listing it would submit pages to Google that lead nowhere.
-  const sellable = (product) => product.status === "active" && product.slug && product.fileKey && isConfigured.r2;
-  for (const product of (await listProducts()).filter(sellable)) {
+  // The filter is the storefront's own (isSellable), so a page nobody can buy
+  // can never be submitted to Google.
+  for (const product of (await listProducts()).filter(isSellable)) {
     const updated = product.updatedAt || product.updated_at;
     urls.push(`<url><loc>${base}/product/${encodeURIComponent(product.slug)}</loc>${updated ? `<lastmod>${new Date(updated).toISOString().slice(0, 10)}</lastmod>` : ""}<changefreq>weekly</changefreq><priority>0.8</priority></url>`);
   }
@@ -120,7 +207,7 @@ app.get("/sitemap.xml", async (_req, res) => {
 });
 
 app.use((req, res, next) => {
-  if (req.hostname === "www.sonvudev.com") return res.redirect(308, `https://sonvudev.com${req.originalUrl}`);
+  if (wwwHost && req.hostname === wwwHost) return res.redirect(308, `${canonicalOrigin}${req.originalUrl}`);
   next();
 });
 // Short link for buyers, e.g. /order/SVD-XXXX. The page reads the token from
@@ -137,18 +224,23 @@ app.get("/api/health", async (_req, res) => {
     // "outbox" means there is no mail provider yet: order mail is being written
     // to data/outbox instead of being delivered.
     email: notifyMode(), orderWindowHours: env.orders.paymentWindowHours, sweeper: Boolean(process.env.ORDER_SWEEP_DISABLED) ? false : true,
+    // Whether the domain has been claimed with the search engines that crawl it.
+    // A store can be perfectly healthy and still invisible, and this is the one
+    // fact about that which is not visible anywhere else.
+    search: { google: Boolean(env.site.googleVerification), bing: Boolean(env.site.bingVerification), indexNow: isIndexNowConfigured() },
     vndPerUsd: rate ? { rate: Math.round(rate.rate * 100) / 100, source: rate.source, live: env.paypal.vndToUsdRate === "live" } : null,
   });
 });
 app.get("/api/products", async (_req, res) => {
-  try { res.json({ products: (await listProducts()).filter((product) => product.status === "active" && product.fileKey && isConfigured.r2).map(publicProduct) }); }
+  try { res.json({ products: (await listProducts()).filter(isSellable).map(publicProduct) }); }
   catch (error) { console.error(error); res.status(500).json({ error: "Không thể tải danh mục" }); }
 });
 app.get("/api/products/:id", async (req, res) => {
   try {
     const product = await getProduct(req.params.id);
-    if (!product || product.status !== "active") return res.status(404).json({ error: "Không tìm thấy sản phẩm" });
-    if (!product.fileKey || !isConfigured.r2) return res.status(404).json({ error: "Sản phẩm chưa sẵn sàng" });
+    // Same rule as the storefront and the sitemap, so a product cannot be
+    // readable through the API while being invisible on the page.
+    if (!isSellable(product)) return res.status(404).json({ error: "Không tìm thấy sản phẩm" });
     res.json({ product: publicProduct(product) });
   } catch (error) { console.error(error); res.status(500).json({ error: "Không thể tải sản phẩm" }); }
 });
@@ -382,11 +474,23 @@ app.post("/api/admin/products", admin, json, async (req, res) => {
       shortDescription: text(req.body.shortDescription, 180), description: text(req.body.description, 2000), category: text(req.body.category, 50) || "Khác", platform: text(req.body.platform, 50) || "Windows", version: text(req.body.version, 30) || "1.0.0", price, currency: text(req.body.currency, 8) || "VND",
       features: Array.isArray(req.body.features) ? req.body.features.map((v) => text(v, 120)).filter(Boolean) : [], featuresEn: Array.isArray(req.body.featuresEn) ? req.body.featuresEn.map((v) => text(v, 200)).filter(Boolean) : [], shortDescriptionEn: text(req.body.shortDescriptionEn, 180), descriptionEn: text(req.body.descriptionEn, 4000), requirements: text(req.body.requirements, 240), seoTitle: text(req.body.seoTitle, 70), seoDescription: text(req.body.seoDescription, 200), status: text(req.body.fileKey, 500) ? (req.body.status === "draft" ? "draft" : "active") : "draft", fileKey: text(req.body.fileKey, 500), badge: text(req.body.badge, 40) || null, featured: Boolean(req.body.featured),
     });
+    // Publishing a product is the one event a crawler cannot guess at: the
+    // sitemap is only re-read on its own schedule, so without this a new page
+    // can stay invisible for days. The ping is fire and forget, because a
+    // search engine being slow must not fail a product save.
+    await pingIndexNow(["/", `/product/${item.slug}`]);
     res.status(201).json({ product: item });
   } catch (error) { console.error(error); res.status(500).json({ error: "Không thể tạo sản phẩm" }); }
 });
 app.patch("/api/admin/products/:id", admin, json, async (req, res) => {
-  try { const item = await updateProduct(req.params.id, { ...req.body, updatedAt: new Date().toISOString() }); if (!item) return res.status(404).json({ error: "Không tìm thấy sản phẩm" }); res.json({ product: item }); }
+  try {
+    const item = await updateProduct(req.params.id, { ...req.body, updatedAt: new Date().toISOString() });
+    if (!item) return res.status(404).json({ error: "Không tìm thấy sản phẩm" });
+    // Price and description are what a search result shows, so an edit here is
+    // exactly as indexable as a new page.
+    await pingIndexNow(["/", `/product/${item.slug}`]);
+    res.json({ product: item });
+  }
   catch (error) { console.error(error); res.status(500).json({ error: "Không thể cập nhật sản phẩm" }); }
 });
 app.post("/api/admin/uploads/presign", admin, json, async (req, res) => {

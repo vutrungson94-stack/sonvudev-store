@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { promises as fs } from 'node:fs';
+import { existsSync, promises as fs, readFileSync } from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 
@@ -17,6 +17,10 @@ process.env.R2_BUCKET_NAME = 'test-private-bucket';
 process.env.APP_URL = 'https://sonvudev.com';
 process.env.ADMIN_API_TOKEN = 'test-admin-token';
 process.env.RESEND_API_KEY = '';
+// Empty, not deleted: .env is loaded without overriding what is already set, so
+// a real INDEXNOW_KEY on the developer's machine would otherwise make this file
+// believe IndexNow is on. See test/indexnow-off.test.js.
+process.env.INDEXNOW_KEY = '';
 
 const { createApp } = await import('../src/app.js');
 const { updateProduct, getProduct } = await import('../src/store.js');
@@ -48,6 +52,9 @@ test.before(async () => {
 test.after(async () => { server?.close(); await fs.rm(tempDir, { recursive: true, force: true }); });
 
 const text = (path) => get(path).then(async (r) => r.text());
+// Source-level assertions: some of these rules are about a value that must not
+// be written down twice, and the only place that can happen is the text itself.
+const fsSync = (relative) => readFileSync(new URL(`../${relative}`, import.meta.url), 'utf8');
 
 test('trang sản phẩm trả về HTML có nội dung thật, không phải khung rỗng', async () => {
   const response = await get(`/product/${product.slug}`);
@@ -221,4 +228,110 @@ test('renderProductPage tự thoát ký tự trong dữ liệu sản phẩm', ()
   assert.ok(!html.includes('<img onerror=x>'), 'tính năng phải được thoát');
   assert.ok(html.includes('&lt;script&gt;'));
   assert.ok(html.includes('a &amp; b &lt; c'));
+});
+
+// ---------------------------------------------------------------------------
+// Everything below guards the Search Console step: a site that is perfect on
+// disk is still invisible if it never proved it owns the domain, if its
+// canonical names the wrong host, or if the landing page advertises nothing.
+// ---------------------------------------------------------------------------
+
+test('trang chủ liệt kê sản phẩm ngay trong HTML, không cần chạy JavaScript', async () => {
+  const html = await text('/');
+  // The grid used to hold three grey placeholders and nothing else, so the page
+  // a visitor lands on told a crawler nothing about what is for sale, and linked
+  // to no product at all. Internal links are how the rest of a site is found.
+  assert.ok(!html.includes('loading-card'), 'khung tải rỗng không được tới máy crawler');
+  assert.ok(html.includes(`href="https://sonvudev.com/product/${product.slug}"`), 'phải có link tuyệt đối tới trang sản phẩm');
+  assert.ok(html.includes('SEO Tester Pro'), 'phải có tên sản phẩm trong HTML trang chủ');
+  const live = (await getProduct(product.id)).price;
+  assert.ok(html.includes(new Intl.NumberFormat('vi-VN', { maximumFractionDigits: 0 }).format(live)), `giá trên trang chủ phải là giá hiện tại (${live})`);
+  assert.ok(/id="product-count">\s*\d\d\s*sản phẩm/.test(html), 'phải có bộ đếm sản phẩm bằng chữ');
+});
+
+test('trang chủ không để lại token chưa thay thế', async () => {
+  const html = await text('/');
+  assert.ok(!html.includes('{{site}}'), 'mọi URL tuyệt đối phải điền từ APP_URL');
+  // A canonical left as a token is ignored by a search engine, and a canonical
+  // naming another host tells Google to index the other host's page instead.
+  assert.ok(html.includes('<link rel="canonical" href="https://sonvudev.com/">'), 'canonical phải theo APP_URL');
+  for (const page of ['/terms', '/privacy', '/refund']) {
+    const legal = await text(page);
+    assert.ok(!legal.includes('{{site}}'), `${page} còn token chưa thay`);
+    assert.ok(legal.includes(`<link rel="canonical" href="https://sonvudev.com${page}">`), `${page} canonical phải theo APP_URL`);
+  }
+});
+
+test('sản phẩm mồ côi không lọt vào trang chủ', async () => {
+  const created = (await (await fetch(`${base}/api/admin/products`, {
+    method: 'POST', headers: jsonHeaders,
+    body: JSON.stringify({ name: 'Draft Only', slug: 'draft-only', price: 100, currency: 'VND', status: 'draft' }),
+  })).json()).product;
+  const html = await text('/');
+  assert.ok(!html.includes('draft-only'), 'bản nháp không được hiện trên trang chủ');
+  assert.ok(!html.includes(created.id), 'bản nháp không được có trong HTML');
+});
+
+test('thẻ xác minh Search Console lấy từ cấu hình, không gõ trong HTML', async () => {
+  const html = await text('/');
+  // GOOGLE_SITE_VERIFICATION is deliberately not set in this run: the tags must
+  // simply be absent, and the page must still be complete without them.
+  assert.ok(!html.includes('google-site-verification'), 'chưa cấu hình thì không được thêm thẻ');
+  assert.equal((await get('/google0123456789abcdef.html')).status, 404, 'token lạ không được phục vụ');
+  assert.equal((await get('/ms0123456789abcdef.txt')).status, 404, 'token Bing lạ không được phục vụ');
+});
+
+test('mọi trang lập chỉ mục đều chứa dữ liệu có cấu trúc và logo tồn tại', async () => {
+  // The Organization logo was /logo.svg, a file that never existed, so every
+  // product page told Google the brand's logo was a 404.
+  assert.ok(existsSync(new URL('../public/favicon.svg', import.meta.url)), 'file logo phải tồn tại thật');
+  const html = await text(`/product/${product.slug}`);
+  const graph = [...html.matchAll(/<script type="application\/ld\+json">([\s\S]*?)<\/script>/g)].flatMap((m) => JSON.parse(m[1].replace(/\\u003c/g, '<')));
+  const organization = graph.find((node) => node['@type'] === 'Organization');
+  assert.equal(organization.logo, 'https://sonvudev.com/favicon.svg', 'logo phải trỏ tới file có thật');
+  // Google removed the sitelinks search box in November 2024, and the only page
+  // that took a query string here was /lookup, which robots.txt disallows.
+  const website = graph.find((node) => node['@type'] === 'WebSite');
+  assert.equal(website.potentialAction, undefined, 'không còn SearchAction đã bị Google bỏ');
+  assert.ok(!JSON.stringify(graph).includes('/lookup?q='), 'schema không được trỏ tới trang bị chặn');
+});
+
+test('một quy tắc duy nhất quyết định "bán được", dùng ở mọi nơi', () => {
+  const source = fsSync('src/app.js');
+  // The rule used to be written out four times and the copies did not agree, so
+  // the sitemap listed pages the storefront refused to show.
+  const inline = (source.match(/product\.status === "active"/g) || []).length;
+  assert.equal(inline, 0, `không được tự viết lại điều kiện bán được (còn ${inline} bản), hãy dùng isSellable`);
+  assert.ok(!/product\.status === 'active'/.test(fsSync('src/pages.js')), 'src/pages.js cũng phải dùng isSellable');
+});
+
+test('đổi giờ hạn đơn thì email báo đúng giờ đó', () => {
+  // The templates said "24 hours" while the server cancelled on whatever
+  // ORDER_PAYMENT_WINDOW_HOURS said, so a buyer could be told to wait for an
+  // order that was already gone.
+  const source = fsSync('src/notify.js');
+  const template = source.slice(source.indexOf('const TEMPLATES'), source.indexOf('function body'));
+  assert.ok(!/sau 24 giờ|within 24 hours/.test(template), 'email không được gõ cứng 24 giờ');
+  assert.ok(template.includes('c.windowHours'), 'phải đọc số giờ từ cấu hình');
+  assert.ok(source.includes('windowHours: Math.max(1, Number(env.orders.paymentWindowHours)'), 'context phải lấy từ env.orders');
+});
+
+test('redirect www lấy từ APP_URL chứ không gõ tên miền', () => {
+  const source = fsSync('src/app.js');
+  assert.ok(!source.includes('www.sonvudev.com'), 'tên miền không được gõ thẳng vào code');
+  assert.ok(source.includes('canonicalOrigin') && source.includes('wwwHost'), 'redirect phải suy ra từ APP_URL');
+});
+
+test('trang quản trị báo đến cảnh báo khi publish sản phẩm', async () => {
+  const before = Date.now();
+  await fetch(`${base}/api/admin/products`, {
+    method: 'POST', headers: jsonHeaders,
+    body: JSON.stringify({ name: 'Ping Me', slug: 'ping-me', price: 50000, currency: 'VND', fileKey: 'products/ping/1.0.0/p.exe', status: 'active' }),
+  });
+  // No INDEXNOW key in this run, so the call must be a silent no-op rather than
+  // an outbound request or a failed product save.
+  assert.ok(Date.now() - before < 5000, 'lưu sản phẩm không được chờ mạng');
+  const health = await (await get('/api/health')).json();
+  assert.equal(health.search.indexNow, false, 'chưa cấu hình thì phải báo false');
+  assert.equal(typeof health.search.google, 'boolean');
 });

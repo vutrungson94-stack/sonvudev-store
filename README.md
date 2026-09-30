@@ -21,7 +21,9 @@ npm start
 ```powershell
 npm run build
 npm test
+npm run audit
 npm run check:production
+npm run seo:check
 ```
 
 `check:production` kiểm tra cấu hình, DNS và HTTPS mà không in secret ra nội dung log. Chạy lệnh này trước khi nhận đơn hàng thật.
@@ -29,6 +31,17 @@ npm run check:production
 Ngoài cấu hình local, lệnh còn gọi `/api/health` trên production và kiểm tra site thật sự bán được: `Store is sellable` (R2 đã nối, nếu không storefront ẩn toàn bộ sản phẩm), `Payments live` (PayPal và chuyển khoản) và `Database persistent` (`local-json` nghĩa là đơn hàng mất khi deploy lại).
 
 `Order email` cũng là điều kiện bắt buộc. Không có `RESEND_API_KEY` thì bốn email giao dịch chỉ được ghi ra `data/outbox` chứ không tới tay khách, nên lệnh báo `FAIL` dù mọi thứ khác đều xanh.
+
+`audit` đọc mã nguồn và báo những lỗi không làm hỏng trang nhưng làm mất tác dụng: link nội bộ trỏ tới file không có, route Express đăng ký hai lần, khoá dịch không ai dùng, tên miền và email gõ tay thay vì đọc từ `.env`. Mỗi kiểm tra đều có một test làm cho nó hỏng để chứng minh nó còn bắt được lỗi — xem `test/audit.test.js`.
+
+`seo:check` đi vào **site đang chạy** như một con bọ tìm kiếm và báo những thứ Google thật sự nhìn thấy. Chạy sau mỗi lần deploy:
+
+```powershell
+npm run seo:check                              # dùng APP_URL trong .env
+npm run seo:check -- https://sonvudev.com       # hoặc chỉ định host
+```
+
+Nó kiểm tra: trang chủ có đúng một `h1` và có chữ trong HTML, canonical có trùng `APP_URL`, thẻ xác minh Google và Bing, `robots.txt` có dòng `Sitemap` và có chặn `/admin`, `/api/`, `/order/`, `/lookup`; **mọi URL trong sitemap đều trả 200**, không trùng nhau, đúng domain và không nằm trong vùng bị chặn; và từng trang sản phẩm có đúng một `title`, canonical khớp URL, `SoftwareApplication` với giá bằng giá thật, logo và `og:image` tải được.
 
 **Sau khi đổi code có đụng tới cột database, chạy lại `supabase/schema.sql` trong Supabase SQL editor trước khi deploy.** Thiếu cột làm server lỗi ngay khi tạo đơn, chứ không phải lỗi im lặng.
 
@@ -116,8 +129,12 @@ Script chỉ đẩy danh sách biến của ứng dụng (`ALLOWED`), không đ�
 - `src/paypal.js`: PayPal Orders v2, chuyển VND sang USD và xác minh webhook.
 - `src/payments.js`: dựng hướng dẫn thanh toán trong nước (VietQR, MoMo, ZaloPay).
 - `src/rates.js`: tỷ giá VND/USD, cache và fallback.
+- `src/indexnow.js`: báo URL đổi cho Bing/Yandex/Naver; bắn-thả, không bao giờ chặn lưu sản phẩm.
 - `public/`: storefront responsive, không cần build frontend.
-- `public/lookup.html` + `public/order.html`: tra cứu đơn và trang đơn hàng.
+- `public/lookup.html` + `public/order.html`: tra cứu đơn và trang đơn hàng. Cả hai, cùng
+  `paypal-return.html`, đọc chữ từ `i18n.js` như trang chủ — đây là ba trang khách
+  nước ngoài dùng sau khi trả tiền bằng PayPal, nên chúng phải theo ngôn ngữ khách
+  đang dùng chứ không phải tiếng Việt viết cứng.
 - `supabase/schema.sql`: schema PostgreSQL.
 - `cloudflare/r2-cors.json`: CORS cho upload trực tiếp từ trình duyệt.
 
@@ -443,11 +460,110 @@ alter table public.orders add constraint orders_status_check check (status in ('
 
 ## Các trang pháp lý
 
-`public/terms.html`, `public/privacy.html` và `public/refund.html` là file tĩnh, phục vụ
-qua `express.static`. Thêm link trong footer của `public/index.html` và trong câu pháp lý
-của checkout (`public/app.js`). `sitemap.xml` được sinh tự động từ danh sách file trong
-`public/`, nên trang mới thêm vào danh sách đó là được index — `/lookup` và `/admin.html`
-cố tình không có trong sitemap.
+`public/terms.html`, `public/privacy.html` và `public/refund.html` là file tĩnh. Thêm
+link trong footer của `public/index.html` và trong câu pháp lý của checkout
+(`public/app.js`).
+
+Bốn trang mà máy tìm kiếm được phép đọc — `/`, `/terms`, `/privacy`, `/refund` — được
+server dựng lại từ file trong `public/` thay vì phục vụ thẳng, vì ba thứ phải đến từ
+cấu hình chứ không được viết vào file:
+
+| Chỗ điền | Lấy từ đâu | Vì sao phải vậy |
+| :--- | :--- | :--- |
+| `{{site}}` | `APP_URL` | Mọi `canonical`, `og:url`, `og:image` và `@id` trong JSON-LD. Gõ tên miền vào file là cách chắc chắn nhất để `canonical` trỏ nhầm domain khác, mà `canonical` sai thì Google lập chỉ mục trang của domain khác. |
+| Danh mục sản phẩm | `isSellable()` trong `src/store.js` | Trang chủ từng chỉ có ba ô xám chờ tải: không tên sản phẩm, không giá, và không một đường dẫn nào tới trang sản phẩm — mà liên kết nội bộ mới là cách Google tìm ra phần còn lại của site. |
+| Thẻ xác minh | `GOOGLE_SITE_VERIFICATION`, `BING_SITE_VERIFICATION` | Xoay token là sửa một dòng `.env`, không phải sửa file rồi deploy lại. |
+
+Cache 60 giây chứ không phải vĩnh viễn: đổi giá trong admin phải tới được byte mà máy
+tìm kiếm đọc, vì kết quả tìm kiếm hiện giá tuần trước tệ hơn là không hiện giá.
+
+`sitemap.xml` sinh tự động từ danh sách file trong `public/` cộng với danh mục sống.
+`/lookup` và `/admin.html` cố tình không có trong đó.
+
+## Search Console
+
+Đây là bước biến site từ "đã có" thành "được tìm thấy". Không có gì bên dưới đây làm
+site chậm đi, và để trống cả ba biến thì site vẫn chạy y như cũ — nó chỉ đơn giản là
+chưa được đăng ký với ai cả.
+
+### 1. Google Search Console
+
+1. Vào <https://search.google.com/search-console>, đăng nhập Google, **Add property**.
+2. Chọn loại **Domain** và gõ `sonvudev.com`. Domain property bao gồm mọi giao thức
+   và mọi subdomain, nên đây là lựa chọn đúng khi `www` trỏ cùng chỗ.
+3. Google đưa ra một chuỗi khoá. Dán vào `.env`:
+
+   ```env
+   GOOGLE_SITE_VERIFICATION=a1b2c3d4e5f6...
+   ```
+
+4. Chọn cách xác minh. **Cả ba cách dùng đúng biến trên**, không cần sửa code:
+
+   | Cách | Thứ server phục vụ | Khi nào chọn |
+   | :--- | :--- | :--- |
+   | DNS TXT | Bản ghi TXT `google-site-verification=...` cho tên miền ở Cloudflare | Tốt nhất. Sống lâu nhất, không phụ thuộc deploy, còn nguyên khi site đổi máy chủ. |
+   | Thẻ HTML | `<meta name="google-site-verification" content="...">` trong `<head>` trang chủ | Nhanh nhất. Token nằm trong `.env` nên xoay được. |
+   | File HTML | `/google<token>.html` | Google tải file từ gốc domain. Cũng không cần sửa code. |
+
+   Nếu đã deploy xong mà Google vẫn báo lỗi, chạy `npm run seo:check` để xem thẻ có
+   thật sự ra khỏi trang chủ trên production không. Thẻ nằm sai chỗ (sau `</head>`) thì
+   Google không thấy, còn trang vẫn hiển thị bình thường nên không có gì để nhận ra.
+
+5. Xác minh xong, vào **Sitemaps**, gõ `sitemap.xml`, bấm Submit. Chỉ làm một lần;
+   sitemap tự đổi mỗi khi bạn lưu sản phẩm.
+
+### 2. Bing Webmaster Tools
+
+Lặp lại đúng như trên tại <https://www.bing.com/webmasters> với
+`BING_SITE_VERIFICATION`. Bing phục vụ `/ms<token>.txt`.
+
+Đừng bỏ qua chỉ vì đã có Google. Bing và IndexNow là con đường nhanh nhất tới khách
+quốc tế, mà đó đúng là nhóm khách PayPal.
+
+### 3. IndexNow — báo tin ngay khi có sản phẩm mới
+
+Bình thường một sản phẩm mới phải chờ lần crawl tới mới được thấy, vài ngày là bình
+thường. IndexNow là một POST miễn phí báo thẳng cho Bing, Yandex, Naver và vài
+engine khác.
+
+```env
+INDEXNOW_KEY=<8-128 ký tự, chữ số và gạch ngang>
+```
+
+Sinh khoá bằng PowerShell:
+
+```powershell
+[Convert]::ToBase64String((1..16 | ForEach-Object { Get-Random -Maximum 256 })).TrimEnd('=')
+```
+
+Khi có khoá:
+
+- Server phục vụ `/<khoá>.txt` trả về đúng khoá. Bing tải file này để chứng minh bạn
+  thật sự sở hữu nó.
+- Mỗi lần lưu hoặc sửa sản phẩm trong `/admin.html`, server tự ping IndexNow với
+  URL trang chủ và trang sản phẩm vừa đổi.
+
+Google **chưa** hỗ trợ IndexNow, nên nó bổ sung cho sitemap chứ không thay thế.
+
+Cả ba cơ chế đều bắn-thả: ping hỏng, chậm, hay IndexNow không bật thì lưu sản phẩm vẫn
+bình thường, chỉ mất một chu kỳ crawl. Nó không bao giờ được phép làm hỏng một thao
+tác bán hàng.
+
+### 4. Sau khi xác minh
+
+```powershell
+npm run seo:check
+```
+
+Mọi dòng phải `PASS`. Hai dòng còn `FAIL` là hai thứ Google sẽ không tha:
+
+- `Xác minh Google` / `Xác minh Bing` — token chưa lên production, hoặc chưa chạy
+  `npm run render:sync -- --apply --deploy`.
+- `Trang chủ có sản phẩm trong HTML` — trang chủ đang chỉ có khung tải.
+
+Trong Search Console, **URL Inspection** với một URL bất kỳ của site cho biết Google
+đang thấy gì. **Page Indexing → Test Live URL** dùng để xin thu thập ngay một trang cụ
+thể thay vì chờ lần crawl tới.
 
 ## Phương thức thanh toán theo vị trí khách
 
