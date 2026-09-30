@@ -3,6 +3,10 @@ const title=document.getElementById('title'),message=document.getElementById('me
 // PayPal buyers are the overseas half of the shop, so this page follows the same
 // dictionary as the storefront instead of carrying its own fixed copy.
 const T=key=>window.I18N.t(key);
+// Injected into the page from SUPPORT_EMAIL on the server, so the address here
+// cannot drift from the one the emails go to. The dictionary holds the
+// configured default for the case where the page was served without it.
+const SUPPORT=()=>document.body?.dataset?.support||window.I18N.t('brand.supportEmail');
 function goHome(){location.href='/'}
 function showMissing(){eyebrow.textContent=T('paypal.eyebrow');title.textContent=T('order.notFound');message.textContent=T('paypal.noSession');loader.hidden=true;actions.innerHTML=`<a class="button button-primary" href="/lookup">${T('nav.lookup')}</a>`}
 function link(token){const dl=document.createElement('button');dl.className='button button-primary';dl.id='download';dl.textContent=T('order.download')+' ↓';dl.onclick=async()=>{try{const result=await fetch('/api/orders/'+encodeURIComponent(state.id)+'/download',{headers:{'x-order-token':token}}),payload=await result.json();if(result.ok){location.href=payload.url;fetch('/api/orders/'+encodeURIComponent(state.id)+'/delivered',{method:'POST',headers:{'x-order-token':token,'content-type':'application/json'}}).catch(()=>{})}else message.textContent=T('order.errDownload')}catch(error){message.textContent=T('order.errOffline')}};return dl}
@@ -43,7 +47,7 @@ async function start(){
   // The order id and the support address are the only two things that let a
   // buyer who was actually charged get their money or their file, so they stay
   // in the sentence even though the sentence now comes from the dictionary.
-  message.textContent=T('paypal.errHint').replace('{id}',state.id).replace('{support}','hello@sonvudev.com');
+  message.textContent=T('paypal.errHint',{id:state.id,support:SUPPORT()});
   actions.innerHTML='';
   const retry=document.createElement('button');retry.className='button button-primary';retry.textContent=T('order.check')+' ↻';retry.onclick=()=>{retry.disabled=true;start()};
   const order=document.createElement('a');order.className='button button-secondary';order.href='/order/'+encodeURIComponent(state.id);order.textContent=T('paypal.myOrders');

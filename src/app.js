@@ -155,23 +155,34 @@ const indexablePages = {
   "privacy.html": {},
   "refund.html": {},
 };
-const renderedPages = new Map();
+// The pages a buyer reaches after paying. Not indexable, so no ownership tag and
+// no catalogue, but they quote the support address and that has to come from
+// config: the same value is in the outgoing email, in the terms, and on three
+// static pages, and a change made in one place used to leave the others pointing
+// at an address nobody reads.
+const supportPages = ["order.html", "paypal-return.html"];
+// One lookup for both groups. renderPage asks what a given file needs, and a file
+// missing from this table fell through to being served raw — which is how
+// /order/<id> kept its template tokens while /order had none left.
+const served = { ...indexablePages, ...Object.fromEntries(supportPages.map((file) => [file, {}])) };
+const pageCache = new Map();
 // Short-lived on purpose. A price change in the admin panel has to reach the
 // bytes a crawler reads: a search result that shows last week's price is worse
 // than no price, and the storefront's own script only ever sees the fresh copy.
 const PAGE_TTL_MS = 60000;
 
 async function renderPage(file) {
-  const cached = renderedPages.get(file);
+  const cached = pageCache.get(file);
   if (cached && Date.now() - cached.at < PAGE_TTL_MS) return cached.html;
   const template = await fs.readFile(path.join(publicDir, file), "utf8");
-  const products = indexablePages[file].catalog ? await listProducts() : [];
+  const products = served[file].catalog ? await listProducts() : [];
   const html = template
     .replaceAll("{{site}}", env.appUrl)
+    .replaceAll("{{support}}", env.email.supportEmail)
     .replace("</head>", `${verificationMeta()}\n</head>`)
     .replace(/(<span class="product-count" id="product-count">)[\s\S]*?(<\/span>)/, `$1${esc(renderIndexCount(products))}$2`)
     .replace(/<!--catalog:start-->[\s\S]*?<!--catalog:end-->/, `<!--catalog:start-->${renderIndexGrid(products)}<!--catalog:end-->`);
-  renderedPages.set(file, { at: Date.now(), html });
+  pageCache.set(file, { at: Date.now(), html });
   return html;
 }
 
@@ -184,10 +195,15 @@ const sendPage = (file) => async (_req, res) => {
     res.sendFile(path.join(publicDir, file));
   }
 };
-for (const file of Object.keys(indexablePages)) {
+for (const file of Object.keys(served)) {
   app.get(file === "index.html" ? "/" : `/${file}`, sendPage(file));
   if (file !== "index.html") app.get(`/${file.replace(/\.html$/, "")}`, sendPage(file));
 }
+// The order page is reached as /order/<id> — the lookup form and the PayPal
+// return both link that shape. Registering only /order and /order.html left the
+// page a buyer actually lands on being served as a raw file, with the template
+// tokens still in it and the substituted values never applied.
+app.get("/order/:id", sendPage("order.html"));
 
 app.get("/og/:slug.svg", async (req, res) => {
   // A clean site-wide card, so a link shared without a product still previews.
@@ -234,8 +250,10 @@ app.use((req, res, next) => {
   next();
 });
 // Short link for buyers, e.g. /order/SVD-XXXX. The page reads the token from
-// sessionStorage, so it is a viewer rather than an entry point.
-app.get("/order/:id", (_req, res) => res.sendFile(path.join(publicDir, "order.html")));
+// sessionStorage, so it is a viewer rather than an entry point. It goes through
+// the renderer like every other page, because this is the shape the lookup form
+// and the PayPal return both link to: serving the raw file here left the real
+// order page carrying template tokens that nothing would ever replace.
 app.use(express.static(publicDir, { extensions: ["html"] }));
 
 app.get("/api/health", async (_req, res) => {

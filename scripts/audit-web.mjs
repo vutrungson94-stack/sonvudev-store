@@ -140,7 +140,11 @@ const appUrl = env("APP_URL") || "https://sonvudev.com";
 const appHost = new URL(appUrl).hostname.toLowerCase();
 const supportEmail = (env("SUPPORT_EMAIL") || "hello@sonvudev.com").toLowerCase();
 const thirdParty = new Set(["www.w3.org", "schema.org", "www.sitemaps.org", "localhost", "img.vietqr.io", "fonts.googleapis.com", "fonts.gstatic.com", "resend.com", "supabase.com", "supabase.co", "paypal.com", "google.com", "cloudflare.com", "render.com", "ipapi.co", "ipwho.is", "er-api.com", "exchangerate-api.com", "indexnow.org"]);
-for (const relative of [...htmlFiles, ...scriptFiles].map((n) => path.join("public", n)).concat(path.join("src", "pages.js"))) {
+// i18n.js is scanned too: brand.supportEmail is the configured default the pages
+// fall back to, so letting it drift away from .env would mean an empty mailto on
+// exactly the page a paying customer is reading.
+const emailBearing = [...htmlFiles, ...scriptFiles].map((n) => path.join("public", n)).concat([path.join("src", "pages.js"), path.join("public", "i18n.js")]);
+for (const relative of emailBearing) {
   const source = await read(relative);
   for (const match of source.matchAll(/https?:\/\/([a-z0-9.-]+)/gi)) {
     const host = match[1].toLowerCase();

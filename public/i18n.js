@@ -10,6 +10,9 @@ const DICT = {
   vi: {
     'lang.switch': 'EN',
     'lang.switchAria': 'Chuyển sang tiếng Anh',
+    // Dia chi ho tro. Gia tri mac dinh; may chu thay bang SUPPORT_EMAIL
+    // nen doi mot lan la ca site doi.
+    'brand.supportEmail': 'hello@sonvudev.com',
     'brand.tagline': 'Phần mềm tốt cho công việc tốt.',
     'brand.rights': '© 2026 SonVuDev.com · Đồng sở hữu',
     'announce.text': 'SonVuDev đang mở cửa cho các bản phát hành mới',
@@ -197,6 +200,8 @@ const DICT = {
   en: {
     'lang.switch': 'VI',
     'lang.switchAria': 'Switch to Vietnamese',
+    // The configured default. The server substitutes the live SUPPORT_EMAIL.
+    'brand.supportEmail': 'hello@sonvudev.com',
     'brand.tagline': 'Good software for good work.',
     'brand.rights': '© 2026 SonVuDev.com · All rights reserved',
     'announce.text': 'SonVuDev is opening up to new releases',

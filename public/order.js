@@ -7,7 +7,11 @@ const T=(key,vars)=>window.I18N.t(key,undefined,vars);
 const esc=v=>window.I18N.esc(v);
 const money=(v,c)=>window.I18N.money(v,c);
 const statusLabel=o=>window.I18N.status(o.status);
-const SUPPORT='hello@sonvudev.com';
+// The address is injected into the page from SUPPORT_EMAIL on the server, so
+// changing it there changes the email templates, the terms, and these pages at
+// once. The dictionary value is the configured default and the last resort: an
+// empty mailto on a page a paying customer is reading helps nobody.
+const SUPPORT = () => document.body?.dataset?.support || T('brand.supportEmail');
 const state=JSON.parse(sessionStorage.getItem('sonvudev_order')||'null');
 function missing(){title.textContent=T('order.noSession.title');lead.textContent=T('order.noSession.hint');body.innerHTML='<a class="button button-primary" href="/lookup">'+esc(T('order.noSession.cta'))+' <span>→</span></a>'}
 // A dead device leaves no session, so the order id has to be the one thing the
@@ -54,7 +58,7 @@ function scheduleWatch(delay=10000){
 // money leave their account that nothing happened is the one answer that turns a
 // glitch into a chargeback.
 function hintFor(o){
-  if(o.status==='refunded')return T('order.hint.refunded',{reason:o.refundReason||T('order.hint.refundUnknown'),support:SUPPORT});
+  if(o.status==='refunded')return T('order.hint.refunded',{reason:o.refundReason||T('order.hint.refundUnknown'),support:SUPPORT()});
   if(o.status==='paid')return T('order.hint.paid');
   if(closed(o))return T('order.hint.delivered');
   if(o.status==='cancelled'){
@@ -135,7 +139,7 @@ ${deadline?`<p class="order-deadline${left!==null&&left<=0?' is-over':''}" id="o
 ${order.status==='cancelled'?'':`${channels}`}
 <button class="button button-primary button-wide" id="order-download" disabled>${esc(T('order.unlock'))} <span>↓</span></button>
 <button class="button button-secondary button-wide" id="order-refresh">${esc(T('order.refresh'))} <span>↻</span></button>`}
-<p class="order-help">${esc(T('order.help.need'))} <a href="mailto:${SUPPORT}">${SUPPORT}</a> hoặc xem <a href="/refund">${esc(T('order.help.refundPolicy'))}</a>.</p>
+<p class="order-help">${esc(T('order.help.need'))} <a href="mailto:${SUPPORT()}">${SUPPORT()}</a> hoặc xem <a href="/refund">${esc(T('order.help.refundPolicy'))}</a>.</p>
 ${recoveryBar(order.id)}`;
   document.getElementById('order-download')?.addEventListener('click',async()=>{
     const button=document.getElementById('order-download');
