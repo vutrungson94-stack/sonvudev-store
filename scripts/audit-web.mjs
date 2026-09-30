@@ -102,10 +102,17 @@ const enKeys = keysOf(i18nSource.slice(i18nSource.indexOf("en: {")));
 for (const key of viKeys) if (!enKeys.has(key)) fail("thiếu bản dịch", "public/i18n.js", `"${key}" có tiếng Việt, thiếu tiếng Anh`);
 for (const key of enKeys) if (!viKeys.has(key)) fail("thiếu bản dịch", "public/i18n.js", `"${key}" có tiếng Anh, thiếu tiếng Việt`);
 
-// i18n.js is excluded here: its own source is the dictionary, so every key
-// appears in it as a literal and the check would pass itself. Only the calls it
-// makes are counted, which is how it reads its own two labels.
+// i18n.js is excluded from the page scripts below: its own source is the
+// dictionary, so every key appears in it as a literal and the check would pass
+// itself. What the file does with those keys is still real usage though — the
+// status map and the two labels for the switch button both live there — so the
+// dictionary tables are stripped and the rest of the file is scanned.
 const pageScriptSources = await Promise.all(scriptFiles.filter((name) => name !== "i18n.js").map((name) => read(path.join("public", name))));
+// Everything after the dictionary closes is real code that reads those keys: the
+// status map, the switch button labels, the download format. A key named only in
+// the dictionary is dead copy; a key named in the code beside it is not.
+const dictionaryCloses = i18nSource.indexOf("};", i18nSource.indexOf("en: {"));
+const i18nCode = i18nSource.slice(dictionaryCloses > 0 ? dictionaryCloses : 0);
 const htmlSources = await Promise.all(htmlFiles.map((name) => read(path.join("public", name))));
 const allHtml = htmlSources.join("\n");
 const usedKeys = new Set([
@@ -115,7 +122,10 @@ const usedKeys = new Set([
   ...[...allHtml.matchAll(/\bdata-i18n="([^"]+)"/g)].map((m) => m[1]),
   ...[...allHtml.matchAll(/\bdata-i18n-attr="([^"]+)"/g)].flatMap((m) => m[1].split(",").map((pair) => pair.split(":")[1]?.trim()).filter(Boolean)),
   ...pageScriptSources.flatMap((source) => [...source.matchAll(/'([a-z][\w]*(?:\.[\w]+)+)'/g)].map((m) => m[1])),
-  ...[...i18nSource.matchAll(/I18N\.t\('([\w.]+)'/g)].map((m) => m[1]),
+  // What i18n.js itself reads: the status map, the switch button labels, the
+  // download format. A key named only in the dictionary is dead; a key named in
+  // the code next to it is not.
+  ...[...i18nCode.matchAll(/'([\w.]+)'/g)].map((m) => m[1]),
 ]);
 const orphans = [...viKeys].filter((key) => !usedKeys.has(key)).sort();
 if (orphans.length) fail("khoá i18n mồ côi", "public/i18n.js", `${orphans.length} khoá không nơi nào dùng: ${orphans.join(", ")}`);
@@ -190,7 +200,48 @@ for (const name of htmlFiles) {
 }
 
 // ---------------------------------------------------------------------------
-const groups = 6;
+// 7. Two scripts on one page declaring the same top-level name.
+//    A classic <script> with `let x` or `const x` puts x in the global lexical
+//    scope, so a second script declaring x is a SyntaxError and that script never
+//    runs at all. order.js and i18n.js both declared `current`, which left the
+//    order page blank: it renders an empty shell with no error on screen, and it
+//    is the page a buyer reaches after paying and losing their session. Both
+//    files passed their own syntax check and their own tests, because each was
+//    valid on its own — only loading them together breaks.
+// ---------------------------------------------------------------------------
+const declarationsOf = (source) => {
+  const names = [];
+  for (const match of source.matchAll(/^(?:let|const)\s+([^=;]+)=/gm)) {
+    // One statement can declare several names; only the leading ones matter,
+    // since the rest need their own destructuring pass.
+    for (const part of match[1].split(",")) {
+      const name = part.trim().split(/[\s=:[({]/)[0];
+      if (name && /^[A-Za-z_$][\w$]*$/.test(name)) names.push(name);
+    }
+  }
+  return names;
+};
+for (const name of htmlFiles) {
+  const html = await read(path.join("public", name));
+  const scripts = [...html.matchAll(/<script[^>]+src="([^"]+\.js)"/g)].map((m) => m[1].replace(/^\.?\//, ""));
+  const owners = new Map();
+  for (const script of scripts) {
+    const file = path.join(publicDir, script);
+    if (!existsSync(file)) continue;
+    for (const declared of declarationsOf(await read(path.join("public", script)))) {
+      if (!owners.has(declared)) owners.set(declared, []);
+      owners.get(declared).push(script);
+    }
+  }
+  for (const [declared, files] of owners) {
+    if (files.length > 1) {
+      fail("trùng tên toàn cục", `public/${name}`, `"${declared}" được khai báo ở cả ${files.join(" và ")} — trang sẽ không chạy`);
+    }
+  }
+}
+
+// ---------------------------------------------------------------------------
+const groups = 7;
 for (const item of findings) console.error(`FAIL  ${item.check.padEnd(18)} ${item.file}: ${item.detail}`);
 console.log(`\n[audit] ${groups} nhom kiem tra, ${findings.length} van de.`);
 if (!findings.length) console.log("[audit] PASS: khong co domain ghi tay, route trung, link gay hay khoa i18n mo coi.");

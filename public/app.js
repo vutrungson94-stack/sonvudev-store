@@ -21,7 +21,12 @@ let countdownTimer = null;
 let watchTimer = null;
 
 const T = (key, fallback) => window.I18N.t(key, fallback);
-const esc = (v) => String(v ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+// esc and money now live in i18n.js, which every page already loads. They were typed out
+// here and again in order.js, and had already drifted: this copy formatted every amount in
+// Vietnamese even for a buyer who had switched the site to English, which showed 249.000
+// where 249,000 was meant.
+const esc = (v) => window.I18N.esc(v);
+const money = (v, c) => window.I18N.money(v, c);
 // Product copy is authored with blank lines between paragraphs. HTML collapses
 // every newline, so a plain esc() turned a wall of text into one solid block.
 // Escaping first and then turning the newlines into <p> keeps the structure
@@ -33,10 +38,6 @@ const paragraphs = (text) => String(text || '')
   .map((block) => `<p>${esc(block).replace(/\n/g, '<br>')}</p>`)
   .join('');
 const initials = (n) => String(n || 'SV').split(/\s+/).map((p) => p[0]).join('').slice(0, 2).toUpperCase();
-const money = (v, c = 'VND') => new Intl.NumberFormat(
-  window.I18N.lang === 'en' ? 'en-US' : 'vi-VN',
-  c === 'USD' ? { style: 'currency', currency: c } : { maximumFractionDigits: 0 },
-).format(Number(v || 0));
 
 function toastMsg(message, isError = false) {
   toast.textContent = message;
@@ -393,12 +394,12 @@ async function checkOrder(id, token, quiet = false) {
     if (!res.ok) throw Error(data.error || T('order.errStatus'));
     const wasPaid = lastOrder && lastOrder.status === 'paid';
     lastOrder = data.order;
-    const labels = {
-      pending: 'order.pending', pending_transfer: 'order.pending',
-      paid: 'order.paid', payment_failed: 'order.failed', cancelled: 'order.cancelled',
-    };
-    const key = labels[data.order.status] || 'order.pending';
-    const note = data.order.status === 'paid' ? T('order.paidHint') : T(key === 'order.pending' ? 'order.pendingHint' : 'order.statusHint');
+    // The status-to-key map lives in i18n.js now. It used to be written out
+    // here and again in order.js, and the copies disagreed: this one showed a
+    // bank transfer as merely awaiting payment, while the order page named the
+    // bank transfer outright.
+    const key = window.I18N.statusKey(data.order.status);
+    const note = data.order.status === 'paid' ? T('order.paidHint') : T(key === 'order.status.pending' ? 'order.pendingHint' : 'order.statusHint');
     // Tell the buyer the moment the button unlocks, rather than making them
     // wonder whether the payment went through.
     if (!wasPaid && data.order.status === 'paid' && !quiet) toastMsg(T('order.justPaid'));

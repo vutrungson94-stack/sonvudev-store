@@ -29,7 +29,7 @@ async function page(orderOverrides, respond) {
   const base = document.getElementById.bind(document);
   document.getElementById = (id) => base(id) || (extra.has(id) ? new El('div', id) : null);
   const fetch = async (url, options = {}) => (respond || (async () => ({ ok: true, status: 200, json: async () => ({ order: order(orderOverrides), payment: null }) })))(String(url), options);
-  const run = await runScript(read('order.js'), {
+  const run = await runScript(`${read('i18n.js')}\n${read('order.js')}`, {
     document, window: {}, fetch, location: { href: '' },
     sessionStorage: { getItem: () => JSON.stringify({ id: 'SVD-TEST', token: 'tok' }), setItem() {}, removeItem() {} },
   });
@@ -132,10 +132,34 @@ test('10. Hết hạn, chuyển khoản: KHÔNG được nói chưa bị trừ t
 // ── Chống hồi quy: hai nhánh không được phủ lẫn nhau ───────────────────
 
 test('nhánh "chưa trừ tiền" và "đã trừ tiền" không được dùng chung', () => {
-  const source = read('order.js');
   // Every "you have not been charged" promise is a claim about a real balance.
   // Two of them sharing a message is how a buyer ends up told the wrong one.
-  const claims = source.match(/[^']*chưa bị trừ tiền[^']*/g) || [];
-  assert.ok(claims.length >= 2, 'phải có cả hai nhánh');
-  assert.equal(new Set(claims).size, claims.length, 'hai nhánh phải là hai thông điệp khác nhau');
+  // The copy moved into i18n.js when the page became bilingual, so that is where
+  // the guarantee is checked now.
+  const source = read('i18n.js');
+  const quote = String.fromCharCode(39);
+  const value = (key) => {
+    const hit = new RegExp(`${quote}${key}${quote}: ${quote}([^${quote}]*)${quote}`).exec(source);
+    assert.ok(hit, `thiếu khoá ${key}`);
+    return hit[1];
+  };
+  const paypal = value('order.hint.expiredPaypal');
+  const bank = value('order.hint.expiredBank');
+  // PayPal reported nothing, so the promise is a fact we can make.
+  assert.match(paypal, /chưa bị trừ tiền/, 'nhánh PayPal phải nói rõ chưa bị trừ tiền');
+  // A bank transfer tells us nothing either way. Telling a buyer who did pay that
+  // they were not charged is the single worst thing this page can say.
+  assert.ok(!/chưa bị trừ tiền/.test(bank), 'nhánh chuyển khoản KHÔNG được nói chưa bị trừ tiền');
+  assert.match(bank, /chưa ghi nhận được|chưa chuyển/, 'nhánh chuyển khoản phải nói ta chưa biết, không phải nói khách chưa bị trừ');
+  assert.notEqual(paypal, bank, 'hai nhánh phải là hai thông điệp khác nhau');
+  // The same holds in English, where the two sentences were authored separately
+  // and could drift apart from the Vietnamese without anything noticing.
+  const englishBank = source.slice(source.indexOf('en: {'));
+  const bankEn = /'order\.hint\.expiredBank': '([^']*)'/.exec(englishBank);
+  assert.ok(bankEn, 'thiếu nhánh chuyển khoản tiếng Anh');
+  assert.ok(!/not been charged/.test(bankEn[1]), 'tiếng Anh cũng không được nói chưa bị trừ tiền');
+  const paypalEn = /'order\.hint\.expiredPaypal': '([^']*)'/.exec(englishBank);
+  assert.match(paypalEn[1], /not been charged/, 'tiếng Anh nhánh PayPal phải nói rõ chưa bị trừ tiền');
 });
+
+

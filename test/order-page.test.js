@@ -24,8 +24,13 @@ const order = (overrides = {}) => ({
 /**
  * Boots public/order.js. `respond` decides what the network returns, and
  * `offline` makes fetch reject the way a dropped connection does.
+ *
+ * i18n.js is loaded first and into the same sandbox, because the page reads every
+ * string from it. Loading only order.js would leave the dictionary out of the
+ * test and prove nothing about the copy a buyer actually reads — including the
+ * English half, which is the whole reason the page uses one.
  */
-async function boot({ respond, offline = false, state = { id: 'SVD-TEST', token: 'tok-123' } } = {}) {
+async function boot({ respond, offline = false, lang = 'vi-VN', state = { id: 'SVD-TEST', token: 'tok-123' } } = {}) {
   const { document, nodes } = createDom(IDS);
   const extra = new Set(['order-download', 'order-refresh', 'order-countdown', 'order-card']);
   const base = document.getElementById.bind(document);
@@ -42,7 +47,12 @@ async function boot({ respond, offline = false, state = { id: 'SVD-TEST', token:
     setItem(k, v) { this._v[k] = String(v); },
     removeItem(k) { delete this._v[k]; },
   };
-  const run = await runScript(read('order.js'), { document, window: {}, fetch, sessionStorage, location: { href: '' } });
+  // The browser's language picks the starting side of the switch, exactly as it
+  // does for a real buyer whose OS is set to English.
+  const navigator = { language: lang, clipboard: { writeText: async () => {} } };
+  const run = await runScript(`${read('i18n.js')}\n${read('order.js')}`, {
+    document, window: {}, fetch, sessionStorage, navigator, location: { href: '' },
+  });
   // Recovery costs extra round trips: read the order, ask PayPal to capture,
   // then read the order again. Draining more than the usual two ticks is what
   // lets that chain settle before anything is asserted.
@@ -116,8 +126,8 @@ test('bấm nút tải thì gọi delivered để đóng đơn', async () => {
     if (String(url).includes('/download')) return { ok: true, status: 200, json: async () => ({ url: 'https://r2.example/file.zip' }) };
     return { ok: true, status: 200, json: async () => ({ order: order({ status: 'paid' }) }) };
   };
-  const run = await runScript(read('order.js'), {
-    document, window: {}, fetch, location: { href: '' },
+  const run = await runScript(`${read('i18n.js')}\n${read('order.js')}`, {
+    document, window: {}, fetch, location: { href: '' }, navigator: { language: 'vi-VN' },
     sessionStorage: { getItem: () => JSON.stringify({ id: 'SVD-TEST', token: 'tok-123' }), setItem() {}, removeItem() {} },
   });
   await new Promise((r) => setTimeout(r, 0));
@@ -212,4 +222,69 @@ test('hết hạn thì đồng hồ chuyển sang trạng thái hết hạn', as
   const html = nodes.get('order-body').innerHTML;
   assert.ok(html.includes('is-over'), 'hết hạn phải đổi màu cảnh báo');
   assert.ok(html.includes('hết thời gian thanh toán'), 'phải giải thích sắp bị hủy');
+});
+
+// The page a buyer reaches after paying by PayPal, and the reason all of the
+// above moved into the dictionary. These boot the same file with an English
+// browser: every assertion is that Vietnamese is gone, not merely that something
+// appeared, because a half-translated recovery page is worse than an untranslated
+// one.
+test('trang don hang theo ngon ngu trinh duyet', async () => {
+  const vi = await boot({ lang: 'vi-VN', respond: json({ order: order({ status: 'pending_transfer' }), payment: null }) });
+  const en = await boot({ lang: 'en-US', respond: json({ order: order({ status: 'pending_transfer' }), payment: null }) });
+  const html = (run) => String(run.nodes.get('order-body').innerHTML);
+  const lead = (run) => String(run.nodes.get('order-lead').textContent);
+  const title = (run) => String(run.nodes.get('order-title').textContent);
+
+  assert.deepEqual(en.run.errors, [], `tieng Anh khong nem loi: ${en.run.errors.join(' | ')}`);
+  assert.match(title(vi), /^Đơn SVD-TEST$/);
+  assert.equal(title(en), 'Order SVD-TEST', 'tieu de phai doi ngon ngu');
+  assert.equal(lead(vi), 'Đang chờ chuyển khoản');
+  assert.equal(lead(en), 'Awaiting bank transfer');
+  for (const key of ['Sản phẩm', 'Số tiền', 'Trạng thái', 'Thời điểm']) assert.ok(html(vi).includes(key), `tieng Viet thieu "${key}"`);
+  for (const key of ['Product', 'Amount', 'Status', 'Created']) {
+    assert.ok(html(en).includes(key), `tieng Anh thieu "${key}"`);
+  }
+  // Only the interface is compared. The product name in the fixture is the
+  // buyer's own Vietnamese data, which is correct to leave alone.
+  for (const leftover of ['Số tiền', 'Trạng thái', 'Thời điểm', 'Thanh toán thành công để mở nút tải']) {
+    assert.ok(!html(en).includes(leftover), `tieng Anh con chu tieng Viet: "${leftover}"`);
+  }
+  assert.ok(html(en).includes('Pay to unlock the download'));
+  assert.ok(html(vi).includes('Thanh toán thành công để mở nút tải'));
+});
+
+test('so tien va ngay duoc dinh dang theo ngon ngu', async () => {
+  const vi = await boot({ lang: 'vi-VN', respond: json({ order: order({ amount: 249000 }), payment: null }) });
+  const en = await boot({ lang: 'en-US', respond: json({ order: order({ amount: 249000 }), payment: null }) });
+  // The separator is part of the language. An English buyer reading 249.000 was
+  // being shown a Vietnamese number, on the one screen that follows a payment.
+  assert.ok(String(vi.nodes.get('order-body').innerHTML).includes('249.000'), 'tieng Viet tach ngan cach bang cham');
+  assert.ok(String(en.nodes.get('order-body').innerHTML).includes('249,000'), 'tieng Anh tach ngan cach bang phay');
+});
+
+test('moi trang don hang deu dung chung mot bo nhan trang thai', () => {
+  const source = read('order.js');
+  const app = read('app.js');
+  // Two copies of this map had already drifted: the same order read as awaiting
+  // payment in one place and awaiting a bank transfer in the other.
+  assert.ok(!/const statusLabels\s*=/.test(source), 'order.js khong duoc tu dinh nghia nhan trang thai');
+  assert.ok(!/const labels\s*=\s*\{\s*pending/.test(app), 'app.js khong duoc tu dinh nghia nhan trang thai');
+  for (const [name, file] of [['order.js', source], ['app.js', app]]) {
+    assert.ok(/I18N\.status(Key)?\(/.test(file), `${name} phai dung ham trang thai chung`);
+    // Aliasing the shared helper is the point. Writing a second implementation is
+    // the thing this check exists to stop, so the test looks for the escaping and
+    // the formatter rather than for the name.
+    const escLine = file.split(/\r?\n/).find((l) => /^\s*const esc\s*=/.test(l)) || '';
+    assert.ok(!/\.replace\(/.test(escLine), `${name} khong duoc tu viet lai ham escape`);
+    const moneyLine = file.split(/\r?\n/).find((l) => /^\s*const money\s*=/.test(l)) || '';
+    assert.ok(!/Intl\.NumberFormat/.test(moneyLine), `${name} khong duoc goi dinh dang so tien bang ngon ngu cua nguoi ban`);
+  }
+});
+
+test('trang don hang co nut doi ngon ngu', () => {
+  const html = read('order.html');
+  assert.ok(/data-lang-toggle/.test(html), 'trang don hang can nut doi ngon ngu');
+  const order = read('order.js');
+  assert.ok(/I18N\.onChange\(\(\)=>render\(\)\)/.test(order), 'doi ngon ngu thi ve tu dung loi chu khong doi chu');
 });

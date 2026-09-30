@@ -91,11 +91,8 @@ const DICT = {
     'order.keepCode': 'Lưu lại mã này. Nếu đóng tab, mất mạng hoặc máy tắt, bạn vẫn lấy lại được đơn bằng mã tra cứu cùng email đã dùng.',
     'order.openLookup': 'Mở trang tra cứu',
     'order.copied': 'Đã sao chép mã tra cứu.',
-    'order.pending': 'Đang chờ thanh toán',
     'order.pendingHint': 'Bạn đã đặt đơn nhưng chưa thanh toán. Chuyển khoản rồi báo chúng tôi để được duyệt nhanh.',
     'order.paid': 'Đã thanh toán',
-    'order.failed': 'Thanh toán thất bại',
-    'order.cancelled': 'Đơn hàng đã hủy',
     'order.download': 'Tải sản phẩm',
     'order.notFound': 'Không tìm thấy đơn hàng.',
     'paypal.eyebrow': 'PayPal',
@@ -156,6 +153,46 @@ const DICT = {
     'product.requirements': 'Yêu cầu hệ thống',
     'product.version': 'Phiên bản',
     'product.buyNow': 'Mua ngay',
+    // Trang đơn hàng. Trước đây copy ở đây nằm thẳng trong order.js nên khách
+    // nước ngoài đọc tiếng Việt sau khi đã trả tiền, và cùng một trạng thái lại
+    // hiện hai chữ khác nhau ở popup thanh toán với ở trang đơn.
+    'order.status.pending': 'Đang chờ thanh toán',
+    'order.status.pendingTransfer': 'Đang chờ chuyển khoản',
+    'order.status.paid': 'Đã thanh toán',
+    'order.status.failed': 'Thanh toán thất bại',
+    'order.status.cancelled': 'Đã hủy',
+    'order.status.refunded': 'Đã hoàn tiền',
+    'order.title': 'Đơn {id}',
+    'order.row.product': 'Sản phẩm',
+    'order.row.amount': 'Số tiền',
+    'order.row.status': 'Trạng thái',
+    'order.row.created': 'Thời điểm',
+    'order.channel.account': 'Số tài khoản',
+    'order.channel.amount': 'Số tiền',
+    'order.channel.note': 'Nội dung',
+    'order.channel.qr': 'Mã QR {label}',
+    'order.unlock': 'Thanh toán thành công để mở nút tải',
+    'order.refresh': 'Kiểm tra trạng thái',
+    'order.help.need': 'Cần trợ giúp?',
+    'order.help.refundPolicy': 'chính sách hoàn tiền',
+    'order.noSession.title': 'Chưa tìm thấy phiên đơn hàng',
+    'order.noSession.hint': 'Vì lý do bảo mật, mã tra cứu chỉ được giữ trong trình duyệt này. Nếu bạn mở trang này ở thiết bị khác, hãy tra cứu lại bằng mã đơn và email.',
+    'order.noSession.cta': 'Tra cứu đơn hàng',
+    'order.recover.hint': 'Mất mạng, đóng máy hoặc chuyển thiết bị? Đơn {id} vẫn còn. Mở lại bằng mã đơn này và email bạn đã dùng để thanh toán.',
+    'order.recover.cta': 'Tra cứu đơn hàng',
+    'order.errDownloadOffline': 'Mất kết nối khi tải. Bạn có thể thử lại, đơn vẫn còn hiệu lực.',
+    'order.hint.refunded': 'Chúng tôi đã hoàn lại tiền cho đơn này. Lý do: {reason}. Quyền tải sản phẩm đã được thu hồi. Nếu bạn cho là nhầm lẫn, hãy liên hệ {support} kèm mã đơn.',
+    'order.hint.paid': 'Thanh toán đã được xác nhận. Bạn có thể tải sản phẩm ngay. Nếu tải bị gián đoạn, bấm tải lại là được, đơn vẫn còn hiệu lực.',
+    'order.hint.delivered': 'Bạn đã tải sản phẩm và đơn đã hoàn tất. Nếu tệp tải về bị hỏng hoặc thiếu, gửi email cho chúng tôi kèm mã đơn, chúng tôi mở lại đơn ngay.',
+    'order.hint.expiredPaid': 'Đơn này đã hết hạn nhưng tiền đã vào tài khoản của chúng tôi, nên đơn đã được mở lại. Nếu bạn vẫn không thấy nút tải, hãy liên hệ kèm mã đơn.',
+    'order.hint.expiredPaypal': 'Đơn hàng quá thời gian thanh toán nên đã bị hủy, và PayPal không ghi nhận khoản nào nên bạn chưa bị trừ tiền. Bạn có thể đặt đơn mới.',
+    'order.hint.expiredBank': 'Đơn hàng quá thời gian nên đã bị hủy. Chúng tôi chưa ghi nhận được khoản chuyển khoản này — nếu bạn đã chuyển, hãy gửi ảnh biên lai kèm mã đơn, chúng tôi sẽ mở lại đơn hoặc hoàn lại. Nếu chưa chuyển, bạn có thể đặt đơn mới.',
+    'order.hint.paymentFailed': 'Thanh toán không thành công nên bạn chưa bị trừ tiền. Bạn có thể thử lại, đơn vẫn giữ nguyên.',
+    'order.hint.deadlinePassed': 'Đơn hàng đã hết thời gian thanh toán và sắp bị hủy. Nếu bạn đã chuyển khoản, hãy liên hệ để chúng tôi đối soát, chúng tôi sẽ mở lại đơn cho bạn.',
+    'order.hint.pendingTransfer': 'Bạn đang thanh toán bằng chuyển khoản, nên thao tác nằm trong app ngân hàng chứ không ở trang này. Nếu app ngân hàng bị treo hoặc máy tắt giữa chừng, hãy mở lại app để kiểm tra giao dịch đã thực hiện hay chưa. Đơn này được giữ nguyên, còn thời gian và chúng tôi sẽ báo ngay khi bạn bấm nút bên dưới.',
+    'order.hint.paypalUnconfirmed': 'Nếu bạn đã bấm thanh toán ở PayPal nhưng trang này chưa xác nhận được, đừng thanh toán lại lần nữa. Hãy tải lại trang hoặc bấm nút bên dưới: hệ thống sẽ hỏi lại PayPal và mở nút tải nếu tiền đã vào. Nếu PayPal chưa ghi nhận khoản nào, bạn chưa bị trừ tiền và có thể thanh toán lại bình thường.',
+    'order.hint.refundUnknown': 'không rõ',
+    'order.hint.processing': 'Đơn hàng đang được xử lý. Bạn có thể tải ngay khi trạng thái chuyển sang đã thanh toán, trang này sẽ tự cập nhật.',
   },
   en: {
     'lang.switch': 'VI',
@@ -241,11 +278,8 @@ const DICT = {
     'order.keepCode': 'Save this code. If you close the tab, lose your connection or your device powers off, you can still get the order back with this code and the email you paid with.',
     'order.openLookup': 'Open the lookup page',
     'order.copied': 'Lookup code copied.',
-    'order.pending': 'Awaiting payment',
     'order.pendingHint': 'Your order is placed but not paid yet. Transfer the amount and tell us so we can confirm quickly.',
     'order.paid': 'Paid',
-    'order.failed': 'Payment failed',
-    'order.cancelled': 'Order cancelled',
     'order.download': 'Download product',
     'order.notFound': 'Order not found.',
     'paypal.eyebrow': 'PayPal',
@@ -306,10 +340,59 @@ const DICT = {
     'order.errDownload': 'The product is not available for download right now',
     'order.paidHint': 'Payment confirmed. You can download the product now.',
     'order.statusHint': 'Current status of your order.',
+    'order.status.pending': 'Awaiting payment',
+    'order.status.pendingTransfer': 'Awaiting bank transfer',
+    'order.status.paid': 'Paid',
+    'order.status.failed': 'Payment failed',
+    'order.status.cancelled': 'Cancelled',
+    'order.status.refunded': 'Refunded',
+    'order.title': 'Order {id}',
+    'order.row.product': 'Product',
+    'order.row.amount': 'Amount',
+    'order.row.status': 'Status',
+    'order.row.created': 'Created',
+    'order.channel.account': 'Account number',
+    'order.channel.amount': 'Amount',
+    'order.channel.note': 'Transfer note',
+    'order.channel.qr': '{label} QR code',
+    'order.unlock': 'Pay to unlock the download',
+    'order.refresh': 'Check status',
+    'order.help.need': 'Need help?',
+    'order.help.refundPolicy': 'refund policy',
+    'order.noSession.title': 'No order session found',
+    'order.noSession.hint': 'For your security the lookup code is kept in this browser only. If you opened this page on a different device, look the order up again with its id and the email you paid with.',
+    'order.noSession.cta': 'Look up the order',
+    'order.recover.hint': 'Lost connection, closed the laptop or switched device? Order {id} is still here. Open it again with this order id and the email you paid with.',
+    'order.recover.cta': 'Look up the order',
+    'order.errDownloadOffline': 'Connection dropped during the download. You can try again, the order is still valid.',
+    'order.hint.refunded': 'We have refunded this order. Reason: {reason}. The download right has been withdrawn. If you think this is a mistake, contact {support} with your order id.',
+    'order.hint.paid': 'Payment confirmed. You can download the product now. If the download is interrupted, press download again — the order is still valid.',
+    'order.hint.delivered': 'You have downloaded the product and the order is complete. If the file arrived damaged or incomplete, email us with the order id and we will reopen it.',
+    'order.hint.expiredPaid': 'This order expired but the money did reach our account, so the order has been reopened. If you still do not see a download button, contact us with the order id.',
+    'order.hint.expiredPaypal': 'This order passed its payment window and was cancelled, and PayPal recorded no payment, so you have not been charged. You can place a new order.',
+    'order.hint.expiredBank': 'This order passed its payment window and was cancelled. We have not received this transfer — if you already sent it, send the receipt with your order id and we will reopen the order or refund you. If you did not, you can place a new one.',
+    'order.hint.paymentFailed': 'The payment did not go through, so you have not been charged. You can try again, the order is unchanged.',
+    'order.hint.deadlinePassed': 'This order has passed its payment window and is about to be cancelled. If you already transferred the money, contact us so we can reconcile it and reopen the order.',
+    'order.hint.pendingTransfer': 'You are paying by bank transfer, so that step happens in your banking app rather than on this page. If the app froze or the device switched off midway, reopen it to check whether the transfer went through. This order is unchanged, there is still time, and we will confirm the moment you press the button below.',
+    'order.hint.paypalUnconfirmed': 'If you pressed pay at PayPal but this page cannot confirm it, do not pay again. Reload the page or press the button below: the system will ask PayPal again and unlock the download if the money arrived. If PayPal has recorded nothing, you have not been charged and can pay again as normal.',
+    'order.hint.refundUnknown': 'not recorded',
+    'order.hint.processing': 'Your order is being processed. You can download as soon as the status turns to paid — this page updates on its own.',
   },
 };
 
 // ---------------------------------------------------------------------------
+// One mapping from the status column to its key. The checkout modal and the order
+// page used to carry separate copies, and a bank transfer read as "Đang chờ thanh toán"
+// in one and "Đang chờ chuyển khoản" in the other.
+const STATUS_KEYS = {
+  pending: 'order.status.pending',
+  pending_transfer: 'order.status.pendingTransfer',
+  paid: 'order.status.paid',
+  payment_failed: 'order.status.failed',
+  cancelled: 'order.status.cancelled',
+  refunded: 'order.status.refunded',
+};
+
 const SUPPORTED = ['vi', 'en'];
 const STORAGE_KEY = 'sonvudev_lang';
 const listeners = new Set();
@@ -326,13 +409,17 @@ let current = readStored();
 
 const I18N = {
   get lang() { return current; },
-  t(key, fallback) {
+  t(key, fallback, vars) {
     const table = DICT[current] || DICT.vi;
-    if (table[key] !== undefined) return table[key];
+    // Placeholders are filled here rather than by every caller. A sentence that
+    // mentions an order id or a countdown reads as broken the moment one of them
+    // is left as a literal brace.
+    const fill = (text) => (vars ? String(text).replace(/\{(\w+)\}/g, (match, name) => (vars[name] !== undefined ? vars[name] : match)) : text);
+    if (table[key] !== undefined) return fill(table[key]);
     // Never render an empty box for a missing key: fall back to Vietnamese,
     // then to whatever the caller passed, so the gap stays visible.
-    if (DICT.vi[key] !== undefined) return DICT.vi[key];
-    return fallback !== undefined ? fallback : key;
+    if (DICT.vi[key] !== undefined) return fill(DICT.vi[key]);
+    return fill(fallback !== undefined ? fallback : key);
   },
   set(lang) {
     if (!SUPPORTED.includes(lang) || lang === current) return;
@@ -348,6 +435,27 @@ const I18N = {
   },
   toggle() { I18N.set(current === 'vi' ? 'en' : 'vi'); },
   onChange(fn) { listeners.add(fn); return () => listeners.delete(fn); },
+  // Everything below is shared rather than retyped per page. The storefront, the
+  // recovery form and the order page each had their own escape, money and status
+  // helpers; two of those copies had already drifted apart, so one order showed a
+  // different status word depending on which screen the buyer was looking at.
+  get locale() { return current === 'en' ? 'en-US' : 'vi-VN'; },
+  esc(value) {
+    return String(value ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+  },
+  money(value, currency = 'VND') {
+    // A Vietnamese reader wants 249.000 and an English reader wants 249,000. The
+    // separator is part of the language, so it follows the switch rather than
+    // being hard-coded to the seller's own locale.
+    const amount = Number(value || 0);
+    return new Intl.NumberFormat(I18N.locale, currency === 'USD' ? { style: 'currency', currency } : { maximumFractionDigits: 0 }).format(amount);
+  },
+  date(value) {
+    const at = value ? new Date(value) : new Date(NaN);
+    return Number.isFinite(at.getTime()) ? at.toLocaleString(I18N.locale) : '';
+  },
+  statusKey(status) { return STATUS_KEYS[status] || 'order.status.pending'; },
+  status(status) { return I18N.t(I18N.statusKey(status), status); },
 };
 
 // Walks the document swapping text, placeholders and attributes.
