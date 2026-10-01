@@ -207,6 +207,18 @@ export const verificationMeta = () => {
 };
 
 /**
+ * The brand, as a meta tag, so the browser knows it.
+ *
+ * It used to be a literal in the dictionary, and then it briefly became the part of
+ * SUPPORT_EMAIL after the "@" — which printed the bare domain in the footer in lower
+ * case, and would have printed "gmail.com" the moment the support address moved to a
+ * webmail provider. Neither is the brand. The name belongs to the configuration, so
+ * it is injected once here and every page reads it back, exactly the way the support
+ * address already is.
+ */
+export const brandMeta = () => `<meta name="x-brand" content="${esc(env.brand.name)}">`;
+
+/**
  * The verification file a search engine fetches from the site root.
  *
  * Google names it google<token>.html and wants a one-line body naming itself;
@@ -457,6 +469,7 @@ ${meta({ title, description, url, type: "product", lang, alternates: { vi: absol
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="/styles.css">
+${brandMeta()}
 ${jsonLd([organization(), websiteSchema(), productSchema(product, lang), breadcrumbSchema(product, lang), faq])}
 </head>
 <body class="product-page">

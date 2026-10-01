@@ -4,11 +4,11 @@ import { promises as fs } from "node:fs";
 import { fileURLToPath } from "node:url";
 import crypto from "node:crypto";
 import { env, isConfigured } from "./config.js";
-import { ensureSeed, findOrderByIdempotencyKey, getOrder, getProduct, getProductBySlug, isOrderOwner, isSellable, latestOrder, listExpiringOrders, listOpenOrders, listOrders, listOrdersForRevenue, listProducts, createOrder, updateOrder, createProduct, updateProduct, persistenceMode } from "./store.js";
+import { countOrders, ensureSeed, findOrderByIdempotencyKey, getOrder, getProduct, getProductBySlug, isOrderOwner, isSellable, latestOrder, listExpiringOrders, listOpenOrders, listOrders, listOrdersForRevenue, listProducts, createOrder, updateOrder, createProduct, updateProduct, persistenceMode } from "./store.js";
 import { createDownloadUrl, createUploadUrl } from "./r2.js";
 import { captureOrder, createOrder as createPayPalOrder, hashToken, newOrderId, newToken, paypalChargeFor, paypalChargeForProduct, paymentMatchesOrder, readOrder, verifyWebhook } from "./paypal.js";
 import { paymentInstructions, paymentOptions } from "./payments.js";
-import { esc, jsonLdGraph, renderFeed, renderIndexCount, renderIndexGrid, renderLlmsTxt, renderOgImage, renderProductPage, verificationFile, verificationMeta } from "./pages.js";
+import { brandMeta, esc, jsonLdGraph, renderFeed, renderIndexCount, renderIndexGrid, renderLlmsTxt, renderOgImage, renderProductPage, verificationFile, verificationMeta } from "./pages.js";
 import { hasPayment, isClosed, isUnpaid, markOrderDelivered, markOrderPaid, paymentDeadline, voidPayment } from "./orders.js";
 import { notifyOrder, notifyMode } from "./notify.js";
 import { resolveCountry } from "./geo.js";
@@ -234,7 +234,7 @@ async function renderPage(file) {
     // The homepage's structured data comes from the same functions the product
     // pages use, so the two can no longer describe the shop differently.
     .replaceAll("{{jsonLd}}", jsonLdGraph(products))
-    .replace("</head>", `${verificationMeta()}\n</head>`)
+    .replace("</head>", `${verificationMeta()}\n${brandMeta()}\n</head>`)
     .replace(/(<span class="product-count" id="product-count">)[\s\S]*?(<\/span>)/, `$1${esc(renderIndexCount(products))}$2`)
     .replace(/<!--catalog:start-->[\s\S]*?<!--catalog:end-->/, `<!--catalog:start-->${renderIndexGrid(products)}<!--catalog:end-->`);
   pageCache.set(file, { at: Date.now(), html });
@@ -666,8 +666,8 @@ app.get("/api/admin/orders", admin, async (req, res) => {
   try {
     const limit = Math.min(200, Math.max(1, Number(req.query.limit) || 50));
     const offset = Math.max(0, Number(req.query.offset) || 0);
-    const [orders, open] = await Promise.all([listOrders({ limit, offset }), listOpenOrders()]);
-    res.json({ orders: orders.map(publicOrder), live: open.length, limit, offset, hasMore: orders.length === limit });
+    const [orders, open, total] = await Promise.all([listOrders({ limit, offset }), listOpenOrders(), countOrders()]);
+    res.json({ orders: orders.map(publicOrder), live: open.length, limit, offset, hasMore: orders.length === limit, total });
   }
   catch (error) { console.error(error); res.status(500).json({ error: "Không thể tải đơn hàng" }); }
 });

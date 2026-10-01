@@ -92,7 +92,7 @@ async function loadOrders({append=false}={}){
   if(!token||orderLoading)return;
   orderLoading=true;
   moreBtn.disabled=true;
-  moreBtn.textContent='Dang tai...';
+  moreBtn.textContent='Đang tải…';
   try{
     const d=await api('/api/admin/orders?limit='+ORDER_PAGE+'&offset='+(append?orderPage*ORDER_PAGE:0)),orders=d.orders||[];
     orderPage=append?orderPage+1:1;
@@ -102,7 +102,7 @@ async function loadOrders({append=false}={}){
     const open=(Number(d.live)||0)+orders.filter(o=>o.status==='pending_transfer'&&!o.deliveredAt).length;
     const rows=orders.map(orderRow).join('');
     if(append&&body.innerHTML)body.insertAdjacentHTML('beforeend',rows);
-    else body.innerHTML=orders.length?rows:'<tr><td colspan="6" class="table-empty">Chua co don hang.</td></tr>';
+    else body.innerHTML=orders.length?rows:'<tr><td colspan="6" class="table-empty">Chưa có đơn hàng.</td></tr>';
     for(const attr of ['data-status','data-delivered','data-reopen','data-refund','data-reopen2']){
       body.querySelectorAll('['+attr+']').forEach(btn=>{
         const id=btn.dataset[attr.slice(5).replace(/-([a-z])/g,(m,c)=>c.toUpperCase())];
@@ -113,12 +113,16 @@ async function loadOrders({append=false}={}){
         else btn.onclick=()=>reopenRefunded(id);
       });
     }
-    const suffix=orderHasMore?'+':'';
+const suffix=orderHasMore?'+':'';
+    // The total comes from the server, not from how far the owner has scrolled. It
+    // used to be page * pageSize, which labelled "50 orders in the system" for a shop
+    // with two — right by coincidence, which is worse than wrong on purpose.
+    const total=Number(d.total)||0;
     summary.textContent=open
-      ? (open+' don dang cho chuyen khoan · da xem '+orderPage*ORDER_PAGE+suffix)
-      : (orderPage*ORDER_PAGE+suffix+' don hang trong he thong');
+      ? (open+' đơn đang chờ chuyển khoản · đã xem '+(orderPage*ORDER_PAGE)+suffix+' / '+total)
+      : (total+' đơn hàng trong hệ thống');
     moreRow.hidden=!orderHasMore;
-    moreBtn.textContent=orderHasMore?'Tai them don hang':'Da xem het don hang';
+    moreBtn.textContent=orderHasMore?'Tải thêm đơn hàng':'Đã xem hết đơn hàng';
   }catch(e){showToast(e.message,true)}
   finally{orderLoading=false;moreBtn.disabled=false}
 }
@@ -133,8 +137,16 @@ async function uploadRelease(file, productRef, version, onProgress = () => {}) {
   return presign.key;
 }
 
-async function loadProducts(){try{const d=await api('/api/admin/products');productList.innerHTML=d.products.length?d.products.map(p=>`<div class="admin-product-row"><span class="admin-product-icon">${esc((p.name||'SV').slice(0,2).toUpperCase())}</span><div><b>${esc(p.name)}</b><small>${esc(p.version)} · ${money(p.price)} ${esc(p.currency)} · ${p.status==='active'?'Đang bán':'Bản nháp'}</small></div><div class="admin-product-actions"><span>${p.fileKey?'Đã có file':'Chưa có file'}</span><label class="admin-upload-button">Cập nhật file<input type="file" accept=".zip,.exe,.msi,.7z" data-product-id="${esc(p.id)}" data-product-ref="${esc(p.slug)}" data-version="${esc(p.version)}" hidden></label><button class="text-link" type="button" data-seo-toggle="${esc(p.id)}">${p.seoTitle?'Sửa SEO':'Thêm SEO'}</button></div>${seoEditor(p)}</div>`).join(''):'<p class="table-empty">Chưa có sản phẩm.</p>';productList.querySelectorAll('input[type=file]').forEach(input=>input.onchange=uploadExistingProduct);productList.querySelectorAll('[data-seo-toggle]').forEach(button=>button.onclick=()=>{const form=productList.querySelector(`[data-seo-form="${button.dataset.seoToggle}"]`);if(form){form.hidden=!form.hidden;if(!form.hidden)countSeo(form)}});productList.querySelectorAll('[data-seo-form]').forEach(form=>{form.onsubmit=saveSeo;form.querySelectorAll('input,textarea').forEach(input=>input.oninput=()=>countSeo(form))})}catch(e){showToast(e.message,true)}}
-function seoEditor(p){return `<form class="admin-seo-form" data-seo-form="${esc(p.id)}" data-seo-title="${esc(p.seoTitle||'')}" data-seo-description="${esc(p.seoDescription||'')}" hidden><label>Tiêu đề tìm kiếm<input name="seoTitle" maxlength="70" value="${esc(p.seoTitle||'')}" placeholder="Để trống thì lấy tên sản phẩm"></label><label>Mô tả tìm kiếm<textarea name="seoDescription" maxlength="175" rows="2" placeholder="Câu người ta gõ vào Google, trả lời thẳng vấn đề của họ">${esc(p.seoDescription||'')}</textarea></label><p class="admin-seo-count"></p><button class="button button-primary" type="submit">Lưu SEO</button></form>`}
+async function loadProducts(){try{const d=await api('/api/admin/products');productList.innerHTML=d.products.length?d.products.map(p=>`<div class="admin-product-row"><span class="admin-product-icon">${esc((p.name||'SV').slice(0,2).toUpperCase())}</span><div><b>${esc(p.name)}</b><small>${esc(p.version)} · ${money(p.price)} ${esc(p.currency)} · ${p.status==='active'?'Đang bán':'Bản nháp'}</small></div><div class="admin-product-actions"><span>${p.fileKey?'Đã có file':'Chưa có file'}</span><label class="admin-upload-button">Cập nhật file<input type="file" accept=".zip,.exe,.msi,.7z" data-product-id="${esc(p.id)}" data-product-ref="${esc(p.slug)}" data-version="${esc(p.version)}" hidden></label><button class="text-link" type="button" data-seo-toggle="${esc(p.id)}">${p.seoTitle?'Sửa SEO':'Thêm SEO'}</button></div>${seoEditor(p)}</div>`).join(''):'<p class="table-empty">Chưa có sản phẩm.</p>';productList.querySelectorAll('input[type=file]').forEach(input=>input.onchange=uploadExistingProduct);productList.querySelectorAll('[data-seo-toggle]').forEach(button=>button.onclick=()=>{const form=productList.querySelector(`[data-seo-form="${button.dataset.seoToggle}"]`);if(form){form.hidden=!form.hidden;if(!form.hidden){seoLock(form,false);countSeo(form)}}});productList.querySelectorAll('[data-seo-form]').forEach(form=>{form.onsubmit=saveSeo;seoLock(form,true);form.querySelectorAll('input,textarea').forEach(input=>input.oninput=()=>countSeo(form))})}catch(e){showToast(e.message,true)}}
+function seoEditor(p){return `<form class="admin-seo-form" data-seo-form="${esc(p.id)}" data-seo-title="${esc(p.seoTitle||'')}" data-seo-description="${esc(p.seoDescription||'')}" hidden><label>Tiêu đề tìm kiếm<input name="seoTitle" maxlength="70" value="${esc(p.seoTitle||'')}" placeholder="Để trống thì lấy tên sản phẩm"></label><label>Mô tả tìm kiếm<textarea name="seoDescription" maxlength="175" rows="2" placeholder="Câu người ta gõ vào Google, trả lời thẳng vấn đề của họ">${esc(p.seoDescription||'')}</textarea></label><p class="admin-seo-count"></p><button class="button button-primary" type="submit" disabled>Lưu SEO</button></form>`}
+// Read-only once saved, editable once "Sửa SEO" is pressed.
+//
+// A form that is saved and still accepts typing is the form the owner reported:
+// they pressed Lưu SEO, nothing visibly happened, and pressing it again wrote the
+// same two fields. Locking the inputs and saying so removes the ambiguity — the
+// greyed fields are the confirmation, not just the button. The alternative, leaving
+// them live and relying on a disabled button, was tried and read as a broken form.
+function seoLock(form,locked){for(const el of form.querySelectorAll('input,textarea'))el.readOnly=locked;form.classList.toggle('locked',locked)}
 function seoDirty(form){return (form.elements.seoTitle?form.elements.seoTitle.value.trim():'')!==(form.dataset.seoTitle||'')||(form.elements.seoDescription?form.elements.seoDescription.value.trim():'')!==(form.dataset.seoDescription||'')}
 // The counter doubles as the form's state. A clean form says so: the save button is
 // disabled because there is nothing to save, and saying "Đã lưu" is the only visible
@@ -160,7 +172,7 @@ const storedTitle=stored.seoTitle!==undefined?stored.seoTitle:seoTitle,storedDes
 if(form.elements.seoTitle.value!==storedTitle)form.elements.seoTitle.value=storedTitle;if(form.elements.seoDescription.value!==storedDescription)form.elements.seoDescription.value=storedDescription;
 // The row's toggle still reads "Thêm SEO" until a title exists, so that one word is
 // updated directly rather than by re-rendering everything.
-for(const toggle of productList.querySelectorAll('[data-seo-toggle]')){if(toggle.dataset.seoToggle===form.dataset.seoForm){toggle.textContent='Sửa SEO';break}}showToast('Đã lưu SEO')}catch(e){showToast(e.message,true)}
+for(const toggle of productList.querySelectorAll('[data-seo-toggle]')){if(toggle.dataset.seoToggle===form.dataset.seoForm){toggle.textContent='Sửa SEO';break}}seoLock(form,true);showToast('Đã lưu SEO')}catch(e){showToast(e.message,true)}
 // Runs on the form that is still on screen, and the button follows the same
 // comparison rule it always did. Clean after a save, so it locks; still dirty after a
 // failure, so it unlocks and the owner can try again. Nothing sets it either way.

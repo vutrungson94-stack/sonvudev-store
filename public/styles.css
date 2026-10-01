@@ -270,6 +270,9 @@ body.modal-open{overflow:hidden}
 /* A clean form. Quieter than the editable state and says so, which is what the save
    button being disabled does not: a greyed button alone reads as broken. */
 .admin-seo-count.clean{color:#4fbf8b}
+/* Saved and read-only, until "Sửa SEO" is pressed. The greyed fields are the
+   confirmation; without them a saved form looks like an unsaved one. */
+.admin-seo-form.locked input,.admin-seo-form.locked textarea{background:#f2f5f4;color:#8b979c;border-style:dashed;cursor:default}
 @media (max-width:700px){.admin-seo-form{grid-template-columns:1fr}}
 /* The load-more control under the order table. Centred because it is an action
    on the list as a whole, not one of the row actions in the last column. */

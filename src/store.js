@@ -87,6 +87,29 @@ export async function updateProduct(id, patch) { if (!local) return fromProduct(
 // admin history view shows the lot. Anything on a timer or a poll must use one of
 // the narrow queries below instead, because the cost of this one grows forever
 // while the work those callers do does not.
+/**
+ * How many orders exist in total.
+ *
+ * The admin panel used to label "orders in the system" with
+ * `page * pageSize`, which is how many orders have been *scrolled through* — after
+ * one page of 50 it said "50 orders in the system" about a shop with two. A figure
+ * that is right by coincidence is worse than no figure, because the owner stops
+ * looking at it and then cannot tell a real spike from a rendering bug.
+ *
+ * PostgREST reports the total in Content-Range when asked to count exactly, so this
+ * costs one header on a query that fetches a single id rather than the table.
+ */
+export async function countOrders() {
+  if (local) return (await readJson(files.orders, [])).length;
+  const headers = { apikey: env.supabase.serviceRoleKey, Prefer: "count=exact", Range: "0-0" };
+  if (env.supabase.serviceRoleKey.startsWith("eyJ")) headers.Authorization = `Bearer ${env.supabase.serviceRoleKey}`;
+  const response = await fetch(`${env.supabase.url}/rest/v1/orders?select=id`, { headers });
+  if (!response.ok) throw new Error(`Supabase ${response.status}: ${await response.text()}`);
+  // "0-0/2" — the part after the slash is the total, not the length of the slice.
+  const total = Number(String(response.headers.get("content-range") || "").split("/")[1]);
+  return Number.isFinite(total) ? total : 0;
+}
+
 export async function listOrders({ limit = 200, offset = 0 } = {}) {
   if (local) {
     const items = (await readJson(files.orders, [])).slice().sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0));

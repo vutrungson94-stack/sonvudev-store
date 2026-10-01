@@ -23,6 +23,7 @@
     "metrics": "node scripts/metrics.mjs",
     "metrics:update": "node scripts/metrics.mjs --update",
     "i18n:fill": "node scripts/fill-static-text.mjs",
+    "test:flow": "node scripts/payment-flow-test.mjs",
     "seo:check": "node scripts/seo-check.mjs",
     "start": "node src/server.js",
     "dev": "node --watch src/server.js",

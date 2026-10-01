@@ -238,6 +238,63 @@ for (const match of pagesSource.matchAll(/"(?:urlTemplate|item|url)"\s*:\s*`?\$\
   if (blocked.has(target)) fail("schema chặn", "src/pages.js", `dữ liệu có cấu trúc trỏ tới ${target} mà robots.txt chặn`);
 }
 
+// ---------------------------------------------------------------------------
+// 5b. Vietnamese written without its diacritics, in text a person reads.
+//
+//     Two buttons in the admin panel read "Tai them don hang" and "Da xem het don
+//     hang" for as long as the panel has existed. Nothing here would have caught it:
+//     it parses, it renders, it has the right shape, and every test that touched the
+//     panel asserted on structure rather than on what it says.
+//
+//     The first attempt compared single words and was hopeless: "thanh", "hay",
+//     "dung", "thay", "ngay" and "trong" are all real Vietnamese words with the
+//     diacritics dropped, and English code comments are full of "that", "than" and
+//     "them", which are the same as "thất" and "thận" without marks. Fifty-three
+//     findings, none of them the bug.
+//
+//     So this matches phrases of two or three words instead. "Tai them don hang"
+//     cannot be English, cannot be a coincidence, and is unmistakably the
+//     unaccented form of a phrase spelled correctly somewhere else in the project.
+//     The dictionary is still built from the project itself, so it has nothing to
+//     tune and cannot fire on a phrase the project has never written.
+// ---------------------------------------------------------------------------
+const stripDiacritics = (value) => value.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase();
+const accented = (value) => /[àáâãèéêìíòóôõùúýăđĩũơưạảấầẩẫậắằẳẵặẹẻẽếềểễệỉịọỏốồổỗộớờởỡợụủứừửữựỳỵỷỹ]/i.test(value);
+const PHRASES = new Map();
+for (const source of [i18nSource, ...htmlSources, ...pageScriptSources, await read(path.join("src", "pages.js")), await read(path.join("src", "app.js"))]) {
+  const words = source.replace(/<[^>]+>/g, " ").match(/[\wÀ-ỹĐđ]{2,}/g) || [];
+  for (let i = 0; i < words.length; i += 1) {
+    for (const size of [3, 2]) {
+      if (i + size > words.length) continue;
+      const phrase = words.slice(i, i + size);
+      // Every word has to be accented, or the phrase is already ASCII somewhere
+      // else and the entry would fire on perfectly correct text.
+      if (!phrase.every(accented)) continue;
+      PHRASES.set(stripDiacritics(phrase.join(" ")), phrase.join(" "));
+    }
+  }
+}
+const suspects = [...PHRASES.keys()].sort((a, b) => b.length - a.length);
+// i18n.js is excluded: its own source is the dictionary, so every correctly spelled
+// phrase in the project appears in it in ASCII form as the key.
+const customerFacing = [...htmlFiles, ...scriptFiles.filter((name) => name !== "i18n.js")].map((name) => path.join("public", name));
+// Comments are stripped first, and only comments: they are English, and a save
+// handler documented in prose is full of "that" and "them". Strings are kept,
+// because that is where the customer-facing text lives.
+const stripComments = (source) => source
+  .replace(/\/\*[\s\S]*?\*\//g, " ")
+  .replace(/(^|[^:])\/\/[^\n]*/g, "$1 ");
+for (const relative of customerFacing) {
+  const raw = await read(relative);
+  const text = stripComments(relative.endsWith(".js")
+    ? raw
+    : raw.replace(/<script[\s\S]*?<\/script>/gi, " ").replace(/<style[\s\S]*?<\/style>/gi, " ").replace(/<!--[\s\S]*?-->/g, " "));
+  for (const phrase of suspects) {
+    const match = new RegExp(`(?<![\\wÀ-ỹ])${phrase.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}(?![\\wÀ-ỹ])`, "i").exec(text);
+    if (match) fail("tiếng Việt không dấu", relative, `"${match[0]}" — viết đúng là "${PHRASES.get(match[0].toLowerCase())}"`);
+  }
+}
+
 // A token the server never substitutes is a value the page prints verbatim. The
 // {{support}}, {{site}}, {{year}} and {{paymentWindowHours}} tokens each cover
 // their own pages; a new one added to a template and never wired up is invisible
@@ -253,9 +310,6 @@ for (const name of htmlFiles) {
 
 // ---------------------------------------------------------------------------
 // 6. A page in public/ that nothing links to.
-//    An orphaned page is one the owner believes is live, that no visitor reaches
-//    from anywhere, and that a crawler may still find and index.
-// ---------------------------------------------------------------------------
 
 // 6a. A data-i18n element with no text in it.
 //

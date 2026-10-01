@@ -35,10 +35,16 @@ new vm.Script(`${pick('seoDirty')}\n${pick('countSeo')}`).runInContext(sandbox);
 const makeForm = ({ title = '', description = '' } = {}) => {
   const button = { disabled: false };
   const counter = { className: '', textContent: '' };
+  const classes = new Set();
   const form = {
     dataset: { seoTitle: title, seoDescription: description },
-    elements: { seoTitle: { value: title }, seoDescription: { value: description } },
+    elements: { seoTitle: { value: title, readOnly: false }, seoDescription: { value: description, readOnly: false } },
     querySelector: (selector) => (selector === 'button[type=submit]' ? button : counter),
+    // seoLock marks the form and sets readOnly on both fields, so the stub has to
+    // carry all three or the assertion below would pass on a no-op.
+    querySelectorAll: () => Object.values(form.elements),
+    classList: { toggle: (name, on) => (on ? classes.add(name) : classes.delete(name)) },
+    classes,
   };
   return { form, button, counter };
 };
@@ -146,7 +152,7 @@ test('nut kiem tra chi do bang mau, khong phai chi bien mat', async () => {
 test('bam Luu SEO that thi nut khoa lai va form bao "Đã lưu"', async () => {
   const save = source.slice(source.indexOf('async function saveSeo'), source.indexOf('async function uploadExistingProduct'));
   const box = vm.createContext({ encodeURIComponent, console, JSON });
-  vm.runInContext(`${pick('seoDirty')}\n${pick('countSeo')}\n${save}`, box);
+  vm.runInContext(`${pick('seoDirty')}\n${pick('countSeo')}\n${pick('seoLock')}\n${save}`, box);
 
   const sent = [];
   const toasts = [];
@@ -196,6 +202,13 @@ test('bam Luu SEO that thi nut khoa lai va form bao "Đã lưu"', async () => {
   assert.match(typed.counter.className, /clean/);
   assert.equal(toggle.textContent, 'Sửa SEO', 'nut cua dong phai doi sangSua SEO');
 
+  // The fields go read-only too. That is the part the report asked for: a greyed
+  // Save button on its own still looks like an unsaved form, because the boxes
+  // still accept typing and nothing says the values are already published.
+  assert.equal(typed.form.elements.seoTitle.readOnly, true, 'ô tiêu đề phải khoá lại');
+  assert.equal(typed.form.elements.seoDescription.readOnly, true, 'ô mô tả phải khoá lại');
+  assert.ok(typed.form.classes.has('locked'), 'form phải có trạng thái đã khoá');
+
   // And it stays locked rather than drifting back on a keystroke that changed
   // nothing, which is what "no changes yet the button is lit" would look like.
   box.countSeo(typed.form);
@@ -221,7 +234,7 @@ test('bam Luu SEO that thi nut khoa lai va form bao "Đã lưu"', async () => {
 test('luu that bai thi nut phai mo lai de thu lai duoc', async () => {
   const save = source.slice(source.indexOf('async function saveSeo'), source.indexOf('async function uploadExistingProduct'));
   const box = vm.createContext({ encodeURIComponent, console, JSON });
-  vm.runInContext(`${pick('seoDirty')}\n${pick('countSeo')}\n${save}`, box);
+  vm.runInContext(`${pick('seoDirty')}\n${pick('countSeo')}\n${pick('seoLock')}\n${save}`, box);
 
   const { form, button } = makeForm({ title: 'Cu', description: 'Cu' });
   form.dataset.seoForm = 'prod-1';

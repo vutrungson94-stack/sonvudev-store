@@ -17,7 +17,12 @@
 // from what the server already substituted into the page.
 //
 const YEAR = new Date().getFullYear();
-const host = () => (document.body?.dataset?.support || '').split('@').pop() || '';
+// The brand, as the server injected it. It was a literal here for a while, and then
+// briefly the part of SUPPORT_EMAIL after the "@" — which printed the bare domain
+// in the footer, and would have printed "gmail.com" the moment the support address
+// moved to a webmail provider. Neither is the brand, and the name belongs to
+// configuration, so it arrives as a meta tag from src/pages.js.
+const host = () => document.querySelector('meta[name="x-brand"]')?.content || 'SonVuDev';
 const supportAddress = () => document.body?.dataset?.support || '';
 
 const DICT = {
