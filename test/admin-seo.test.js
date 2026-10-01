@@ -90,6 +90,50 @@ test('tao san pham co giu nguyen SEO title va mo ta', async () => {
   assert.ok(page.includes('Bật macro Excel không cần chỉnh tay từng file'), 'tieu de SEO phai len trang san pham');
 });
 
+test('sau khi luu, nut khoa lai va form bao "Đã lưu"', async () => {
+  // This is the bug: pressing Lưu SEO appeared to do nothing.
+  //
+  // Two things caused it and neither showed up in the tests, because every test here
+  // exercised the API and not the panel. The save handler re-rendered the whole
+  // product list, which replaces productList.innerHTML and therefore destroys the
+  // form the owner was looking at; its cleanup then ran countSeo on that detached
+  // form, so the button state it computed applied to nothing on screen. And the
+  // saved values were never written back into the form's baseline, so even with the
+  // form intact it stayed "dirty" forever — button clickable, counters still
+  // reporting unsaved text, and a second save writing the same two fields again.
+  //
+  // The assertions below are on the source because the panel is one dense module
+  // wired to a real DOM at import time, which is the only reason it is not tested by
+  // behaviour. They pin the contract rather than the formatting.
+  const source = await readPublic('admin.js');
+  const saveSeo = source.slice(source.indexOf('async function saveSeo'), source.indexOf('async function uploadExistingProduct'));
+  assert.ok(saveSeo.length > 0, 'khong tim thay saveSeo');
+
+  // The baseline is what "dirty" is measured against, so it has to be updated or the
+  // form can never be clean again. It holds what the server stored, not what was
+  // typed — the API truncates a title to 70 characters, so a long paste would
+  // otherwise leave the form permanently dirty.
+  assert.match(saveSeo, /storedTitle/, 'baseline phai lay tu gia tri server tra ve');
+  assert.match(saveSeo, /form\.dataset\.seoTitle\s*=\s*storedTitle/, 'phai ghi gia tri vua luu vao baseline');
+  assert.match(saveSeo, /form\.dataset\.seoDescription\s*=\s*storedDescription/, 'phai ghi gia tri vua luu vao baseline');
+
+  // No full re-render in the save path. It is the thing that detached the form, and
+  // it also closed the form the owner was working in.
+  assert.ok(!/loadProducts\(\)/.test(saveSeo), 'saveSeo khong duoc ve lai toan bo danh sach — no se tach form dang mo');
+
+  // The counters and the button are re-evaluated on the form that is still live, and
+  // they run on both paths so a failure leaves the button usable for a retry.
+  assert.match(saveSeo, /countSeo\(form\)/, 'phai cap nhat lai bo dem tren form con tren man hinh');
+  const after = saveSeo.slice(saveSeo.lastIndexOf('catch'));
+  assert.match(after, /countSeo\(form\)/, 'khi that bai cung phai cap nhat lai de mo nut cho thu lai');
+
+  // A clean form has to say so. A greyed button on its own reads as a broken button.
+  assert.match(source, /Đã lưu/, 'form da luu phai hien thi trang thai');
+  assert.match(source, /'admin-seo-count'\+\(clean\?' clean':''\)/, 'trang thai da luu phai co class rieng');
+  const css = await readPublic('styles.css');
+  assert.match(css, /\.admin-seo-count\.clean\{/, 'can co CSS cho trang thai da luu');
+});
+
 test('sua SEO khong duoc xoa mo ta va tinh nang', async () => {
   const created = await create({
     name: 'Keep My Text', slug: 'keep-my-text', price: 99000, currency: 'VND', status: 'active', fileKey: 'products/keep/1.0.0/k.exe',

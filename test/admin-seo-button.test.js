@@ -103,13 +103,35 @@ test('form sua SEO ghi lai gia tri luc mo, va do la noi so sanh', () => {
   assert.ok(/return\s*\(?\s*form\.elements\.seoTitle/.test(source), 'phai so sanh voi o nhap chu khong phai voi hang so');
 });
 
-test('sau khi luu, danh sach san pham duoc ve lai tu du lieu moi', () => {
-  // Saving re-renders the product list from the server, so the form comes back
-  // in its freshly opened state and the button follows that same rule. Nothing
-  // should force the button back on afterwards.
-  assert.ok(/showToast\('Đã lưu SEO'\);await loadProducts\(\)/.test(source), 'luu xong phai tai lai danh sach san pham tu server');
-  assert.ok(!/catch\(e\)\{showToast\(e\.message,true\)\}finally\{button\.disabled=false\}/.test(source),
+test('sau khi luu, nut phai theo dung quy tac so sanh chu khong duoc ai bat', () => {
+  // The requirement, not the mechanism: after a save the button's state comes from
+  // the same comparison that governs typing, and nothing switches it on regardless.
+  //
+  // It used to be implemented by re-rendering the whole product list, so the form
+  // came back hidden and its own cleanup ran on the form that had just been replaced —
+  // which is why pressing Lưu SEO looked like nothing happened. The baseline was also
+  // never written back, so even an intact form stayed "dirty" for ever: lit button,
+  // counters still saying unsaved, and a second save writing the same two fields.
+  const save = source.slice(source.indexOf('async function saveSeo'), source.indexOf('async function uploadExistingProduct'));
+  assert.ok(save.length > 0, 'khong tim thay saveSeo');
+
+  // The baseline comes from what the server stored. The API truncates a title to 70
+  // characters and a description to 175, so a long paste comes back shorter;
+  // comparing against the typed text would leave the form permanently dirty and
+  // quietly re-send the over-length value on the next save.
+  assert.match(save, /stored\.seoTitle/, 'baseline phai lay tu gia tri server tra ve');
+  assert.match(save, /stored\.seoDescription/, 'baseline phai lay tu gia tri server tra ve');
+  assert.match(save, /form\.dataset\.seoTitle\s*=/, 'phai ghi baseline');
+  assert.match(save, /form\.dataset\.seoDescription\s*=/, 'phai ghi baseline');
+
+  // The button state is computed by the shared rule, on both paths, and never
+  // assigned directly after the fact.
+  assert.match(save, /countSeo\(form\)/, 'trang thai nut phai do countSeo quyet dinh');
+  assert.match(save.slice(save.lastIndexOf('catch')), /countSeo\(form\)/, 'that bai cung phai chay lai quy tac de mo nut thu lai');
+  assert.ok(!/catch\(e\)\{[^}]*\}\s*finally\{[^}]*button\.disabled\s*=\s*false/.test(source),
     'khong duoc bat cuong nguon nut o khoi finally: loi hay thanh cong deu phai theo quy tac so sanh');
+  assert.ok(!/finally\{[^}]*button\.disabled\s*=\s*false/.test(save),
+    'nut SEO khong duoc duoc bat cuong nguon sau khi luu');
 });
 
 test('nut kiem tra chi do bang mau, khong phai chi bien mat', async () => {
@@ -117,4 +139,104 @@ test('nut kiem tra chi do bang mau, khong phai chi bien mat', async () => {
   // The logic disables the button correctly and the owner still sees it lit,
   // which reads as "the fix did not work" and costs an hour of debugging.
   assert.ok(/\.button\[disabled\],\.button:disabled\{[^}]*opacity:\.\d+/.test(css), 'nut khoa phai mo, khong chi dung lai');
+});
+
+// The source checks above pin the contract. This runs the real saveSeo, so the claim
+// "pressing Lưu SEO locks the button" is demonstrated rather than pattern-matched.
+test('bam Luu SEO that thi nut khoa lai va form bao "Đã lưu"', async () => {
+  const save = source.slice(source.indexOf('async function saveSeo'), source.indexOf('async function uploadExistingProduct'));
+  const box = vm.createContext({ encodeURIComponent, console, JSON });
+  vm.runInContext(`${pick('seoDirty')}\n${pick('countSeo')}\n${save}`, box);
+
+  const sent = [];
+  const toasts = [];
+  const toggle = { textContent: 'Thêm SEO', dataset: { seoToggle: 'prod-1' } };
+  box.productList = { querySelectorAll: () => [toggle] };
+  box.showToast = (message, isError) => toasts.push({ message, isError });
+  // Stands in for the server, and echoes back what it stored — including the
+  // truncation it really performs, which is what the baseline has to be measured
+  // against.
+  box.api = async (url, options) => {
+    sent.push({ url, body: JSON.parse(options.body) });
+    const stored = { seoTitle: sent.at(-1).body.seoTitle.slice(0, 70), seoDescription: sent.at(-1).body.seoDescription.slice(0, 175) };
+    return { product: stored };
+  };
+  // A real FormData is iterable, and the code calls Object.fromEntries on it
+  // directly, so the stub has to be too.
+  box.FormData = function (form) {
+    const pairs = Object.keys(form.elements).map((key) => [key, form.elements[key].value]);
+    return { [Symbol.iterator]: () => pairs[Symbol.iterator]() };
+  };
+
+  const build = (title, description) => {
+    const { form, button, counter } = makeForm({ title, description });
+    // The form knows which product it edits, and that is how it finds its row.
+    form.dataset.seoForm = 'prod-1';
+    form.elements.seoTitle.value = title;
+    form.elements.seoDescription.value = description;
+    return { form, button, counter };
+  };
+
+  // Open the editor and type. The button lights up.
+  const typed = build('Tieu de cu', 'Mo ta cu');
+  box.countSeo(typed.form);
+  typed.form.elements.seoTitle.value = 'Bam macro Excel khong can chinh tay';
+  typed.form.elements.seoDescription.value = 'Tu them thu muc tin cay, co cach hoan tac.';
+  box.countSeo(typed.form);
+  assert.equal(typed.button.disabled, false, 'da sua thi nut phai sang de bam duoc');
+
+  // Save. This is the step that did nothing visible.
+  await box.saveSeo({ preventDefault() {}, currentTarget: typed.form });
+
+  assert.equal(sent.length, 1, 'phai gui mot request');
+  assert.equal(sent[0].body.seoTitle, 'Bam macro Excel khong can chinh tay');
+  assert.equal(toasts.at(-1).message, 'Đã lưu SEO');
+  assert.equal(typed.button.disabled, true, 'luu xong nut phai khoa lai — day la loi dang bao cao');
+  assert.match(typed.counter.textContent, /Đã lưu/, 'form phai noi la da luu');
+  assert.match(typed.counter.className, /clean/);
+  assert.equal(toggle.textContent, 'Sửa SEO', 'nut cua dong phai doi sangSua SEO');
+
+  // And it stays locked rather than drifting back on a keystroke that changed
+  // nothing, which is what "no changes yet the button is lit" would look like.
+  box.countSeo(typed.form);
+  assert.equal(typed.button.disabled, true);
+
+  // Typing again re-arms it, because there is now something to save.
+  typed.form.elements.seoTitle.value = 'Khac di';
+  box.countSeo(typed.form);
+  assert.equal(typed.button.disabled, false);
+
+  // A long paste is the case the old code got permanently wrong: the server shortens
+  // it, so the baseline has to be the stored value or the form never comes back
+  // clean and every later save re-sends the over-length text.
+  const long = build('Cu', 'Ngan');
+  box.countSeo(long.form);
+  long.form.elements.seoTitle.value = 'A'.repeat(90);
+  await box.saveSeo({ preventDefault() {}, currentTarget: long.form });
+  assert.equal(long.form.elements.seoTitle.value.length, 70, 'o nhap phai hien dung do dai da luu');
+  assert.equal(long.button.disabled, true, 'form phai sach sau khi server cat ngan');
+  assert.equal(long.form.dataset.seoTitle.length, 70);
+});
+
+test('luu that bai thi nut phai mo lai de thu lai duoc', async () => {
+  const save = source.slice(source.indexOf('async function saveSeo'), source.indexOf('async function uploadExistingProduct'));
+  const box = vm.createContext({ encodeURIComponent, console, JSON });
+  vm.runInContext(`${pick('seoDirty')}\n${pick('countSeo')}\n${save}`, box);
+
+  const { form, button } = makeForm({ title: 'Cu', description: 'Cu' });
+  form.dataset.seoForm = 'prod-1';
+  form.elements.seoTitle.value = 'Thu lai di';
+  box.productList = { querySelectorAll: () => [] };
+  box.showToast = () => {};
+  box.api = async () => { throw new Error('mang hong'); };
+  box.FormData = function (form) {
+    const pairs = Object.keys(form.elements).map((key) => [key, form.elements[key].value]);
+    return { [Symbol.iterator]: () => pairs[Symbol.iterator]() };
+  };
+
+  await box.saveSeo({ preventDefault() {}, currentTarget: form });
+  // A save that failed must not leave the owner with a dead button and no way to
+  // retry — which is the one outcome worse than the bug being reported.
+  assert.equal(button.disabled, false, 'that bai thi nut phai mo cho thu lai');
+  assert.notEqual(form.dataset.seoTitle, 'Thu lai di', 'baseline khong duoc doi khi chua luu duoc');
 });

@@ -267,6 +267,9 @@ body.modal-open{overflow:hidden}
 .admin-seo-form button{grid-column:1/-1;justify-self:start}
 .admin-seo-count{grid-column:1/-1;margin:0;font-size:11px;color:var(--muted)}
 .admin-seo-count.over{color:#c0392b}
+/* A clean form. Quieter than the editable state and says so, which is what the save
+   button being disabled does not: a greyed button alone reads as broken. */
+.admin-seo-count.clean{color:#4fbf8b}
 @media (max-width:700px){.admin-seo-form{grid-template-columns:1fr}}
 /* The load-more control under the order table. Centred because it is an action
    on the list as a whole, not one of the row actions in the last column. */
