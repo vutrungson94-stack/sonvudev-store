@@ -17,8 +17,8 @@ process.env.RESEND_API_KEY = 're_test_key_123';
 // A real IndexNow key in .env would make every product created in these
 // tests fire a real ping at api.indexnow.org. Same trap as the mail key above.
 process.env.INDEXNOW_KEY = '';
-process.env.EMAIL_FROM = 'SonVuDev <no-reply@sonvudev.com>';
-process.env.SUPPORT_EMAIL = 'hello@sonvudev.com';
+process.env.EMAIL_FROM = 'SonVuDev <no-reply@mail-fixture.example>';
+process.env.SUPPORT_EMAIL = 'support@mail-fixture.example';
 
 const { ensureSeed } = await import('../src/store.js');
 const { notifyOrder, notifyMode, previewMessage } = await import('../src/notify.js');
@@ -53,7 +53,7 @@ test('gửi đúng endpoint, header và payload Resend yêu cầu', async () => 
   assert.equal(request.url, 'https://api.resend.com/emails');
   assert.equal(request.headers.Authorization, 'Bearer re_test_key_123');
   assert.equal(request.headers['Content-Type'], 'application/json');
-  assert.equal(request.body.from, 'SonVuDev <no-reply@sonvudev.com>');
+  assert.equal(request.body.from, 'SonVuDev <no-reply@mail-fixture.example>');
   assert.deepEqual(request.body.to, ['buyer@example.com']);
   assert.equal(typeof request.body.subject, 'string');
   assert.ok(request.body.html.length > 0, 'phải có bản HTML');
@@ -64,7 +64,7 @@ test('Reply-To trỏ về email hỗ trợ, không phải no-reply', async () =>
   // This is the moment a buyer needs help. Without Reply-To their reply lands
   // in an address nobody reads and the sale becomes a bad review.
   await notifyOrder(order({ id: 'SVD-MAIL02' }), 'created');
-  assert.equal(sent[0].body.reply_to, 'hello@sonvudev.com');
+  assert.equal(sent[0].body.reply_to, 'support@mail-fixture.example');
   assert.ok(!sent[0].body.from.includes(sent[0].body.reply_to), 'địa chỉ gửi và Reply-To phải khác nhau');
 });
 

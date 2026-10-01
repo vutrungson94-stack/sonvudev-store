@@ -15,6 +15,9 @@ import { createDom, runScript, El } from './helpers/dom.mjs';
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const read = (p) => fs.readFileSync(path.join(root, 'public', p), 'utf8');
 const IDS = ['order-title', 'order-lead', 'order-body'];
+// A fixture address, not the shop's real one. A test that hardcodes the live mailbox is a
+// test that only passes on the machine where it happens to be configured.
+const SUPPORT_FIXTURE = 'support@mail-fixture.example';
 
 const order = (overrides = {}) => ({
   id: 'SVD-TEST', status: 'pending_transfer', amount: 99000, currency: 'VND',
@@ -30,7 +33,7 @@ async function page(orderOverrides, respond) {
   // files against a value it was itself reading out of a hardcoded file. Real
   // pages carry this attribute; the fake document has to as well.
   document.body = new El('body');
-  document.body.dataset = { support: 'hello@sonvudev.com' };
+  document.body.dataset = { support: SUPPORT_FIXTURE };
   const extra = new Set(['order-download', 'order-refresh', 'order-countdown', 'order-card']);
   const base = document.getElementById.bind(document);
   document.getElementById = (id) => base(id) || (extra.has(id) ? new El('div', id) : null);
@@ -106,7 +109,7 @@ test('7. Đã đóng đơn nhưng file hỏng: nói cách mở lại', async () 
   const { nodes } = await page({ status: 'pending', deliveredAt: new Date().toISOString() });
   const shown = text(nodes);
   assert.ok(shown.includes('mở lại đơn'), 'phải nói chúng tôi mở lại được');
-  assert.ok(shown.includes('hello@sonvudev.com'), 'phải có đường liên hệ');
+  assert.ok(shown.includes(SUPPORT_FIXTURE), 'phải có đường liên hệ');
 });
 
 test('8. Hết hạn nhưng tiền đã vào: nói rõ đơn đã được mở lại', async () => {

@@ -44,21 +44,27 @@ test('mọi trang có địa chỉ đều nhận từ SUPPORT_EMAIL', async () =
   // /order/<id> is the shape the lookup form and the PayPal return both link to.
   // It used to fall through to the static file, which is why it still carried its
   // template tokens while /order and /order.html did not.
+  const configured = process.env.SUPPORT_EMAIL;
   for (const route of ['/terms', '/privacy', '/refund', '/order.html', '/order/SVD-XXXXXX-XXXXXX', '/paypal-return.html']) {
     const html = await page(route);
     assert.ok(!html.includes('{{support}}'), `${route} còn token chưa thay`);
-    assert.ok(!html.includes('hello@sonvudev.com'), `${route} vẫn ghi cứng địa chỉ cũ`);
-    assert.ok(html.includes('support-ao@shop-vi.example'), `${route} chưa nhận địa chỉ từ cấu hình`);
+    // A rendered page is supposed to show the configured address — that is the
+    // whole point of the substitution. What it must not do is show a *different*
+    // one, which is what happens when a file carries a literal and the token is
+    // never reached. The token check above is what catches that case; here the
+    // assertion is simply that the configured value made it into the bytes.
+    assert.ok(html.includes(configured), `${route} chưa nhận địa chỉ từ cấu hình`);
   }
 });
 
 test('file trong public/ không ghi địa chỉ bằng tay', async () => {
   // The token in the file is not a hardcode, it is the one place that says "put
   // SUPPORT_EMAIL here". A literal anywhere else is a second address to remember.
+  const configured = process.env.SUPPORT_EMAIL;
   const files = ['terms.html', 'privacy.html', 'refund.html', 'order.html', 'paypal-return.html',
     'order.js', 'paypal-return.js', 'app.js', 'lookup.js'];
   for (const file of files) {
-    assert.ok(!(await publicFile(file)).includes('hello@sonvudev.com'), `public/${file} vẫn ghi cứng địa chỉ`);
+    assert.ok(!(await publicFile(file)).includes(configured), `public/${file} vẫn ghi cứng chính địa chỉ đang cấu hình`);
   }
   // i18n.js used to hold the address as a literal "last resort" so a page served
   // without the substituted value still had a working mailto. That literal is the

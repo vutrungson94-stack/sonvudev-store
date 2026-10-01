@@ -159,7 +159,34 @@ const thirdParty = new Set(["www.w3.org", "schema.org", "www.sitemaps.org", "loc
 // i18n.js is scanned too: brand.supportEmail is the configured default the pages
 // fall back to, so letting it drift away from .env would mean an empty mailto on
 // exactly the page a paying customer is reading.
+//
+// Tests are scanned for the production domain only, and that rule earned its place
+// by failing on the first run. A test asserting on a literal shop address looks
+// correct on the machine it was written on and fails everywhere else: CI sets
+// APP_URL and SUPPORT_EMAIL to fixture values on purpose, so two tests failed from
+// the first run and would have failed on every push from then on. A test that only
+// passes with one .env is a test that does not run.
+//
+// The other domain and email rules stay off here. A test legitimately names a
+// loopback address and a fixture mailbox, and flagging those would only teach
+// people to ignore the audit.
 const emailBearing = [...htmlFiles, ...scriptFiles].map((n) => path.join("public", n)).concat([path.join("src", "pages.js"), path.join("public", "i18n.js")]);
+const testDir = path.join(root, "test");
+const testFiles = existsSync(testDir) ? (await readdir(testDir)).filter((name) => name.endsWith(".js")) : [];
+for (const name of testFiles) {
+  // This file exists to run the audit against a fixture APP_URL, so it necessarily
+  // contains a domain that the audit would flag. Skipping it by name is the only
+  // honest option: a pattern meant to recognise "this is a fixture" would eventually
+  // match a real hardcode written in the same shape.
+  if (name === "audit.test.js") continue;
+  const relative = path.join("test", name);
+  const source = await read(relative);
+  for (const match of source.matchAll(new RegExp(`(?<![/.\\w-])${appHost.replace(/\./g, "\\.")}(?![\\w-])`, "gi"))) {
+    const line = source.slice(0, match.index).split("\n").length;
+    fail("domain gõ tay", `${relative}:${line}`, `${match[0]} — APP_URL là ${appUrl}. Test phai doc tu process.env.APP_URL, khong ghi cung domain.`);
+  }
+}
+
 for (const relative of emailBearing) {
   const source = await read(relative);
   for (const match of source.matchAll(/https?:\/\/([a-z0-9.-]+)/gi)) {

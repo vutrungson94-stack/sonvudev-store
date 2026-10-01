@@ -6,7 +6,7 @@ import assert from 'node:assert/strict';
 // be allowed to fail a product save. The "no key configured" path lives in
 // indexnow-off.test.js because the key is read once, at import.
 process.env.NODE_ENV = 'test';
-process.env.APP_URL = 'https://sonvudev.com';
+process.env.APP_URL = 'https://indexnow-fixture.example';
 process.env.INDEXNOW_KEY = 'a1b2c3d4e5f6a1b2c3d4e5f6';
 
 const { pingIndexNow, isIndexNowConfigured, isValidIndexNowKey, siteUrl } = await import('../src/indexnow.js');
@@ -30,8 +30,8 @@ test('khoá phải đúng dạng trước khi dùng', () => {
     assert.equal(isValidIndexNowKey(bad), false, `"${bad}" phải bị từ chối`);
   }
   assert.equal(isIndexNowConfigured(), true);
-  assert.match(siteUrl('/sitemap.xml'), /^https:\/\/sonvudev\.com\/sitemap\.xml$/);
-  assert.equal(siteUrl('terms'), 'https://sonvudev.com/terms', 'đường dẫn không có dấu gạch chéo phải tự được thêm');
+  assert.match(siteUrl('/sitemap.xml'), /^https:\/\/indexnow-fixture\.example\/sitemap\.xml$/);
+  assert.equal(siteUrl('terms'), 'https://indexnow-fixture.example/terms', 'đường dẫn không có dấu gạch chéo phải tự được thêm');
 });
 
 test('ping gửi host, key và vị trí file key đúng chuẩn IndexNow', async () => {
@@ -41,12 +41,12 @@ test('ping gửi host, key và vị trí file key đúng chuẩn IndexNow', asyn
   assert.equal(result.count, 2);
   const [call] = probe.calls;
   assert.equal(call.url, 'https://api.indexnow.org/indexnow');
-  assert.equal(call.body.host, 'sonvudev.com');
+  assert.equal(call.body.host, 'indexnow-fixture.example');
   assert.equal(call.body.key, 'a1b2c3d4e5f6a1b2c3d4e5f6');
   // keyLocation is how the receiver proves the site really owns the key. A wrong
   // path there comes back 422 and the ping is lost with nothing logged.
-  assert.equal(call.body.keyLocation, 'https://sonvudev.com/a1b2c3d4e5f6a1b2c3d4e5f6.txt');
-  assert.deepEqual(call.body.urlList, ['https://sonvudev.com/', 'https://sonvudev.com/product/spark']);
+  assert.equal(call.body.keyLocation, 'https://indexnow-fixture.example/a1b2c3d4e5f6a1b2c3d4e5f6.txt');
+  assert.deepEqual(call.body.urlList, ['https://indexnow-fixture.example/', 'https://indexnow-fixture.example/product/spark']);
 });
 
 test('ping thất bại thì báo lý do chứ không ném lỗi ra ngoài', async () => {
@@ -69,5 +69,5 @@ test('không gửi đường dẫn rỗng, không gửi trùng, không gửi đ�
   // Everything that is not a path on this site is dropped: a submission naming
   // another host is rejected outright, and one naming this host wrongly is how a
   // ping ends up telling a search engine about a page that does not exist.
-  assert.deepEqual(probe.calls[0].body.urlList, ['https://sonvudev.com/product/a', 'https://sonvudev.com/product/b']);
+  assert.deepEqual(probe.calls[0].body.urlList, ['https://indexnow-fixture.example/product/a', 'https://indexnow-fixture.example/product/b']);
 });

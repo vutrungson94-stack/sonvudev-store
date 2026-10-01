@@ -37,7 +37,7 @@ test.before(async () => {
   // the storefront — which is what the local JSON store used to allow and Postgres
   // never did.
   const headers = { 'content-type': 'application/json', 'x-admin-token': 'test-admin-token' };
-  const created = await fetch(`${base}/api/admin/products`, { method: 'POST', headers, body: JSON.stringify({ name: 'Lookup Tester', category: 'Công cụ', platform: 'Windows', version: '1.0.0', price: 99000, currency: 'VND', fileKey: 'products/lookup/1.0.0/test.exe', status: 'active' }) });
+  const created = await fetch(`${base}/api/admin/products`, { method: 'POST', headers, body: JSON.stringify({ name: 'Lookup Tester', category: 'Công cụ', platform: 'Windows', version: '1.0.0', price: 99000, currency: 'VND', fileKey: 'products/lookup/1.0.0/test.exe', status: 'active', shortDescriptionEn: 'Finds an order fast.', descriptionEn: 'Looks up an order and recovers its download link.', features: ['Tra cứu nhanh'], featuresEn: ['Finds an order fast'] }) });
   product = (await created.json()).product;
 });
 test.after(async () => { server?.close(); await fs.rm(tempDir, { recursive: true, force: true }); });
@@ -114,21 +114,30 @@ test('the legal pages are published and linked from the storefront', async () =>
     assert.equal(response.status, 200, page);
     const html = await response.text();
     assert.match(html, /<h1>/, page);
-    assert.match(html, /mailto:hello@sonvudev\.com/, page);
+    // Read from the configuration rather than the shop's real address. This used
+    // to assert on a literal shop mailbox, which meant the test only
+    // passed on one machine with one .env — and failed outright in CI, where
+    // APP_URL and SUPPORT_EMAIL are deliberately set to fixture values.
+    assert.ok(html.includes(`mailto:${process.env.SUPPORT_EMAIL}`), `${page} phai lien he bang SUPPORT_EMAIL`);
+    assert.ok(!html.includes('{{support}}'), `${page} con sot token chua thay`);
   }
   const home = await (await fetch(`${base}/`)).text();
   for (const link of ['/terms', '/privacy', '/refund', '/lookup']) assert.ok(home.includes(`href="${link}"`), `footer should link ${link}`);
 });
 
 test('the sitemap lists the storefront and the legal pages but not the lookup', async () => {
+  const site = process.env.APP_URL.replace(/\/$/, '');
   const sitemap = await (await fetch(`${base}/sitemap.xml`)).text();
-  for (const loc of ['<loc>https://sonvudev.com/</loc>', '<loc>https://sonvudev.com/terms</loc>', '<loc>https://sonvudev.com/privacy</loc>', '<loc>https://sonvudev.com/refund</loc>']) {
-    assert.ok(sitemap.includes(loc), `sitemap should contain ${loc}`);
+  for (const loc of ['/', '/terms', '/privacy', '/refund', '/about']) {
+    assert.ok(sitemap.includes(`<loc>${site}${loc}</loc>`), `sitemap should contain ${site}${loc}`);
   }
   // Matched exactly rather than as a substring: a product whose slug happens to
   // contain the word "lookup" is still a product and belongs in the sitemap.
-  assert.ok(!sitemap.includes('<loc>https://sonvudev.com/lookup</loc>'), 'the lookup page is not for search engines');
-  assert.ok(sitemap.includes('<loc>https://sonvudev.com/product/lookup-tester</loc>'), 'products belong in the sitemap');
+  assert.ok(!sitemap.includes(`<loc>${site}/lookup</loc>`), 'the lookup page is not for search engines');
+  assert.ok(sitemap.includes(`<loc>${site}/product/lookup-tester</loc>`), 'products belong in the sitemap');
+  // Every product has two language URLs that point at each other, so a crawler
+  // does not drop the English one as a duplicate of the Vietnamese.
+  assert.ok(sitemap.includes(`<loc>${site}/en/product/lookup-tester</loc>`), 'ban tieng Anh phai co trong sitemap');
 });
 
 test('the order page and lookup page are served', async () => {
