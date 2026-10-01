@@ -1,6 +1,6 @@
 // Verifies the PayPal credentials in .env and makes sure a webhook exists.
 // Usage: npm run paypal:setup
-//        npm run paypal:setup -- --detect   (find out which environment the
+//        npm run paypal:detect   (find out which environment the
 //        credentials belong to, instead of trusting the dashboard toggle)
 import path from "node:path";
 import { fileURLToPath } from "node:url";

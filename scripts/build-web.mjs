@@ -5,7 +5,12 @@ import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
-const required = ['package.json', 'src/server.js', 'src/app.js', 'src/store.js', 'src/r2.js', 'src/paypal.js', 'src/payments.js', 'src/rates.js', 'src/geo.js', 'src/indexnow.js', 'src/pages.js', 'public/index.html', 'public/i18n.js', 'public/styles.css', 'public/app.js', 'public/admin.html', 'public/admin.js', 'public/paypal-return.html', 'public/paypal-return.js', 'public/lookup.html', 'public/lookup.js', 'public/order.html', 'public/order.js', 'public/404.html', 'public/favicon.svg', 'scripts/production-check.mjs', 'scripts/audit-web.mjs', 'scripts/seo-check.mjs', 'cloudflare/r2-cors.json'];
+// The build refuses to package without each of these. Every one was added because
+// the site worked but something on it was quietly broken: og.png because every
+// platform that renders a link preview refuses SVG, related.js because the strict
+// Content-Security-Policy refuses to run an inline script, about.html because a
+// page that exists only in someone's head is not a page.
+const required = ['package.json', 'src/server.js', 'src/app.js', 'src/store.js', 'src/r2.js', 'src/paypal.js', 'src/payments.js', 'src/rates.js', 'src/geo.js', 'src/indexnow.js', 'src/pages.js', 'src/reviews.js', 'src/format.js', 'public/index.html', 'public/i18n.js', 'public/styles.css', 'public/app.js', 'public/admin.html', 'public/admin.js', 'public/paypal-return.html', 'public/paypal-return.js', 'public/lookup.html', 'public/lookup.js', 'public/order.html', 'public/order.js', 'public/404.html', 'public/about.html', 'public/related.js', 'public/favicon.svg', 'public/og.png', 'scripts/production-check.mjs', 'scripts/audit-web.mjs', 'scripts/seo-check.mjs', 'cloudflare/r2-cors.json'];
 const ignored = new Set(['.git', '.gbuildcache', 'build-reports', 'logs']);
 const jsFiles = [];
 async function walk(dir) { for (const entry of await readdir(dir, { withFileTypes: true })) { if (ignored.has(entry.name) || entry.name === 'node_modules' || entry.name.startsWith('node_modules_stale_')) continue; const full = path.join(dir, entry.name); if (entry.isDirectory()) await walk(full); else if (entry.name.endsWith('.js') || entry.name.endsWith('.mjs')) jsFiles.push(full); } }
@@ -22,6 +27,15 @@ for (const file of jsFiles) { const result = spawnSync(process.execPath, ['--che
 const audit = spawnSync(process.execPath, [path.join(root, 'scripts', 'audit-web.mjs')], { encoding: 'utf8' });
 if (audit.status !== 0) throw new Error(`Audit failed:\n${audit.stdout}${audit.stderr}`);
 const auditSummary = (audit.stdout.match(/\[audit\] .*/g) || []).pop() || '';
+
+// A pass or a fail at a point in time. The metrics step is what answers whether
+// this week was better than last week: it compares test count, route count,
+// dependency count and duplicate-helper count against a committed baseline and
+// fails if one moved the wrong way. Cheap, and it is the difference between a
+// project that is measured and one that is only verified.
+const metrics = spawnSync(process.execPath, [path.join(root, 'scripts', 'metrics.mjs')], { encoding: 'utf8' });
+if (metrics.status !== 0) throw new Error(`Metrics regressed:\n${metrics.stdout}${metrics.stderr}`);
+const metricsSummary = (metrics.stdout.match(/\[metrics\].*/g) || []).pop() || '';
 const publishRoot = path.join(root, 'publish-output', 'node');
 await rm(publishRoot, { recursive: true, force: true });
 await mkdir(publishRoot, { recursive: true });
@@ -35,6 +49,6 @@ await mkdir(path.join(root, 'build-reports'), { recursive: true });
 const artifactFiles = [];
 async function collectArtifacts(dir) { for (const entry of await readdir(dir, { withFileTypes: true })) { const full = path.join(dir, entry.name); if (entry.isDirectory()) await collectArtifacts(full); else artifactFiles.push(path.relative(root, full).replaceAll('\\', '/')); } }
 await collectArtifacts(publishRoot);
-const report = { application: 'SonVuDev Store', mode: 'web-node', generatedAt: new Date().toISOString(), javascriptFilesChecked: jsFiles.length, requiredFilesChecked: required.length, audit: auditSummary, artifactFiles: artifactFiles.length, status: 'passed' };
+const report = { application: 'SonVuDev Store', mode: 'web-node', generatedAt: new Date().toISOString(), javascriptFilesChecked: jsFiles.length, requiredFilesChecked: required.length, audit: auditSummary, metrics: metricsSummary, artifactFiles: artifactFiles.length, status: 'passed' };
 await writeFile(path.join(root, 'build-reports', 'web-build.json'), JSON.stringify(report, null, 2));
-console.log(`[build] PASS: ${required.length} required files, ${jsFiles.length} JavaScript files checked, ${auditSummary}, ${artifactFiles.length} deploy files packaged.`);
+console.log(`[build] PASS: ${required.length} required files, ${jsFiles.length} JavaScript files checked, ${auditSummary}, ${metricsSummary}, ${artifactFiles.length} deploy files packaged.`);

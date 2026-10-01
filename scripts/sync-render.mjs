@@ -1,7 +1,7 @@
 // Syncs environment variables from .env to a Render service.
 // Usage: npm run render:sync          (dry run, prints the diff)
-//        npm run render:sync -- --apply  (writes to Render)
-//        npm run render:sync -- --apply --deploy  (writes, then redeploys)
+//        npm run render:sync:apply  (writes to Render)
+//        npm run render:sync:deploy  (writes, then redeploys)
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import dotenv from "dotenv";
@@ -156,7 +156,19 @@ async function main() {
   console.log(`\n${changes.length} thay doi tren ${wanted.size} bien.`);
 
   if (!apply) {
-    console.log("Day chi la kiem tra. Chay lai voi --apply de ghi len Render.");
+    console.log("Chua ghi gi len Render. Day moi la phan kiem tra.");
+    console.log("De ghi that:  npm run render:sync:apply");
+    // A dry run that reports "4 changes" reads like four changes happened. It
+    // matters most for PayPal, where PAYPAL_ENVIRONMENT and the credential pair
+    // have to move together: a live deployment left holding sandbox credentials
+    // shows PayPal in the checkout and fails it at the last step, for real
+    // customers, with no error on the machine that made the change.
+    const money = changes.filter((change) => /^(PAYPAL_|SUPABASE_|R2_|BANK_|RESEND_|ADMIN_|APP_URL)/.test(change.key));
+    if (money.length) {
+      console.log(`\n${money.length} trong cac thay doi nay la thong tin thanh toan va ket noi du lieu:`);
+      console.log(`  ${money.map((change) => change.key).join(", ")}`);
+      console.log("  Chua thay thi site dang chay tren cau hinh CU, khong phai cau hinh moi.");
+    }
     return;
   }
 

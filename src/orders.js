@@ -1,16 +1,17 @@
 import { env } from "./config.js";
-import { getOrder, listExpiringOrders, updateOrder } from "./store.js";
+import { UNPAID_STATUSES, getOrder, listExpiringOrders, updateOrder } from "./store.js";
 import { notifyOrder } from "./notify.js";
 
 // A store has to answer two questions the raw status column cannot: when does an
 // unpaid order stop being payable, and who is allowed to grant the download
 // after the money actually arrives. Both live here so the checkout, the admin
 // panel, the PayPal webhook and the background sweep all agree on one answer.
-const UNPAID = new Set(["pending", "pending_transfer"]);
+// The same list the store's PostgREST filters are built from. Defined here once
+// and derived, because a PayPal order is `pending` until its capture lands and an
+// `isUnpaid` that forgot that would refuse to sweep exactly the orders that needed
+// it most.
+const UNPAID = new Set(UNPAID_STATUSES);
 const HOUR = 60 * 60 * 1000;
-
-/** Money that left the account back towards the buyer. */
-export const refunds = (order) => Number(order?.refundedAmount || 0) + Number(order?.refundedProviderAmount || 0);
 
 const windowMs = () => Math.max(1, Number(env.orders.paymentWindowHours) || 24) * HOUR;
 const warnMs = () => Math.max(0, Number(env.orders.expiringWarnHours) || 0) * HOUR;
@@ -19,6 +20,27 @@ export const isUnpaid = (order) => Boolean(order) && UNPAID.has(order.status);
 
 /** True once the file has been handed over, so the order is closed for good. */
 export const isClosed = (order) => Boolean(order?.deliveredAt);
+
+/**
+ * Whether money ever reached the shop for this order.
+ *
+ * Not the same question as "is the status paid", and the difference matters.
+ * markOrderDelivered deliberately resets the status to pending and clears paidAt so
+ * that a buyer who downloads a second time gets a working order rather than a
+ * closed one — which means a delivered order, the single most common thing to need
+ * a refund, is no longer "paid" by the only test anyone was using.
+ *
+ * So this reads the payment columns instead of the status, and it lives here
+ * because four separate questions depend on it: can it be downloaded, can it be
+ * refunded, may the buyer review it, and is it counted as revenue. Four private
+ * copies of that test is how a delivered order ends up unrefundable.
+ */
+export const hasPayment = (order) => Boolean(order) && (
+  order.status === "paid"
+  || order.paidAt
+  || Number(order.paidCount || 0) > 0
+  || Number(order.paidAmount || 0) > 0
+);
 
 /**
  * When the buyer stops being able to pay. Stored on the order at creation so a
@@ -33,6 +55,13 @@ export function paymentDeadline(order) {
   return Number.isFinite(created) ? created + windowMs() : null;
 }
 
+/**
+ * Past the point where the buyer can still pay.
+ *
+ * Exported because the deadline rule is worth testing on its own: the test drives
+ * the clock directly rather than waiting for real hours to pass, which is the only
+ * way to check the boundary rather than roughly around it.
+ */
 export const isExpired = (order, now = Date.now()) => {
   if (!isUnpaid(order) || isClosed(order)) return false;
   const deadline = paymentDeadline(order);
@@ -87,7 +116,7 @@ export async function markOrderPaid(order, { source = "manual", providerAmount =
  * paidAmount stay on the row and deliveredAt records when the file left.
  */
 export async function markOrderDelivered(order) {
-  if (!order || order.status !== "paid") return order;
+  if (!order || !hasPayment(order)) return order;
   const now = new Date().toISOString();
   return updateOrder(order.id, { status: "pending", paidAt: null, deliveredAt: now, updatedAt: now });
 }
@@ -102,7 +131,10 @@ export async function markOrderDelivered(order) {
  * refunded and net side by side.
  */
 export async function voidPayment(order, { reason = "refunded", source = "admin" } = {}) {
-  if (!order || order.status !== "paid") return null;
+  // Reads the payment columns rather than the status, so an order whose file was
+  // already handed over can still be refunded. That is the common case: the buyer
+  // downloaded, the file was broken, and the refund is what they asked for.
+  if (!hasPayment(order)) return null;
   const now = new Date().toISOString();
   const update = {
     status: "refunded",

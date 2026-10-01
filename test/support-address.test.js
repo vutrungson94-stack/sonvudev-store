@@ -60,17 +60,23 @@ test('file trong public/ không ghi địa chỉ bằng tay', async () => {
   for (const file of files) {
     assert.ok(!(await publicFile(file)).includes('hello@sonvudev.com'), `public/${file} vẫn ghi cứng địa chỉ`);
   }
-  // i18n.js is the one deliberate exception: it carries the configured default so
-  // a page served without the substituted value still gets a working mailto, and
-  // the audit compares that one value against .env.
+  // i18n.js used to hold the address as a literal "last resort" so a page served
+  // without the substituted value still had a working mailto. That literal is the
+  // one thing that made the domain check hollow: the audit compared the files
+  // against a hardcoded value it was itself reading out of a hardcoded file, so it
+  // reported itself clean exactly when nothing was configured.
+  //
+  // The address now comes from data-support, which the server fills from
+  // SUPPORT_EMAIL on every page it renders. Same guarantee, no second copy.
   const dictionary = await publicFile('i18n.js');
-  assert.ok(dictionary.includes('brand.supportEmail'), 'từ điển phải có địa chỉ dự phòng');
-  // One per language table, no more. A second address here would be exactly the
-  // drift this whole change exists to remove.
-  const cut = dictionary.indexOf('\n  en: {');
-  const occurrences = (text) => (text.match(/hello@sonvudev\.com/g) || []).length;
-  assert.equal(occurrences(dictionary.slice(0, cut)), 1, 'tiếng Việt giữ đúng một giá trị dự phòng');
-  assert.equal(occurrences(dictionary.slice(cut)), 1, 'tiếng Anh giữ đúng một giá trị dự phòng');
+  assert.ok(!/hello@sonvudev\.com/.test(dictionary), 'từ điển không được ghi cứng địa chỉ');
+  assert.ok(/dataset\?\.support|dataset\.support/.test(dictionary), 'từ điển phải đọc địa chỉ từ data-support');
+  // Every page that loads i18n.js has to carry that attribute, or the dictionary
+  // resolves to an empty string and every link built from it becomes mailto:.
+  for (const file of ['index.html', 'lookup.html']) {
+    const html = await publicFile(file);
+    assert.match(html, /<body[^>]*data-support="\{\{support\}\}"/, `public/${file} phải có data-support trên body`);
+  }
 });
 
 test('trang đơn hàng truyền địa chỉ xuống script qua data attribute', async () => {

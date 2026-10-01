@@ -20,7 +20,15 @@ import dotenv from "dotenv";
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 dotenv.config({ path: path.join(root, ".env") });
 
-const base = String(process.argv[2] || process.env.APP_URL || "https://sonvudev.com").replace(/\/$/, "");
+// No fallback domain. The old one was the shop's own address, so a run with no
+// APP_URL and no argument quietly audited production from a machine that may not
+// have been pointed at it — and reported the result as if it had been asked for.
+// With nothing to audit, say so and stop.
+const base = String(process.argv[2] || process.env.APP_URL || "").replace(/\/$/, "");
+if (!base) {
+  console.error("Thiếu APP_URL. Chạy: npm run seo:check -- https://ten-mien-cua-ban");
+  process.exit(1);
+}
 const expectedToken = (process.env.GOOGLE_SITE_VERIFICATION || "").trim();
 const TIMEOUT_MS = 12000;
 
@@ -40,12 +48,28 @@ const all = (html, pattern) => [...html.matchAll(pattern)].map((m) => m[1]);
 //    it here saves opening the browser to find out.
 // ---------------------------------------------------------------------------
 let home;
+let networkBlocked = false;
 try {
   home = await get(`${base}/`);
   record("Trang chủ", home.response.status === 200, `HTTP ${home.response.status}`);
 } catch (error) {
-  record("Trang chủ", false, error.name === "TimeoutError" ? "timeout" : error.message);
+  // undici rejects with "fetch failed" and keeps the real reason in `cause`. On a
+  // managed network that reason is almost always the endpoint's TLS inspection or a
+  // filtering resolver, neither of which has anything to do with the site's SEO.
+  // Reporting the bare message sends people to debug the server when the server was
+  // never involved.
+  const chain = [];
+  for (let node = error, depth = 0; node && depth < 5; node = node.cause, depth += 1) {
+    chain.push(String(node.message || node.code || node));
+  }
+  const cause = chain.join(" <- ");
+  const last = chain[chain.length - 1];
+  networkBlocked = /self-signed|unable to verify|SELF_SIGNED|DEPTH_ZERO|revocation|CRYPT_E_NO_REVOCATION|ENOTFOUND|EAI_AGAIN/i.test(cause);
+  record("Trang chủ", false, networkBlocked
+    ? `may nay khong pho giao duoc domain — ${last}. Do proxy/endpoint cua may chan hoac giai phong TLS, KHONG phai loi cua site. Chay lai tren 4G.`
+    : (error.name === "TimeoutError" ? "timeout" : cause));
   for (const item of results) console.log(`${item.ok ? "PASS" : "FAIL"}  ${item.name}: ${item.detail}`);
+  if (networkBlocked) console.error("\nKHONG KET LUAN DUOC ve site — may nay khong nhin thay no. CI chay phan nay tren runner cua GitHub nen van chay binh thuong.");
   process.exit(1);
 }
 
@@ -157,6 +181,106 @@ for (const loc of locations) {
   let status = 0;
   try { status = (await get(loc)).response.status; } catch { status = 0; }
   record(`URL sống: ${loc.replace(base, "") || "/"}`, status === 200, `HTTP ${status}`);
+}
+
+// ---------------------------------------------------------------------------
+// 4b. The two machine-readable entry points, and the raster card.
+//
+//    Each is a single request that saves a crawler or an assistant from parsing a
+//    hero image to work out what this shop sells. They are also the easiest things
+//    to break quietly: a route added and then renamed, a 404 nobody visits, and
+//    the sitemap still looks perfect.
+// ---------------------------------------------------------------------------
+for (const [label, path] of [["/llms.txt", "/llms.txt"], ["/feed.json", "/feed.json"]]) {
+  let response = { response: { status: 0 }, body: "" };
+  try { response = await get(`${base}${path}`); } catch { /* reported below */ }
+  record(label, response.response.status === 200, `HTTP ${response.response.status}`);
+  if (path === "/feed.json" && response.response.status === 200) {
+    let items = 0;
+    try { items = (JSON.parse(response.body || "{}").itemListElement || []).length; } catch { items = -1; }
+    record("/feed.json là JSON đúng", items >= 0, items < 0 ? "parse lỗi" : `${items} sản phẩm`);
+  }
+  if (path === "/llms.txt" && response.response.status === 200) {
+    record("/llms.txt nói tên cửa hàng", response.body.trim().startsWith("# "), response.body.split("\n")[0] || "(rỗng)");
+  }
+}
+
+// ---------------------------------------------------------------------------
+// 4c. Every sameAs link in the Organization.
+//
+//    sameAs is the one field that ties this shop to the rest of the web in a
+//    knowledge graph, and it is entirely made of URLs nothing on this site
+//    controls. A dead link there is worse than an empty one: an empty sameAs says
+//    "no other accounts", while a dead one says "this is who we are" and then
+//    leads nowhere, which is the same mistake as naming /logo.svg as the logo —
+//    markup that is confident and wrong.
+//
+//    A brand-new account with no public content does resolve, and is still worth
+//    almost nothing: it only helps if that page links back. That is not something
+//    a status code can measure, so this reports reachability and leaves the
+//    judgement to the owner.
+// ---------------------------------------------------------------------------
+const homeGraph = [...home.body.matchAll(/<script type="application\/ld\+json">([\s\S]*?)<\/script>/g)]
+  .flatMap((block) => {
+    try {
+      const parsed = JSON.parse(block[1].replace(/\\u003c/g, "<"));
+      return Array.isArray(parsed) ? parsed : (parsed["@graph"] || [parsed]);
+    } catch { return []; }
+  });
+const organization = homeGraph.find((node) => node["@type"] === "Organization");
+const sameAs = Array.isArray(organization?.sameAs) ? organization.sameAs : [];
+record("Organization khai báo", Boolean(organization), organization ? "ok" : "(thiếu)");
+if (organization && !sameAs.length) {
+  console.log("      Ghi chú: sameAs rỗng. Cửa hàng chưa nối được tới đâu trên web,");
+  console.log("      nên không có gì để xác nhận nó là ai. Không phải lỗi, nhưng là");
+  console.log("      mất cơ hội — xem BRAND_SOCIAL_LINKS trong .env.example.");
+}
+for (const url of sameAs) {
+  let status = 0;
+  try { status = (await fetch(url, { redirect: "follow", signal: AbortSignal.timeout(TIMEOUT_MS) })).status; } catch { status = 0; }
+  // 401/403 still mean the page exists and is not public. Treating those as dead
+  // would push the owner towards deleting a perfectly good private-ish profile.
+  const alive = status > 0 && status !== 404 && status !== 410;
+  record(`sameAs sống: ${url}`, alive, status === 0 ? "không phản hồi" : `HTTP ${status}${alive ? "" : " (trang không tồn tại)"}`);
+}
+
+if (organization?.logo) {
+  let status = 0;
+  try { status = (await fetch(organization.logo, { signal: AbortSignal.timeout(TIMEOUT_MS) })).status; } catch { status = 0; }
+  record("logo trong schema tồn tại", status === 200, `HTTP ${status} — ${organization.logo}`);
+}
+
+// og:image has to be a raster image. The SVG renderer at /og/:slug.svg is still
+// served for the crawlers that handle it, but Facebook, Zalo, Telegram, Slack,
+// LinkedIn and most AI answer engines refuse SVG and show an empty box, so a
+// share of the site renders with no picture at all. This is the check that would
+// have caught that before anyone shared a link.
+const ogImage = one(home.body, /<meta\s+property="og:image"\s+content="([^"]*)"/i);
+record("og:image có trong trang chủ", Boolean(ogImage), ogImage || "(thiếu)");
+if (ogImage) {
+  let status = 0;
+  let type = "";
+  let buffer = Buffer.alloc(0);
+  try {
+    const response = await fetch(ogImage, { signal: AbortSignal.timeout(TIMEOUT_MS) });
+    status = response.status;
+    type = response.headers.get("content-type") || "";
+    // Read the file's own bytes, not its Content-Type. A server can send an
+    // image/png header over a file that is not a PNG, and a crawler that finds
+    // that out shows nothing at all.
+    buffer = Buffer.from(await response.arrayBuffer());
+  } catch { /* reported below */ }
+  record("og:image là ảnh raster", status === 200 && /image\/(png|jpeg|jpg|webp|gif)/i.test(type), `HTTP ${status} ${type || "(không rõ)"}`);
+  // The declared width has to match the real one. A 1200 in the markup over a
+  // 600-wide file gets the card rendered small, or cropped, depending on the
+  // platform, and there is no error anywhere to look at.
+  const declaredWidth = Number(one(home.body, /<meta\s+property="og:image:width"\s+content="(\d+)"/i)) || 0;
+  const declaredHeight = Number(one(home.body, /<meta\s+property="og:image:height"\s+content="(\d+)"/i)) || 0;
+  const isPng = buffer.length > 24 && buffer.subarray(0, 8).toString("hex") === "89504e470d0a1a0a";
+  const realWidth = isPng ? buffer.readUInt32BE(16) : 0;
+  const realHeight = isPng ? buffer.readUInt32BE(20) : 0;
+  record("og:image đúng 1200x630 như khai báo", realWidth === declaredWidth && realHeight === declaredHeight && declaredWidth === 1200 && declaredHeight === 630,
+    isPng ? `thật ${realWidth}x${realHeight}, khai ${declaredWidth}x${declaredHeight}` : "không đọc được kích thước (không phải PNG)");
 }
 
 // ---------------------------------------------------------------------------

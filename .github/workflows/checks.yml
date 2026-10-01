@@ -1,0 +1,118 @@
+# Runs the checks on every push and pull request.
+#
+# This exists because the whole project was previously verifiable only by opening a
+# terminal on the developer's machine. Everything in this file already ran by hand;
+# the change is that it now runs for everyone, every time, and a failure is
+# something a pull request cannot merge past.
+#
+# Three gates, in the order they should fail:
+#   1. lint        every file parses
+#   2. audit       the rules this project has already been bitten by
+#   3. test        the behaviour, including the two that no amount of reading
+#                  would have caught: the CSP blocking its own pages, and an
+#                  og:image that is not an image most platforms can display
+#
+# The audit and the tests need APP_URL and SUPPORT_EMAIL to mean anything — the
+# audit compares files against those values and refuses to run without them, on
+# purpose. They are given fixture values here rather than read from a developer's
+# .env, so a fresh clone and this machine run exactly the same checks.
+name: checks
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: checks-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  checks:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      NODE_ENV: test
+      APP_URL: https://ci-fixture.example
+      SUPPORT_EMAIL: support@ci-fixture.example
+      # Secrets are never available to a pull request from a fork, and no check
+      # here may reach the network with one. These exist so a stray default can
+      # never turn a lint run into a real email or a real IndexNow ping.
+      RESEND_API_KEY: ''
+      INDEXNOW_KEY: ''
+      SUPABASE_URL: ''
+      SUPABASE_SERVICE_ROLE_KEY: ''
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+
+      # The lockfile is committed and npm ci is the install. A range in package.json
+      # that resolved differently this week than last week is not something a
+      # passing build should depend on.
+      - name: install
+        run: npm ci
+
+      - name: lint
+        run: npm run lint
+
+      - name: audit
+        run: npm run audit
+
+      - name: metrics
+        run: npm run metrics
+
+      - name: test
+        run: npm test
+
+      # The build runs the audit again on purpose: it is what actually ships, and
+      # the packaging step is the last moment a missing required file is cheap to
+      # notice.
+      - name: build
+        run: npm run build
+
+      # Uploads the build report so a failing deploy can be traced without asking
+      # whoever ran it. The report lists every packaged file, which is the
+      # difference between "it broke" and "this file was not in it".
+      - name: upload build report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: web-build-report
+          path: build-reports/
+          if-no-files-found: ignore
+
+  # The live site, checked the way a crawler sees it. Separate from the checks
+  # above because it needs the deployed host and the network, and because it is
+  # the only job that can catch a sitemap listing a 404 or a share card that
+  # stopped rendering.
+  deployed-site:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    # Only on the branch that is live. Every other run would report against a URL
+    # that is not the one people visit.
+    if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master'
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+
+      - run: npm ci
+
+      # Reads APP_URL from the repository secret rather than a workflow variable,
+      # so the same value the server is configured with is the one audited.
+      - name: check the live site
+        run: npm run seo:check -- "${{ secrets.APP_URL }}"
+        env:
+          GOOGLE_SITE_VERIFICATION: ${{ secrets.GOOGLE_SITE_VERIFICATION }}

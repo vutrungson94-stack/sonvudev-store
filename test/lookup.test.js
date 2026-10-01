@@ -27,15 +27,23 @@ process.env.INDEXNOW_KEY = '';
 const { createApp } = await import('../src/app.js');
 let server;
 let base;
+let product;
 
-test.before(async () => { server = (await createApp()).listen(0); base = `http://127.0.0.1:${server.address().port}`; });
-test.after(async () => { server?.close(); await fs.rm(tempDir, { recursive: true, force: true }); });
-
-// Publishes a product and returns the order created against it.
-async function placeOrder(email) {
+test.before(async () => {
+  server = (await createApp()).listen(0);
+  base = `http://127.0.0.1:${server.address().port}`;
+  // One product, reused. A slug is unique, so publishing "Lookup Tester" three
+  // times is now a 409 rather than three rows that quietly shadow each other in
+  // the storefront — which is what the local JSON store used to allow and Postgres
+  // never did.
   const headers = { 'content-type': 'application/json', 'x-admin-token': 'test-admin-token' };
   const created = await fetch(`${base}/api/admin/products`, { method: 'POST', headers, body: JSON.stringify({ name: 'Lookup Tester', category: 'Công cụ', platform: 'Windows', version: '1.0.0', price: 99000, currency: 'VND', fileKey: 'products/lookup/1.0.0/test.exe', status: 'active' }) });
-  const product = (await created.json()).product;
+  product = (await created.json()).product;
+});
+test.after(async () => { server?.close(); await fs.rm(tempDir, { recursive: true, force: true }); });
+
+// Places an order against the shared product and returns the checkout response.
+async function placeOrder(email) {
   const response = await fetch(`${base}/api/checkout`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ productId: product.id, email, customerName: 'Buyer', paymentMethod: 'bank_transfer' }) });
   assert.equal(response.status, 200);
   return response.json();

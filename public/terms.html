@@ -1,7 +1,18 @@
 <!doctype html>
 <html lang="vi">
 <head>
-<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="description" content="Điều khoản sử dụng kho phần mềm SonVuDev: phạm vi cấp phép, thanh toán, bảo hành và giới hạn trách nhiệm."><meta name="robots" content="index,follow"><link rel="canonical" href="{{site}}/terms"><title>Điều khoản sử dụng — SonVuDev</title><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet"><link rel="stylesheet" href="styles.css">
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="description" content="Điều khoản sử dụng kho phần mềm SonVuDev: phạm vi cấp phép, thanh toán, bảo hành và giới hạn trách nhiệm."><meta name="robots" content="index,follow"><link rel="canonical" href="{{site}}/terms"><meta property="og:type" content="website">
+<meta property="og:site_name" content="SonVuDev">
+<meta property="og:locale" content="vi_VN">
+<meta property="og:locale:alternate" content="en_US">
+<meta property="og:title" content="Điều khoản sử dụng — SonVuDev">
+<meta property="og:url" content="{{site}}/terms">
+<meta property="og:image" content="{{site}}/og.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta name="twitter:card" content="summary_large_image">
+<link rel="alternate" hreflang="vi" href="{{site}}/terms">
+<link rel="alternate" hreflang="x-default" href="{{site}}/terms"><title>Điều khoản sử dụng — SonVuDev</title><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet"><link rel="stylesheet" href="styles.css">
 </head>
 <body>
 <header class="site-header"><a class="brand" href="/"><span class="brand-mark">S</span><span>SonVu<span>Dev</span></span></a><nav><a href="/#products">Sản phẩm</a><a href="/#faq">FAQ</a><a href="/terms" aria-current="page">Điều khoản</a></nav><a class="header-cta" href="/#products">Mua ngay <span>↗</span></a></header>
@@ -9,7 +20,31 @@
 <article class="legal">
 <p class="eyebrow"><span>✦</span> Pháp lý</p>
 <h1>Điều khoản sử dụng</h1>
-<p class="legal-updated">Cập nhật: 28/09/2026 · Áp dụng cho mọi giao dịch tại <strong>sonvudev.com</strong></p>
+<p class="legal-updated">Cập nhật: 28/09/2026 · Áp dụng cho mọi giao dịch tại <strong>{{site}}</strong></p>
+<!--
+  Who behind the shop a buyer would actually name in a dispute. Left as a token
+  because it has to be one value across the terms, the privacy page, the emails and
+  /llms.txt — and because a name that only appears on one page is the kind of
+  detail that gets missed when a company name changes.
+
+  If BRAND_LEGAL_ENTITY is empty this renders as nothing at all, which is the
+  correct outcome for a sole trader who has not registered anything: an invented
+  entity name on a legal page is worse than none.
+-->
+<p class="legal-entity">{{legalEntity}}</p>
+<!--
+  The date above is the one value on this page that is meant to stay written in.
+  It is a fact about the document rather than a setting: the terms only change
+  when they are rewritten, and a date that moved on every deploy would tell a
+  buyer the terms were revised last Tuesday when they were not. Bump it in the
+  same edit that changes a clause.
+
+  Everything else that used to be typed in by hand here now comes from config:
+  {{site}} so a domain change is one env var, {{paymentWindowHours}} so the
+  window the server enforces and the window promised to a buyer cannot disagree,
+  {{year}} so the copyright is never a year out of date, and {{support}} so the
+  address in the body is the address in the mail templates.
+-->
 
 <p>Bạn đang đọc các điều khoản áp dụng khi mua và sử dụng phần mềm do <strong>SonVuDev</strong> phát triển. Mua hàng nghĩa là bạn chấp nhận các điều khoản dưới đây. Nếu không đồng ý, vui lòng không thực hiện giao dịch.</p>
 
@@ -23,7 +58,7 @@
 <p>Đơn hàng chuyển khoản được xác nhận trong thời gian làm việc, thông thường dưới 24 giờ. Trong thời gian chờ, trạng thái đơn là <em>đang chờ chuyển khoản</em> và chưa thể tải.</p>
 
 <h2>3. Thời hạn thanh toán và hủy đơn</h2>
-<p>Đơn hàng chưa được thanh toán sẽ tự động bị hủy sau <strong>24 giờ</strong> kể từ thời điểm bạn nhấn nút đặt hàng, áp dụng cho mọi phương thức thanh toán. Thời hạn này được hiển thị ngay trên biểu mẫu thanh toán và trên trang đơn hàng của bạn.</p>
+<p>Đơn hàng chưa được thanh toán sẽ tự động bị hủy sau <strong>{{paymentWindowHours}} giờ</strong> kể từ thời điểm bạn nhấn nút đặt hàng, áp dụng cho mọi phương thức thanh toán. Thời hạn này được hiển thị ngay trên biểu mẫu thanh toán và trên trang đơn hàng của bạn.</p>
 <p>Trước khi hết hạn, chúng tôi gửi email nhắc. Nếu tiền đã vào tài khoản của chúng tôi sau khi đơn bị hủy — chẳng hạn PayPal báo thành công muộn — đơn sẽ được mở lại và bạn vẫn tải được sản phẩm. Nếu bạn đã chuyển khoản ngân hàng nhưng đơn đã hết hạn, hãy gửi ảnh biên lai, chúng tôi sẽ đối soát hoặc hoàn lại.</p>
 <h2>4. Cấp phát và tải phần mềm</h2>
 <p>Sau khi đơn chuyển khoản được xác nhận <em>hoặc</em> PayPal báo thành công, bạn nhận mã tra cứu đơn hàng. Mã này là thông tin truy cập duy nhất vào file phát hành, hãy lưu lại cẩn thận. Chúng tôi cũng gửi mã này qua email kèm thời hạn thanh toán.</p>
@@ -54,5 +89,5 @@
 <p>Các điều khoản này được hiểu và thực hiện theo pháp luật Việt Nam. Tranh chấp sẽ được giải quyết bằng thương lượng thiện chí trước; nếu không thống nhất được, bất kỳ bên nào cũng có quyền yêu cầu tòa án có thẩm quyền tại nơi SonVuDev đặt trụ sở xử lý.</p>
 </article>
 </main>
-<footer class="site-footer wrap"><div class="brand"><span class="brand-mark">S</span><span>SonVu<span>Dev</span></span></div><p>Phần mềm tốt cho công việc tốt.</p><div class="footer-links"><a href="/#products">Sản phẩm</a><a href="/terms">Điều khoản</a><a href="/privacy">Bảo mật</a><a href="/refund">Hoàn tiền</a><a href="mailto:{{support}}">Liên hệ</a></div><small>© 2026 SonVuDev.com · Đồng sở hữu</small></footer>
+<footer class="site-footer wrap"><div class="brand"><span class="brand-mark">S</span><span>SonVu<span>Dev</span></span></div><p>Phần mềm tốt cho công việc tốt.</p><div class="footer-links"><a href="/#products">Sản phẩm</a><a href="/terms">Điều khoản</a><a href="/privacy">Bảo mật</a><a href="/refund">Hoàn tiền</a><a href="mailto:{{support}}">Liên hệ</a></div><small>© {{year}} · Đồng sở hữu</small></footer>
 </body></html>

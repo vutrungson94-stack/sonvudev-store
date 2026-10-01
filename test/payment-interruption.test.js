@@ -25,6 +25,12 @@ const order = (overrides = {}) => ({
 
 async function page(orderOverrides, respond) {
   const { document, nodes } = createDom(IDS);
+  // The support address now comes from the page rather than from a literal in the
+  // dictionary, which is what let the audit's domain check stop comparing the
+  // files against a value it was itself reading out of a hardcoded file. Real
+  // pages carry this attribute; the fake document has to as well.
+  document.body = new El('body');
+  document.body.dataset = { support: 'hello@sonvudev.com' };
   const extra = new Set(['order-download', 'order-refresh', 'order-countdown', 'order-card']);
   const base = document.getElementById.bind(document);
   document.getElementById = (id) => base(id) || (extra.has(id) ? new El('div', id) : null);

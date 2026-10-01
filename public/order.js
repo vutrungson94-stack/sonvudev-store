@@ -19,14 +19,52 @@ function missing(){title.textContent=T('order.noSession.title');lead.textContent
 // tap away, not something to retype from a screenshot.
 function recoveryBar(id){return `<div class="order-recover"><p>${esc(T('order.recover.hint',{id}))}</p><a class="button button-secondary button-wide" href="/lookup?order=${encodeURIComponent(id)}">${esc(T('order.recover.cta'))} <span>→</span></a></div>`}
 
+// The review form, offered only once the file has actually been handed over.
+//
+// No stars, on purpose. Google has never used a rating as a ranking signal, and
+// self-collected AggregateRating markup earns no rich result on a normal site;
+// worse, a paid product with public stars makes the refund-then-review route
+// obvious to anyone who reads the terms. What an assistant quotes is a sentence
+// from someone who had the same problem, so the box asks for a sentence.
+//
+// The gate is the same one the server enforces: paid and delivered. Anything else
+// and the form is not rendered, because the request would be refused anyway and a
+// form that always fails is worse than no form.
+function reviewForm(order, item){
+  const already=(order.reviews||[]).some(r=>r.productId===item.productId);
+  if(order.status!=='paid'||!order.deliveredAt)return '';
+  if(already)return `<p class="review-done">${esc(T('review.already'))}</p>`;
+  return `<div class="review-box"><h3>${esc(T('review.heading'))}</h3><p class="review-hint">${esc(T('review.hint'))}</p><textarea id="review-body" rows="3" maxlength="1200" placeholder="${esc(T('review.placeholder'))}"></textarea><input id="review-name" type="text" maxlength="60" placeholder="${esc(T('review.namePlaceholder'))}"><button class="button button-secondary button-wide" id="review-send">${esc(T('review.send'))}</button><p class="review-status" id="review-status"></p></div>`;
+}
+function wireReviewForm(order, item){
+  const send=document.getElementById('review-send');
+  if(!send)return;
+  send.onclick=async()=>{
+    const status=document.getElementById('review-status');
+    const button=send;
+    button.disabled=true;
+    status.textContent=T('review.sending');
+    try{
+      const response=await fetch('/api/reviews',{method:'POST',headers:{'content-type':'application/json','x-order-token':state.token},body:JSON.stringify({orderId:order.id,accessToken:state.token,productId:item.productId,body:document.getElementById('review-body').value,authorName:document.getElementById('review-name').value})});
+      const payload=await response.json();
+      if(!response.ok){status.textContent=payload.error||T('review.failed');button.disabled=false;return}
+      status.textContent=T('review.sent');
+      // Repaint so the server's copy, not this optimistic guess, is what shows.
+      render();
+    }catch(error){status.textContent=T('review.failed');button.disabled=false}
+  };
+}
+
 // The countdown is measured against the server's clock, not this device's, so a
 // phone with a wrong time cannot show a buyer more time than they actually have.
+// The clock itself lives in i18n.js: the modal used to carry its own copy of the
+// same calculation, and two clocks is two chances to disagree with a buyer about
+// how long they have to pay.
 let deadline=null,clockOffset=0,activeOrder=null,watchTimer=null,countdownTimer=null;
-const remaining=()=>deadline?new Date(deadline).getTime()-(Date.now()+clockOffset):null;
-const pad=n=>String(n).padStart(2,'0');
-const formatLeft=ms=>{const t=Math.max(0,Math.floor(ms/1000)),h=Math.floor(t/3600),m=Math.floor((t%3600)/60);return h>0?`${h}:${pad(m)}:${pad(t%60)}`:`${pad(m)}:${pad(t%60)}`};
+const clock=()=>window.I18N.clock(deadline,deadline?new Date(Date.now()+clockOffset).toISOString():null);
+const remaining=()=>clock().remaining;
 const closed=o=>Boolean(o&&o.deliveredAt)&&o.status!=='paid';
-function countdownText(){const left=remaining();if(left===null)return'';return left<=0?T('order.deadlineOver'):T('order.expiresIn',{time:formatLeft(left)})}
+function countdownText(){return clock().text()}
 
 function stopTimers(){if(watchTimer)clearTimeout(watchTimer);if(countdownTimer)clearTimeout(countdownTimer);watchTimer=null;countdownTimer=null}
 function tickCountdown(){
@@ -57,25 +95,17 @@ function scheduleWatch(delay=10000){
 // whether PayPal has seen an approval, and telling a buyer who just watched
 // money leave their account that nothing happened is the one answer that turns a
 // glitch into a chargeback.
-function hintFor(o){
-  if(o.status==='refunded')return T('order.hint.refunded',{reason:o.refundReason||T('order.hint.refundUnknown'),support:SUPPORT()});
-  if(o.status==='paid')return T('order.hint.paid');
-  if(closed(o))return T('order.hint.delivered');
-  if(o.status==='cancelled'){
-    if(o.paidProviderAmount||o.paidCount)return T('order.hint.expiredPaid');
-    // Only PayPal can prove money did not move. For a bank transfer we simply do
-    // not know, and telling a buyer who did pay that they were not charged is
-    // the single worst thing this page can say.
-    if(o.paymentProvider==='paypal')return T('order.hint.expiredPaypal');
-    return T('order.hint.expiredBank');
-  }
-  if(o.status==='payment_failed')return T('order.hint.paymentFailed');
-  const left=remaining();
-  if(left!==null&&left<=0)return T('order.hint.deadlinePassed');
-  if(o.status==='pending_transfer')return T('order.hint.pendingTransfer');
-  if(o.paymentProvider==='paypal'&&o.providerOrderId)return T('order.hint.paypalUnconfirmed');
-  return T('order.hint.processing');
-}
+//
+// That logic now lives in one place, I18N.orderHint, because the checkout modal
+// had its own copy of it. That copy knew five of the ten states below, so a
+// refunded order or an unconfirmed PayPal capture read as a bland "đang chờ
+// thanh toán" in the modal and as the truth here: the same order, two different
+// stories, depending on which screen the buyer happened to be looking at.
+//
+// The order of the checks is the page's, because it is the complete one: what the
+// buyer needs to know is which world they are in, and that is decided by refund
+// first, then payment, then delivery, then the clock.
+const hintFor = (o) => window.I18N.orderHint(o, { expiresAt: deadline, serverTime: deadline ? new Date(Date.now()).toISOString() : null, support: SUPPORT() });
 let captureTries=0;
 async function resumePayPalCapture(){
   // One attempt per page load. Re-rendering calls back into here, and a server
@@ -140,6 +170,7 @@ ${order.status==='cancelled'?'':`${channels}`}
 <button class="button button-primary button-wide" id="order-download" disabled>${esc(T('order.unlock'))} <span>↓</span></button>
 <button class="button button-secondary button-wide" id="order-refresh">${esc(T('order.refresh'))} <span>↻</span></button>`}
 <p class="order-help">${esc(T('order.help.need'))} <a href="mailto:${SUPPORT()}">${SUPPORT()}</a> hoặc xem <a href="/refund">${esc(T('order.help.refundPolicy'))}</a>.</p>
+${reviewForm(order, item)}
 ${recoveryBar(order.id)}`;
   document.getElementById('order-download')?.addEventListener('click',async()=>{
     const button=document.getElementById('order-download');
@@ -163,6 +194,7 @@ ${recoveryBar(order.id)}`;
     }
   });
   document.getElementById('order-refresh')?.addEventListener('click',()=>render());
+  wireReviewForm(order, item);
   if(deadline) countdownTimer=setTimeout(tickCountdown,1000);
   scheduleWatch();
 }

@@ -6,15 +6,28 @@
 // Markup:  <span data-i18n="hero.title"></span>
 // JS:      I18N.t('products.count')
 //
+// The copyright year is read from the clock rather than written in. It used to be
+// the literal 2026 in the dictionary and in five other files, so every 1 January
+// the whole shop quietly claimed to be a year old.
+//
+// So is the host name and the support address. All three used to be typed in
+// here, which meant the audit could only ever compare the files against a
+// hardcoded value it was itself reading from the hardcoded file — the check
+// reported itself healthy precisely when it was not configured. Both now come
+// from what the server already substituted into the page.
+//
+const YEAR = new Date().getFullYear();
+const host = () => (document.body?.dataset?.support || '').split('@').pop() || '';
+const supportAddress = () => document.body?.dataset?.support || '';
+
 const DICT = {
   vi: {
     'lang.switch': 'EN',
     'lang.switchAria': 'Chuyển sang tiếng Anh',
-    // Dia chi ho tro. Gia tri mac dinh; may chu thay bang SUPPORT_EMAIL
-    // nen doi mot lan la ca site doi.
-    'brand.supportEmail': 'hello@sonvudev.com',
+    // Địa chỉ hỗ trợ do máy chủ đưa vào data-support, không ghi tay ở đây.
+    'brand.supportEmail': supportAddress(),
     'brand.tagline': 'Phần mềm tốt cho công việc tốt.',
-    'brand.rights': '© 2026 SonVuDev.com · Đồng sở hữu',
+    'brand.rights': `© ${YEAR} ${host()} · Đồng sở hữu`,
     'announce.text': 'SonVuDev đang mở cửa cho các bản phát hành mới',
     'announce.cta': 'Khám phá ngay',
     'nav.products': 'Sản phẩm',
@@ -24,6 +37,8 @@ const DICT = {
     'nav.store': 'Cửa hàng',
     'nav.terms': 'Điều khoản',
     'nav.privacy': 'Bảo mật',
+    'nav.refund': 'Hoàn tiền',
+    'nav.about': 'Về chúng tôi',
     'nav.refund': 'Hoàn tiền',
     'nav.lookup': 'Tra cứu đơn',
     'nav.contact': 'Liên hệ',
@@ -94,7 +109,6 @@ const DICT = {
     'order.keepCode': 'Lưu lại mã này. Nếu đóng tab, mất mạng hoặc máy tắt, bạn vẫn lấy lại được đơn bằng mã tra cứu cùng email đã dùng.',
     'order.openLookup': 'Mở trang tra cứu',
     'order.copied': 'Đã sao chép mã tra cứu.',
-    'order.pendingHint': 'Bạn đã đặt đơn nhưng chưa thanh toán. Chuyển khoản rồi báo chúng tôi để được duyệt nhanh.',
     'order.paid': 'Đã thanh toán',
     'order.download': 'Tải sản phẩm',
     'order.notFound': 'Không tìm thấy đơn hàng.',
@@ -138,11 +152,7 @@ const DICT = {
     'cart.errNetwork': 'Không kết nối được tới máy chủ. Đơn có thể đã được tạo — hãy kiểm tra email hoặc thử lại, lần sau sẽ trả về đúng đơn cũ thay vì tạo đơn mới.',
     'order.expiresIn': 'Còn {time} để thanh toán',
     'order.deadlineOver': 'Đơn hàng đã hết hạn',
-    'order.expiredHint': 'Đơn hàng đã quá thời gian thanh toán và sắp bị hủy. Nếu bạn đã chuyển khoản, hãy liên hệ để chúng tôi đối soát.',
-    'order.cancelledHint': 'Đơn hàng quá thời gian thanh toán nên đã bị hủy. Bạn có thể đặt đơn mới.',
-    'order.transferHint': 'Chuyển khoản xong bạn bấm nút bên dưới để chúng tôi kiểm tra trạng thái. Trang này cũng tự kiểm tra giúp bạn.',
     'order.completed': 'Đã hoàn tất',
-    'order.completedHint': 'Bạn đã tải sản phẩm. Đơn hàng đã hoàn tất, cảm ơn bạn!',
     'order.justPaid': 'Thanh toán đã được xác nhận — nút tải đã mở.',
     'order.errOffline': 'Mất kết nối. Trang sẽ tự kiểm tra lại khi bạn có mạng.',
     'order.recorded': 'Đơn hàng đã được ghi nhận. Lưu mã tra cứu để kiểm tra trạng thái và tải sản phẩm.',
@@ -150,8 +160,6 @@ const DICT = {
     'order.check': 'Kiểm tra đơn hàng',
     'order.errStatus': 'Không kiểm tra được trạng thái đơn hàng',
     'order.errDownload': 'Chưa thể tải sản phẩm lúc này',
-    'order.paidHint': 'Thanh toán đã được xác nhận. Bạn có thể tải sản phẩm ngay.',
-    'order.statusHint': 'Trạng thái hiện tại của đơn hàng.',
     'cart.agree': 'Tôi đồng ý với điều khoản sử dụng và chính sách bảo mật.',
     'product.requirements': 'Yêu cầu hệ thống',
     'product.version': 'Phiên bản',
@@ -191,6 +199,15 @@ const DICT = {
     'order.hint.expiredPaypal': 'Đơn hàng quá thời gian thanh toán nên đã bị hủy, và PayPal không ghi nhận khoản nào nên bạn chưa bị trừ tiền. Bạn có thể đặt đơn mới.',
     'order.hint.expiredBank': 'Đơn hàng quá thời gian nên đã bị hủy. Chúng tôi chưa ghi nhận được khoản chuyển khoản này — nếu bạn đã chuyển, hãy gửi ảnh biên lai kèm mã đơn, chúng tôi sẽ mở lại đơn hoặc hoàn lại. Nếu chưa chuyển, bạn có thể đặt đơn mới.',
     'order.hint.paymentFailed': 'Thanh toán không thành công nên bạn chưa bị trừ tiền. Bạn có thể thử lại, đơn vẫn giữ nguyên.',
+    'review.heading': 'Cảm nhận của bạn?',
+    'review.hint': 'Một câu về điều bạn đã làm được với phần mềm này là đủ rồi. Chúng tôi không xin điểm số, chỉ cần lời của người thật.',
+    'review.placeholder': 'Ví dụ: file cài đặt chạy được luôn, không phải tự cấu hình gì thêm.',
+    'review.namePlaceholder': 'Tên hiển thị (bỏ trống nếu ẩn danh)',
+    'review.send': 'Gửi cảm nhận',
+    'review.sending': 'Đang gửi…',
+    'review.sent': 'Cảm ơn bạn, đã ghi lại.',
+    'review.already': 'Bạn đã gửi cảm nhận cho sản phẩm này rồi. Cảm ơn bạn!',
+    'review.failed': 'Chưa gửi được. Thử lại sau ít phút.',
     'order.hint.deadlinePassed': 'Đơn hàng đã hết thời gian thanh toán và sắp bị hủy. Nếu bạn đã chuyển khoản, hãy liên hệ để chúng tôi đối soát, chúng tôi sẽ mở lại đơn cho bạn.',
     'order.hint.pendingTransfer': 'Bạn đang thanh toán bằng chuyển khoản, nên thao tác nằm trong app ngân hàng chứ không ở trang này. Nếu app ngân hàng bị treo hoặc máy tắt giữa chừng, hãy mở lại app để kiểm tra giao dịch đã thực hiện hay chưa. Đơn này được giữ nguyên, còn thời gian và chúng tôi sẽ báo ngay khi bạn bấm nút bên dưới.',
     'order.hint.paypalUnconfirmed': 'Nếu bạn đã bấm thanh toán ở PayPal nhưng trang này chưa xác nhận được, đừng thanh toán lại lần nữa. Hãy tải lại trang hoặc bấm nút bên dưới: hệ thống sẽ hỏi lại PayPal và mở nút tải nếu tiền đã vào. Nếu PayPal chưa ghi nhận khoản nào, bạn chưa bị trừ tiền và có thể thanh toán lại bình thường.',
@@ -201,9 +218,9 @@ const DICT = {
     'lang.switch': 'VI',
     'lang.switchAria': 'Switch to Vietnamese',
     // The configured default. The server substitutes the live SUPPORT_EMAIL.
-    'brand.supportEmail': 'hello@sonvudev.com',
+    'brand.supportEmail': supportAddress(),
     'brand.tagline': 'Good software for good work.',
-    'brand.rights': '© 2026 SonVuDev.com · All rights reserved',
+    'brand.rights': `© ${YEAR} ${host()} · All rights reserved`,
     'announce.text': 'SonVuDev is opening up to new releases',
     'announce.cta': 'Explore now',
     'nav.products': 'Products',
@@ -213,6 +230,7 @@ const DICT = {
     'nav.store': 'Store',
     'nav.terms': 'Terms',
     'nav.privacy': 'Privacy',
+    'nav.about': 'About us',
     'nav.refund': 'Refund',
     'nav.lookup': 'Order lookup',
     'nav.contact': 'Contact',
@@ -283,7 +301,6 @@ const DICT = {
     'order.keepCode': 'Save this code. If you close the tab, lose your connection or your device powers off, you can still get the order back with this code and the email you paid with.',
     'order.openLookup': 'Open the lookup page',
     'order.copied': 'Lookup code copied.',
-    'order.pendingHint': 'Your order is placed but not paid yet. Transfer the amount and tell us so we can confirm quickly.',
     'order.paid': 'Paid',
     'order.download': 'Download product',
     'order.notFound': 'Order not found.',
@@ -331,11 +348,7 @@ const DICT = {
     'cart.errNetwork': 'Could not reach the server. The order may already exist — check your email or try again, and the next attempt returns that same order instead of creating a new one.',
     'order.expiresIn': '{time} left to pay',
     'order.deadlineOver': 'Payment window has closed',
-    'order.expiredHint': 'This order has passed its payment window and is about to be cancelled. If you already transferred the money, contact us so we can reconcile it.',
-    'order.cancelledHint': 'This order passed its payment window and was cancelled. You can place a new one.',
-    'order.transferHint': 'After transferring, press the button below so we can check. This page also checks on its own.',
     'order.completed': 'Completed',
-    'order.completedHint': 'You have downloaded the product. This order is complete, thank you!',
     'order.justPaid': 'Payment confirmed — your download is unlocked.',
     'order.errOffline': 'Connection lost. This page will check again as soon as you are back online.',
     'order.recorded': 'Your order has been recorded. Keep the lookup code to check its status and download the product.',
@@ -343,8 +356,6 @@ const DICT = {
     'order.check': 'Check order status',
     'order.errStatus': 'Could not check the order status',
     'order.errDownload': 'The product is not available for download right now',
-    'order.paidHint': 'Payment confirmed. You can download the product now.',
-    'order.statusHint': 'Current status of your order.',
     'order.status.pending': 'Awaiting payment',
     'order.status.pendingTransfer': 'Awaiting bank transfer',
     'order.status.paid': 'Paid',
@@ -377,6 +388,15 @@ const DICT = {
     'order.hint.expiredPaypal': 'This order passed its payment window and was cancelled, and PayPal recorded no payment, so you have not been charged. You can place a new order.',
     'order.hint.expiredBank': 'This order passed its payment window and was cancelled. We have not received this transfer — if you already sent it, send the receipt with your order id and we will reopen the order or refund you. If you did not, you can place a new one.',
     'order.hint.paymentFailed': 'The payment did not go through, so you have not been charged. You can try again, the order is unchanged.',
+    'review.heading': 'How did it go?',
+    'review.hint': 'One sentence about what you got done with it is plenty. We are not asking for a score, only for what a real person thought.',
+    'review.placeholder': 'For example: the installer ran first time, nothing to configure.',
+    'review.namePlaceholder': 'Name to show (leave blank to stay anonymous)',
+    'review.send': 'Send it',
+    'review.sending': 'Sending…',
+    'review.sent': 'Thank you, that is saved.',
+    'review.already': 'You have already reviewed this product. Thank you!',
+    'review.failed': 'Could not send it. Try again in a minute.',
     'order.hint.deadlinePassed': 'This order has passed its payment window and is about to be cancelled. If you already transferred the money, contact us so we can reconcile it and reopen the order.',
     'order.hint.pendingTransfer': 'You are paying by bank transfer, so that step happens in your banking app rather than on this page. If the app froze or the device switched off midway, reopen it to check whether the transfer went through. This order is unchanged, there is still time, and we will confirm the moment you press the button below.',
     'order.hint.paypalUnconfirmed': 'If you pressed pay at PayPal but this page cannot confirm it, do not pay again. Reload the page or press the button below: the system will ask PayPal again and unlock the download if the money arrived. If PayPal has recorded nothing, you have not been charged and can pay again as normal.',
@@ -461,6 +481,85 @@ const I18N = {
   },
   statusKey(status) { return STATUS_KEYS[status] || 'order.status.pending'; },
   status(status) { return I18N.t(I18N.statusKey(status), status); },
+  /**
+   * The countdown clock.
+   *
+   * The checkout modal and the order page each carried their own copy: the same
+   * remaining-ms calculation, the same zero padding, the same HH:MM:SS formatting,
+   * the same "is this order closed" test. Two copies of a clock is two chances to
+   * show a buyer a different amount of time to pay on two screens, and a
+   * discrepancy there reads as being charged by the shop.
+   *
+   * It is measured against the server's clock rather than the device's, so a phone
+   * with the wrong time cannot invent extra hours. `deadline` is an ISO string and
+   * `serverTime` is the server's own clock from the same response.
+   */
+  clock(deadline, serverTime) {
+    const at = deadline ? new Date(deadline).getTime() : null;
+    const skew = serverTime ? new Date(serverTime).getTime() - Date.now() : 0;
+    return {
+      at,
+      remaining: at === null ? null : at - (Date.now() + skew),
+      text() {
+        const left = this.remaining;
+        if (left === null) return '';
+        if (left <= 0) return I18N.t('order.deadlineOver');
+        const total = Math.floor(left / 1000);
+        const pad = (n) => String(n).padStart(2, '0');
+        const hours = Math.floor(total / 3600);
+        const minutes = Math.floor((total % 3600) / 60);
+        const time = hours > 0 ? `${hours}:${pad(minutes)}:${pad(total % 60)}` : `${pad(minutes)}:${pad(total % 60)}`;
+        return I18N.t('order.expiresIn', undefined, { time });
+      },
+    };
+  },
+  /**
+   * The one sentence that explains what state an order is in.
+   *
+   * The checkout modal and the order page each used to have their own. They were
+   * not two wordings of one rule: the modal knew five states and the page knew
+   * ten, so a refunded order, a failed payment or an unconfirmed PayPal capture
+   * read as a bland "đang chờ thanh toán" in one and as the truth in the other.
+   * Two screens describing the same order differently is the single worst thing
+   * a shop can do to a buyer who is worried about their money.
+   *
+   * The order here is the page's, because it is the complete one: what the buyer
+   * needs to know is which world they are in, and that is decided by refund first,
+   * then payment, then delivery, then the clock.
+   */
+  orderHint(order, options) {
+    const deadlineAt = options && options.expiresAt ? new Date(options.expiresAt).getTime() : null;
+    const serverSkew = options && options.serverTime ? new Date(options.serverTime).getTime() - Date.now() : 0;
+    const left = deadlineAt === null ? null : deadlineAt - (Date.now() + serverSkew);
+    const paid = order.status === 'paid' || Number(order.paidCount || 0) > 0 || Boolean(order.paidAt);
+    // The order is closed once the file has been handed over, and closed means
+    // "reopen it if it broke", which is a different sentence from "paid".
+    const delivered = Boolean(order.deliveredAt) && order.status !== 'paid';
+    const provider = order.paymentProvider || 'bank_transfer';
+
+    if (order.status === 'refunded') return I18N.t('order.hint.refunded', { reason: order.refundReason || I18N.t('order.hint.refundUnknown'), support: options.support || '' });
+    if (order.status === 'cancelled') {
+      // Already swept. Which of three sentences depends entirely on whether money
+      // actually moved, and only PayPal can prove it did not: for a bank transfer
+      // we simply do not know, so telling a buyer who did pay that they were not
+      // charged is the single worst thing this function can say.
+      if (order.paidProviderAmount || order.paidCount) return I18N.t('order.hint.expiredPaid');
+      if (provider === 'paypal') return I18N.t('order.hint.expiredPaypal');
+      return I18N.t('order.hint.expiredBank');
+    }
+    if (order.status === 'payment_failed') return I18N.t('order.hint.paymentFailed');
+    if (paid) return I18N.t('order.hint.paid');
+    if (delivered) return I18N.t('order.hint.delivered');
+
+    // The clock has run out but the sweep has not fired yet. That is a different
+    // situation from the three above and needs a different sentence: there is
+    // still something to save if the buyer moved the money after all.
+    if (left !== null && left <= 0) return I18N.t('order.hint.deadlinePassed');
+
+    if (order.status === 'pending_transfer') return I18N.t('order.hint.pendingTransfer');
+    if (provider === 'paypal' && order.providerOrderId) return I18N.t('order.hint.paypalUnconfirmed');
+    return I18N.t('order.hint.processing');
+  },
 };
 
 // Walks the document swapping text, placeholders and attributes.

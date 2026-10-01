@@ -92,10 +92,26 @@ alter table public.orders add column if not exists refunded_provider_amount nume
 -- One entry per sent message per order, so retries and the webhook/capture race
 -- cannot send a buyer two of the same mail.
 alter table public.orders add column if not exists notifications jsonb not null default '{}'::jsonb;
+-- Customer reviews, kept on the order rather than in a table of their own: the
+-- order is the only place the proof of purchase already exists, and the only thing
+-- a review is really a claim about. Prose only, no star rating on purpose — Google
+-- does not use ratings as a ranking signal, self-collected AggregateRating markup earns
+-- no rich result on a normal website, and a paid product with public stars invites
+-- the refund-then-review route. What an answer engine quotes is a sentence from a
+-- buyer who had the same problem, so the sentence is the record.
+alter table public.orders add column if not exists reviews jsonb not null default '[]'::jsonb;
 
 create index if not exists orders_idempotency_key_idx on public.orders(idempotency_key);
 -- The sweep only ever asks for rows it could act on.
 create index if not exists orders_open_idx on public.orders(status, expires_at);
+-- Reviews are read by the product page, which asks for orders whose file was
+-- handed over. Without this the page load scans the whole order history to find a
+-- handful of rows, and gets slower every month the shop sells anything.
+--
+-- On delivered_at rather than status, because delivering an order resets its
+-- status to pending on purpose so a second download is possible. A predicate on
+-- status would miss exactly the rows the reviews belong to.
+create index if not exists orders_delivered_idx on public.orders(delivered_at) where delivered_at is not null;
 -- The admin history and the badge poll both order by created_at, and neither
 -- index above covers that, so Postgres was sorting the whole table on every
 -- request. Descending matters here: the queries only ever read the newest end.

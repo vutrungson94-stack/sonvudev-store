@@ -16,7 +16,7 @@ let lastToken = null;
 // purchase. Cleared once an order is safely in hand.
 let checkoutKey = null;
 // The deadline is counted against the server's clock, not the device's.
-let deadlineState = { expiresAt: null, offset: 0 };
+let deadlineState = { expiresAt: null, offset: 0, serverTime: null };
 let countdownTimer = null;
 let watchTimer = null;
 
@@ -254,21 +254,20 @@ const channelCard = (c, first) => `<section class="pay-channel${first ? ' is-act
   <div class="payment-note"><small>${esc(T('pay.transferNote'))}</small><code>${esc(c.transferNote)}</code></div>
 </section>`;
 
-const formatDuration = (ms) => {
-  const total = Math.max(0, Math.floor(ms / 1000));
-  const pad = (n) => String(n).padStart(2, '0');
-  const h = Math.floor(total / 3600);
-  const m = Math.floor((total % 3600) / 60);
-  return h > 0 ? `${h}:${pad(m)}:${pad(total % 60)}` : `${pad(m)}:${pad(total % 60)}`;
-};
-
-const remainingMs = () => (deadlineState.expiresAt ? new Date(deadlineState.expiresAt).getTime() - (Date.now() + deadlineState.offset) : null);
+// One countdown implementation, in i18n.js. The formatting, the zero padding and
+// the clock-skew correction were each written out twice — once here and once in
+// order.js — and two copies of a clock is two chances to tell a buyer two
+// different amounts of time to pay on two screens.
+const clock = () => window.I18N.clock(deadlineState.expiresAt, deadlineState.serverTime);
+const remainingMs = () => clock().remaining;
+// The deadline and the server's own clock, in the shape the shared orderHint
+// expects. One object rather than three loose arguments, because the hint is
+// asked for it as one thing.
+const deadlineOptions = () => ({ expiresAt: deadlineState.expiresAt, serverTime: deadlineState.serverTime, support: window.I18N.t('brand.supportEmail') });
 const closedOrder = (order) => Boolean(order && order.deliveredAt) && order.status !== 'paid';
 
 function countdownText() {
-  const left = remainingMs();
-  if (left === null) return '';
-  return left <= 0 ? T('order.deadlineOver') : T('order.expiresIn').replace('{time}', formatDuration(left));
+  return clock().text();
 }
 
 function tickCountdown() {
@@ -318,6 +317,7 @@ function showOrder(order, token, payment, meta) {
   lastOrder = order;
   lastToken = token;
   if (meta && meta.serverTime) deadlineState.offset = new Date(meta.serverTime).getTime() - Date.now();
+  deadlineState.serverTime = (meta && meta.serverTime) || null;
   const expiresAt = (meta && meta.expiresAt) || order.expiresAt || null;
   deadlineState.expiresAt = expiresAt && order.status !== 'paid' && !closedOrder(order) ? expiresAt : null;
   const channels = (payment && payment.channels) || [];
@@ -345,7 +345,7 @@ function showOrder(order, token, payment, meta) {
     </div>
     ${tabs}${box}
     ${countdown}
-    <p class="order-hint">${esc(orderHint(order, paid, closed))}</p>
+    <p class="order-hint">${esc(window.I18N.orderHint(order, deadlineOptions()))}</p>
     <button id="download-order" class="button button-primary button-wide"${paid ? '' : ' disabled'}>${esc(T('order.download'))} <span>↓</span></button>
     <button id="check-order" class="button button-secondary button-wide">${esc(T('order.check'))} <span>↻</span></button>
   </div>`;
@@ -372,15 +372,6 @@ function showOrder(order, token, payment, meta) {
   scheduleWatch();
 }
 
-function orderHint(order, paid, closed) {
-  if (paid) return T('order.paidHint');
-  if (closed) return T('order.completedHint');
-  if (order.status === 'cancelled') return T('order.cancelledHint');
-  const left = remainingMs();
-  if (left !== null && left <= 0) return T('order.expiredHint');
-  return order.status === 'pending_transfer' ? T('order.transferHint') : T('order.statusHint');
-}
-
 // Silent when the caller is the background watcher: a failed poll on a phone in
 // a lift must not turn into a stack of toasts, but a person who pressed the
 // button deserves to know why nothing happened.
@@ -394,12 +385,6 @@ async function checkOrder(id, token, quiet = false) {
     if (!res.ok) throw Error(data.error || T('order.errStatus'));
     const wasPaid = lastOrder && lastOrder.status === 'paid';
     lastOrder = data.order;
-    // The status-to-key map lives in i18n.js now. It used to be written out
-    // here and again in order.js, and the copies disagreed: this one showed a
-    // bank transfer as merely awaiting payment, while the order page named the
-    // bank transfer outright.
-    const key = window.I18N.statusKey(data.order.status);
-    const note = data.order.status === 'paid' ? T('order.paidHint') : T(key === 'order.status.pending' ? 'order.pendingHint' : 'order.statusHint');
     // Tell the buyer the moment the button unlocks, rather than making them
     // wonder whether the payment went through.
     if (!wasPaid && data.order.status === 'paid' && !quiet) toastMsg(T('order.justPaid'));

@@ -26,7 +26,7 @@ export function vietQrUrl({ amount, transferNote }) {
  * fall back to showing the wallet number, because a static wallet QR cannot carry
  * the order amount.
  */
-export function paymentChannels(order) {
+function paymentChannels(order) {
   const transferNote = `${env.bank.notePrefix} ${order.id}`.trim();
   const amount = Number(order.amount) || 0;
   const currency = order.currency || "VND";

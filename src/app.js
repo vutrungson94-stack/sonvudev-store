@@ -4,16 +4,17 @@ import { promises as fs } from "node:fs";
 import { fileURLToPath } from "node:url";
 import crypto from "node:crypto";
 import { env, isConfigured } from "./config.js";
-import { ensureSeed, findOrderByIdempotencyKey, getOrder, getProduct, getProductBySlug, isSellable, latestOrder, listExpiringOrders, listOpenOrders, listOrders, listOrdersForRevenue, listProducts, createOrder, updateOrder, createProduct, updateProduct, persistenceMode } from "./store.js";
+import { ensureSeed, findOrderByIdempotencyKey, getOrder, getProduct, getProductBySlug, isOrderOwner, isSellable, latestOrder, listExpiringOrders, listOpenOrders, listOrders, listOrdersForRevenue, listProducts, createOrder, updateOrder, createProduct, updateProduct, persistenceMode } from "./store.js";
 import { createDownloadUrl, createUploadUrl } from "./r2.js";
 import { captureOrder, createOrder as createPayPalOrder, hashToken, newOrderId, newToken, paypalChargeFor, paypalChargeForProduct, paymentMatchesOrder, readOrder, verifyWebhook } from "./paypal.js";
 import { paymentInstructions, paymentOptions } from "./payments.js";
-import { esc, renderIndexCount, renderIndexGrid, renderOgImage, renderProductPage, verificationFile, verificationMeta } from "./pages.js";
-import { isClosed, isUnpaid, markOrderDelivered, markOrderPaid, paymentDeadline, voidPayment } from "./orders.js";
+import { esc, jsonLdGraph, renderFeed, renderIndexCount, renderIndexGrid, renderLlmsTxt, renderOgImage, renderProductPage, verificationFile, verificationMeta } from "./pages.js";
+import { hasPayment, isClosed, isUnpaid, markOrderDelivered, markOrderPaid, paymentDeadline, voidPayment } from "./orders.js";
 import { notifyOrder, notifyMode } from "./notify.js";
 import { resolveCountry } from "./geo.js";
 import { pingIndexNow, isIndexNowConfigured } from "./indexnow.js";
 import { vndPerUsd } from "./rates.js";
+import { createReview, listReviewsForProduct } from "./reviews.js";
 
 const app = express();
 const publicDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "public");
@@ -95,6 +96,35 @@ app.get("/robots.txt", (_req, res) => {
     "Disallow: /lookup",
     "Disallow: /paypal-return",
     "",
+    // Text agents, named one by one rather than left to the default. The default
+    // already allowed them, so nothing changes for the major crawlers; what
+    // changes is that the decision is written down instead of implied, and that a
+    // shop which later wants to opt out of one has the exact block to copy.
+    //
+    // They are allowed on purpose. Answer engines are where people ask this kind
+    // of question now, and a store that hides its catalogue from them is only
+    // hiding it from the people who are looking for it.
+    "User-agent: GPTBot",
+    "Allow: /",
+    "",
+    "User-agent: OAI-SearchBot",
+    "Allow: /",
+    "",
+    "User-agent: ChatGPT-User",
+    "Allow: /",
+    "",
+    "User-agent: ClaudeBot",
+    "Allow: /",
+    "",
+    "User-agent: anthropic-ai",
+    "Allow: /",
+    "",
+    "User-agent: PerplexityBot",
+    "Allow: /",
+    "",
+    "User-agent: Google-Extended",
+    "Allow: /",
+    "",
     `Sitemap: ${env.appUrl.replace(/\/$/, "")}/sitemap.xml`,
     "",
   ].join("\n"));
@@ -154,6 +184,7 @@ const indexablePages = {
   "terms.html": {},
   "privacy.html": {},
   "refund.html": {},
+  "about.html": {},
 };
 // The pages a buyer reaches after paying. Not indexable, so no ownership tag and
 // no catalogue, but they quote the support address and that has to come from
@@ -171,6 +202,15 @@ const pageCache = new Map();
 // than no price, and the storefront's own script only ever sees the fresh copy.
 const PAGE_TTL_MS = 60000;
 
+// Every rendered page is derived from the catalogue, and the catalogue is
+// editable from the panel. Caching without this meant a price edit took up to a
+// minute to reach the homepage, an hour to reach a share card, and left
+// /llms.txt and /feed.json describing products at prices that no longer existed.
+const invalidatePages = () => {
+  pageCache.clear();
+  textCache.clear();
+};
+
 async function renderPage(file) {
   const cached = pageCache.get(file);
   if (cached && Date.now() - cached.at < PAGE_TTL_MS) return cached.html;
@@ -179,6 +219,21 @@ async function renderPage(file) {
   const html = template
     .replaceAll("{{site}}", env.appUrl)
     .replaceAll("{{support}}", env.email.supportEmail)
+    // The payment window is quoted in the terms rather than decided silently by
+    // the server. It used to be the number 24 written into three files, so
+    // changing ORDER_PAYMENT_WINDOW_HOURS made the terms promise something the
+    // server did not do.
+    .replaceAll("{{paymentWindowHours}}", String(env.orders.paymentWindowHours))
+    .replaceAll("{{year}}", String(new Date().getFullYear()))
+    // The legal entity behind the shop. It belongs on the terms page because that
+    // is the page a buyer reads when they are deciding whether to dispute a
+    // payment, and a page that names a brand but no entity behind it gives them
+    // nothing to name. Whatever goes here should be the entity a customer would
+    // actually see on their PayPal or bank statement, not the trading name.
+    .replaceAll("{{legalEntity}}", env.brand.legalEntity)
+    // The homepage's structured data comes from the same functions the product
+    // pages use, so the two can no longer describe the shop differently.
+    .replaceAll("{{jsonLd}}", jsonLdGraph(products))
     .replace("</head>", `${verificationMeta()}\n</head>`)
     .replace(/(<span class="product-count" id="product-count">)[\s\S]*?(<\/span>)/, `$1${esc(renderIndexCount(products))}$2`)
     .replace(/<!--catalog:start-->[\s\S]*?<!--catalog:end-->/, `<!--catalog:start-->${renderIndexGrid(products)}<!--catalog:end-->`);
@@ -205,10 +260,72 @@ for (const file of Object.keys(served)) {
 // tokens still in it and the substituted values never applied.
 app.get("/order/:id", sendPage("order.html"));
 
+// Machine-readable entry points.
+//
+// Both are one route over the live catalogue and nothing else. An answer engine
+// asked what this shop sells would otherwise have to read three product pages to
+// answer it; here it is one fetch. Neither is a substitute for the pages — they
+// exist so a crawler that wants structure can get it without parsing a hero
+// image and a testimonial.
+//
+// The shared TTL exists so a price edit in the panel cannot leave these quoting
+// numbers the shop no longer honours. invalidatePages() clears both.
+const textCache = new Map();
+const TEXT_TTL_MS = 60000;
+const cachedText = async (key, build) => {
+  const hit = textCache.get(key);
+  if (hit && Date.now() - hit.at < TEXT_TTL_MS) return hit;
+  const value = build(await listProducts());
+  textCache.set(key, { at: Date.now(), value });
+  return value;
+};
+
+app.get("/llms.txt", async (_req, res) => {
+  res.set("Cache-Control", "public, max-age=3600").type("text/plain; charset=utf-8")
+    .send(await cachedText("llms", renderLlmsTxt));
+});
+
+app.get("/feed.json", async (_req, res) => {
+  res.set("Cache-Control", "public, max-age=3600").type("application/json")
+    .send(await cachedText("feed", renderFeed));
+});
+
+/**
+ * The product page, in whichever language the URL asks for.
+ *
+ * The English copy has been in the database since the columns were added, and the
+ * browser has used it since the storefront got a language switch — but the server
+ * rendered Vietnamese only. So an assistant asked in English could find the page
+ * and still had nothing quotable on it. One renderer, two languages, one source
+ * of truth for the wording.
+ */
+const productPage = (lang) => async (req, res) => {
+  try {
+    const product = await getProductBySlug(req.params.slug);
+    // A draft, or one with no file behind it, must read as a 404 rather than as a
+    // noindex page: the second is a page Google has already been told about, and
+    // leaving it reachable invites the URL being kept and re-submitted.
+    if (!product || product.status !== "active" || !product.fileKey || !isConfigured.r2) {
+      return res.status(404).sendFile(path.join(publicDir, "404.html"));
+    }
+    const reviews = await listReviewsForProduct(product.id);
+    res.set("Cache-Control", "public, max-age=600").type("html").send(renderProductPage(product, lang, reviews));
+  } catch (error) {
+    console.error(error);
+    res.status(500).sendFile(path.join(publicDir, "404.html"));
+  }
+};
+app.get("/product/:slug", productPage("vi"));
+app.get("/en/product/:slug", productPage("en"));
+
 app.get("/og/:slug.svg", async (req, res) => {
   // A clean site-wide card, so a link shared without a product still previews.
+  // The price used to be written into this line as "Từ 99.000₫" and the platform
+  // and version as literals, so a shop that changed either kept publishing the
+  // old numbers. There is no price here at all: a card that invents a number is
+  // worse than a card that states none.
   if (req.params.slug === "sonvudev") {
-    return res.set("Cache-Control", "public, max-age=3600").type("image/svg+xml").send(renderOgImage({ name: "Phần mềm Windows cho công việc", platform: "Windows", version: "1.0", price: 0, currency: "VND", priceLabel: "Từ 99.000₫" }));
+    return res.set("Cache-Control", "public, max-age=3600").type("image/svg+xml").send(renderOgImage({ name: "Phần mềm Windows cho công việc", platform: "Windows", version: "1.0", price: 0, currency: "VND" }));
   }
   const product = await getProductBySlug(req.params.slug);
   if (!product || product.status !== "active" || !product.fileKey || !isConfigured.r2) return res.status(404).type("text/plain").send("Not found");
@@ -216,33 +333,31 @@ app.get("/og/:slug.svg", async (req, res) => {
   res.type("image/svg+xml").send(renderOgImage(product));
 });
 
-app.get("/product/:slug", async (req, res) => {
-  try {
-    const product = await getProductBySlug(req.params.slug);
-    // A product the storefront would not show is a 404 here too. The seed rows
-    // that never got a file attached would otherwise be reachable and indexable
-    // even though nobody can buy them.
-    if (!isSellable(product)) return res.status(404).sendFile(path.join(publicDir, "404.html"));
-    res.set("Cache-Control", "public, max-age=300");
-    res.type("html").send(renderProductPage(product));
-  } catch (error) { console.error(error); res.status(500).type("text/plain").send("Lỗi máy chủ"); }
-});
-
 app.get("/sitemap.xml", async (_req, res) => {
   const base = env.appUrl.replace(/\/$/, "");
   const pages = await fs.readdir(publicDir);
   const urls = pages
-    .filter((file) => /^(index|terms|privacy|refund)\.html$/.test(file))
+    .filter((file) => /^(index|terms|privacy|refund|about)\.html$/.test(file))
     .map((file) => `<url><loc>${base}/${file === "index.html" ? "" : file.replace(/\.html$/, "")}</loc><changefreq>monthly</changefreq><priority>${file === "index.html" ? "1.0" : "0.3"}</priority></url>`);
   // A product that is not on the sitemap cannot be found, so this is built from
   // the live catalogue rather than from a list someone has to remember to edit.
   // The filter is the storefront's own (isSellable), so a page nobody can buy
   // can never be submitted to Google.
+  //
+  // Each product contributes two URLs with hreflang pointing at each other. A
+  // sitemap that lists only the Vietnamese page tells a crawler the English one
+  // is a duplicate to be dropped, which is the opposite of what the two-language
+  // setup is for.
   for (const product of (await listProducts()).filter(isSellable)) {
     const updated = product.updatedAt || product.updated_at;
-    urls.push(`<url><loc>${base}/product/${encodeURIComponent(product.slug)}</loc>${updated ? `<lastmod>${new Date(updated).toISOString().slice(0, 10)}</lastmod>` : ""}<changefreq>weekly</changefreq><priority>0.8</priority></url>`);
+    const lastmod = updated ? `<lastmod>${new Date(updated).toISOString().slice(0, 10)}</lastmod>` : "";
+    const vi = `${base}/product/${encodeURIComponent(product.slug)}`;
+    const en = `${base}/en/product/${encodeURIComponent(product.slug)}`;
+    urls.push(`<url><loc>${vi}</loc>${lastmod}<changefreq>weekly</changefreq><priority>0.8</priority><xhtml:link rel="alternate" hreflang="vi" href="${vi}"/><xhtml:link rel="alternate" hreflang="en" href="${en}"/><xhtml:link rel="alternate" hreflang="x-default" href="${vi}"/></url>`);
+    const hasEnglish = String(product.descriptionEn || "").trim() || String(product.shortDescriptionEn || "").trim() || (Array.isArray(product.featuresEn) && product.featuresEn.length);
+    if (hasEnglish) urls.push(`<url><loc>${en}</loc>${lastmod}<changefreq>weekly</changefreq><priority>0.7</priority><xhtml:link rel="alternate" hreflang="vi" href="${vi}"/><xhtml:link rel="alternate" hreflang="en" href="${en}"/><xhtml:link rel="alternate" hreflang="x-default" href="${vi}"/></url>`);
   }
-  res.type("application/xml").send(`<?xml version="1.0" encoding="UTF-8"?><urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">${urls.join("")}</urlset>`);
+  res.type("application/xml").send(`<?xml version="1.0" encoding="UTF-8"?><urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9" xmlns:xhtml="http://www.w3.org/1999/xhtml">${urls.join("")}</urlset>`);
 });
 
 app.use((req, res, next) => {
@@ -402,7 +517,10 @@ function validOrderToken(req) { return req.get("x-order-token") || text(req.quer
 async function requireOrder(req, res) {
   const order = await getOrder(req.params.id);
   const token = validOrderToken(req);
-  if (!order || !token || order.accessTokenHash !== hashToken(token)) { res.status(404).json({ error: "Không tìm thấy đơn hàng" }); return null; }
+  // isOrderOwner hashes and compares in constant time. The inline comparison this
+  // replaced was a plain === on a hash, which leaks how many leading characters
+  // matched, and it was the fourth copy of this check in the codebase.
+  if (!isOrderOwner(order, token)) { res.status(404).json({ error: "Không tìm thấy đơn hàng" }); return null; }
   return order;
 }
 app.get("/api/orders/:id", async (req, res) => {
@@ -450,6 +568,30 @@ app.post("/api/orders/lookup", json, async (req, res) => {
     await updateOrder(order.id, { accessTokenHash: hashToken(accessToken), updatedAt: new Date().toISOString() });
     res.json({ order: publicOrder(await getOrder(order.id)), accessToken, ...deadlinePayload(await getOrder(order.id)) });
   } catch (error) { console.error(error); res.status(500).json({ error: "Không thể tra cứu đơn hàng" }); }
+});
+
+/**
+ * A review, from someone who paid and was given the file.
+ *
+ * The access token is the whole authorisation: it is what opens the order, and
+ * buyers are only ever shown it after checkout. So the review can only ever be
+ * attached to a purchase whose download the caller could actually open, and there
+ * is nothing to moderate beyond that.
+ */
+app.post("/api/reviews", json, async (req, res) => {
+  try {
+    const result = await createReview({
+      orderId: text(req.body.orderId, 80).toUpperCase(),
+      accessToken: text(req.body.accessToken, 200),
+      productId: text(req.body.productId, 80),
+      body: req.body.body,
+      authorName: req.body.authorName,
+    });
+    if (result.error) return res.status(result.status || 400).json({ error: result.error });
+    res.status(201).json({ review: result.review });
+    // The words are now on the product page, which was already rendered and cached.
+    invalidatePages();
+  } catch (error) { console.error(error); res.status(500).json({ error: "Không thể lưu đánh giá" }); }
 });
 
 app.post("/api/paypal/webhook", express.raw({ type: "application/json" }), async (req, res) => {
@@ -537,8 +679,16 @@ app.post("/api/admin/products", admin, json, async (req, res) => {
   try {
     const name = text(req.body.name, 120); const price = Number(req.body.price);
     if (!name || !Number.isFinite(price) || price < 0) return res.status(400).json({ error: "Tên hoặc giá sản phẩm không hợp lệ" });
+    const slug = text(req.body.slug, 80) || name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
+    // Checked here as well as by the unique index, so the panel gets a sentence it
+    // can show rather than a 500. Postgres rejects the second row with a 23505
+    // that used to reach the owner as "server error" with no way to tell which
+    // field was the problem. The index stays the real guarantee; this is the
+    // message.
+    if (!slug) return res.status(400).json({ error: "Tên sản phẩm không tạo được đường dẫn. Hãy nhập slug." });
+    if (await getProductBySlug(slug)) return res.status(409).json({ error: `Đường dẫn /product/${slug} đã có sản phẩm khác dùng rồi.` });
     const item = await createProduct({
-      slug: text(req.body.slug, 80) || name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, ""), name,
+      slug, name,
       shortDescription: text(req.body.shortDescription, 180), description: text(req.body.description, 2000), category: text(req.body.category, 50) || "Khác", platform: text(req.body.platform, 50) || "Windows", version: text(req.body.version, 30) || "1.0.0", price, currency: text(req.body.currency, 8) || "VND",
       features: Array.isArray(req.body.features) ? req.body.features.map((v) => text(v, 120)).filter(Boolean) : [], featuresEn: Array.isArray(req.body.featuresEn) ? req.body.featuresEn.map((v) => text(v, 200)).filter(Boolean) : [], shortDescriptionEn: text(req.body.shortDescriptionEn, 180), descriptionEn: text(req.body.descriptionEn, 4000), requirements: text(req.body.requirements, 240), seoTitle: text(req.body.seoTitle, 70), seoDescription: text(req.body.seoDescription, 175), status: text(req.body.fileKey, 500) ? (req.body.status === "draft" ? "draft" : "active") : "draft", fileKey: text(req.body.fileKey, 500), badge: text(req.body.badge, 40) || null, featured: Boolean(req.body.featured),
     });
@@ -548,6 +698,10 @@ app.post("/api/admin/products", admin, json, async (req, res) => {
     // search engine being slow must not fail a product save.
     await pingIndexNow(["/", `/product/${item.slug}`]);
     res.status(201).json({ product: item });
+    // A new product changes what the homepage, /llms.txt and /feed.json say, and
+    // all three were allowed to keep serving the previous catalogue for a minute.
+    // Creating is rare; being wrong about a price is not.
+    invalidatePages();
   } catch (error) { console.error(error); res.status(500).json({ error: "Không thể tạo sản phẩm" }); }
 });
 app.patch("/api/admin/products/:id", admin, json, async (req, res) => {
@@ -566,6 +720,7 @@ app.patch("/api/admin/products/:id", admin, json, async (req, res) => {
     // exactly as indexable as a new page.
     await pingIndexNow(["/", `/product/${item.slug}`]);
     res.json({ product: item });
+    invalidatePages();
   }
   catch (error) { console.error(error); res.status(500).json({ error: "Không thể cập nhật sản phẩm" }); }
 });
@@ -573,6 +728,10 @@ app.post("/api/admin/uploads/presign", admin, json, async (req, res) => {
   try {
     const productRef = text(req.body.productRef ?? req.body.productId, 80); const version = text(req.body.version, 30); const fileName = text(req.body.fileName, 140);
     if (!productRef || !version || !fileName) return res.status(400).json({ error: "Thiếu productRef, version hoặc fileName" });
+    // The release formats, in one place. This gate used to name three extensions
+    // while the shop sells Windows software, which is the whole catalogue: there
+    // is no Apple or Linux build, and pretending otherwise in the uploader would
+    // only produce a file the product page then misdescribes.
     if (!/\.(zip|exe|msi|7z)$/i.test(fileName)) return res.status(400).json({ error: "Chỉ hỗ trợ file .zip, .exe, .msi hoặc .7z" });
     if (!isConfigured.r2) return res.status(503).json({ error: "R2 chưa được cấu hình" });
     res.json(await createUploadUrl({ productRef, version, fileName, contentType: text(req.body.contentType, 120) }));
@@ -675,7 +834,9 @@ app.patch("/api/admin/orders/:id", admin, json, async (req, res) => {
     // mistake. Recorded as its own figure rather than subtracted from the sale,
     // so the gross number still matches a bank statement.
     if (req.body.refund === true) {
-      if (existing.status !== "paid") return res.status(409).json({ error: "Chỉ hoàn tiền được đơn đã thanh toán" });
+      // hasPayment, not status === "paid": a delivered order is no longer "paid"
+      // by design, and refusing those made the most common refund impossible.
+      if (!hasPayment(existing)) return res.status(409).json({ error: "Chỉ hoàn tiền được đơn đã nhận tiền" });
       const reason = typeof req.body.reason === "string" ? req.body.reason.trim() : "";
       if (!reason) return res.status(400).json({ error: "Cần ghi lý do hoàn tiền" });
       return res.json({ order: publicOrder(await voidPayment(existing, { reason })) });

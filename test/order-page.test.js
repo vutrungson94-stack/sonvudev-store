@@ -12,6 +12,10 @@ import { createDom, runScript, El } from './helpers/dom.mjs';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const read = (p) => fs.readFileSync(path.join(root, 'public', p), 'utf8');
+// Server-side files live outside public/. read() above is deliberately scoped to
+// the browser layer, so these go through their own path rather than through a
+// ".." in a test string that quietly stops working when the file moves.
+const readSrc = (p) => fs.readFileSync(path.join(root, 'src', p), 'utf8');
 
 const IDS = ['order-title', 'order-lead', 'order-body'];
 
@@ -267,11 +271,19 @@ test('moi trang don hang deu dung chung mot bo nhan trang thai', () => {
   const source = read('order.js');
   const app = read('app.js');
   // Two copies of this map had already drifted: the same order read as awaiting
-  // payment in one place and awaiting a bank transfer in the other.
+  // payment in one place and awaiting a bank transfer in the other. Then the two
+  // copies of the *hint* drifted the same way, and worse: the checkout modal knew
+  // five states and the order page knew ten, so a refunded order or an
+  // unconfirmed PayPal capture read as a bland "awaiting payment" in one and as
+  // the truth in the other. Both are now one function in i18n.js.
   assert.ok(!/const statusLabels\s*=/.test(source), 'order.js khong duoc tu dinh nghia nhan trang thai');
   assert.ok(!/const labels\s*=\s*\{\s*pending/.test(app), 'app.js khong duoc tu dinh nghia nhan trang thai');
   for (const [name, file] of [['order.js', source], ['app.js', app]]) {
-    assert.ok(/I18N\.status(Key)?\(/.test(file), `${name} phai dung ham trang thai chung`);
+    // Neither page may reason about order state on its own. The word is
+    // orderHint, not status(), because the sentence a buyer reads has to come
+    // from the same place on both screens.
+    assert.ok(/I18N\.orderHint\(/.test(file), `${name} phai dung ham trang thai chung`);
+    assert.ok(!/function orderHint\s*\(/.test(file), `${name} khong duoc tu viet lai cau hinh trang thai don`);
     // Aliasing the shared helper is the point. Writing a second implementation is
     // the thing this check exists to stop, so the test looks for the escaping and
     // the formatter rather than for the name.
@@ -279,6 +291,43 @@ test('moi trang don hang deu dung chung mot bo nhan trang thai', () => {
     assert.ok(!/\.replace\(/.test(escLine), `${name} khong duoc tu viet lai ham escape`);
     const moneyLine = file.split(/\r?\n/).find((l) => /^\s*const money\s*=/.test(l)) || '';
     assert.ok(!/Intl\.NumberFormat/.test(moneyLine), `${name} khong duoc goi dinh dang so tien bang ngon ngu cua nguoi ban`);
+  }
+  // One copy of the logic, not two aliases of two copies.
+  const i18n = read('i18n.js');
+  assert.ok((i18n.match(/orderHint\s*\(/g) || []).length >= 1, 'i18n.js phai dinh nghia ham orderHint');
+});
+
+// A clock told in two places is two chances to tell a buyer two different amounts
+// of time to pay. The modal and the order page each had their own remaining-ms
+// calculation, zero padding and HH:MM:SS formatting, which is exactly the class of
+// drift the hint checks above were written for.
+test('dem nguoc chi co mot cach tinh, va do theo dong ho cua may chu', () => {
+  const files = [['order.js', read('order.js')], ['app.js', read('app.js')]];
+  for (const [name, file] of files) {
+    assert.ok(/I18N\.clock\(/.test(file), `${name} phai dung bo dem nguoc chung`);
+    // Narrow on the clock's own padding, not padStart in general: the product
+    // count is padded to two digits for display and has nothing to do with time.
+    assert.ok(!/pad\(n\)\s*=>?\s*String\(n\)\.padStart\(2/.test(file) && !/String\(n\)\.padStart\(2/.test(file), `${name} khong duoc tu viet lai cach dem gio`);
+    assert.ok(!/const (formatDuration|formatLeft)\s*=/.test(file), `${name} khong duoc tu dinh nghia dinh dang gio`);
+  }
+  const i18n = read('i18n.js');
+  assert.ok(/clock\(deadline, serverTime\)/.test(i18n), 'i18n.js phai cung cap ham clock');
+  assert.ok(/new Date\(serverTime\)\.getTime\(\) - Date\.now\(\)/.test(i18n), 'phai bu chenh lech dong ho cua may chu');
+});
+
+// The escape helper and the money formatter were each written out twice in the
+// server, byte for byte identical. The reason two identical copies are dangerous
+// is not that today's copy is wrong: it is that the page a crawler reads and the
+// email a buyer reads are the same sentence, and the day one of them is extended
+// nothing stops the other disagreeing about what counts as escaped.
+test('escape va dinh dang tien chi co mot ban o phia may chu', () => {
+  const format = readSrc('format.js');
+  assert.ok(/export const esc\s*=/.test(format), 'format.js phai xuat esc');
+  assert.ok(/export const money\s*=/.test(format), 'format.js phai xuat money');
+  for (const [name, file] of [['pages.js', readSrc('pages.js')], ['notify.js', readSrc('notify.js')]]) {
+    assert.ok(/from "\.\/format\.js"/.test(file), `${name} phai import tu format.js`);
+    assert.ok(!/&\quot;/.test(file), `${name} khong duoc tu viet lai bang escape`);
+    assert.ok(!/Intl\.NumberFormat/.test(file), `${name} khong duoc goi dinh dang so tien bang ngon ngu cua nguoi ban`);
   }
 });
 

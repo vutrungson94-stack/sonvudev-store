@@ -38,6 +38,26 @@ export const env = {
   port: numberValue("PORT", 3000),
   appUrl: value("APP_URL", "http://localhost:3000").replace(/\/$/, ""),
   adminToken: value("ADMIN_API_TOKEN"),
+  // Who the shop is to the outside world. The brand used to be typed into the
+  // templates, the PayPal call and the order emails separately, so renaming the
+  // shop meant editing four files and forgetting one. Everything that speaks to
+  // a person or to a crawler now reads it from here.
+  brand: {
+    name: value("BRAND_NAME", "SonVuDev"),
+    // Shown on the legal pages, so a buyer has something to hold the shop to.
+    legalEntity: value("BRAND_LEGAL_ENTITY", ""),
+    // The person behind the shop. Models weight a named human far more heavily
+    // than an anonymous storefront, and schema.org has a slot for exactly this.
+    founderName: value("BRAND_FOUNDER_NAME", ""),
+    founderUrl: value("BRAND_FOUNDER_URL", ""),
+    // Profile URLs for the same accounts elsewhere. This is what links the shop
+    // to the wider web in a knowledge graph; an empty sameAs makes the brand an
+    // island that no model can corroborate.
+    socialLinks: value("BRAND_SOCIAL_LINKS")
+      .split(/[\s,]+/)
+      .map((item) => item.trim())
+      .filter((item) => /^https:\/\//i.test(item)),
+  },
   r2: {
     accountId: value("R2_ACCOUNT_ID"),
     accessKeyId: value("R2_ACCESS_KEY_ID"),
@@ -68,7 +88,7 @@ export const env = {
   email: {
     // Resend is a plain REST API, so no dependency and no SMTP server is needed.
     resendKey: value("RESEND_API_KEY"),
-    from: value("EMAIL_FROM", "SonVuDev <no-reply@sonvudev.com>"),
+    from: value("EMAIL_FROM", `${value("BRAND_NAME", "SonVuDev")} <no-reply@sonvudev.com>`),
     supportEmail: value("SUPPORT_EMAIL", "hello@sonvudev.com"),
   },
   paypal: {
@@ -85,9 +105,9 @@ export const env = {
   },
   bank: {
     name: value("BANK_NAME", "Chưa cập nhật"),
-    accountName: value("BANK_ACCOUNT_NAME", "SonVuDev"),
+    accountName: value("BANK_ACCOUNT_NAME", value("BRAND_NAME", "SonVuDev")),
     accountNumber: value("BANK_ACCOUNT_NUMBER", "Chưa cập nhật"),
-    notePrefix: value("BANK_TRANSFER_NOTE_PREFIX", "SonVuDev"),
+    notePrefix: value("BANK_TRANSFER_NOTE_PREFIX", value("BRAND_NAME", "SonVuDev")),
     bin: value("BANK_BIN", "970436"),
     momo: value("MOMO_ACCOUNT_NUMBER"),
     momoQr: value("MOMO_QR_IMAGE"),

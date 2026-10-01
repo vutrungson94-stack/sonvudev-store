@@ -1,6 +1,7 @@
 import { createApp } from "./app.js";
+import path from "node:path";
 import { env } from "./config.js";
-import { persistenceMode } from "./store.js";
+import { persistenceMode, projectRoot } from "./store.js";
 import { startSweeper, stopSweeper } from "./orders.js";
 import { notifyMode } from "./notify.js";
 
@@ -8,7 +9,7 @@ const mailMode = notifyMode();
 
 const app = await createApp();
 const server = app.listen(env.port, env.host, () => {
-  console.log(`SonVuDev Store running at ${env.appUrl}`);
+  console.log(`${env.brand.name} store running at ${env.appUrl}`);
   console.log(`Listening on ${env.host}:${env.port}`);
   console.log(`Persistence: ${persistenceMode}`);
   console.log(`Unpaid orders are cancelled after ${env.orders.paymentWindowHours}h`);
@@ -20,7 +21,7 @@ const server = app.listen(env.port, env.host, () => {
     console.warn("  [CẢNH BÁO] RESEND_API_KEY chưa được cấu hình.");
     console.warn("  Email đơn hàng đang được ghi ra data/outbox, KHÔNG gửi tới khách.");
     console.warn("  Khách không nhận được xác nhận đơn, nhắc hết hạn, hay thông báo đã thanh toán.");
-    console.warn("  Đặt RESEND_API_KEY rồi chạy: npm run render:sync -- --apply");
+    console.warn("  Đặt RESEND_API_KEY rồi chạy: npm run render:sync:deploy");
     console.warn("");
   } else {
     console.log(`Order mail: ${mailMode}`);
@@ -42,9 +43,12 @@ process.on("SIGTERM", shutdown);
 server.on("error", (error) => {
   if (error.code === "EADDRINUSE") {
     console.error(`Không thể khởi động: cổng ${env.port} đang được sử dụng.`);
-    console.error(`Đóng tiến trình cũ hoặc đổi PORT trong ${"D:/SonVuDev-Upload/.env"}.`);
+    // The path is worked out from the project root rather than written in. It used
+    // to name one developer's machine, so on every other computer the advice
+    // pointed at a file that does not exist.
+    console.error(`Đóng tiến trình cũ hoặc đổi PORT trong ${path.join(projectRoot, ".env")}.`);
   } else {
-    console.error("Không thể khởi động SonVuDev Store:", error.message);
+    console.error(`Không thể khởi động ${env.brand.name} store:`, error.message);
   }
   process.exitCode = 1;
 });

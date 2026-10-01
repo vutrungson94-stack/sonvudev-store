@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { promises as fs } from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 
 process.env.NODE_ENV = 'test';
 
@@ -30,9 +31,10 @@ process.env.RESEND_API_KEY = '';
 process.env.INDEXNOW_KEY = '';
 
 const { createApp } = await import('../src/app.js');
-const { createOrder, getOrder, listOrders, updateOrder } = await import('../src/store.js');
-const { isExpired, markOrderDelivered, markOrderPaid, paymentDeadline, sweepOrders } = await import('../src/orders.js');
+const { UNPAID_STATUSES, createOrder, getOrder, listOrders, updateOrder } = await import('../src/store.js');
+const { isExpired, isUnpaid, markOrderDelivered, markOrderPaid, paymentDeadline, sweepOrders } = await import('../src/orders.js');
 const { notifyOrder, outboxPath } = await import('../src/notify.js');
+const readSrc = (file) => fs.readFile(path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', file), 'utf8');
 
 let server;
 let base;
@@ -264,4 +266,52 @@ test('không mở lại được đơn chưa đóng', async () => {
   const { data, email } = await checkout();
   const response = await fetch(`${base}/api/admin/orders/${data.order.id}`, { method: 'PATCH', headers: jsonHeaders, body: JSON.stringify({ reopen: true }) });
   assert.equal(response.status, 409, 'đơn chưa giao thì không có gì để mở lại');
+});
+
+test('mọi đường truy vấn đều hỏi cả hai trạng thái chưa thanh toán', async () => {
+  // This test exists because of a real production bug, not a hypothetical one.
+  // A PayPal order stays `pending` until its capture lands, so a query asking only
+  // for `pending_transfer` never saw one. A buyer who abandoned PayPal checkout left
+  // an order that could never expire, never got its reminder mail, and sat in the
+  // admin list for ever — one was found that way. The JSON path was correct and the
+  // PostgREST path was not, and every test in this repository runs against JSON,
+  // which is exactly why it survived a long time unnoticed.
+  //
+  // The rule is enforced structurally rather than behaviourally: a status filter
+  // written into a query by hand is how the two paths drift apart, so there cannot
+  // be one.
+// Scoped to order queries and with comments stripped: `products` legitimately
+  // filters on `status=eq.active`, and a paragraph explaining this very bug quotes
+  // the old string. Neither is a hand-written order filter.
+  const source = (await readSrc('src/store.js'))
+    .replace(/\/\*[\s\S]*?\*\//g, '')
+    .replace(/^\s*\/\/.*$/gm, '');
+  const orderQueries = [...source.matchAll(/orders\?([^`"']*)/g)].map((match) => match[1]);
+  assert.ok(orderQueries.length >= 2, 'phai co it nhat hai truy vấn bảng orders');
+  const handWritten = orderQueries.filter((query) => /status=eq\./.test(query));
+  assert.deepEqual(handWritten, [], `truy vấn orders còn ghi cứng trạng thái: ${handWritten.join(' | ')}`);
+  assert.ok(/status=in\.\(\$\{UNPAID_STATUSES/.test(source), 'bộ lọc PostgREST phải dựng từ UNPAID_STATUSES, không gõ tay');
+
+  // Both statuses are unpaid, and the sweep's own rule agrees.
+  assert.deepEqual([...UNPAID_STATUSES].sort(), ['pending', 'pending_transfer']);
+  assert.equal(isUnpaid({ status: 'pending' }), true);
+  assert.equal(isUnpaid({ status: 'pending_transfer' }), true);
+  assert.equal(isUnpaid({ status: 'paid' }), false);
+
+  // And an expired PayPal order is actually cancelled, which it was not before,
+  // because the status was filtered out before the sweep ever saw the row.
+  const now = Date.parse('2026-06-02T12:00:00Z');
+  const paypal = {
+    id: 'SVD-SWEEP-PAYPAL', status: 'pending', paymentProvider: 'paypal',
+    createdAt: '2026-06-01T00:00:00.000Z', expiresAt: '2026-06-01T12:00:00.000Z',
+    customerEmail: 'buyer@example.com', items: [product],
+  };
+  assert.equal(isExpired(paypal, now), true, 'đơn PayPal quá hạn phải được coi là hết hạn');
+  await createOrder(paypal);
+
+  const touched = await sweepOrders(now);
+  assert.ok(touched.expired.includes('SVD-SWEEP-PAYPAL'), 'sweep phải huỷ được đơn PayPal quá hạn');
+  const after = await getOrder('SVD-SWEEP-PAYPAL');
+  assert.equal(after.status, 'cancelled');
+  assert.equal(after.cancelReason, 'expired');
 });

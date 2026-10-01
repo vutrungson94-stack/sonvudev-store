@@ -44,7 +44,13 @@ const i18nSource = await read(path.join("public", "i18n.js"));
 //    just recorded a 404 for the brand's logo.
 // ---------------------------------------------------------------------------
 // Paths the server answers itself, with no file behind them.
-const dynamicRoute = /^(?:\/$|\/product\/[^/]+$|\/order\/[^/]+$|\/og\/[^/]+$|\/robots\.txt$|\/sitemap\.xml$|\/api\/|\/admin(?:\.html)?$|\/paypal-return(?:\.html)?$|\/lookup$|\/google[0-9a-z]+\.html$|\/ms[0-9a-z]+\.txt$|\/[0-9a-z-]{8,128}\.txt$)/;
+//
+// This list has to grow with the server, and that is the point of writing it down
+// rather than loosening the check: a route added without a line here is a failing
+// build, not a silently accepted 404. /llms.txt, /feed.json and the English
+// product path were all missing here when they were first written, and each one
+// was caught by the same check that has been catching bad links all along.
+const dynamicRoute = /^(?:\/$|\/en(?:\/product\/[^/]+)?$|\/product\/[^/]+$|\/order\/[^/]+$|\/og\/[^/]+$|\/robots\.txt$|\/sitemap\.xml$|\/llms\.txt$|\/feed\.json$|\/api\/|\/admin(?:\.html)?$|\/paypal-return(?:\.html)?$|\/lookup$|\/google[0-9a-z]+\.html$|\/ms[0-9a-z]+\.txt$|\/[0-9a-z-]{8,128}\.txt$)/;
 // Pages that are entry points rather than link targets: the buyer reaches them
 // from an email or a PayPal redirect, and robots.txt deliberately keeps crawlers
 // away from all three.
@@ -136,9 +142,19 @@ if (orphans.length) fail("khoá i18n mồ côi", "public/i18n.js", `${orphans.le
 //    static pages. Change it in one place and the others keep sending buyers to
 //    an address nobody reads.
 // ---------------------------------------------------------------------------
-const appUrl = env("APP_URL") || "https://sonvudev.com";
-const appHost = new URL(appUrl).hostname.toLowerCase();
-const supportEmail = (env("SUPPORT_EMAIL") || "hello@sonvudev.com").toLowerCase();
+// Read the values the audit compares against straight out of the environment,
+// with no fallback.
+//
+// The fallback used to be the shop's own domain and support address. That is the
+// one thing this check must never invent: with APP_URL unset it compared the
+// files against a constant, found the constant in index.html's own JSON-LD, and
+// passed. The mechanism reported itself healthy precisely when it was not
+// configured. Now a missing value fails, loudly, naming itself.
+const appUrl = env("APP_URL");
+const supportEmail = (env("SUPPORT_EMAIL") || "").toLowerCase();
+if (!appUrl) fail("cau hinh thieu", "process.env", "APP_URL chưa được đặt — audit không thể biết domain nào là chính");
+if (!supportEmail) fail("cau hinh thieu", "process.env", "SUPPORT_EMAIL chưa được đặt — audit không thể biết địa chỉ hỗ trợ nào là chính");
+const appHost = appUrl ? new URL(appUrl).hostname.toLowerCase() : "";
 const thirdParty = new Set(["www.w3.org", "schema.org", "www.sitemaps.org", "localhost", "img.vietqr.io", "fonts.googleapis.com", "fonts.gstatic.com", "resend.com", "supabase.com", "supabase.co", "paypal.com", "google.com", "cloudflare.com", "render.com", "ipapi.co", "ipwho.is", "er-api.com", "exchangerate-api.com", "indexnow.org"]);
 // i18n.js is scanned too: brand.supportEmail is the configured default the pages
 // fall back to, so letting it drift away from .env would mean an empty mailto on
@@ -159,6 +175,16 @@ for (const relative of emailBearing) {
     if (thirdParty.has(host)) continue;
     if (host.endsWith(".supabase.co") || host.endsWith(".r2.cloudflarestorage.com")) continue;
     fail("domain gõ tay", relative, `https://${host} — APP_URL là ${appUrl}`);
+  }
+  // The same domain written without a scheme. The scan above needs "https://" to
+  // find a host, so prose like "áp dụng cho mọi giao dịch tại sonvudev.com" passed
+  // straight through — and that is exactly the string a legal page shows a buyer
+  // deciding whether the terms they are reading are the ones that apply.
+  if (appHost) {
+    for (const match of source.matchAll(new RegExp(`(?<![/.\\w-])${appHost.replace(/\./g, "\\.")}(?![\\w-])`, "gi"))) {
+      const line = source.slice(0, match.index).split("\n").length;
+      fail("domain gõ tay", `${relative}:${line}`, `${match[0]} — APP_URL là ${appUrl}`);
+    }
   }
   for (const match of source.matchAll(/[\w.+-]+@[\w.-]+\.[a-z]{2,}/gi)) {
     const address = match[0].toLowerCase();
@@ -185,11 +211,40 @@ for (const match of pagesSource.matchAll(/"(?:urlTemplate|item|url)"\s*:\s*`?\$\
   if (blocked.has(target)) fail("schema chặn", "src/pages.js", `dữ liệu có cấu trúc trỏ tới ${target} mà robots.txt chặn`);
 }
 
+// A token the server never substitutes is a value the page prints verbatim. The
+// {{support}}, {{site}}, {{year}} and {{paymentWindowHours}} tokens each cover
+// their own pages; a new one added to a template and never wired up is invisible
+// until a buyer reads "{{legalEntity}}" in the middle of the terms.
+const wiredTokens = ["site", "support", "year", "paymentWindowHours", "legalEntity", "jsonLd"];
+for (const name of htmlFiles) {
+  const source = await read(path.join("public", name));
+  for (const match of source.matchAll(/\{\{\s*([a-zA-Z]+)\s*\}\}/g)) {
+    if (wiredTokens.includes(match[1])) continue;
+    fail("token chua noi", `public/${name}`, `{{${match[1]}}} không có chỗ nào trong renderPage điền vào`);
+  }
+}
+
 // ---------------------------------------------------------------------------
 // 6. A page in public/ that nothing links to.
 //    An orphaned page is one the owner believes is live, that no visitor reaches
 //    from anywhere, and that a crawler may still find and index.
 // ---------------------------------------------------------------------------
+
+// 6a. A data-i18n element with no text in it.
+//
+// The storefront fills these from the dictionary at runtime, so an element left
+// empty is fine for a person with JavaScript and empty for everyone else: a
+// crawler, a link-preview bot, an assistant fetching the HTML, or a reader who
+// turned scripting off. The text has to be sitting in the markup already, which is
+// what scripts/fill-static-text.mjs writes.
+//
+// This check is what turns that one-off script into a gate: it can be run once,
+// and the build then refuses to let the drift come back the next time someone
+// edits i18n.js and forgets the HTML.
+for (const match of indexHtml.matchAll(/<(?:span|p|h1|h2|h3|a|button|summary|li|div)[^>]*\bdata-i18n="([\w.]+)"[^>]*>\s*</g)) {
+  fail("chữ rỗng", "public/index.html", `data-i18n="${match[1]}" không có chữ trong HTML — chạy npm run i18n:fill`);
+}
+
 const reachable = new Set();
 for (const name of htmlFiles) {
   const source = await read(path.join("public", name));

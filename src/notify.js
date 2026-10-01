@@ -1,24 +1,24 @@
 import { promises as fs } from "node:fs";
 import path from "node:path";
-import { fileURLToPath } from "node:url";
 import { env, isConfigured } from "./config.js";
-import { updateOrder } from "./store.js";
+import { projectRoot, updateOrder } from "./store.js";
+import { esc as escapeHtml, money } from "./format.js";
 
 // Order mail is the only outbound mail the store sends. Resend is used because
 // it is a plain REST API: no dependency, no SMTP server, and its free tier
 // covers a store this size. Without a key every message is written to
 // data/outbox instead, so the whole flow can be exercised before an account
 // exists and a missing key can never break a checkout.
-const root = process.env.DATA_DIR ? path.resolve(process.env.DATA_DIR) : path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
-const outboxDir = path.join(root, "data", "outbox");
+//
+// projectRoot comes from the store, which resolved it the same way. The second
+// copy of that expression could only agree for as long as nobody edited one.
+const outboxDir = path.join(projectRoot, "data", "outbox");
 
 // A mail that keeps failing must not be retried on every sweep tick, but a
 // single failure (a provider timeout, a rate limit) must not silently drop the
 // only message the buyer ever gets.
 const MAX_ATTEMPTS = 3;
 const RETRY_BACKOFF_MS = [0, 60_000, 600_000];
-
-const escapeHtml = (value) => String(value ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 
 const text = (error) => String(error?.message || error || "").slice(0, 300);
 
@@ -28,7 +28,10 @@ const text = (error) => String(error?.message || error || "").slice(0, 300);
 // should not see the letters b and slash-b.
 const stripTags = (value) => String(value).replace(/<\/?b>/g, "");
 
-const money = (amount, currency) => new Intl.NumberFormat(currency === "USD" ? "en-US" : "vi-VN", currency === "USD" ? { style: "currency", currency } : { maximumFractionDigits: 0 }).format(Number(amount) || 0);
+// escapeHtml and money are imported from format.js. They were written out here
+// as well, identical to the character, which meant the price a buyer reads in
+// their bank confirmation and the price on the page they bought from were two
+// independent implementations of the same format.
 
 const stamp = (value) => {
   const date = value ? new Date(value) : null;
@@ -43,7 +46,7 @@ function context(order) {
   const product = item(order);
   return {
     id: order.id,
-    product: product.name || "SonVuDev",
+    product: product.name || env.brand.name,
     version: product.version || "",
     amount: money(order.amount, order.currency),
     currency: order.currency || "VND",
@@ -55,6 +58,13 @@ function context(order) {
     deadline: stamp(order.expiresAt),
     paidAt: stamp(order.paidAt),
     refundReason: order.refundReason || "không rõ",
+    // The exact string the bank-transfer QR and the checkout panel ask the buyer to
+    // write. It used to be written out as "SonVuDev <order id>" here while the QR
+    // code was built from BANK_TRANSFER_NOTE_PREFIX, so setting that variable left
+    // the email telling buyers to write a note that would not match their own
+    // payment. There is one transfer note now and it is built the same way as the
+    // one on screen.
+    transferNote: `${env.bank.notePrefix} ${order.id}`.trim(),
     lookupUrl: `${env.appUrl}/lookup`,
     support: env.email.supportEmail,
   };
@@ -73,7 +83,7 @@ const TEMPLATES = {
       `Pay before ${c.deadline}. Unpaid orders are cancelled automatically after ${c.windowHours} hours.`,
     ],
     blocks: [
-      `Thanh toán đúng số tiền và ghi nội dung chuyển khoản là <b>SonVuDev ${c.id}</b> để chúng tôi đối soát.`,
+      `Thanh toán đúng số tiền và ghi nội dung chuyển khoản là <b>${c.transferNote}</b> để chúng tôi đối soát.`,
       `Mã tra cứu đơn hàng được lưu trong trình duyệt của bạn. Nếu mất, mở ${c.lookupUrl} và nhập mã đơn cùng email này để lấy lại.`,
       `Bạn chỉ bị tính phí khi thanh toán thành công. Cần trợ giúp: ${c.support}.`,
     ],
@@ -148,7 +158,7 @@ function body(order, template) {
   ].join("\n");
   const html = `<!doctype html><html lang="vi"><body style="margin:0;padding:24px;background:#f1f6f3;font-family:-apple-system,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;color:#16302a">
 <div style="max-width:560px;margin:0 auto;background:#fff;border:1px solid #dbe7e0;border-radius:14px;padding:28px">
-<p style="margin:0 0 4px;font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:#3f8f68">SonVuDev</p>
+<p style="margin:0 0 4px;font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:#3f8f68">${escapeHtml(env.brand.name)}</p>
 <h1 style="margin:0 0 18px;font-size:22px;line-height:1.3">${escapeHtml(spec.heading)}</h1>
 <h2 style="margin:0 0 18px;font-size:16px;line-height:1.4;color:#4b6159">${escapeHtml(spec.headingEn)}</h2>
 ${spec.lines.map((l) => `<p style="margin:0 0 10px;font-size:14px;line-height:1.6">${escapeHtml(l)}</p>`).join("")}
@@ -159,7 +169,7 @@ ${spec.lines.map((l) => `<p style="margin:0 0 10px;font-size:14px;line-height:1.
 </table>
 ${spec.blocks.map((b) => `<p style="margin:0 0 10px;font-size:13px;line-height:1.6;color:#3d514a">${b.replace(/(https?:\/\/[^\s<]+)/g, '<a href="$1" style="color:#247653">$1</a>')}</p>`).join("")}
 <hr style="border:0;border-top:1px solid #e6eee9;margin:22px 0">
-<p style="margin:0;font-size:11px;color:#8b9893">© 2026 SonVuDev.com</p>
+<p style="margin:0;font-size:11px;color:#8b9893">© ${new Date().getFullYear()} ${escapeHtml(env.brand.name)}</p>
 </div></body></html>`;
   return { subject: spec.subject, text, html };
 }

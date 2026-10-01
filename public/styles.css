@@ -272,3 +272,33 @@ body.modal-open{overflow:hidden}
    on the list as a whole, not one of the row actions in the last column. */
 .admin-more{display:flex;justify-content:center;padding:18px 0 4px}
 .admin-more .button{width:auto}
+
+/* ------------------------------------------------------------------
+   Reviews. Prose only, so there is no star widget and no score to
+   defend: a box the customer writes a sentence in, and the same
+   sentences quoted back on the product page. The form appears on the
+   order page only after the file has been handed over, because a review
+   from someone who never received anything is worth nothing to anyone.
+   ------------------------------------------------------------------ */
+.review-box{margin:24px 0 0;padding:20px;border:1px solid var(--line);border-radius:14px;background:#fff}
+.review-box h3{margin:0 0 6px;font-family:var(--display);font-size:16px}
+.review-hint{margin:0 0 14px;font-size:12.5px;line-height:1.7;color:var(--muted)}
+.review-box textarea,.review-box input{width:100%;margin-bottom:10px;padding:11px 13px;border:1px solid var(--line);border-radius:10px;background:var(--bg);font:inherit;font-size:14px;color:var(--ink);resize:vertical}
+.review-box textarea:focus,.review-box input:focus{outline:2px solid var(--green);outline-offset:1px}
+.review-box .button{width:auto}
+.review-status{margin:10px 0 0;font-size:12px;color:var(--muted);min-height:1em}
+.review-done{margin:24px 0 0;padding:16px 18px;border:1px solid var(--line);border-radius:12px;background:#fff;font-size:13px;color:var(--muted)}
+/* On the product page, the same sentences as a plain list. Quoted blocks
+   rather than a rating widget: this is text that a person wrote, and it
+   reads as text. */
+.review-list{list-style:none;margin:0;padding:0;display:grid;gap:14px}
+.review-list li{padding:16px 18px;border:1px solid var(--line);border-left:3px solid var(--green);border-radius:12px;background:var(--bg)}
+.review-list p{margin:0 0 8px;font-size:14px;line-height:1.72;color:var(--ink)}
+.review-list small{font-size:12px;color:var(--muted)}
+/* The entity behind the shop, shown on the legal pages. Rendered empty — not
+   visible but blank — when BRAND_LEGAL_ENTITY is not set, because a sole trader
+   with no registered entity should show nothing rather than an invented name.
+   The line is hidden rather than given a placeholder so the page cannot end up
+   saying "Chủ thể:" followed by nothing. */
+.legal-entity{color:var(--muted);font-size:12px;margin:-28px 0 38px;padding:0 0 22px;border-bottom:1px solid var(--line)}
+.legal-entity:empty{display:none}

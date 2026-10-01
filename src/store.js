@@ -4,11 +4,40 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { env, isConfigured } from "./config.js";
 
-const root = process.env.DATA_DIR ? path.resolve(process.env.DATA_DIR) : path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
+/**
+ * Where this process keeps its files.
+ *
+ * One definition, because two modules write under it and the second used to
+ * recompute the same expression with the same DATA_DIR override, so the only way
+ * the two could agree was if the two lines never drifted. notify.js imports this
+ * instead.
+ */
+export const projectRoot = process.env.DATA_DIR ? path.resolve(process.env.DATA_DIR) : path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
+const root = projectRoot;
 const files = { products: path.join(root, "data", "products.json"), orders: path.join(root, "data", "orders.json") };
 let writeChain = Promise.resolve();
 const readJson = async (file, fallback) => { try { return JSON.parse(await fs.readFile(file, "utf8")); } catch { return fallback; } };
 const writeJson = (file, data) => { writeChain = writeChain.then(() => fs.writeFile(file, JSON.stringify(data, null, 2))); return writeChain; };
+
+/**
+ * Read, change and write a JSON file as one indivisible step.
+ *
+ * writeJson only queued the write. Every caller still read the file first, outside
+ * that queue, so two updates landing at the same time both read the same starting
+ * state, both built a new array from it, and the second write silently discarded
+ * the first — which on this data means a lost payment count or a refund that never
+ * reaches the ledger. Serialising the read inside the same queue is what makes the
+ * local path behave the way Postgres already does.
+ */
+const mutateJson = (file, change) => {
+  writeChain = writeChain.then(async () => {
+    const current = await readJson(file, []);
+    const next = await change(current);
+    await fs.writeFile(file, JSON.stringify(next, null, 2));
+    return next;
+  });
+  return writeChain;
+};
 
 const seedProducts = [
   { id: "sonvu-starter", slug: "sonvu-starter", name: "SonVu Starter", shortDescription: "Bộ công cụ nền cho người mới bắt đầu.", description: "Sản phẩm mẫu. Thay nội dung này bằng mô tả phần mềm thật của bạn.", category: "Công cụ", platform: "Windows", version: "1.0.0", price: 149000, currency: "VND", badge: "Phổ biến", features: ["Giao diện tiếng Việt", "Cập nhật miễn phí trong 12 tháng", "Hỗ trợ qua email"], requirements: "Windows 10/11, 4 GB RAM", status: "active", fileKey: "", featured: true, createdAt: new Date().toISOString() },
@@ -26,9 +55,9 @@ async function supabase(pathname, options = {}) {
   return response.status === 204 ? null : response.json();
 }
 const fromProduct = (row) => row ? { ...row, shortDescription: row.shortDescription ?? row.short_description ?? "", description: row.description ?? "", fileKey: row.fileKey ?? row.file_key ?? "", shortDescriptionEn: row.shortDescriptionEn ?? row.short_description_en ?? "", descriptionEn: row.descriptionEn ?? row.description_en ?? "", featuresEn: row.featuresEn ?? row.features_en ?? [], seoTitle: row.seoTitle ?? row.seo_title ?? "", seoDescription: row.seoDescription ?? row.seo_description ?? "", createdAt: row.createdAt ?? row.created_at, updatedAt: row.updatedAt ?? row.updated_at } : null;
-const fromOrder = (row) => row ? { ...row, orderNumber: row.orderNumber ?? row.order_number, accessTokenHash: row.accessTokenHash ?? row.access_token_hash, providerOrderId: row.providerOrderId ?? row.provider_order_id, customerEmail: row.customerEmail ?? row.customer_email, customerName: row.customerName ?? row.customer_name, paymentProvider: row.paymentProvider ?? row.payment_provider, paidAt: row.paidAt ?? row.paid_at, expiresAt: row.expiresAt ?? row.expires_at ?? null, cancelledAt: row.cancelledAt ?? row.cancelled_at ?? null, cancelReason: row.cancelReason ?? row.cancel_reason ?? null, deliveredAt: row.deliveredAt ?? row.delivered_at ?? null, paidCount: row.paidCount ?? row.paid_count ?? 0, paidAmount: row.paidAmount ?? row.paid_amount ?? 0, paidProviderAmount: row.paidProviderAmount ?? row.paid_provider_amount ?? 0, paidProviderCurrency: row.paidProviderCurrency ?? row.paid_provider_currency ?? null, refundedAt: row.refundedAt ?? row.refunded_at ?? null, refundReason: row.refundReason ?? row.refund_reason ?? null, refundedCount: row.refundedCount ?? row.refunded_count ?? 0, refundedAmount: row.refundedAmount ?? row.refunded_amount ?? 0, refundedProviderAmount: row.refundedProviderAmount ?? row.refunded_provider_amount ?? 0, idempotencyKey: row.idempotencyKey ?? row.idempotency_key ?? null, notifications: row.notifications ?? {}, createdAt: row.createdAt ?? row.created_at, updatedAt: row.updatedAt ?? row.updated_at } : null;
+const fromOrder = (row) => row ? { ...row, orderNumber: row.orderNumber ?? row.order_number, accessTokenHash: row.accessTokenHash ?? row.access_token_hash, providerOrderId: row.providerOrderId ?? row.provider_order_id, customerEmail: row.customerEmail ?? row.customer_email, customerName: row.customerName ?? row.customer_name, paymentProvider: row.paymentProvider ?? row.payment_provider, paidAt: row.paidAt ?? row.paid_at, expiresAt: row.expiresAt ?? row.expires_at ?? null, cancelledAt: row.cancelledAt ?? row.cancelled_at ?? null, cancelReason: row.cancelReason ?? row.cancel_reason ?? null, deliveredAt: row.deliveredAt ?? row.delivered_at ?? null, paidCount: row.paidCount ?? row.paid_count ?? 0, paidAmount: row.paidAmount ?? row.paid_amount ?? 0, paidProviderAmount: row.paidProviderAmount ?? row.paid_provider_amount ?? 0, paidProviderCurrency: row.paidProviderCurrency ?? row.paid_provider_currency ?? null, refundedAt: row.refundedAt ?? row.refunded_at ?? null, refundReason: row.refundReason ?? row.refund_reason ?? null, refundedCount: row.refundedCount ?? row.refunded_count ?? 0, refundedAmount: row.refundedAmount ?? row.refunded_amount ?? 0, refundedProviderAmount: row.refundedProviderAmount ?? row.refunded_provider_amount ?? 0, idempotencyKey: row.idempotencyKey ?? row.idempotency_key ?? null, notifications: row.notifications ?? {}, reviews: row.reviews ?? [], createdAt: row.createdAt ?? row.created_at, updatedAt: row.updatedAt ?? row.updated_at } : null;
 const toProduct = (p) => { const { shortDescription, fileKey, shortDescriptionEn, descriptionEn, featuresEn, seoTitle, seoDescription, createdAt, updatedAt, ...columns } = p; return { ...columns, ...(shortDescription !== undefined ? { short_description: shortDescription } : {}), ...(fileKey !== undefined ? { file_key: fileKey } : {}), ...(shortDescriptionEn !== undefined ? { short_description_en: shortDescriptionEn } : {}), ...(descriptionEn !== undefined ? { description_en: descriptionEn } : {}), ...(seoTitle !== undefined ? { seo_title: seoTitle } : {}), ...(seoDescription !== undefined ? { seo_description: seoDescription } : {}), ...(featuresEn !== undefined ? { features_en: featuresEn } : {}), ...(createdAt !== undefined ? { created_at: createdAt } : {}), ...(updatedAt !== undefined ? { updated_at: updatedAt } : {}) }; };
-const toOrder = (o) => { const { orderNumber, accessTokenHash, providerOrderId, customerEmail, customerName, paymentProvider, paidAt, expiresAt, cancelledAt, cancelReason, deliveredAt, paidCount, paidAmount, paidProviderAmount, paidProviderCurrency, refundedAt, refundReason, refundedCount, refundedAmount, refundedProviderAmount, idempotencyKey, notifications, createdAt, updatedAt, ...columns } = o; return { ...columns, ...(orderNumber !== undefined ? { order_number: orderNumber } : {}), ...(accessTokenHash !== undefined ? { access_token_hash: accessTokenHash } : {}), ...(providerOrderId !== undefined ? { provider_order_id: providerOrderId } : {}), ...(customerEmail !== undefined ? { customer_email: customerEmail } : {}), ...(customerName !== undefined ? { customer_name: customerName } : {}), ...(paymentProvider !== undefined ? { payment_provider: paymentProvider } : {}), ...(paidAt !== undefined ? { paid_at: paidAt } : {}), ...(expiresAt !== undefined ? { expires_at: expiresAt } : {}), ...(cancelledAt !== undefined ? { cancelled_at: cancelledAt } : {}), ...(cancelReason !== undefined ? { cancel_reason: cancelReason } : {}), ...(deliveredAt !== undefined ? { delivered_at: deliveredAt } : {}), ...(paidCount !== undefined ? { paid_count: paidCount } : {}), ...(paidAmount !== undefined ? { paid_amount: paidAmount } : {}), ...(paidProviderAmount !== undefined ? { paid_provider_amount: paidProviderAmount } : {}), ...(paidProviderCurrency !== undefined ? { paid_provider_currency: paidProviderCurrency } : {}), ...(refundedAt !== undefined ? { refunded_at: refundedAt } : {}), ...(refundReason !== undefined ? { refund_reason: refundReason } : {}), ...(refundedCount !== undefined ? { refunded_count: refundedCount } : {}), ...(refundedAmount !== undefined ? { refunded_amount: refundedAmount } : {}), ...(refundedProviderAmount !== undefined ? { refunded_provider_amount: refundedProviderAmount } : {}), ...(idempotencyKey !== undefined ? { idempotency_key: idempotencyKey } : {}), ...(notifications !== undefined ? { notifications } : {}), ...(createdAt !== undefined ? { created_at: createdAt } : {}), ...(updatedAt !== undefined ? { updated_at: updatedAt } : {}) }; };
+const toOrder = (o) => { const { orderNumber, accessTokenHash, providerOrderId, customerEmail, customerName, paymentProvider, paidAt, expiresAt, cancelledAt, cancelReason, deliveredAt, paidCount, paidAmount, paidProviderAmount, paidProviderCurrency, refundedAt, refundReason, refundedCount, refundedAmount, refundedProviderAmount, idempotencyKey, notifications, reviews, createdAt, updatedAt, ...columns } = o; return { ...columns, ...(orderNumber !== undefined ? { order_number: orderNumber } : {}), ...(accessTokenHash !== undefined ? { access_token_hash: accessTokenHash } : {}), ...(providerOrderId !== undefined ? { provider_order_id: providerOrderId } : {}), ...(customerEmail !== undefined ? { customer_email: customerEmail } : {}), ...(customerName !== undefined ? { customer_name: customerName } : {}), ...(paymentProvider !== undefined ? { payment_provider: paymentProvider } : {}), ...(paidAt !== undefined ? { paid_at: paidAt } : {}), ...(expiresAt !== undefined ? { expires_at: expiresAt } : {}), ...(cancelledAt !== undefined ? { cancelled_at: cancelledAt } : {}), ...(cancelReason !== undefined ? { cancel_reason: cancelReason } : {}), ...(deliveredAt !== undefined ? { delivered_at: deliveredAt } : {}), ...(paidCount !== undefined ? { paid_count: paidCount } : {}), ...(paidAmount !== undefined ? { paid_amount: paidAmount } : {}), ...(paidProviderAmount !== undefined ? { paid_provider_amount: paidProviderAmount } : {}), ...(paidProviderCurrency !== undefined ? { paid_provider_currency: paidProviderCurrency } : {}), ...(refundedAt !== undefined ? { refunded_at: refundedAt } : {}), ...(refundReason !== undefined ? { refund_reason: refundReason } : {}), ...(refundedCount !== undefined ? { refunded_count: refundedCount } : {}), ...(refundedAmount !== undefined ? { refunded_amount: refundedAmount } : {}), ...(refundedProviderAmount !== undefined ? { refunded_provider_amount: refundedProviderAmount } : {}), ...(idempotencyKey !== undefined ? { idempotency_key: idempotencyKey } : {}), ...(notifications !== undefined ? { notifications } : {}), ...(reviews !== undefined ? { reviews } : {}), ...(createdAt !== undefined ? { created_at: createdAt } : {}), ...(updatedAt !== undefined ? { updated_at: updatedAt } : {}) }; };
 let local = !isConfigured.supabase;
 
 /**
@@ -86,6 +115,26 @@ export async function listOrders({ limit = 200, offset = 0 } = {}) {
  * exclusive bound silently dropped it — the one order a buyer was closest to
  * losing.
  */
+/**
+ * The statuses an order can still be paid in.
+ *
+ * One list, used by the JSON filter, by both PostgREST queries and by the sweep's
+ * own rule. It was previously three separate definitions and they had drifted: the
+ * JSON path filtered on "not delivered and one of these two", while the Supabase
+ * queries asked for `status=eq.pending_transfer` only. A PayPal order is `pending`
+ * until its capture lands, so those queries never saw one — a customer who abandoned
+ * PayPal checkout left an order that could never expire, never got its reminder
+ * mail, and sat in the admin list for ever. The JSON path was right, the SQL was
+ * wrong, and every test ran against JSON, so nothing noticed.
+ *
+ * Lives here rather than in orders.js because orders.js already imports this
+ * module; the other way round is a cycle.
+ */
+export const UNPAID_STATUSES = Object.freeze(["pending", "pending_transfer"]);
+
+/** PostgREST `in` filter for the unpaid statuses, from the one list above. */
+const unpaidFilter = () => `status=in.(${UNPAID_STATUSES.join(",")})`;
+
 export async function listExpiringOrders({ before } = {}) {
   if (local) {
     const cutoff = before ? new Date(before).getTime() : Infinity;
@@ -93,7 +142,7 @@ export async function listExpiringOrders({ before } = {}) {
       && (Number.isFinite(cutoff) ? deadlineOf(order) <= cutoff : true));
   }
   const deadline = before ? new Date(before).toISOString() : new Date(8.64e15).toISOString();
-  return (await supabase(`orders?status=eq.pending_transfer&delivered_at=is.null&or=(expires_at.lte.${deadline},expires_at.is.null)&select=*&order=expires_at.asc`)).map(fromOrder);
+  return (await supabase(`orders?${unpaidFilter()}&delivered_at=is.null&or=(expires_at.lte.${deadline},expires_at.is.null)&select=*&order=expires_at.asc`)).map(fromOrder);
 }
 
 /** Unpaid and not yet delivered, with no deadline bound. Bounded by open orders. */
@@ -101,7 +150,7 @@ export async function listOpenOrders() {
   const columns = { accessTokenHash: 0, access_token_hash: 0, idempotencyKey: 0, idempotency_key: 0, notifications: 0 };
   const strip = (order) => Object.fromEntries(Object.entries(order).filter(([key]) => !(key in columns)));
   if (local) return (await readJson(files.orders, [])).filter((order) => !isSettled(order)).map(strip);
-  return (await supabase("orders?status=eq.pending_transfer&delivered_at=is.null&select=id,status,amount,currency,created_at,expires_at&order=created_at.desc")).map(fromOrder);
+  return (await supabase(`orders?${unpaidFilter()}&delivered_at=is.null&select=id,status,amount,currency,created_at,expires_at&order=created_at.desc`)).map(fromOrder);
 }
 
 /**
@@ -140,7 +189,10 @@ export async function listOrdersForRevenue() {
 }
 
 const isSettled = (order) => Boolean(order?.deliveredAt) || !order || !UNPAID.has(order.status);
-const UNPAID = new Set(["pending", "pending_transfer"]);
+  // The same list the PostgREST filters above are built from. Two definitions of
+  // "unpaid" is how a PayPal order came to never expire: the JSON filter knew
+  // about `pending` and the SQL did not.
+  const UNPAID = new Set(UNPAID_STATUSES);
 const deadlineOf = (order) => {
   const stored = order?.expiresAt ? new Date(order.expiresAt).getTime() : NaN;
   if (Number.isFinite(stored)) return stored;
@@ -149,9 +201,44 @@ const deadlineOf = (order) => {
 };
 
 export async function getOrder(id) { return local ? (await readJson(files.orders, [])).find((o) => o.id === id) : fromOrder((await supabase(`orders?id=eq.${encodeURIComponent(id)}&limit=1`))[0]); }
+/**
+ * Whether this token opens this order.
+ *
+ * Written here rather than in each caller because every feature that acts on
+ * somebody's order — the download, the PayPal capture recovery, writing a review
+ * — has to answer it the same way. It hashes and compares instead of reading the
+ * stored hash, so the check is a single function and there is nowhere for a second
+ * implementation to drift from the first.
+ */
+export const isOrderOwner = (order, accessToken) => {
+  const stored = order?.accessTokenHash || order?.access_token_hash;
+  const offered = String(accessToken || "");
+  if (!stored || !offered) return false;
+  const expected = Buffer.from(stored);
+  const actual = Buffer.from(crypto.createHash("sha256").update(offered).digest("hex"));
+  return expected.length === actual.length && crypto.timingSafeEqual(expected, actual);
+};
 // Lets a buyer who lost the response to checkout find the order they already
 // created, instead of opening a second one for the same purchase.
 export async function findOrderByIdempotencyKey(key) { if (!key) return null; return local ? (await readJson(files.orders, [])).find((o) => o.idempotencyKey === key) || null : fromOrder((await supabase(`orders?idempotency_key=eq.${encodeURIComponent(key)}&limit=1`))[0]); }
-export async function createOrder(order) { if (!local) return fromOrder((await supabase("orders", { method: "POST", body: JSON.stringify(toOrder(order)) }))[0]); const orders = await readJson(files.orders, []); await writeJson(files.orders, [order, ...orders]); return order; }
-export async function updateOrder(id, patch) { if (!local) return fromOrder((await supabase(`orders?id=eq.${encodeURIComponent(id)}`, { method: "PATCH", body: JSON.stringify(toOrder(patch)) }))[0]); const orders = await readJson(files.orders, []); const order = orders.find((o) => o.id === id); if (!order) return null; Object.assign(order, patch, { updatedAt: new Date().toISOString() }); await writeJson(files.orders, orders); return order; }
+export async function createOrder(order) { if (!local) return fromOrder((await supabase("orders", { method: "POST", body: JSON.stringify(toOrder(order)) }))[0]); let saved = null; await mutateJson(files.orders, (orders) => { saved = order; return [order, ...orders]; }); return saved; }
+export async function updateOrder(id, patch) { if (!local) return fromOrder((await supabase(`orders?id=eq.${encodeURIComponent(id)}`, { method: "PATCH", body: JSON.stringify(toOrder(patch)) }))[0]); let saved = null; await mutateJson(files.orders, (orders) => { const order = orders.find((o) => o.id === id); if (!order) return orders; Object.assign(order, patch, { updatedAt: new Date().toISOString() }); saved = order; return orders; }); return saved; }
+/**
+ * Orders whose file was actually handed over, with just enough on each to answer
+ * "did this customer review this product, and what did they say".
+ *
+ * A narrow query with an index behind it rather than reading the whole table:
+ * reviews are rare, and a page load that pulled every order in the shop to find
+ * them would get slower forever.
+ *
+ * The filter is delivered_at rather than status, because delivering an order
+ * resets its status to pending on purpose — that is what lets a buyer download a
+ * second time — so "paid" and "delivered" are never both true on the same row.
+ */
+export async function listFulfilledOrderReviews() {
+  if (local) return (await readJson(files.orders, [])).filter((o) => o.deliveredAt);
+  const columns = "id,status,items,reviews,paid_at,paid_count,created_at,delivered_at";
+  return (await supabase(`orders?select=${columns}&delivered_at=not.is.null`)).map(fromOrder);
+}
+
 export let persistenceMode = local ? "local-json" : "supabase";

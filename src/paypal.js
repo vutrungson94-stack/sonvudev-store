@@ -71,7 +71,7 @@ export async function createOrder({ orderId, product, customerEmail, returnUrl, 
     body: JSON.stringify({
       intent: "CAPTURE",
       purchase_units: [{ reference_id: product.id, custom_id: orderId, description: product.name, amount: { currency_code: currency, value: amountFor(amount, currency) } }],
-      payment_source: { paypal: { experience_context: { brand_name: "SonVuDev", user_action: "PAY_NOW", return_url: returnUrl, cancel_url: cancelUrl } } },
+      payment_source: { paypal: { experience_context: { brand_name: env.brand.name, user_action: "PAY_NOW", return_url: returnUrl, cancel_url: cancelUrl } } },
     }),
   });
   const data = await response.json();

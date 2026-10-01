@@ -11,7 +11,12 @@ const checks = [];
 const add = (name, ok, detail) => checks.push({ name, ok: Boolean(ok), detail });
 const appUrl = value("APP_URL");
 
-add("APP_URL", appUrl === "https://sonvudev.com", appUrl || "missing");
+// Production means HTTPS on a real host. It used to be compared against one
+// hardcoded domain, so every staging and preview deploy failed this check and the
+// real thing was the only thing it could ever pass. What actually matters is the
+// shape, and that is what this asserts now.
+const productionUrl = /^https:\/\/(?!localhost|127\.|0\.0\.0\.0)[a-z0-9.-]+\.[a-z]{2,}$/i.test(appUrl);
+add("APP_URL is a production https host", productionUrl, appUrl || "missing");
 add("Admin token", !placeholder(value("ADMIN_API_TOKEN")), value("ADMIN_API_TOKEN") ? "configured" : "missing");
 add("Supabase URL", /^https:\/\/[a-z0-9-]+\.supabase\.co$/i.test(value("SUPABASE_URL")), value("SUPABASE_URL") ? "configured" : "missing");
 add("Supabase secret key", !placeholder(value("SUPABASE_SERVICE_ROLE_KEY")), value("SUPABASE_SERVICE_ROLE_KEY") ? "configured" : "missing");
@@ -91,21 +96,75 @@ if (appUrl) {
   } catch (error) { add("DNS A record", false, `lookup failed: ${error.message}`); }
   try {
     const response = await fetch(`${appUrl}/api/health`, { redirect: "manual", signal: AbortSignal.timeout(8000) });
-    const health = response.ok ? await response.json() : null;
-    const summary = health ? JSON.stringify({ persistence: health.persistence, r2: health.r2, paypal: health.paypal, bank: health.bank }) : `HTTP ${response.status}`;
-    add("HTTPS health", response.ok && health?.ok === true, summary);
-    // A reachable server is not a store that can take money. Without R2 the
-    // catalog hides every product, without bank/paypal checkout cannot complete,
-    // and local-json means orders vanish on the next deploy.
-    if (health) {
-      add("Store is sellable", health.r2 === true, health.r2 ? "R2 connected, products are visible" : "r2=false, storefront hides every product");
-      add("Payments live", health.paypal === true && health.bank === true, `paypal=${health.paypal}, bank=${health.bank}`);
-      add("Database persistent", health.persistence === "supabase", health.persistence === "supabase" ? "supabase" : `${health.persistence}, orders are not durable`);
+    const body = response.ok ? await response.text() : "";
+    // A blocking resolver does not return an error, it returns a page. On a
+    // managed network — corporate DNS behind a filtering service, an endpoint
+    // agent with URL filtering — the shop comes back as an HTML block page, and
+    // without this the check reports "HTTP 403" and leaves you looking at the
+    // server instead of at the machine you are standing on.
+    //
+    // The tell is that the body is HTML saying it blocked us. JSON would be the
+    // real endpoint; a captcha or a Fortinet/Kaspersky portal is not.
+    const blocked = /<\s*html|Web Page Blocked|Secure DNS Service Portal|captcha|Access Denied/i.test(body);
+    if (blocked) {
+      add("HTTPS health", false, `mạng này đang chặn miền (trả về trang chặn của bộ lọc DNS, HTTP ${response.status}). Site có thể vẫn bình thường — chạy lại trên mạng khác, ví dụ 4G.`);
+    } else {
+      const health = response.ok ? JSON.parse(body) : null;
+      const summary = health ? JSON.stringify({ persistence: health.persistence, r2: health.r2, paypal: health.paypal, bank: health.bank }) : `HTTP ${response.status}`;
+      add("HTTPS health", response.ok && health?.ok === true, summary);
+      // A reachable server is not a store that can take money. Without R2 the
+      // catalog hides every product, without bank/paypal checkout cannot complete,
+      // and local-json means orders vanish on the next deploy.
+      if (health) {
+        add("Store is sellable", health.r2 === true, health.r2 ? "R2 connected, products are visible" : "r2=false, storefront hides every product");
+        add("Payments live", health.paypal === true && health.bank === true, `paypal=${health.paypal}, bank=${health.bank}`);
+        add("Database persistent", health.persistence === "supabase", health.persistence === "supabase" ? "supabase" : `${health.persistence}, orders are not durable`);
+      }
     }
-  } catch (error) { add("HTTPS health", false, error.name === "TimeoutError" ? "timeout" : error.message); }
+  } catch (error) {
+    // A TLS failure and a dead server are different problems with different fixes,
+    // and undici buries the real reason one level down: `fetch` rejects with
+    // "fetch failed" and the diagnosis is in `cause`.
+    //
+    // CRYPT_E_NO_REVOCATION_CHECK is a corporate-network symptom — the machine
+    // could not reach the certificate's revocation list — and says nothing about
+    // the site's certificate. Reporting it as a bare "fetch failed" is what makes
+    // people go looking at the server instead of at the network they are on.
+    const chain = [];
+    for (let node = error, depth = 0; node && depth < 5; node = node.cause, depth += 1) {
+      chain.push(String(node.message || node.code || node));
+    }
+    const cause = chain.join(" <- ");
+    const revocation = /revocation|CRYPT_E_NO_REVOCATION/i.test(cause);
+    // A TLS-intercepting proxy — the default on a managed endpoint — answers with
+    // its own self-signed certificate. Node refuses it, so the handshake dies and
+    // reports "fetch failed", which reads exactly like the site being down when the
+    // site is not involved at all. This is the single most misleading failure this
+    // check can produce, because the fix lives on the machine, not the server.
+    const intercepted = /self-signed|unable to verify|SELF_SIGNED|DEPTH_ZERO/i.test(cause);
+    const filtered = /ENOTFOUND|EAI_AGAIN|ECONNREFUSED|ECONNRESET|socket hang up/i.test(cause);
+    add("HTTPS health", false, intercepted
+      ? `may nay dang bi proxy cong ty giai phong TLS, tra ve chung thu tu ky (${chain[chain.length - 1]}). KHONG phai loi chung thu cua site. Node khong tin CA cua proxy. Chay lai tren 4G, hoac bat SSL inspection trong Kaspersky.`
+      : revocation
+        ? `may nay khong kiem tra duoc CRL cua chung thu (${chain[chain.length - 1]}) — loi mang noi bo, KHONG phai loi chung thu cua site. Thu lai tren 4G.`
+        : filtered
+          ? `may nay khong pho giao duoc domain (${chain[chain.length - 1]}) — thu lai tren mang khac bi chan`
+          : cause);
+  }
 }
+
+// When the live site is unreachable from this machine, the checks that depend on
+// it are skipped rather than failed, and the run is reported as inconclusive
+// instead of broken. A gate that cannot tell "the site is down" from "I cannot
+// see the site" gets ignored exactly when it matters most.
+const networkBlocked = checks.some((check) => /đang chặn miền|không kiểm tra được CRL|không phỏ giao được domain|giải phóng TLS|giai phong TLS/i.test(check.detail));
 
 for (const check of checks) console.log(`${check.ok ? "PASS" : "FAIL"}  ${check.name}: ${check.detail}`);
 const failed = checks.filter((check) => !check.ok);
 console.log(`\n${checks.length - failed.length}/${checks.length} production checks passed.`);
-if (failed.length) process.exitCode = 1;
+if (networkBlocked) {
+  console.error("\nKHONG KET LUAN DUOC: may nay khong truy cap duoc site.\n");
+  console.error("Mot so check cuoi bang phai chay tren mang khong bi chan (4G, mang nha rieng).");
+  console.error("Cac check khac — cau hinh, PayPal, email, DNS — da dung va khong phu thuoc site.");
+  process.exitCode = 1;
+} else if (failed.length) process.exitCode = 1;

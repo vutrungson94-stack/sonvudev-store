@@ -22,9 +22,26 @@ npm start
 npm run build
 npm test
 npm run audit
+npm run metrics
 npm run check:production
 npm run seo:check
 ```
+
+Trên GitHub, `.github/workflows/checks.yml` chạy đúng các bước đó cho mọi lần push, và `seo:check` chạy trên chính domain production sau mỗi lần merge vào nhánh chính.
+
+`metrics` là lớp đo lường mà repo này thiếu: mọi gate ở trên chỉ cho biết **lúc này** pass hay fail, không cho biết tuần này tốt hơn hay xấu hơn tuần trước. Lệnh này ghi lại số test, số route, số phụ thuộc, số bản sao của các hàm từng bị viết trùng, số khoá dịch và số trang cho phép index vào `metrics-baseline.json`, rồi so với lần chạy sau:
+
+```powershell
+npm run metrics          # FAIL nếu một chỉ số đi ngược
+npm run metrics:update   # chấp nhận số hiện tại làm chuẩn mới
+```
+
+Các lệnh có cờ riêng dùng **tên script riêng**, không dùng `-- --cờ`. npm 11 nới rộng cờ:
+`npm run render:sync -- --apply` bị npm nuốt mất `--apply` (`Expanding --update to
+--update-notifier`) và lệnh chạy ở chế độ chỉ xem, in ra danh sách thay đổi như thể đã ghi.
+Với biến thanh toán, kiểu hiểu nhầm đó để lại production chạy credential sandbox.
+
+Hướng của từng chỉ số là cố ý: test, route, khoá dịch và trang index **không được giảm**; phụ thuộc và số bản sao hàm **không được tăng**. Nó không phải điểm chất lượng — nó là mức tối thiểu cần có để trả lời "thay đổi vừa rồi tốt hơn hay không".
 
 `check:production` kiểm tra cấu hình, DNS và HTTPS mà không in secret ra nội dung log. Chạy lệnh này trước khi nhận đơn hàng thật.
 
@@ -41,7 +58,41 @@ npm run seo:check                              # dùng APP_URL trong .env
 npm run seo:check -- https://sonvudev.com       # hoặc chỉ định host
 ```
 
-Nó kiểm tra: trang chủ có đúng một `h1` và có chữ trong HTML, canonical có trùng `APP_URL`, thẻ xác minh Google và Bing, `robots.txt` có dòng `Sitemap` và có chặn `/admin`, `/api/`, `/order/`, `/lookup`; **mọi URL trong sitemap đều trả 200**, không trùng nhau, đúng domain và không nằm trong vùng bị chặn; và từng trang sản phẩm có đúng một `title`, canonical khớp URL, `SoftwareApplication` với giá bằng giá thật, logo và `og:image` tải được.
+Không có `APP_URL` thì lệnh dừng luôn thay vì tự đoán một domain — trước đây nó fallback về chính domain của cửa hàng, nên chạy trên máy chưa cấu hình vẫn ra kết quả trông như đã được yêu cầu.
+
+Nó kiểm tra: trang chủ có đúng một `h1` và có chữ trong HTML, canonical có trùng `APP_URL`, thẻ xác minh Google và Bing, `robots.txt` có dòng `Sitemap` và có chặn `/admin`, `/api/`, `/order/`, `/lookup`; **mọi URL trong sitemap đều trả 200**, không trùng nhau, đúng domain và không nằm trong vùng bị chặn; `/llms.txt` và `/feed.json` có sống và đọc được; và `og:image` tải được **và đúng là PNG 1200×630** — đọc trực tiếp kích thước trong file chứ không tin header. Sau cùng từng trang sản phẩm có đúng một `title`, canonical khớp URL, `SoftwareApplication` với giá bằng giá thật, logo và `og:image` tải được.
+
+## Để AI tìm ra sản phẩm
+
+Phần này nói về cách sản phẩm được **trích dẫn** khi khách hỏi trợ lý, không phải cách lên top Google. Khác nhau ở chỗ: Google xếp hạng trang, còn trợ lý trích dẫn trang có câu trả lời cụ thể và một người thật đứng sau.
+
+Bốn thứ đã làm, theo thứ tự lợi ích trên chi phí:
+
+**1. `og:image` là PNG.** Đây là thay đổi đáng giá nhất và đã xong. Facebook, Zalo, Telegram, Slack, LinkedIn và phần lớn trợ lý **không render SVG** trong `og:image` và hiện ô trống. Giờ mọi link chia sẻ đều có ảnh. Ảnh nằm ở `public/og.png`, commit sẵn nên build và server không cần thư viện ảnh nào; sinh lại bằng `pwsh -ExecutionPolicy Bypass -File scripts/make-og-image.ps1` khi đổi màu thương hiệu.
+
+**2. Hai ngôn ngữ, hai URL.** `descriptionEn`, `shortDescriptionEn` và `featuresEn` đã nằm trong database từ lâu và trình duyệt đã dùng, nhưng server chỉ render tiếng Việt — nên trợ lý hỏi bằng tiếng Anh tìm thấy trang rồi không trích được gì. Giờ có `/en/product/:slug`, hai bản trỏ qua lại bằng `hreflang` và `og:locale:alternate`, và cả hai xuất hiện trong sitemap.
+
+**3. `sameAs` và một con người có tên.** `BRAND_SOCIAL_LINKS` và `BRAND_FOUNDER_NAME` đổ vào schema `Organization`. Đây là thứ nối cửa hàng với phần còn lại của web trong một knowledge graph; `sameAs` rỗng thì thương hiệu là một hòn đảo không gì xác nhận được.
+
+**4. `/llms.txt` và `/feed.json`.** Mỗi cái một request, tiết kiệm cho trình thu thập việc phải đoán từ hero image. `/feed.json` là toàn bộ danh mục với giá, nền tảng, phiên bản và yêu cầu hệ thống — đúng thứ cần để trả lời "bán những tool Windows nào, giá bao nhiêu".
+
+Ngoài ra: `/about` nói rõ ai làm ra cửa hàng, `FAQPage` sinh từ dữ liệu thật của từng sản phẩm (câu hỏi về nền tảng sẽ nói đúng tên nền tảng), và `robots.txt` ghi tên từng trình thu thập AI và cho phép — quyết định đó được viết ra thay vì để ngầm.
+
+### Đánh giá của khách: có, nhưng không có sao
+
+Có, `POST /api/reviews` và ô viết trên trang đơn hàng. **Không có sao, và không thêm `AggregateRating`.** Lý do:
+
+- Google **chưa bao giờ** dùng điểm đánh giá hay số lượt đánh giá làm tín hiệu xếp hạng. `AggregateRating` tự thu thập trên website riêng **không đủ điều kiện** rich result trên web thường.
+- Sản phẩm trả phí có sao công khai là mục tiêu của đường lạm dụng hoàn tiền: một người đánh giá 1 sao kèm hoàn tiền là review xấu **và** mất tiền.
+- Cái trợ lý thực sự trích dẫn là **văn xuôi**: một câu từ người từng gặp đúng vấn đề đó.
+
+Cổng chặn cứng: chỉ người **đã thanh toán và đã nhận file** mới viết được (`deliveredAt` cộng `hasPayment`), sản phẩm phải nằm trong đơn đó, và một đơn chỉ viết một lần cho mỗi sản phẩm. Đơn bị hoàn tiền thì đánh giá bị gỡ khỏi trang. Lưu trên chính dòng đơn (`orders.reviews`) vì đó là nơi bằng chứng đã mua tồn tại sẵn.
+
+## Chính sách bảo mật nội dung và CSP
+
+Server gửi `script-src 'self'` không `unsafe-inline` và không nonce. Điều đó có nghĩa là **không trang nào được có `<script>` chạy được nằm inline** — trước đây trang sản phẩm và trang 404 đều viết loader bằng script inline, trình duyệt từ chối âm thầm và phần "Sản phẩm khác" đứng nguyên ở chữ *Đang tải…* vĩnh viễn. `test/ai-discovery.test.js` kiểm tra đúng điều đó, kể cả thân trang 404 vì nó được phục vụ bằng `sendFile` nằm ngoài mọi kiểm tra khác.
+
+Giờ cả hai dùng `public/related.js`. Nếu sau này cần script inline, phải thêm nonce — đừng nới CSP bằng `unsafe-inline`.
 
 **Sau khi đổi code có đụng tới cột database, chạy lại `supabase/schema.sql` trong Supabase SQL editor trước khi deploy.** Thiếu cột làm server lỗi ngay khi tạo đơn, chứ không phải lỗi im lặng.
 
@@ -68,11 +119,17 @@ Có hai đường để vá.
 
 ```powershell
 npm run db:migrate              # in ra câu lệnh sẽ chạy, không ghi gì
-npm run db:migrate -- --apply   # chạy thật qua Management API
+npm run db:migrate:apply        # chạy thật qua Management API
 npm run db:check                # xác nhận đã khớp
 ```
 
 Script tự tách từng câu và gửi một câu một request. Nên xem trước khi `--apply`.
+
+Cột mới nhất là `orders.reviews` (`jsonb`, mặc định `[]`), nơi lưu đánh giá của khách. Đặt
+trên chính dòng đơn thay vì một bảng riêng là cố ý: đơn hàng là nơi bằng chứng đã mua
+tồn tại sẵn, và một đánh giá về một sản phẩm chỉ có nghĩa là lời của người đã mua sản phẩm
+đó. Thêm bảng riêng nghĩa là thêm một nơi phải chứng minh quan hệ đó, và một nơi nữa để
+kiểm tra nó có đúng hay không.
 
 ## Khách mất nguồn sau khi thanh toán
 
@@ -94,7 +151,7 @@ Ngoài ra email `created` và `paid` đều chứa mã đơn và link tra cứu,
 
 Hành động quyết định khách lấy lại được đơn là lưu mã tra cứu, và họ chỉ làm được nếu biết điều đó quan trọng *trước* khi thanh toán — nên phần "lưu lại mã này" phải nằm ở trang mua, không chỉ ở email. Vì vậy link tra cứu mang sẵn mã đơn: `/lookup?order=SVD-...` điền sẵn ô nhập, thay vì bắt khách gõ tay mã từ ảnh chụp màn hình trên bàn phím điện thoại.
 
-Lưu ý: nếu `RESEND_API_KEY` còn trống thì email chỉ nằm trong `data/outbox` và **không khách nào nhận được**. Kênh cứu trên trang vẫn chạy, nhưng kênh cứu sau khi mất máy thì không. Lấy key tại resend.com → API Keys, rồi `npm run render:sync -- --apply`.
+Lưu ý: nếu `RESEND_API_KEY` còn trống thì email chỉ nằm trong `data/outbox` và **không khách nào nhận được**. Kênh cứu trên trang vẫn chạy, nhưng kênh cứu sau khi mất máy thì không. Lấy key tại resend.com → API Keys, rồi `npm run render:sync:deploy`.
 
 ## Doanh thu trong admin
 
@@ -107,9 +164,9 @@ Báo cáo tính theo `paidCount` chứ không theo `status`, nên đơn đã t�
 Production chạy trên Render, DNS do Cloudflare giữ. `.env` bị `.gitignore` loại nên không bao giờ lên Render — biến môi trường phải khai báo trên Dashboard (Service → Environment) hoặc đẩy bằng script:
 
 ```powershell
-npm run render:sync                    # kiem tra, in ra danh sach thay doi
-npm run render:sync -- --apply         # ghi len Render
-npm run render:sync -- --apply --deploy   # ghi xong trigger deploy moi
+npm run render:sync            # kiem tra, in ra danh sach thay doi
+npm run render:sync:deploy     # ghi len Render roi trigger deploy moi
+npm run render:deploy          # chi deploy, khong doi bien
 ```
 
 Cần `RENDER_API_KEY` trong `.env`, lấy ở [Account Settings](https://dashboard.render.com/) → API Keys. Token này quyền truy cập toàn bộ tài khoản Render, chỉ giữ ở máy.
@@ -120,7 +177,7 @@ Script chỉ đẩy danh sách biến của ứng dụng (`ALLOWED`), không đ�
 
 ## Kiến trúc
 
-- `src/server.js`: khởi động HTTP server.
+- src/server.js: khởi động HTTP server.
 - `src/app.js`: API, SEO routes, tra cứu đơn, kiểm tra thanh toán/download.
 - `src/orders.js`: vòng đời đơn hàng — hạn thanh toán, quét hủy đơn cũ, mở khoá khi có tiền, đóng đơn sau khi giao.
 - `src/notify.js`: bốn email giao dịch (tạo đơn, sắp hết hạn, hủy, đã thanh toán), Resend hoặc ghi ra `data/outbox`.
@@ -136,6 +193,10 @@ Script chỉ đẩy danh sách biến của ứng dụng (`ALLOWED`), không đ�
   `paypal-return.html`, đọc chữ từ `i18n.js` như trang chủ — đây là ba trang khách
   nước ngoài dùng sau khi trả tiền bằng PayPal, nên chúng phải theo ngôn ngữ khách
   đang dùng chứ không phải tiếng Việt viết cứng.
+- `src/reviews.js`: đánh giá của khách, lưu trên chính dòng đơn vì đó là nơi bằng chứng đã mua tồn tại sẵn.
+- `public/related.js`: loader dùng chung cho trang sản phẩm và trang 404. Nằm ngoài file vì CSP cấm script inline.
+- `public/og.png`: ảnh share raster, sinh một lần bởi `scripts/make-og-image.ps1`.
+- `scripts/metrics.mjs`: so số đo với `metrics-baseline.json`.
 - `supabase/schema.sql`: schema PostgreSQL.
 - `cloudflare/r2-cors.json`: CORS cho upload trực tiếp từ trình duyệt.
 
@@ -472,14 +533,22 @@ cấu hình chứ không được viết vào file:
 | Chỗ điền | Lấy từ đâu | Vì sao phải vậy |
 | :--- | :--- | :--- |
 | `{{site}}` | `APP_URL` | Mọi `canonical`, `og:url`, `og:image` và `@id` trong JSON-LD. Gõ tên miền vào file là cách chắc chắn nhất để `canonical` trỏ nhầm domain khác, mà `canonical` sai thì Google lập chỉ mục trang của domain khác. |
+| `{{support}}` | `SUPPORT_EMAIL` | Địa chỉ liên hệ trong thân bài, template email và các trang JS. Giống nhau ở năm nơi thì một lần sửa là xong. |
+| `{{year}}` | Đồng hồ | Năm bản quyền ghi cứng là mỗi 1 tháng 1 cả cửa hàng tự khai là đã một tuổi. |
+| `{{paymentWindowHours}}` | `ORDER_PAYMENT_WINDOW_HOURS` | Số giờ hạn thanh toán từng ghi cứng là `24` ở ba file, nên đổi biến môi trường khiến điều khoản hứa một đằng, server làm một nẻo. |
 | Danh mục sản phẩm | `isSellable()` trong `src/store.js` | Trang chủ từng chỉ có ba ô xám chờ tải: không tên sản phẩm, không giá, và không một đường dẫn nào tới trang sản phẩm — mà liên kết nội bộ mới là cách Google tìm ra phần còn lại của site. |
 | Thẻ xác minh | `GOOGLE_SITE_VERIFICATION`, `BING_SITE_VERIFICATION` | Xoay token là sửa một dòng `.env`, không phải sửa file rồi deploy lại. |
 
-Cache 60 giây chứ không phải vĩnh viễn: đổi giá trong admin phải tới được byte mà máy
-tìm kiếm đọc, vì kết quả tìm kiếm hiện giá tuần trước tệ hơn là không hiện giá.
+Ngày "Cập nhật" trên trang điều khoản là ngoại lệ duy nhất còn ghi tay: đó là một sự thật về
+tài liệu chứ không phải một thiết lập, và nó chỉ nên đổi khi chính điều khoản được viết lại.
 
-`sitemap.xml` sinh tự động từ danh sách file trong `public/` cộng với danh mục sống.
-`/lookup` và `/admin.html` cố tình không có trong đó.
+Cache 60 giây chứ không phải vĩnh viễn: đổi giá trong admin phải tới được byte mà máy
+tìm kiếm đọc, vì kết quả tìm kiếm hiện giá tuần trước tệ hơn là không hiện giá. Sửa xong thì
+`invalidatePages()` xoá luôn cache của trang chủ, `/llms.txt` và `/feed.json` — trước đây
+ba thứ đó có thể mô tả sản phẩm với giá không còn tồn tại.
+
+`sitemap.xml` sinh tự động từ danh mục sống, và mỗi sản phẩm cho ra hai URL (`/product/…`
+và `/en/product/…`) nối với nhau bằng `hreflang`. `/lookup` và `/admin.html` cố tình không có trong đó.
 
 ## Search Console
 
@@ -572,7 +641,7 @@ npm run seo:check
 Mọi dòng phải `PASS`. Hai dòng còn `FAIL` là hai thứ Google sẽ không tha:
 
 - `Xác minh Google` / `Xác minh Bing` — token chưa lên production, hoặc chưa chạy
-  `npm run render:sync -- --apply --deploy`.
+  `npm run render:sync:deploy --deploy`.
 - `Trang chủ có sản phẩm trong HTML` — trang chủ đang chỉ có khung tải.
 
 Trong Search Console, **URL Inspection** với một URL bất kỳ của site cho biết Google

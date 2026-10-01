@@ -24,15 +24,12 @@
 <div class="notfound-actions"><a class="button button-primary" href="/">Về trang chủ <span>→</span></a><a class="button button-secondary" href="/lookup">Tra cứu đơn hàng</a></div>
 </div>
 </main>
-<footer class="site-footer wrap"><p>© 2026 SonVuDev · <a href="/terms">Điều khoản</a> · <a href="/refund">Hoàn tiền</a> · <a href="/privacy">Bảo mật</a></p></footer>
-<script>
-fetch('/api/products').then((r) => r.json()).then((data) => {
-  const box = document.getElementById('notfound-links');
-  const items = data.products || [];
-  box.innerHTML = items.length
-    ? items.map((p) => '<a class="related-card" href="/product/' + encodeURIComponent(p.slug) + '"><b>' + p.name + '</b><span>v' + p.version + ' · ' + p.platform + '</span><span>' + new Intl.NumberFormat('vi-VN', { maximumFractionDigits: 0 }).format(p.price) + ' ' + p.currency + '</span></a>').join('')
-    : '<p class="related-empty">Hiện chưa có sản phẩm nào.</p>';
-}).catch(() => { document.getElementById('notfound-links').textContent = ''; });
-</script>
+<footer class="site-footer wrap"><p>© {{year}} SonVuDev · <a href="/terms">Điều khoản</a> · <a href="/refund">Hoàn tiền</a> · <a href="/privacy">Bảo mật</a> · <a href="/about">Về chúng tôi</a></p></footer>
+<!--
+  Same loader as a product page. It used to be an inline block, and the server's
+  script-src 'self' with no 'unsafe-inline' refused to run it, so every 404 showed
+  an empty box where the product list should have been. Same fix, same file.
+-->
+<script src="/related.js" data-target="notfound-links"></script>
 </body>
 </html>
