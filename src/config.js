@@ -1,6 +1,7 @@
 import dotenv from "dotenv";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { resolvePaypalEnvironment } from "./paypal-environment.js";
 
 const projectRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 if (process.env.NODE_ENV !== "test") {
@@ -116,7 +117,7 @@ export const env = {
     supportEmail: value("SUPPORT_EMAIL", "hello@sonvudev.com"),
   },
   paypal: {
-    environment: value("PAYPAL_ENVIRONMENT", "sandbox"),
+    environment: resolvePaypalEnvironment(value("PAYPAL_ENVIRONMENT")).environment,
     currency: value("PAYPAL_CURRENCY", "USD").toUpperCase(),
     vndToUsdRate: liveRateValue("PAYPAL_VND_TO_USD_RATE", 26000),
     rateFallback: numberValue("PAYPAL_VND_TO_USD_FALLBACK", 26000),
@@ -157,11 +158,31 @@ export const env = {
   },
 };
 
+// Which PayPal this shop talks to, and whether that answer was given or assumed.
+//
+// It used to fall back to "sandbox" when the variable was absent, and to sandbox
+// again for anything that was not exactly the string "live". Both defaults are
+// quiet, and quiet is the problem: a host missing the variable — a Render service
+// where it was never synced, a VPS whose env file predates the setting — would
+// create its PayPal orders against the sandbox API. Client credentials still
+// authenticate there, the checkout page renders normally, the buyer pays, and the
+// capture is refused because a sandbox order has no real money behind it. Every log
+// looks healthy and the order simply never completes.
+//
+// So an unset or unrecognised value is not a default, it is an absence: the shop
+// keeps running — bank transfer still works — but PayPal reports as unconfigured,
+// which hides the option from the checkout form. A buyer is never offered a rail
+// that cannot take their money. /api/health names which one is in force, so the
+// question can be answered against a running host rather than an env file on a
+// different machine.
+const paypalEnv = resolvePaypalEnvironment(value("PAYPAL_ENVIRONMENT"));
+export const paypalEnvironmentIsSet = paypalEnv.isSet;
+
 export const isConfigured = {
   admin: configured("ADMIN_API_TOKEN"),
   r2: configured("R2_ACCOUNT_ID") && configured("R2_ACCESS_KEY_ID") && configured("R2_SECRET_ACCESS_KEY") && configured("R2_BUCKET_NAME"),
   supabase: hasSupabaseProjectUrl() && configured("SUPABASE_SERVICE_ROLE_KEY"),
-  paypal: configured("PAYPAL_CLIENT_ID") && configured("PAYPAL_CLIENT_SECRET") && ["USD", "EUR", "GBP", "AUD", "CAD", "SGD", "JPY"].includes(env.paypal.currency),
+  paypal: paypalEnv.isSet && configured("PAYPAL_CLIENT_ID") && configured("PAYPAL_CLIENT_SECRET") && ["USD", "EUR", "GBP", "AUD", "CAD", "SGD", "JPY"].includes(env.paypal.currency),
   paypalWebhook: configured("PAYPAL_WEBHOOK_ID"),
   // Without a key the mailer falls back to writing each message to
   // data/outbox, so the flow is testable end to end before an account exists.

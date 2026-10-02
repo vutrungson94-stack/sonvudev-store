@@ -6,6 +6,7 @@ import crypto from "node:crypto";
 import { env, isConfigured } from "./config.js";
 import { countOrders, dataDir, ensureSeed, findOrderByIdempotencyKey, getOrder, getProduct, getProductBySlug, isOrderOwner, isSellable, latestOrder, listExpiringOrders, listOpenOrders, listOrders, listOrdersForRevenue, listProducts, createOrder, updateOrder, createProduct, updateProduct, persistenceMode } from "./store.js";
 import { supabaseRequest } from "./supabase-http.js";
+import { paypalEnvironmentIsSet } from "./config.js";
 import { createDownloadUrl, createUploadUrl } from "./r2.js";
 import { captureOrder, createOrder as createPayPalOrder, hashToken, newOrderId, newToken, paypalChargeFor, paypalChargeForProduct, paymentMatchesOrder, readOrder, verifyWebhook } from "./paypal.js";
 import { paymentInstructions, paymentOptions } from "./payments.js";
@@ -539,6 +540,12 @@ app.get("/api/health", async (req, res) => {
     uptime: Math.round(process.uptime()),
     appUrl: env.appUrl, persistence: persistenceMode,
     r2: isConfigured.r2, paypal: isConfigured.paypal, paypalWebhook: isConfigured.paypalWebhook,
+    // Which PayPal this host is actually talking to, and whether that was decided or
+    // assumed. A host that has never been told falls back to sandbox, and sandbox
+    // credentials authenticate perfectly against the sandbox API — so every other
+    // signal says healthy while real payments cannot be captured. Naming it here is
+    // what makes the question answerable against the running server.
+    paypalEnvironment: paypalEnvironmentIsSet ? env.paypal.environment : "unset (treated as sandbox)",
     bank: isConfigured.bank, momo: Boolean(env.bank.momo), zalopay: Boolean(env.bank.zalopay), admin: isConfigured.admin,
     // "outbox" means there is no mail provider yet: order mail is being written
     // to data/outbox instead of being delivered.

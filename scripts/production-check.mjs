@@ -3,6 +3,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import dotenv from "dotenv";
 import { NOT_SET } from "../src/config.js";
+import { resolvePaypalEnvironment } from "../src/paypal-environment.js";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 dotenv.config({ path: path.join(root, ".env"), override: true });
@@ -25,11 +26,21 @@ add("Cloudflare R2", ["R2_ACCOUNT_ID", "R2_ACCESS_KEY_ID", "R2_SECRET_ACCESS_KEY
 // Validates the credentials for real. A non-empty string is not proof they work.
 const paypalClientId = value("PAYPAL_CLIENT_ID");
 const paypalClientSecret = value("PAYPAL_CLIENT_SECRET");
-const paypalEnvironment = value("PAYPAL_ENVIRONMENT") || "sandbox";
-const paypalBase = paypalEnvironment === "live" ? "https://api-m.paypal.com" : "https://api-m.sandbox.paypal.com";
+// The rule itself lives in src/paypal-environment.js, shared with src/config.js. It
+// used to be written out here a second time, and the two copies agreed only by
+// accident — which is how a host could be configured one way and checked another.
+//
+// Read as a fact to be verified, not as a value with a fallback: an unset or
+// unrecognised value fails, and it fails before any network call, because there is
+// nothing to authenticate against if the environment cannot be named.
+const paypalEnv = resolvePaypalEnvironment(value("PAYPAL_ENVIRONMENT"));
+const paypalEnvironment = paypalEnv.environment;
+const paypalBase = paypalEnv.apiBase;
 const paypalFilled = isConfigured(["PAYPAL_CLIENT_ID", "PAYPAL_CLIENT_SECRET"]);
 
-if (!paypalFilled) {
+if (!paypalEnv.isSet) {
+  add("PayPal", false, `${paypalEnv.reason} — mặc định là sandbox, và sandbox không nhận tiền thật`);
+} else if (!paypalFilled) {
   add("PayPal", false, "missing");
 } else if (paypalClientId === paypalClientSecret) {
   add("PayPal", false, "Client ID and Secret are identical, copy-paste error");
