@@ -13,8 +13,11 @@ import { notifyOrder } from "./notify.js";
 const UNPAID = new Set(UNPAID_STATUSES);
 const HOUR = 60 * 60 * 1000;
 
-const windowMs = () => Math.max(1, Number(env.orders.paymentWindowHours) || 24) * HOUR;
-const warnMs = () => Math.max(0, Number(env.orders.expiringWarnHours) || 0) * HOUR;
+// Already clamped to at least an hour in config.js, so these two read the one
+// resolved number rather than each re-deriving a fallback. Three modules used to
+// guard the same value with the same literal and nothing kept them agreeing.
+const windowMs = () => env.orders.paymentWindowHours * HOUR;
+const warnMs = () => env.orders.expiringWarnHours * HOUR;
 
 export const isUnpaid = (order) => Boolean(order) && UNPAID.has(order.status);
 

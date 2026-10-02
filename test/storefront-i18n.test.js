@@ -43,7 +43,7 @@ async function boot({ lang = 'vi' } = {}) {
   const localStorage = { _v: store, getItem(k) { return this._v[k] ?? null; }, setItem(k, v) { this._v[k] = String(v); }, removeItem(k) { delete this._v[k]; } };
   const ctx = { document, window: { I18N: undefined }, fetch, localStorage };
   const i18n = await runScript(read('i18n.js'), ctx);
-  const app = await runScript(read('app.js'), { ...ctx, window: { ...ctx.window, I18N: i18n.window.I18N } });
+  const app = await runScript(`${read('order-client.js')}\n${read('app.js')}`, { ...ctx, window: { ...ctx.window, I18N: i18n.window.I18N } });
   return { ...app, i18n, nodes, fetchCalls };
 }
 
@@ -71,15 +71,15 @@ test('HTML render ra khong chua undefined hay [object Object]', async () => {
   assert.ok(!/\[object Object\]/.test(grid.innerHTML), 'khong duoc chua [object Object]');
 });
 
-test('showOrder viet tron mot khoi, khong bi cat lung giua duong', async () => {
+test('showOrder viết trọn một khối, không bị cắt lúng giữa dòng', async () => {
   // Regression guard: the tail of showOrder (dl.hidden / dl.onclick / closing
   // brace) once ended up stranded after loadProducts(), which killed the whole
   // script and left the product grid stuck on the loading skeleton.
   const source = read('app.js');
   const start = source.indexOf('function showOrder(');
-  assert.ok(start > 0, 'phai co ham showOrder');
+  assert.ok(start > 0, 'phải có hàm showOrder');
   const end = source.indexOf('\nasync function checkOrder(', start);
-  assert.ok(end > start, 'showOrder phai ket thuc truoc checkOrder');
+  assert.ok(end > start, 'showOrder phải kết thúc trước checkOrder');
   const body = source.slice(start, end);
   assert.ok(body.includes('dl.disabled'), 'showOrder phai khoa nut tai khi chua thanh toan');
   assert.ok(body.includes('dl.onclick'), 'showOrder phai gan su kien cho nut tai');
@@ -88,10 +88,10 @@ test('showOrder viet tron mot khoi, khong bi cat lung giua duong', async () => {
   // The deadline the form promises and the countdown the buyer reads have to
   // come from the same place, or the form and the sweep disagree.
   assert.ok(source.includes('expiryNote'), 'form thanh toan phai bao het han');
-  assert.ok(source.includes('paymentWindowHours'), 'so gio phai lay tu server');
+  assert.ok(source.includes('paymentWindowHours'), 'số giờ phải lấy từ server');
 });
 
-test('showOrder chay duoc va day du thong tin don hang', async () => {
+test('showOrder chạy được và đầy đủ thông tin đơn hàng', async () => {
   const { document, nodes } = createDom(IDS);
   const extra = new Set(['modal-title', 'copy-token', 'check-order', 'download-order', 'token-box', 'pay-tabs', 'bank-box']);
   const base = document.getElementById.bind(document);
@@ -103,7 +103,7 @@ test('showOrder chay duoc va day du thong tin don hang', async () => {
   const i18n = await runScript(read('i18n.js'), ctx);
   // showOrder is a top-level function declaration, so it is reachable through a
   // trailing assignment on the same script text.
-  const run = await runScript(`${read('app.js')}\nwindow.__showOrder = showOrder;`, {
+  const run = await runScript(`${read('order-client.js')}\n${read('app.js')}\nwindow.__showOrder = showOrder;`, {
     ...ctx, window: { ...ctx.window, I18N: i18n.window.I18N },
   });
   assert.deepEqual(run.errors, [], `app.js nem loi: ${run.errors.join(' | ')}`);
@@ -114,14 +114,14 @@ test('showOrder chay duoc va day du thong tin don hang', async () => {
   const out = document.getElementById('modal-content').innerHTML;
   assert.ok(out.includes('SVD-1'), 'modal phai hien ma don');
   assert.ok(out.includes('tok-123'), 'modal phai hien ma tra cuu');
-  assert.ok(out.includes('123456'), 'modal phai hien so tai khoan');
+  assert.ok(out.includes('123456'), 'modal phải hiện số tài khoản');
   assert.ok(out.includes('SVD1'), 'modal phai hien noi dung chuyen khoan');
 });
 
 // p1 ships an English copy, p2 does not. Switching to English must show the
 // English text for p1 while p2 keeps whatever copy it has, so no card is ever
 // blank for a customer.
-test('tieng Anh dung ban EN, thieu thi fallback ve tieng Viet', async () => {
+test('tiếng Anh dùng bản EN, thiếu thì fallback về tiếng Việt', async () => {
   const run = await boot({ lang: 'en' });
   assert.deepEqual(run.errors, [], 'app.js khong duoc nem loi o tieng Anh');
   const grid = run.nodes.get('product-grid');
@@ -129,10 +129,10 @@ test('tieng Anh dung ban EN, thieu thi fallback ve tieng Viet', async () => {
   assert.ok(grid.innerHTML.includes('Feature 1 EN'), 'features phai doi sang tieng Anh');
   assert.ok(!grid.innerHTML.includes('Mô tả dài tiếng Việt'), 'san pham co ban EN khong duoc dung ban tieng Viet');
   // p2 has no English copy at all: its original Vietnamese short text must stay.
-  assert.ok(grid.innerHTML.includes('Mô tả ngắn'), 'san pham chua co ban EN phai giu nguyen ban tieng Viet');
+  assert.ok(grid.innerHTML.includes('Mô tả ngắn'), 'sản phẩm chưa có bản EN phải giữ nguyên bản tiếng Việt');
 });
 
-test('moi khoa i18n ton tai o ca hai ngon ngu', async () => {
+test('mọi khoá i18n tồn tại ở cả hai ngôn ngữ', async () => {
   const { document } = createDom(IDS);
   const res = await runScript(read('i18n.js'), {
     document, window: {}, localStorage: { _v: {}, getItem: () => null, setItem() {}, removeItem() {} },
@@ -143,7 +143,7 @@ test('moi khoa i18n ton tai o ca hai ngon ngu', async () => {
   // order page, the recovery form and the PayPal return. A key that no page
   // renders would pass here and still be dead copy, which is what
   // scripts/audit-web.mjs now fails on.
-  const keys = ['nav.products', 'hero.title1', 'faq.q1', 'products.count', 'order.download', 'pay.bank', 'geo.outside', 'lookup.title', 'paypal.pending', 'order.eyebrow'];
+  const keys = ['nav.products', 'hero.title1', 'faq.q1', 'products.count', 'order.download', 'pay.option.bank', 'geo.outside', 'lookup.title', 'paypal.pending', 'order.eyebrow', 'review.err.tooShort', 'order.help.or'];
   const vi = new Map(), en = new Map();
   for (const lang of ['vi', 'en']) {
     I18N.set(lang);
@@ -171,13 +171,13 @@ test('doi ngon ngu thi <html lang> va nut doi cung doi theo', async () => {
   assert.equal(document.documentElement.lang, 'vi');
 });
 
-test('nut chuyen ngon ngu khong lam vo layout tren man hinh nho', () => {
+test('nút chuyển ngôn ngữ không làm vỡ layout trên màn hình nhỏ', () => {
   const css = read('styles.css');
   // The switch is a 4th flex child of .site-header. Without flex:0 0 auto the
   // button stretches and pushes the row past the viewport, which is what broke
   // the header on phones when the language feature was added.
   const rule = css.match(/^\.lang-toggle\{[^}]*\}/m);
-  assert.ok(rule, 'phai co rule .lang-toggle');
+  assert.ok(rule, 'phải có rule .lang-toggle');
   assert.ok(rule[0].includes('flex:0 0 auto'), 'nut phai co flex:0 0 auto de khong bi keo gian');
   // Below 800px the nav is hidden and the CTA is pushed right, so the switch
   // needs its own margin and the CTA must stop using margin-left:auto.
@@ -190,7 +190,7 @@ test('nut chuyen ngon ngu nam trong header cua index.html', () => {
   const html = read('index.html');
   assert.ok(/<button[^>]*data-lang-toggle/.test(html), 'phai co nut co thuoc tinh data-lang-toggle');
   const header = html.slice(html.indexOf('<header'), html.indexOf('</header>'));
-  assert.ok(header.includes('data-lang-toggle'), 'nut phai nam trong header');
+  assert.ok(header.includes('data-lang-toggle'), 'nút phải nằm trong header');
 });
 
 
@@ -209,7 +209,7 @@ async function clickThroughCheckout() {
     : { ok: true, json: async () => ({ country: 'VN', options: [{ id: 'bank_transfer', label: 'Chuyen khoan', hint: 'h', account: '1', amount: 1, currency: 'VND', transferNote: 'n' }] }) });
   const ls = { _v: {}, getItem: () => null, setItem() {}, removeItem() {} };
   const i18n = await runScript(read('i18n.js'), { document, window: {}, fetch, localStorage: ls });
-  const run = await runScript(read('app.js'), { document, window: { I18N: i18n.window.I18N }, fetch, localStorage: ls });
+  const run = await runScript(`${read('order-client.js')}\n${read('app.js')}`, { document, window: { I18N: i18n.window.I18N }, fetch, localStorage: ls });
   return { run, document, get: (id) => cache.get(id) };
 }
 
@@ -221,7 +221,7 @@ test('bam san pham -> mo duyet chi tiet -> bam mua -> den trang thanh toan', asy
 
   run.window.openProduct('p1');
   const detail = document.getElementById('modal-content').innerHTML;
-  assert.ok(detail.includes('Sản phẩm A'), 'modal chi tiet phai hien ten san pham');
+  assert.ok(detail.includes('Sản phẩm A'), 'modal chi tiết phải hiện tên sản phẩm');
   assert.ok(detail.includes('buy-product'), 'modal chi tiet phai co nut mua');
 
   const buy = get('buy-product');
@@ -232,10 +232,10 @@ test('bam san pham -> mo duyet chi tiet -> bam mua -> den trang thanh toan', asy
   assert.ok(checkout.includes('checkout-form'), 'buoc sau phai ra form thanh toan');
   assert.ok(checkout.includes('bank_transfer'), 'form thanh toan phai liet ke phuong thuc');
   assert.ok(checkout.includes('checkout-form'), 'phai co form');
-  assert.deepEqual(run.errors, [], 'khong duoc nem loi sau khi bam');
+  assert.deepEqual(run.errors, [], 'không được ném lỗi sau khi bấm');
 });
 
-test('openProduct va openCheckout phai nam o cap global', () => {
+test('openProduct và openCheckout phải nằm ở cấp global', () => {
   // A stray brace once turned these into a bare block, which parses fine and
   // silently hides the functions from the rest of the page: tapping a product
   // then did nothing. Assert they are reachable, not merely present in the file.
@@ -250,7 +250,7 @@ test('openProduct va openCheckout phai nam o cap global', () => {
   }
 });
 
-test('mo ta san pham tach thanh doan, khong bien mot khoi lien dong', async () => {
+test('mô tả sản phẩm tách thành đoạn, không biến một khối liền dòng', async () => {
   const { document } = createDom(IDS);
   const cache = new Map();
   for (const id of ['modal-title', 'buy-product']) cache.set(id, new El('div', id));
@@ -261,7 +261,7 @@ test('mo ta san pham tach thanh doan, khong bien mot khoi lien dong', async () =
     : { ok: true, json: async () => ({ country: 'VN', options: [] }) });
   const ls = { _v: {}, getItem: () => null, setItem() {}, removeItem() {} };
   const i18n = await runScript(read('i18n.js'), { document, window: {}, fetch, localStorage: ls });
-  const run = await runScript(read('app.js'), { document, window: { I18N: i18n.window.I18N }, fetch, localStorage: ls });
+  const run = await runScript(`${read('order-client.js')}\n${read('app.js')}`, { document, window: { I18N: i18n.window.I18N }, fetch, localStorage: ls });
   assert.deepEqual(run.errors, [], 'app.js khong duoc nem loi');
   run.window.openProduct('p3');
   const html = document.getElementById('modal-content').innerHTML;
@@ -278,12 +278,12 @@ test('mo ta san pham tach thanh doan, khong bien mot khoi lien dong', async () =
   assert.ok(!block.includes('\n'), 'khong duoc con xuong dong tho trong HTML');
 });
 
-test('modal tren dien thoai cuon tung phan, khong phai ca trang', () => {
+test('modal trên điện thoại cuộn từng phần, không phải cả trang', () => {
   const css = read('styles.css');
   // The whole modal used to scroll as one 90vh block, forcing a long page of
   // scrolling on a phone. The body must scroll on its own instead.
   const block = css.match(/@media\(max-width:700px\)\{([\s\S]*?)\n\}/);
-  assert.ok(block, 'can co media query 700px cho modal dien thoai');
+  assert.ok(block, 'cần có media query 700px cho modal điện thoại');
   const rules = block[1];
   assert.ok(/\.modal\{[^}]*flex-direction:column/.test(rules), 'modal phai la flex column de tach phan');
   assert.ok(/\.checkout-form\{[^}]*overflow-y:auto/.test(rules), 'form thanh toan phai cuon rieng');
@@ -294,20 +294,20 @@ test('modal tren dien thoai cuon tung phan, khong phai ca trang', () => {
   // The decorative banner eats a lot of vertical space on a small screen.
   assert.ok(/\.detail-art\{display:none\}/.test(rules), 'anh banner nen an di tren dien thoai');
   // The header must not scroll away, and the buy bar must not either.
-  assert.ok(/\.detail-copy\{[^}]*flex:0 0 auto/.test(rules), 'ten san pham phai ghim khong cuon');
+  assert.ok(/\.detail-copy\{[^}]*flex:0 0 auto/.test(rules), 'tên sản phẩm phải ghim không cuộn');
   assert.ok(/\.detail-footer\{[^}]*flex:0 0 auto/.test(rules), 'nut mua phai ghim o day duoi');
   // The base .modal-backdrop is a centred grid (`place-items:center`), which
   // leaves the sheet with no height to divide among its rows, so the scroll area
   // froze and the buy bar vanished. The phone rule has to switch it to flex.
   assert.ok(/\.modal-backdrop\{[^}]*display:flex/.test(rules), 'backdrop phai doi tu grid sang flex tren dien thoai');
   assert.ok(/\.modal-backdrop\{[^}]*align-items:stretch/.test(rules), 'backdrop phai keo theo chieu cao');
-  assert.ok(/\.modal\{[^}]*flex:1 1 auto/.test(rules), 'modal phai nhan phan con lai cua backdrop');
+  assert.ok(/\.modal\{[^}]*flex:1 1 auto/.test(rules), 'modal phải nhận phần còn lại của backdrop');
   assert.ok(/\.modal\{[^}]*min-width:0/.test(rules), 'can min-width:0 de modal co lai duoc');
   // Swiping inside the sheet must not drag the store page along.
   assert.ok(/overscroll-behavior:contain/.test(rules), 'can chan lan truyen cuon sang trang nen');
 });
 
-test('chieu cao modal phai xac dinh o ca may tinh va dien thoai', () => {
+test('chiều cao modal phải xác định ở cả máy tính và điện thoại', () => {
   const css = read('styles.css');
   // The sheet must have a definite height, not just a max-height: in a flex
   // column a max-height alone gives the children no height to shrink into, so
@@ -316,7 +316,7 @@ test('chieu cao modal phai xac dinh o ca may tinh va dien thoai', () => {
   const rules = block[1];
   assert.ok(/\.modal-backdrop\{[^}]*position:fixed[^}]*inset:0/.test(rules), 'backdrop phai gan vao 4 canh man hinh');
   assert.ok(/\.modal\{[^}]*max-height:none/.test(rules), 'phai bo max-height tren dien thoai');
-  assert.ok(/\.detail-body\{[^}]*flex:1 1 0/.test(rules), 'vung cuon phai flex-basis 0 de nhan phan con lai');
+  assert.ok(/\.detail-body\{[^}]*flex:1 1 0/.test(rules), 'vùng cuộn phải flex-basis 0 để nhận phần còn lại');
   assert.ok(/\.checkout-form\{[^}]*flex:1 1 0/.test(rules), 'form thanh toan cung phan nay');
   assert.ok(/\.success-state\{[^}]*flex:1 1 0/.test(rules), 'trang thanh cong cung phan nay');
 
@@ -324,21 +324,21 @@ test('chieu cao modal phai xac dinh o ca may tinh va dien thoai', () => {
   // and the buy bar scrolled out of view. It has to be a flex column with an
   // inner scroll region on every screen size.
   const base = css.match(/\.modal\{position:relative;[^}]*\}/);
-  assert.ok(base, 'can co rule .modal co ban');
+  assert.ok(base, 'cần có rule .modal cơ bản');
   assert.ok(base[0].includes('display:flex'), 'modal phai la flex column');
-  assert.ok(base[0].includes('flex-direction:column'), 'modal phai xep cot');
+  assert.ok(base[0].includes('flex-direction:column'), 'modal phải xếp cột');
   assert.ok(!base[0].includes('overflow:auto'), 'modal khong duoc cuon toan bo');
   const body = css.match(/^\.detail-body\{[^}]*\}/m);
-  assert.ok(body, 'can co rule .detail-body');
+  assert.ok(body, 'cần có rule .detail-body');
   assert.ok(body[0].includes('overflow-y:auto'), 'chi detail-body moi cuon');
   assert.ok(body[0].includes('min-height:0'), 'can min-height:0 de flex con co the co');
   const footer = css.match(/^\.detail-footer\{[^}]*\}/m);
-  assert.ok(footer, 'can co rule .detail-footer');
+  assert.ok(footer, 'cần có rule .detail-footer');
   assert.ok(footer[0].includes('flex:0 0 auto'), 'thanh nut mua phai co dinh khong co');
 });
 
 
-test('mo mo phai khoa trang nen lai', () => {
+test('mở modal phải khoá trang nền lại', () => {
   const css = read('styles.css');
   // Without a body lock the page behind keeps its own scroll offset, so a swipe
   // over the sheet moved the store instead of the modal.
@@ -349,7 +349,7 @@ test('mo mo phai khoa trang nen lai', () => {
   assert.ok(/document\.body\.classList\.remove\('modal-open'\)/.test(source), 'dong modal phai go class modal-open');
 });
 
-test('nut mua nam ngoai vung cuon, luon nhin thay', async () => {
+test('nút mua nằm ngoài vùng cuộn, luôn nhìn thấy', async () => {
   const { run, document, get } = await clickThroughCheckout();
   assert.deepEqual(run.errors, [], `app.js nem loi: ${run.errors.join(' | ')}`);
   run.window.openProduct('p3');
@@ -358,8 +358,8 @@ test('nut mua nam ngoai vung cuon, luon nhin thay', async () => {
   const iBody = html.indexOf('detail-body');
   const iFooter = html.indexOf('detail-footer');
   const iTitle = html.indexOf('detail-copy');
-  assert.ok(iTitle >= 0 && iBody > iTitle, 'ten san pham phai tren phan noi dung');
-  assert.ok(iFooter > iBody, 'thanh nut mua phai duoi phan noi dung');
+  assert.ok(iTitle >= 0 && iBody > iTitle, 'tên sản phẩm phải trên phần nội dung');
+  assert.ok(iFooter > iBody, 'thanh nút mua phải dưới phần nội dung');
   const body = html.slice(iBody, iFooter);
   assert.ok(!body.includes('buy-product'), 'nut mua khong duoc nam trong vung cuon');
   assert.ok(html.slice(iFooter).includes('buy-product'), 'nut mua phai nam trong detail-footer');
@@ -400,10 +400,10 @@ test('#modal-content phai la flex column, va la noi app.js ghi vao', () => {
   const css = read('styles.css');
   const wrapper = baseRule(css, '#modal-content');
   assert.ok(wrapper, 'can co rule cho #modal-content');
-  assert.match(wrapper, /display:flex/, 'wrapper phai la flex container de cac phan ben trong chia duoc chieu cao');
-  assert.match(wrapper, /flex-direction:column/, 'wrapper phai xep cot');
-  assert.match(wrapper, /min-height:0/, 'can min-height:0 de wrapper co the bi ep xuong trong modal');
-  assert.match(wrapper, /flex:1 1 auto/, 'wrapper phai nhan phan con lai cua .modal');
+  assert.match(wrapper, /display:flex/, 'wrapper phải là flex container để các phần bên trong chia được chiều cao');
+  assert.match(wrapper, /flex-direction:column/, 'wrapper phải xếp cột');
+  assert.match(wrapper, /min-height:0/, 'cần min-height:0 để wrapper có thể bị ép xuống trong modal');
+  assert.match(wrapper, /flex:1 1 auto/, 'wrapper phải nhận phần còn lại của .modal');
 
   // The CSS is only useful while it describes the node the JS fills in.
   const html = read('index.html');
@@ -418,7 +418,7 @@ test('#modal-content phai la flex column, va la noi app.js ghi vao', () => {
   }
 });
 
-test('vung cuon phai co overflow va min-height:0 ngay o rule co ban', () => {
+test('vùng cuộn phải có overflow và min-height:0 ngay ở rule cơ bản', () => {
   const css = read('styles.css');
   // These have to hold on a desktop too, where the 700px query never applies.
   // A scroll region that is not allowed to shrink below its content is just a
@@ -428,25 +428,25 @@ test('vung cuon phai co overflow va min-height:0 ngay o rule co ban', () => {
     assert.ok(rule, `can co rule co ban cho ${cls}`);
     assert.match(rule, /overflow-y:auto/, `${cls} phai cuon duoc o rule co ban`);
     assert.match(rule, /min-height:0/, `${cls} can min-height:0 o rule co ban`);
-    assert.match(rule, /flex:1 1/, `${cls} phai la flex item de nhan phan con lai cua wrapper`);
+    assert.match(rule, /flex:1 1/, `${cls} phải là flex item để nhận phần còn lại của wrapper`);
   }
   const footer = baseRule(css, '.detail-footer');
-  assert.match(footer, /flex:0 0 auto/, 'thanh nut mua phai ghim khong co');
-  assert.match(footer, /margin-top:0/, 'thanh nut mua phai sat vung cuon, khong de khe 27px');
+  assert.match(footer, /flex:0 0 auto/, 'thanh nút mua phải ghim không có');
+  assert.match(footer, /margin-top:0/, 'thanh nút mua phải sát vùng cuộn, không để khe 27px');
 });
 
-test('flex-basis cua vung cuon dung theo cach tinh chieu cao cua tung man hinh', () => {
+test('flex-basis của vùng cuộn đúng theo cách tính chiều cao của từng màn hình', () => {
   const css = read('styles.css');
   // On a desktop .modal is height:auto with only a max-height, so it sizes to
   // its content and a 0-basis child has no free space to grow into: the scroll
   // region collapsed to 0px tall. `auto` lets a short sheet shrink to fit and a
   // long one push the overflow into the region that is allowed to shrink.
-  assert.match(baseRule(css, '.detail-body'), /flex:1 1 auto/, 'vung cuon tren may tinh phai flex-basis auto');
+  assert.match(baseRule(css, '.detail-body'), /flex:1 1 auto/, 'vùng cuộn trên máy tính phải flex-basis auto');
   // On a phone the backdrop pins a real height, so basis 0 is correct there and
   // is what lets the middle take exactly the leftover space.
   const block = css.match(/@media\(max-width:700px\)\{([\s\S]*?)\n\}/);
-  assert.ok(block, 'can co media query 700px');
-  assert.match(block[1], /\.detail-body\{[^}]*flex:1 1 0/, 'vung cuen tren dien thoai phai flex-basis 0');
-  assert.match(block[1], /\.checkout-form\{[^}]*flex:1 1 0/, 'form thanh toan tren dien thoai phai flex-basis 0');
+  assert.ok(block, 'cần có media query 700px');
+  assert.match(block[1], /\.detail-body\{[^}]*flex:1 1 0/, 'vùng cuộn trên điện thoại phải flex-basis 0');
+  assert.match(block[1], /\.checkout-form\{[^}]*flex:1 1 0/, 'form thanh toán trên điện thoại phải flex-basis 0');
 });
 

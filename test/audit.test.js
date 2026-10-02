@@ -43,6 +43,13 @@ test('audit chặn được từng loại lỗi nó sinh ra để bắt', async 
     const target = path.join(dir, name);
     await fs.cp(path.join(projectRoot, 'public'), path.join(target, 'public'), { recursive: true });
     await fs.cp(path.join(projectRoot, 'src'), path.join(target, 'src'), { recursive: true });
+    // The operator-facing directories, for the checks that read them. Without these
+    // the audit skips them by design — existsSync is the guard — and the cases
+    // below would silently prove nothing.
+    for (const extra of ['scripts', 'test', 'deploy']) {
+      await fs.cp(path.join(projectRoot, extra), path.join(target, extra), { recursive: true });
+    }
+    await fs.cp(path.join(projectRoot, '.env.example'), path.join(target, '.env.example'));
     return target;
   };
 
@@ -123,8 +130,8 @@ test('audit chặn được từng loại lỗi nó sinh ra để bắt', async 
     });
     const output = `${result.stdout}${result.stderr}`;
     assert.equal(result.status, 1, 'audit thiếu cấu hình phải FAIL');
-    assert.match(output, /cau hinh thieu.*APP_URL/s, output);
-    assert.match(output, /cau hinh thieu.*SUPPORT_EMAIL/s, output);
+    assert.match(output, /cấu hình thiếu.*APP_URL/s, output);
+    assert.match(output, /cấu hình thiếu.*SUPPORT_EMAIL/s, output);
   }
 
   // 5c. A template token nothing substitutes. {{legalEntity}} was added to the
@@ -139,7 +146,7 @@ test('audit chặn được từng loại lỗi nó sinh ra để bắt', async 
     const result = runAudit(cwd);
     const output = `${result.stdout}${result.stderr}`;
     assert.equal(result.status, 1, 'token không được điền phải FAIL');
-    assert.match(output, /token chua noi.*chuaCoAiDien/s, output);
+    assert.match(output, /token chưa nối.*chuaCoAiDien/s, output);
   }
 
   // 6. Structured data aimed at a page robots.txt forbids.
@@ -164,6 +171,80 @@ test('audit chặn được từng loại lỗi nó sinh ra để bắt', async 
     const output = `${result.stdout}${result.stderr}`;
     assert.equal(result.status, 1, 'phải FAIL');
     assert.match(output, /trang mồ côi.*orphan\.html/s, output);
+  }
+
+  await fs.rm(dir, { recursive: true, force: true });
+});
+
+// Unaccented Vietnamese is not illegible, so it survives: it reads as written,
+// just wrong, and only someone who already knows the correct spelling notices.
+// It accumulated in scripts/ and test/ — the text read when something is wrong —
+// because the check only ever looked at the storefront. A customer would have
+// spotted it at once.
+test('tiếng Việt mất dấu trong scripts và test cũng bị bắt', async () => {
+  const dir = await fs.mkdtemp(path.join(os.tmpdir(), 'sonvudev-diacritics-'));
+  const copy = async (name) => {
+    const target = path.join(dir, name);
+    await fs.cp(path.join(projectRoot, 'public'), path.join(target, 'public'), { recursive: true });
+    await fs.cp(path.join(projectRoot, 'src'), path.join(target, 'src'), { recursive: true });
+    for (const extra of ['scripts', 'test', 'deploy']) {
+      await fs.cp(path.join(projectRoot, extra), path.join(target, extra), { recursive: true });
+    }
+    await fs.cp(path.join(projectRoot, '.env.example'), path.join(target, '.env.example'));
+    return target;
+  };
+  const audit = (cwd) => runAudit(cwd);
+
+  // A script that cannot find an order. The bare spelling of a phrase that exists
+  // accented elsewhere in the project, which is the only kind of evidence the check
+  // needs — it does not know Vietnamese, it knows this project's own words, read out
+  // of the storefront and the server. A phrase that only appears in a test file is
+  // not in that table, and inventing one for the fixture would have tested nothing.
+  {
+    const cwd = await copy('script');
+    await fs.appendFile(path.join(cwd, 'scripts', 'build-web.mjs'), '\nconsole.error("Khong tim thay don hang nay");\n', 'utf8');
+    const result = audit(cwd);
+    const output = `${result.stdout}${result.stderr}`;
+    assert.equal(result.status, 1, 'phải FAIL');
+    assert.match(output, /tiếng Việt không dấu.*Khong tim thay/s, output);
+    // The file is named, so the person who wrote it knows where to look.
+    assert.match(output, /scripts\\build-web\.mjs/, output);
+    // And the correct spelling is handed to them rather than left to guesswork.
+    assert.match(output, /viết đúng là "Không tìm thấy/, output);
+  }
+
+  // The same mistake in a test title, which is what someone reads when a run is red.
+  // A different phrase, and one that only exists accented in the storefront rather
+  // than in src/ — so this also proves the vocabulary is read from both, and not
+  // only from the server the previous case happened to quote.
+  {
+    const cwd = await copy('test');
+    await fs.appendFile(path.join(cwd, 'test', 'probe.test.js'), "\ntest('can tro giup khi khong tai duoc file', () => {});\n", 'utf8');
+    const result = audit(cwd);
+    const output = `${result.stdout}${result.stderr}`;
+    assert.equal(result.status, 1, 'phải FAIL');
+    assert.match(output, /tiếng Việt không dấu.*can tro giup/s, output);
+    assert.match(output, /test\\probe\.test\.js/, output);
+  }
+
+  // The fix must be accepted: accented text in the same places changes nothing.
+  {
+    const cwd = await copy('clean');
+    await fs.appendFile(path.join(cwd, 'scripts', 'build-web.mjs'), '\nconsole.error("Không tìm thấy đơn hàng này");\n', 'utf8');
+    await fs.appendFile(path.join(cwd, 'test', 'probe.test.js'), "\ntest('cần trợ giúp khi không tải được file', () => {});\n", 'utf8');
+    const result = audit(cwd);
+    const output = `${result.stdout}${result.stderr}`;
+    assert.equal(result.status, 0, `bản có dấu phải sạch:\n${output}`);
+  }
+
+  // Two words are not enough to be sure. A bare pair is ambiguous in shape often
+  // enough to be useless, and a check that fired on loose words would report every
+  // English identifier in the repository and be switched off within a week.
+  {
+    const cwd = await copy('english');
+    await fs.appendFile(path.join(cwd, 'scripts', 'build-web.mjs'), '\nconst paymentWindow = 1; // do not reorder\n', 'utf8');
+    const result = audit(cwd);
+    assert.equal(result.status, 0, `tiếng Anh không được báo sai:\n${result.stdout}${result.stderr}`);
   }
 
   await fs.rm(dir, { recursive: true, force: true });

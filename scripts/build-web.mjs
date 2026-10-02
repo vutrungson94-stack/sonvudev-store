@@ -10,7 +10,15 @@ const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 // platform that renders a link preview refuses SVG, related.js because the strict
 // Content-Security-Policy refuses to run an inline script, about.html because a
 // page that exists only in someone's head is not a page.
-const required = ['package.json', 'src/server.js', 'src/app.js', 'src/store.js', 'src/r2.js', 'src/paypal.js', 'src/payments.js', 'src/rates.js', 'src/geo.js', 'src/indexnow.js', 'src/pages.js', 'src/reviews.js', 'src/format.js', 'public/index.html', 'public/i18n.js', 'public/styles.css', 'public/app.js', 'public/admin.html', 'public/admin.js', 'public/paypal-return.html', 'public/paypal-return.js', 'public/lookup.html', 'public/lookup.js', 'public/order.html', 'public/order.js', 'public/404.html', 'public/about.html', 'public/related.js', 'public/favicon.svg', 'public/og.png', 'scripts/production-check.mjs', 'scripts/audit-web.mjs', 'scripts/seo-check.mjs', 'cloudflare/r2-cors.json'];
+// Everything a deploy is not allowed to be missing.
+//
+// The list is explicit on purpose. A file referenced by a page but absent from
+// disk breaks that one page, in production only, and nothing in the test suite
+// would notice — so the file's existence is checked before packaging rather than
+// discovered by a buyer. public/order-client.js is here for the same reason as
+// the rest: four pages load it, and it holds the access token and the download
+// handshake they all share.
+const required = ['package.json', 'src/server.js', 'src/app.js', 'src/store.js', 'src/r2.js', 'src/paypal.js', 'src/payments.js', 'src/rates.js', 'src/geo.js', 'src/indexnow.js', 'src/pages.js', 'src/reviews.js', 'src/format.js', 'src/supabase-http.js', 'public/index.html', 'public/i18n.js', 'public/styles.css', 'public/order-client.js', 'public/app.js', 'public/admin.html', 'public/admin.js', 'public/paypal-return.html', 'public/paypal-return.js', 'public/lookup.html', 'public/lookup.js', 'public/order.html', 'public/order.js', 'public/404.html', 'public/about.html', 'public/related.js', 'public/favicon.svg', 'public/og.png', 'scripts/production-check.mjs', 'scripts/audit-web.mjs', 'scripts/seo-check.mjs', 'cloudflare/r2-cors.json'];
 const ignored = new Set(['.git', '.gbuildcache', 'build-reports', 'logs']);
 const jsFiles = [];
 async function walk(dir) { for (const entry of await readdir(dir, { withFileTypes: true })) { if (ignored.has(entry.name) || entry.name === 'node_modules' || entry.name.startsWith('node_modules_stale_')) continue; const full = path.join(dir, entry.name); if (entry.isDirectory()) await walk(full); else if (entry.name.endsWith('.js') || entry.name.endsWith('.mjs')) jsFiles.push(full); } }

@@ -71,10 +71,10 @@ const dependencies = Object.keys({ ...manifest.dependencies, ...manifest.devDepe
 // Each row is [key, value, direction]. "up" means a fall is a regression; "down"
 // means a rise is one.
 const rows = [
-  ['tests', totalTests, 'up', 'so test co ten'],
-  ['testFiles', testFiles.length, 'up', 'so file test'],
+  ['tests', totalTests, 'up', 'số test có tên'],
+  ['testFiles', testFiles.length, 'up', 'số file test'],
   ['routes', routes.size, 'up', 'route Express dang ky'],
-  ['dependencies', dependencies.length, 'down', 'phu thuoc npm'],
+  ['dependencies', dependencies.length, 'down', 'phụ thuộc npm'],
   // Counts real implementations, not the aliases that call the shared one. An
   // escape function that was written twice and drifted is the exact failure this
   // number exists to catch, and it cannot be satisfied the way a test can — by
@@ -94,17 +94,30 @@ const rows = [
 // deliberately does not load i18n.js), public/related.js (a standalone loader for
 // the 404 page). The server used to have two escapes and two money formatters of
 // its own.
-['escCopies', [...srcText, ...publicText].reduce((n, s) => n + countCopies(s, /&quot;/g), 0), 'down', 'ban sao ham escape'],
-['moneyCopies', [...srcText, ...publicText].reduce((n, s) => n + countCopies(s, /style:\s*['"]currency['"]/g), 0), 'down', 'ban sao ham dinh dang tien'],
-  ['i18nKeys', countCopies(i18nText, /^\s{4}'[\w.]+':/gm), 'up', 'khoa i18n'],
+['escCopies', [...srcText, ...publicText].reduce((n, s) => n + countCopies(s, /&quot;/g), 0), 'down', 'bản sao hàm escape'],
+['moneyCopies', [...srcText, ...publicText].reduce((n, s) => n + countCopies(s, /style:\s*['"]currency['"]/g), 0), 'down', 'bản sao hàm định dạng tiền'],
+  ['i18nKeys', countCopies(i18nText, /^\s{4}'[\w.]+':/gm), 'up', 'khóa i18n'],
   // A page that allows indexing is a page a crawler can be pointed at. Losing one
   // is a silent loss of traffic that no other check would notice.
-  ['indexablePages', publicHtmlText.filter((body) => /index,follow/.test(body)).length, 'up', 'trang cho phep index'],
-  ['productPageLocales', countCopies(appSource, /productPage\("(?:vi|en)"\)/g), 'up', 'ngon ngu trang san pham'],
+  ['indexablePages', publicHtmlText.filter((body) => /index,follow/.test(body)).length, 'up', 'trang cho phép index'],
+  ['productPageLocales', countCopies(appSource, /productPage\("(?:vi|en)"\)/g), 'up', 'ngôn ngữ trang sản phẩm'],
+  // How many pages carry the dictionary.
+  //
+  // Five do not: the four legal pages and the 404 are Vietnamese-only, with no
+  // language switch and no English route behind one. That is a real gap and it was
+  // invisible — nothing counted it, so closing it was neither possible to notice nor
+  // possible to hold. The direction is "up", so a page that loses its dictionary is
+  // a regression the same way a deleted test is.
+  //
+  // What this number is not: a claim that the shop is translated. It says how much of
+  // it is. Reaching the remaining pages means translating their prose, which is
+  // work for someone who can be held to the legal wording — not something a
+  // placeholder or a machine should decide.
+  ['localizedPages', publicHtmlText.filter((body) => /<script src="i18n\.js">/.test(body)).length, 'up', 'trang có từ điển'],
   // One route serving two languages. It was one, then two pages with a renderer
   // between them that only ever spoke Vietnamese, and the English copy sat unused
   // in the database the whole time.
-  ['productPageRenderers', countCopies(await read('src/pages.js'), /export function renderProductPage/g), 'down', 'bo render trang san pham'],
+  ['productPageRenderers', countCopies(await read('src/pages.js'), /export function renderProductPage/g), 'down', 'bộ render trang sản phẩm'],
 ];
 
 const measurements = Object.fromEntries(rows.map(([key, value, direction]) => [key, { value, direction }]));
@@ -141,4 +154,4 @@ if (regressions.length) {
   console.error('\nNeu do la chu y dich, chay: npm run metrics:update');
   process.exit(1);
 }
-console.log('\n[metrics] PASS — khong co chi so nao lui ve.');
+console.log('\n[metrics] PASS — không có chỉ số nào lùi về.');

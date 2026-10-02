@@ -23,7 +23,7 @@ process.env.RESEND_API_KEY = '';
 process.env.INDEXNOW_KEY = '';
 
 const { createApp } = await import('../src/app.js');
-const { updateProduct, getProduct } = await import('../src/store.js');
+const { updateProduct, getProduct, listProducts, isSellable } = await import('../src/store.js');
 const { productSummary, renderProductPage } = await import('../src/pages.js');
 
 let server;
@@ -281,9 +281,60 @@ test('thẻ xác minh Search Console lấy từ cấu hình, không gõ trong HT
   assert.equal((await get('/ms0123456789abcdef.txt')).status, 404, 'token Bing lạ không được phục vụ');
 });
 
+test('số liệu trên trang chủ được đếm từ catalogue, không gõ tay', async () => {
+  // These three read 01+, 4.9/5 and 100%, and none of them was ever a measurement:
+  // there is no rating in this shop and nothing behind the third figure. On the
+  // page whose argument is that the software is made carefully, invented numbers
+  // are the cheapest thing to fix and the most expensive to leave.
+  //
+  // The test runs against the real catalogue, so it checks that the numbers on the
+  // page are the numbers in the data — which is the only property that survives the
+  // next product being added.
+  const html = await text('/');
+  const sellable = (await listProducts()).filter(isSellable);
+  if (!sellable.length) {
+    // Nothing to count: the strip is removed rather than showing zeros, because a
+    // shop saying "0 products" is still making a claim about itself.
+    assert.ok(!html.includes('id="stats"'), 'không có sản phẩm thì bỏ hẳn dải số liệu');
+    return;
+  }
+  const platforms = new Set(sellable.map((p) => String(p.platform || '').trim()).filter(Boolean));
+  assert.match(html, new RegExp(`id="stat-products">${sellable.length}<`), 'số sản phẩm phải bằng số sản phẩm đang bán');
+  assert.match(html, new RegExp(`id="stat-platforms">${platforms.size}<`), 'số nền tảng phải đếm từ dữ liệu');
+  // Narrowed to the strip itself: a product description is free to contain the
+  // number 4.9, and a check over the whole page would fail on that for ever.
+  const stats = html.match(/<section class="stats[^"]*"[^>]*>[\s\S]*?<\/section>/);
+  assert.ok(stats, 'phải có dải số liệu');
+  assert.ok(!/4\.9/.test(stats[0]) && !/100\s*<span>\s*%/.test(stats[0]), 'không được trình số liệu không đo được');
+  // And the numbers are not in the template, where the next edit would leave them
+  // stale.
+  const template = fsSync('public/index.html');
+  assert.ok(!/stat-products">\s*\d/.test(template), 'số liệu không được gõ trong template');
+});
+
+test('danh mục lọc được sinh từ dữ liệu, không phải danh sách gõ tay', async () => {
+  // The row held three literals — two categories and a platform — beside a grid
+  // that was loaded live. Nothing connected them: publish a product in a fourth
+  // category and it appears with no button that reaches it, while the three
+  // buttons sit there offering a subset nobody chose. One was not even a category.
+  const html = await text('/');
+  const sellable = (await listProducts()).filter(isSellable);
+  const categories = new Set(sellable.map((p) => String(p.category || '').trim()).filter(Boolean));
+  const buttons = [...html.matchAll(/class="filter[^"]*"\s+data-filter="([^"]+)"/g)].map((m) => m[1]);
+  assert.ok(buttons.includes('all'), 'luôn có nút "tất cả"');
+  // The direction that matters: every category with products has a button, or the
+  // buyer cannot filter to something they can see.
+  for (const category of categories) assert.ok(buttons.includes(category), `thiếu nút lọc cho danh mục "${category}"`);
+  // Not the other direction. Rendered pages are cached for a minute on purpose, so
+  // a category emptied a moment ago can keep its button until the cache turns over.
+  // That is the trade the TTL buys — a stale button that filters to nothing is a
+  // far smaller problem than a product with no way to reach it, and asserting
+  // against it would only make the test flaky.
+  // And no literal category list is left in the template to drift again.
+  assert.ok(!/data-filter="(Công cụ|Bundle|Windows)"/.test(fsSync('public/index.html')), 'danh sách danh mục không được gõ trong template');
+});
+
 test('mọi trang lập chỉ mục đều chứa dữ liệu có cấu trúc và logo tồn tại', async () => {
-  // The Organization logo was /logo.svg, a file that never existed, so every
-  // product page told Google the brand's logo was a 404.
   assert.ok(existsSync(new URL('../public/favicon.svg', import.meta.url)), 'file logo phải tồn tại thật');
   const html = await text(`/product/${product.slug}`);
   const graph = [...html.matchAll(/<script type="application\/ld\+json">([\s\S]*?)<\/script>/g)].flatMap((m) => JSON.parse(m[1].replace(/\\u003c/g, '<')));
@@ -313,7 +364,11 @@ test('đổi giờ hạn đơn thì email báo đúng giờ đó', () => {
   const template = source.slice(source.indexOf('const TEMPLATES'), source.indexOf('function body'));
   assert.ok(!/sau 24 giờ|within 24 hours/.test(template), 'email không được gõ cứng 24 giờ');
   assert.ok(template.includes('c.windowHours'), 'phải đọc số giờ từ cấu hình');
-  assert.ok(source.includes('windowHours: Math.max(1, Number(env.orders.paymentWindowHours)'), 'context phải lấy từ env.orders');
+  // One resolved number, read from config, rather than three modules each
+  // re-deriving a fallback. The window the email promises has to be the window the
+  // sweep enforces, and re-deriving it in each place is how the two drift.
+  assert.ok(source.includes('windowHours: env.orders.paymentWindowHours'), 'context phải lấy thẳng từ env.orders');
+  assert.ok(!/Math\.max\(1, Number\(env\.orders\.paymentWindowHours\)/.test(source), 'không cần chốt lại giá trị config đã chốt sẵn');
 });
 
 test('redirect www lấy từ APP_URL chứ không gõ tên miền', () => {

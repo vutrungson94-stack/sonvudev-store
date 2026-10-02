@@ -1,4 +1,4 @@
-const state=JSON.parse(sessionStorage.getItem('sonvudev_order')||'null');
+const state = window.OrderClient.read();
 const title=document.getElementById('title'),message=document.getElementById('message'),actions=document.getElementById('actions'),loader=document.getElementById('loader'),eyebrow=document.getElementById('eyebrow');
 // PayPal buyers are the overseas half of the shop, so this page follows the same
 // dictionary as the storefront instead of carrying its own fixed copy.
@@ -9,7 +9,7 @@ const T=key=>window.I18N.t(key);
 const SUPPORT=()=>document.body?.dataset?.support||window.I18N.t('brand.supportEmail');
 function goHome(){location.href='/'}
 function showMissing(){eyebrow.textContent=T('paypal.eyebrow');title.textContent=T('order.notFound');message.textContent=T('paypal.noSession');loader.hidden=true;actions.innerHTML=`<a class="button button-primary" href="/lookup">${T('nav.lookup')}</a>`}
-function link(token){const dl=document.createElement('button');dl.className='button button-primary';dl.id='download';dl.textContent=T('order.download')+' ↓';dl.onclick=async()=>{try{const result=await fetch('/api/orders/'+encodeURIComponent(state.id)+'/download',{headers:{'x-order-token':token}}),payload=await result.json();if(result.ok){location.href=payload.url;fetch('/api/orders/'+encodeURIComponent(state.id)+'/delivered',{method:'POST',headers:{'x-order-token':token,'content-type':'application/json'}}).catch(()=>{})}else message.textContent=T('order.errDownload')}catch(error){message.textContent=T('order.errOffline')}};return dl}
+function link(token){const dl=document.createElement('button');dl.className='button button-primary';dl.id='download';dl.textContent=T('order.download')+' ↓';dl.onclick=async()=>{const result=await window.OrderClient.download(state.id,token);if(!result.ok)message.textContent=result.offline?T('order.errOffline'):T('order.errDownload')};return dl}
 function showPaid(){eyebrow.textContent=T('paypal.success');title.textContent=T('paypal.success');message.textContent=T('paypal.successHint');actions.innerHTML='';actions.appendChild(link(state.token));const back=document.createElement('a');back.className='button button-secondary';back.href='/';back.textContent=T('paypal.back');actions.appendChild(back);loader.hidden=true}
 function showRetry(text){eyebrow.textContent=T('paypal.pending');title.textContent=T('paypal.pending');message.textContent=text;actions.innerHTML='';const retry=document.createElement('button');retry.className='button button-primary';retry.textContent=T('order.check')+' ↻';retry.onclick=()=>{retry.disabled=true;start()};const order=document.createElement('a');order.className='button button-secondary';order.href='/order/'+encodeURIComponent(state.id);order.textContent=T('paypal.myOrders');actions.appendChild(retry);actions.appendChild(order)}
 const wait=(ms)=>new Promise(r=>setTimeout(r,ms));

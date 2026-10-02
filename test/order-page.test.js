@@ -54,7 +54,7 @@ async function boot({ respond, offline = false, lang = 'vi-VN', state = { id: 'S
   // The browser's language picks the starting side of the switch, exactly as it
   // does for a real buyer whose OS is set to English.
   const navigator = { language: lang, clipboard: { writeText: async () => {} } };
-  const run = await runScript(`${read('i18n.js')}\n${read('order.js')}`, {
+  const run = await runScript(`${read('i18n.js')}\n${read('order-client.js')}\n${read('order.js')}`, {
     document, window: {}, fetch, sessionStorage, navigator, location: { href: '' },
   });
   // Recovery costs extra round trips: read the order, ask PayPal to capture,
@@ -130,7 +130,7 @@ test('bấm nút tải thì gọi delivered để đóng đơn', async () => {
     if (String(url).includes('/download')) return { ok: true, status: 200, json: async () => ({ url: 'https://r2.example/file.zip' }) };
     return { ok: true, status: 200, json: async () => ({ order: order({ status: 'paid' }) }) };
   };
-  const run = await runScript(`${read('i18n.js')}\n${read('order.js')}`, {
+  const run = await runScript(`${read('i18n.js')}\n${read('order-client.js')}\n${read('order.js')}`, {
     document, window: {}, fetch, location: { href: '' }, navigator: { language: 'vi-VN' },
     sessionStorage: { getItem: () => JSON.stringify({ id: 'SVD-TEST', token: 'tok-123' }), setItem() {}, removeItem() {} },
   });
@@ -233,7 +233,7 @@ test('hết hạn thì đồng hồ chuyển sang trạng thái hết hạn', as
 // browser: every assertion is that Vietnamese is gone, not merely that something
 // appeared, because a half-translated recovery page is worse than an untranslated
 // one.
-test('trang don hang theo ngon ngu trinh duyet', async () => {
+test('trang đơn hàng theo ngôn ngữ trình duyệt', async () => {
   const vi = await boot({ lang: 'vi-VN', respond: json({ order: order({ status: 'pending_transfer' }), payment: null }) });
   const en = await boot({ lang: 'en-US', respond: json({ order: order({ status: 'pending_transfer' }), payment: null }) });
   const html = (run) => String(run.nodes.get('order-body').innerHTML);
@@ -258,7 +258,7 @@ test('trang don hang theo ngon ngu trinh duyet', async () => {
   assert.ok(html(vi).includes('Thanh toán thành công để mở nút tải'));
 });
 
-test('so tien va ngay duoc dinh dang theo ngon ngu', async () => {
+test('số tiền và ngày được định dạng theo ngôn ngữ', async () => {
   const vi = await boot({ lang: 'vi-VN', respond: json({ order: order({ amount: 249000 }), payment: null }) });
   const en = await boot({ lang: 'en-US', respond: json({ order: order({ amount: 249000 }), payment: null }) });
   // The separator is part of the language. An English buyer reading 249.000 was
@@ -267,7 +267,7 @@ test('so tien va ngay duoc dinh dang theo ngon ngu', async () => {
   assert.ok(String(en.nodes.get('order-body').innerHTML).includes('249,000'), 'tieng Anh tach ngan cach bang phay');
 });
 
-test('moi trang don hang deu dung chung mot bo nhan trang thai', () => {
+test('mọi trang đơn hàng đều dùng chung một bộ nhãn trạng thái', () => {
   const source = read('order.js');
   const app = read('app.js');
   // Two copies of this map had already drifted: the same order read as awaiting
@@ -290,18 +290,60 @@ test('moi trang don hang deu dung chung mot bo nhan trang thai', () => {
     const escLine = file.split(/\r?\n/).find((l) => /^\s*const esc\s*=/.test(l)) || '';
     assert.ok(!/\.replace\(/.test(escLine), `${name} khong duoc tu viet lai ham escape`);
     const moneyLine = file.split(/\r?\n/).find((l) => /^\s*const money\s*=/.test(l)) || '';
-    assert.ok(!/Intl\.NumberFormat/.test(moneyLine), `${name} khong duoc goi dinh dang so tien bang ngon ngu cua nguoi ban`);
+    assert.ok(!/Intl\.NumberFormat/.test(moneyLine), `${name} không được gọi định dạng số tiền bằng ngôn ngữ của người bán`);
   }
   // One copy of the logic, not two aliases of two copies.
   const i18n = read('i18n.js');
   assert.ok((i18n.match(/orderHint\s*\(/g) || []).length >= 1, 'i18n.js phai dinh nghia ham orderHint');
 });
 
+test('phi bản đơn dùng chung một nơi: khoá, khởi động, và báo đã nhận file', () => {
+  // Three pages do the same two things after a payment and each wrote its own
+  // copy. The sessionStorage key was a brand literal in three files; the
+  // "is this order finished" predicate was in two; and the download-then-confirm
+  // pair was in three.
+  //
+  // The pair is the expensive one. POST /delivered is what resets the order so a
+  // second download is possible and what stops the same file being handed over
+  // twice, so a copy that misses it is an order a buyer can never download again,
+  // and a copy that sends it twice resets an order mid-delivery. The predicate is
+  // subtler: delivering deliberately resets the status to pending, so a rule
+  // written from `status` alone would call a freshly paid order closed.
+  const client = read('order-client.js');
+  assert.match(client, /isClosed:/, 'order-client.js phai so sanh trang thai don');
+  assert.match(client, /markDelivered:/, 'order-client.js phai bao da nhan file');
+  assert.match(client, /deliveredAt/, 'quản đơn phải đọc deliveredAt, không chỉ status');
+
+  for (const name of ['order.js', 'app.js', 'paypal-return.js', 'lookup.js']) {
+    const file = read(name);
+    // The key, once, and never as a literal in a page.
+    assert.ok(!/sessionStorage\.(setItem|getItem|removeItem)\(\s*['"]sonvudev_order/.test(file), `${name} khong duoc tu ghi khoa session`);
+    assert.ok(!/sonvudev_order/.test(file), `${name} khong duoc chua ten khoa session`);
+    // The predicate, once.
+    assert.ok(!/deliveredAt\)\s*&&\s*\w+\.status\s*!==/.test(file), `${name} khong duoc tu viet lai quy tac "don da xong"`);
+    assert.ok(!/deliveredAt\s*&&\s*!?\w*\.?status/.test(file), `${name} khong duoc suy trang thai don tu deliveredAt va status`);
+
+    const needsOrderClient = ['order.js', 'app.js', 'paypal-return.js', 'lookup.js'];
+    if (needsOrderClient.includes(name)) {
+      assert.ok(/window\.OrderClient\./.test(file), `${name} phai dung phien ban chung`);
+    }
+    // The confirmation call, once.
+    assert.ok(!/\/delivered['"`]/.test(file), `${name} khong duoc tu goi /delivered`);
+  }
+
+  // And the shared script is actually loaded by every page that needs it, or the
+  // shared helpers are undefined at runtime and nothing here would say so.
+  for (const page of ['index.html', 'order.html', 'lookup.html', 'paypal-return.html']) {
+    assert.match(read(page), /<script src="order-client\.js"><\/script>/, `${page} phai nap order-client.js`);
+  }
+  assert.ok(!read('404.html').includes('order-client.js'), '404.html khong dung phien ban don, khong nen nap');
+});
+
 // A clock told in two places is two chances to tell a buyer two different amounts
 // of time to pay. The modal and the order page each had their own remaining-ms
 // calculation, zero padding and HH:MM:SS formatting, which is exactly the class of
 // drift the hint checks above were written for.
-test('dem nguoc chi co mot cach tinh, va do theo dong ho cua may chu', () => {
+test('đếm ngược chỉ có một cách tính, và đo theo đồng hồ của máy chủ', () => {
   const files = [['order.js', read('order.js')], ['app.js', read('app.js')]];
   for (const [name, file] of files) {
     assert.ok(/I18N\.clock\(/.test(file), `${name} phai dung bo dem nguoc chung`);
@@ -320,18 +362,18 @@ test('dem nguoc chi co mot cach tinh, va do theo dong ho cua may chu', () => {
 // is not that today's copy is wrong: it is that the page a crawler reads and the
 // email a buyer reads are the same sentence, and the day one of them is extended
 // nothing stops the other disagreeing about what counts as escaped.
-test('escape va dinh dang tien chi co mot ban o phia may chu', () => {
+test('escape và định dạng tiền chỉ có một bản ở phía máy chủ', () => {
   const format = readSrc('format.js');
   assert.ok(/export const esc\s*=/.test(format), 'format.js phai xuat esc');
   assert.ok(/export const money\s*=/.test(format), 'format.js phai xuat money');
   for (const [name, file] of [['pages.js', readSrc('pages.js')], ['notify.js', readSrc('notify.js')]]) {
     assert.ok(/from "\.\/format\.js"/.test(file), `${name} phai import tu format.js`);
     assert.ok(!/&\quot;/.test(file), `${name} khong duoc tu viet lai bang escape`);
-    assert.ok(!/Intl\.NumberFormat/.test(file), `${name} khong duoc goi dinh dang so tien bang ngon ngu cua nguoi ban`);
+    assert.ok(!/Intl\.NumberFormat/.test(file), `${name} không được gọi định dạng số tiền bằng ngôn ngữ của người bán`);
   }
 });
 
-test('trang don hang co nut doi ngon ngu', () => {
+test('trang đơn hàng có nút đổi ngôn ngữ', () => {
   const html = read('order.html');
   assert.ok(/data-lang-toggle/.test(html), 'trang don hang can nut doi ngon ngu');
   const order = read('order.js');

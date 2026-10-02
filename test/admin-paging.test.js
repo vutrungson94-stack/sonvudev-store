@@ -56,32 +56,32 @@ const makeOrder = async () => {
   })).json()).order;
 };
 
-test('trang sau khac trang truoc, va bao ro con bao nhieu', async () => {
+test('trang sau khác trang trước, và báo rõ còn bao nhiêu', async () => {
   for (let i = 0; i < 25; i += 1) await makeOrder();
   const first = await orders();
-  assert.equal(first.orders.length, 10, 'phai tra dung mot trang');
-  assert.equal(first.hasMore, true, 'phai bao co trang tiep theo');
+  assert.equal(first.orders.length, 10, 'phải trả đúng một trang');
+  assert.equal(first.hasMore, true, 'phải báo có trang tiếp theo');
   const second = await fetch(`${base}/api/admin/orders?limit=10&offset=10`, { headers: { 'x-admin-token': 'test-admin-token' } }).then((r) => r.json());
   assert.equal(second.orders.length, 10);
   const overlap = second.orders.filter((order) => first.orders.some((seen) => seen.id === order.id));
-  assert.equal(overlap.length, 0, 'hai trang khong duoc trung don nhau');
+  assert.equal(overlap.length, 0, 'hai trang không được trùng đơn nhau');
 });
 
-test('trang cuoi cung bat buoc bao het, khong bao gi con trang sau', async () => {
+test('trang cuối cùng bắt buộc báo hết, không báo gì còn trang sau', async () => {
   const last = await fetch(`${base}/api/admin/orders?limit=10&offset=20`, { headers: { 'x-admin-token': 'test-admin-token' } }).then((r) => r.json());
-  assert.ok(last.orders.length > 0, 'trang cuoi phai van co don');
+  assert.ok(last.orders.length > 0, 'trang cuối phải vẫn có đơn');
   assert.equal(last.hasMore, false, 'het rồi thì phai noi het, khong de nút no giong them nua');
 });
 
-test('so don dang mo duoc dem tren ca shop, khong phai tren trang hien len', async () => {
+test('số đơn đang mở được đếm trên cả shop, không phải trên trang hiện lên', async () => {
   const page = await fetch(`${base}/api/admin/orders?limit=2&offset=0`, { headers: { 'x-admin-token': 'test-admin-token' } }).then((r) => r.json());
   assert.equal(typeof page.live, 'number', 'phai tra so don con mo');
   // Scrolling down must not make the waiting count fall to zero, which is what
   // happened when the figure came from the rows on screen.
-  assert.ok(page.live >= 25, 'so don dang cho phai dem ca shop');
+  assert.ok(page.live >= 25, 'số đơn đang chờ phải đếm cả shop');
 });
 
-test('panel co nut tai them, va chi nut do moi them tiep', async () => {
+test('panel có nút tải thêm, và chỉ nút đó mới thêm tiếp', async () => {
   const html = await fs.readFile(path.join(root, 'public', 'admin.html'), 'utf8');
   assert.ok(html.includes('id="orders-more"'), 'thieu hang chua nut tai them');
   assert.ok(html.includes('id="orders-more-btn"'), 'thieu nut tai them');
@@ -97,7 +97,7 @@ test('panel co nut tai them, va chi nut do moi them tiep', async () => {
   assert.ok(!/\)\s*loadOrders\(\)\s*;?\s*(catch|;)/.test(source), 'khong duoc tai tiep o noi khong phai do nguoi dung bam nut');
 });
 
-test('panel noi bo khong duoc luu trong bo dem trinh duyet', async () => {
+test('panel nội bộ không được lưu trong bộ đếm trình duyệt', async () => {
   // A cached admin.js sits in a browser for weeks because the panel is opened
   // rarely. A fix lands, the owner keeps running the old one, and the panel does
   // the wrong thing with no error anywhere to look at.

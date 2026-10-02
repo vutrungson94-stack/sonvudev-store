@@ -2,20 +2,32 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { paymentOptions } from '../src/payments.js';
 import { isRoutable, createGeoResolver } from '../src/geo.js';
+import { dictionary } from './helpers/dictionary.mjs';
 
+// The checkout form prints whatever key it is handed, resolved in the reader's
+// own language. So the assertions here read the key the server sends and then ask
+// the dictionary what it actually says — in both languages. Asserting on a
+// Vietnamese string held fine while an English buyer was handed Vietnamese, which
+// is the whole failure: the sentence existed, the sentence was just in one
+// language and nothing looked in the other.
+const vi = dictionary('vi');
+const en = dictionary('en');
 const both = { bank: true, momo: true, zalopay: true, paypal: true };
 const ids = (list) => list.map((o) => o.id);
 
 test('a Vietnamese visitor sees the bank transfer first', () => {
   const options = paymentOptions('VN', both);
   assert.equal(options[0].id, 'bank_transfer');
-  assert.match(options[0].hint, /VietQR/);
+  assert.equal(options[0].hintKey, 'pay.option.bank.vi.wallets');
+  assert.match(vi.t(options[0].hintKey), /VietQR/);
+  assert.match(en.t(options[0].hintKey), /VietQR/);
 });
 
 test('an overseas visitor sees PayPal first', () => {
   const options = paymentOptions('US', both);
   assert.equal(options[0].id, 'paypal');
-  assert.match(options[0].hint, /quốc tế|thẻ/i);
+  assert.match(vi.t(options[0].hintKey), /quốc tế|thẻ/i);
+  assert.match(en.t(options[0].hintKey), /international card/i);
 });
 
 test('the country only reorders, it never removes a method', () => {
@@ -29,7 +41,8 @@ test('the country only reorders, it never removes a method', () => {
 test('an overseas visitor is warned that the bank rail needs a Vietnamese account', () => {
   const bank = paymentOptions('US', both).find((o) => o.id === 'bank_transfer');
   assert.equal(bank.available, false);
-  assert.match(bank.hint, /ngân hàng Việt Nam/);
+  assert.match(vi.t(bank.hintKey), /ngân hàng Việt Nam/);
+  assert.match(en.t(bank.hintKey), /Vietnamese bank account/);
   const local = paymentOptions('VN', both).find((o) => o.id === 'bank_transfer');
   assert.equal(local.available, true);
 });
@@ -47,8 +60,47 @@ test('only configured methods are offered', () => {
 });
 
 test('the wallet hint only appears when a wallet is configured', () => {
-  assert.match(paymentOptions('VN', { bank: true, momo: false, zalopay: false, paypal: true })[0].hint, /VietQR trong app/);
-  assert.match(paymentOptions('VN', { bank: true, momo: true, zalopay: false, paypal: true })[0].hint, /MoMo/);
+  const bare = paymentOptions('VN', { bank: true, momo: false, zalopay: false, paypal: true })[0];
+  assert.equal(bare.hintKey, 'pay.option.bank.vi');
+  const withWallet = paymentOptions('VN', { bank: true, momo: true, zalopay: false, paypal: true })[0];
+  assert.equal(withWallet.hintKey, 'pay.option.bank.vi.wallets');
+  assert.match(vi.t(withWallet.hintKey), /MoMo/);
+  assert.match(en.t(withWallet.hintKey), /MoMo/);
+});
+
+test('every key the server can send to the checkout form resolves in both languages', () => {
+  // The property that was missing: the server names a key, so a key that only
+  // exists in one language prints as the other language's fallback — or, if it
+  // exists in neither, as the key itself, in a box on the payment form. Enumerated
+  // from every country and configuration rather than a hand-written list, so a new
+  // rail is covered by writing the rail.
+  const configs = [];
+  for (const bank of [true, false]) {
+    for (const momo of [true, false]) {
+      for (const zalopay of [true, false]) {
+        for (const paypal of [true, false]) {
+          configs.push({ bank, momo, zalopay, paypal });
+        }
+      }
+    }
+  }
+  const seen = new Set();
+  for (const config of configs) {
+    for (const country of ['VN', 'US', null]) {
+      for (const option of paymentOptions(country, config)) {
+        seen.add(option.labelKey);
+        seen.add(option.hintKey);
+      }
+    }
+  }
+  assert.ok(seen.size >= 6, `phai ra so khoa duoc gui, thay vi ${seen.size}`);
+  for (const key of [...seen].sort()) {
+    for (const [lang, dict] of [['vi', vi], ['en', en]]) {
+      const text = dict.t(key);
+      assert.notEqual(text, key, `khoá "${key}" khong ton tai trong ${lang} — form thanh toan se in chinh khoá do ra`);
+      assert.ok(text.trim().length > 0, `khoá "${key}" rong trong ${lang}`);
+    }
+  }
 });
 
 test('private and malformed addresses are never sent to a lookup provider', () => {

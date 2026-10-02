@@ -12,7 +12,24 @@ const statusLabel=o=>window.I18N.status(o.status);
 // once. The dictionary value is the configured default and the last resort: an
 // empty mailto on a page a paying customer is reading helps nobody.
 const SUPPORT = () => document.body?.dataset?.support || T('brand.supportEmail');
-const state=JSON.parse(sessionStorage.getItem('sonvudev_order')||'null');
+// Review length limits, as the server configured them.
+//
+// They used to be a literal 1200 on the textarea and no minimum at all, so the
+// box accepted a three-word "good" and the buyer only found out from a rejection
+// — and the rejection was a Vietnamese sentence inside an English form. The server
+// already owns both numbers (src/reviews.js), so it also renders them into the
+// page and the client stops carrying its own copy.
+//
+// Zero means "the server did not say", and the client then does not second-guess
+// it: the request still goes out and the answer is still translated.
+const LIMITS = () => ({ min: Number(document.body?.dataset?.reviewMin) || 0, max: Number(document.body?.dataset?.reviewMax) || 0 });
+// A refusal the server names rather than phrases, so the reader is told in the
+// language they are reading. The key arrives whole — src/reviews.js sends
+// `review.err.<what>`, not a suffix for this file to assemble — so there is no
+// place for the two halves to disagree about what a code is called. Anything
+// unnamed falls back to the generic sentence.
+const reviewError = (payload) => T(payload && payload.code, T('review.failed'));
+const state = window.OrderClient.read();
 function missing(){title.textContent=T('order.noSession.title');lead.textContent=T('order.noSession.hint');body.innerHTML='<a class="button button-primary" href="/lookup">'+esc(T('order.noSession.cta'))+' <span>→</span></a>'}
 // A dead device leaves no session, so the order id has to be the one thing the
 // buyer can still act on. It is a link, not plain text: recovery should be one
@@ -34,7 +51,9 @@ function reviewForm(order, item){
   const already=(order.reviews||[]).some(r=>r.productId===item.productId);
   if(order.status!=='paid'||!order.deliveredAt)return '';
   if(already)return `<p class="review-done">${esc(T('review.already'))}</p>`;
-  return `<div class="review-box"><h3>${esc(T('review.heading'))}</h3><p class="review-hint">${esc(T('review.hint'))}</p><textarea id="review-body" rows="3" maxlength="1200" placeholder="${esc(T('review.placeholder'))}"></textarea><input id="review-name" type="text" maxlength="60" placeholder="${esc(T('review.namePlaceholder'))}"><button class="button button-secondary button-wide" id="review-send">${esc(T('review.send'))}</button><p class="review-status" id="review-status"></p></div>`;
+  const {min,max}=LIMITS();
+  const length=[max?` maxlength="${max}"`:'',min?` minlength="${min}"`:''].join('');
+  return `<div class="review-box"><h3>${esc(T('review.heading'))}</h3><p class="review-hint">${esc(T('review.hint'))}</p><textarea id="review-body" rows="3"${length} placeholder="${esc(T('review.placeholder'))}"></textarea><input id="review-name" type="text" maxlength="60" placeholder="${esc(T('review.namePlaceholder'))}"><button class="button button-secondary button-wide" id="review-send">${esc(T('review.send'))}</button><p class="review-status" id="review-status"></p></div>`;
 }
 function wireReviewForm(order, item){
   const send=document.getElementById('review-send');
@@ -42,12 +61,18 @@ function wireReviewForm(order, item){
   send.onclick=async()=>{
     const status=document.getElementById('review-status');
     const button=send;
+    const text=document.getElementById('review-body').value.trim();
+    const {min}=LIMITS();
+    // Caught here rather than after the round trip so the buyer finds out while
+    // still looking at the box they typed into. The server enforces it either way;
+    // this is about where the message appears.
+    if(min&&text.length<min){status.textContent=T('review.err.tooShort',undefined,{min});return}
     button.disabled=true;
     status.textContent=T('review.sending');
     try{
-      const response=await fetch('/api/reviews',{method:'POST',headers:{'content-type':'application/json','x-order-token':state.token},body:JSON.stringify({orderId:order.id,accessToken:state.token,productId:item.productId,body:document.getElementById('review-body').value,authorName:document.getElementById('review-name').value})});
+      const response=await fetch('/api/reviews',{method:'POST',headers:{'content-type':'application/json','x-order-token':state.token},body:JSON.stringify({orderId:order.id,accessToken:state.token,productId:item.productId,body:text,authorName:document.getElementById('review-name').value})});
       const payload=await response.json();
-      if(!response.ok){status.textContent=payload.error||T('review.failed');button.disabled=false;return}
+      if(!response.ok){status.textContent=reviewError(payload);button.disabled=false;return}
       status.textContent=T('review.sent');
       // Repaint so the server's copy, not this optimistic guess, is what shows.
       render();
@@ -63,7 +88,10 @@ function wireReviewForm(order, item){
 let deadline=null,clockOffset=0,activeOrder=null,watchTimer=null,countdownTimer=null;
 const clock=()=>window.I18N.clock(deadline,deadline?new Date(Date.now()+clockOffset).toISOString():null);
 const remaining=()=>clock().remaining;
-const closed=o=>Boolean(o&&o.deliveredAt)&&o.status!=='paid';
+// An order is closed once its file has been handed over and no payment is
+// expected. The storefront used to carry its own copy of this rule, and a pair of
+// predicates that have to agree to be worth anything is not one predicate.
+const closed=window.OrderClient.isClosed;
 function countdownText(){return clock().text()}
 
 function stopTimers(){if(watchTimer)clearTimeout(watchTimer);if(countdownTimer)clearTimeout(countdownTimer);watchTimer=null;countdownTimer=null}
@@ -105,7 +133,16 @@ function scheduleWatch(delay=10000){
 // The order of the checks is the page's, because it is the complete one: what the
 // buyer needs to know is which world they are in, and that is decided by refund
 // first, then payment, then delivery, then the clock.
-const hintFor = (o) => window.I18N.orderHint(o, { expiresAt: deadline, serverTime: deadline ? new Date(Date.now()).toISOString() : null, support: SUPPORT() });
+// The skew-corrected server clock, in one place.
+//
+// Both the countdown and the status sentence have to be measured against the same
+// clock. They were not: the countdown passed a corrected serverTime and this
+// passed Date.now(), which puts the skew back to zero — so on a device whose clock
+// is fast, the countdown said "20:00 left to pay" while the sentence directly
+// under it said the window had already closed. Two screens arguing with each other
+// about money is the thing this file was refactored to prevent.
+const skewOptions = () => (deadline ? { expiresAt: deadline, serverTime: new Date(Date.now() + clockOffset).toISOString() } : { expiresAt: null, serverTime: null });
+const hintFor = (o) => window.I18N.orderHint(o, { ...skewOptions(), support: SUPPORT() });
 let captureTries=0;
 async function resumePayPalCapture(){
   // One attempt per page load. Re-rendering calls back into here, and a server
@@ -137,7 +174,7 @@ async function render(){
   if(!response.ok&&!response.status) return scheduleWatch(5000);
   const data=await response.json();
   if(!response.ok){
-    sessionStorage.removeItem('sonvudev_order');
+    window.OrderClient.clear();
     return missing();
   }
   if(data.serverTime) clockOffset=new Date(data.serverTime).getTime()-Date.now();
@@ -169,29 +206,21 @@ ${deadline?`<p class="order-deadline${left!==null&&left<=0?' is-over':''}" id="o
 ${order.status==='cancelled'?'':`${channels}`}
 <button class="button button-primary button-wide" id="order-download" disabled>${esc(T('order.unlock'))} <span>↓</span></button>
 <button class="button button-secondary button-wide" id="order-refresh">${esc(T('order.refresh'))} <span>↻</span></button>`}
-<p class="order-help">${esc(T('order.help.need'))} <a href="mailto:${SUPPORT()}">${SUPPORT()}</a> hoặc xem <a href="/refund">${esc(T('order.help.refundPolicy'))}</a>.</p>
+<p class="order-help">${esc(T('order.help.need'))} <a href="mailto:${esc(SUPPORT())}">${esc(SUPPORT())}</a> ${esc(T('order.help.or'))} <a href="/refund">${esc(T('order.help.refundPolicy'))}</a>.</p>
 ${reviewForm(order, item)}
 ${recoveryBar(order.id)}`;
   document.getElementById('order-download')?.addEventListener('click',async()=>{
     const button=document.getElementById('order-download');
     if(button.disabled)return;
     button.disabled=true;
-    try{
-      const result=await fetch('/api/orders/'+encodeURIComponent(order.id)+'/download',{headers:{'x-order-token':state.token}});
-      const payload=await result.json();
-      if(result.ok){
-        // The server cannot see the file arrive in the browser, so this click is
-        // what closes the order. Best effort: never block the transfer on it.
-        location.href=payload.url;
-        fetch('/api/orders/'+encodeURIComponent(order.id)+'/delivered',{method:'POST',headers:{'x-order-token':state.token,'content-type':'application/json'}}).then(()=>render()).catch(()=>{});
-      }else{
-        lead.textContent=payload.error||T('order.errDownload');
-        button.disabled=false;
-      }
-    }catch(error){
-      lead.textContent=T('order.errDownloadOffline');
-      button.disabled=false;
-    }
+    // Ask for a fresh URL, follow it, and tell the server the file was handed
+    // over. Shared with the storefront and the PayPal return — the reset is what
+    // makes a second download possible, and doing it on one page and not another
+    // means one order that can be downloaded forever beside one that cannot.
+    const result=await window.OrderClient.download(order.id,state.token);
+    if(result.ok){render();return}
+    lead.textContent=result.offline?T('order.errDownloadOffline'):(result.error||T('order.errDownload'));
+    button.disabled=false;
   });
   document.getElementById('order-refresh')?.addEventListener('click',()=>render());
   wireReviewForm(order, item);

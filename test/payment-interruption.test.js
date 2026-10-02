@@ -38,7 +38,7 @@ async function page(orderOverrides, respond) {
   const base = document.getElementById.bind(document);
   document.getElementById = (id) => base(id) || (extra.has(id) ? new El('div', id) : null);
   const fetch = async (url, options = {}) => (respond || (async () => ({ ok: true, status: 200, json: async () => ({ order: order(orderOverrides), payment: null }) })))(String(url), options);
-  const run = await runScript(`${read('i18n.js')}\n${read('order.js')}`, {
+  const run = await runScript(`${read('i18n.js')}\n${read('order-client.js')}\n${read('order.js')}`, {
     document, window: {}, fetch, location: { href: '' },
     sessionStorage: { getItem: () => JSON.stringify({ id: 'SVD-TEST', token: 'tok' }), setItem() {}, removeItem() {} },
   });

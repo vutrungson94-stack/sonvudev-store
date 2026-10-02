@@ -2,6 +2,7 @@ import dns from "node:dns/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import dotenv from "dotenv";
+import { NOT_SET } from "../src/config.js";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 dotenv.config({ path: path.join(root, ".env"), override: true });
@@ -50,7 +51,14 @@ if (!paypalFilled) {
   }
 }
 add("PayPal webhook", !placeholder(value("PAYPAL_WEBHOOK_ID")), value("PAYPAL_WEBHOOK_ID") ? "configured" : "missing");
-add("Bank transfer", [value("BANK_NAME"), value("BANK_ACCOUNT_NAME"), value("BANK_ACCOUNT_NUMBER")].every((item) => item && !/^(chưa cập nhật|not configured|example|replace-with)/i.test(item)), [value("BANK_NAME"), value("BANK_ACCOUNT_NUMBER")].every((item) => item && !/^(chưa cập nhật|not configured|example|replace-with)/i.test(item)) ? "configured" : "missing");
+// The one question "has this been filled in", answered by the same rule the server
+// uses. The sentence that marks an unset value was written out three times — once
+// as the default in config.js, once in the check that decides whether bank
+// transfer is offered, and once here with its own regex. Rewording it in one place
+// left the other two disagreeing, which is a shop that accepts transfers it has no
+// account for while its own health check says it is fine.
+const filledIn = (item) => Boolean(item) && !new RegExp(`^(${NOT_SET}|not configured|example|replace-with|your_)`, "i").test(item);
+add("Bank transfer", ["BANK_NAME", "BANK_ACCOUNT_NAME", "BANK_ACCOUNT_NUMBER"].every((key) => filledIn(value(key))), ["BANK_NAME", "BANK_ACCOUNT_NUMBER"].every((key) => filledIn(value(key))) ? "configured" : "missing");
 add("Bank BIN (VietQR)", /^\d{6}$/.test(value("BANK_BIN")), value("BANK_BIN") || "missing");
 add("MoMo wallet", !placeholder(value("MOMO_ACCOUNT_NUMBER")), value("MOMO_ACCOUNT_NUMBER") ? "configured" : "optional, missing");
 add("ZaloPay wallet", !placeholder(value("ZALOPAY_ACCOUNT_NUMBER")), value("ZALOPAY_ACCOUNT_NUMBER") ? "configured" : "optional, missing");
@@ -79,7 +87,12 @@ if (!resendKey) {
     add("Order email", false, `lookup failed: ${error.message}`);
   }
 }
-add("Email sender", /^[^<]+<[^>]+>$/.test(value("EMAIL_FROM") || "SonVuDev <no-reply@sonvudev.com>"), value("EMAIL_FROM") || "SonVuDev <no-reply@sonvudev.com>");
+// The sender is whatever EMAIL_FROM says, checked only for the shape a mail API
+// needs. A literal address used to sit in the fallback, so this check agreed with
+// itself about a sender the shop had already replaced — and reported a healthy
+// configuration for a domain it was not sending from.
+const emailFrom = value("EMAIL_FROM");
+add("Email sender", /^[^<]+<[^>]+>$/.test(emailFrom), emailFrom || "(chưa đặt EMAIL_FROM)");
 const windowHours = Number(value("ORDER_PAYMENT_WINDOW_HOURS") || "24");
 add("Order payment window", Number.isFinite(windowHours) && windowHours >= 1, `${windowHours}h before an unpaid order is cancelled`);
 
@@ -164,7 +177,7 @@ const failed = checks.filter((check) => !check.ok);
 console.log(`\n${checks.length - failed.length}/${checks.length} production checks passed.`);
 if (networkBlocked) {
   console.error("\nKHONG KET LUAN DUOC: may nay khong truy cap duoc site.\n");
-  console.error("Mot so check cuoi bang phai chay tren mang khong bi chan (4G, mang nha rieng).");
+  console.error("Một số check cuối bảng phải chạy trên mạng không bị chặn (4G, mạng nhà riêng).");
   console.error("Cac check khac — cau hinh, PayPal, email, DNS — da dung va khong phu thuoc site.");
   process.exitCode = 1;
 } else if (failed.length) process.exitCode = 1;

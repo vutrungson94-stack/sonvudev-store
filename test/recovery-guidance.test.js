@@ -54,7 +54,7 @@ const lookupDom = (search) => {
 
 const runLookup = async (search) => {
   const { document, form, search: q } = lookupDom(search);
-  const run = await runScript(read('lookup.js'), { document, window: {}, fetch: async () => { throw new Error('not stubbed'); }, location: { search: q, href: '' } });
+  const run = await runScript(`${read('order-client.js')}\n${read('lookup.js')}`, { document, window: {}, fetch: async () => { throw new Error('not stubbed'); }, location: { search: q, href: '' } });
   return { run, form };
 };
 

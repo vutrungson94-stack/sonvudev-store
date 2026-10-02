@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Không tìm thấy trang — SonVuDev</title>
+<title data-i18n-attr="title:notfound.title">Không tìm thấy trang — SonVuDev</title>
 <meta name="description" content="Đường dẫn này không tồn tại. Quay lại danh sách phần mềm của SonVuDev.">
 <!-- A 404 that says "found" would be invited into the index. -->
 <meta name="robots" content="noindex,follow">
@@ -13,23 +13,38 @@
 <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="/styles.css">
 </head>
+<!--
+  This page speaks both languages.
+
+  It is the one page a visitor cannot choose: they arrive by following a link that is
+  broken, or by typing an address, and neither carries a language. So it reads the
+  browser's own setting and follows it — the same thing every other page does, except
+  here it is the only thing that can happen. A visitor from outside Vietnam who
+  mistypes a URL was previously told, in Vietnamese, that nothing was there.
+
+  The list of products underneath comes from related.js, which now reads the page's
+  language rather than assuming Vietnamese: it holds the only sentence on this page
+  that is not in the dictionary, because it is a fallback for the moment before the
+  catalogue answers.
+-->
 <body class="page-404">
-<header class="site-header"><a class="brand" href="/"><span class="brand-mark">S</span><span>SonVu<span>Dev</span></span></a><a class="header-cta" href="/">Về trang chủ <span>↗</span></a></header>
+<header class="site-header"><a class="brand" href="/"><span class="brand-mark">S</span><span>SonVu<span>Dev</span></span></a><button class="lang-toggle" type="button" data-lang-toggle>EN</button><a class="header-cta" href="/"><span data-i18n="nav.home">Về trang chủ</span> <span>↗</span></a></header>
 <main class="wrap">
 <div class="notfound">
-<p class="eyebrow">Lỗi 404</p>
-<h1>Không tìm thấy trang này</h1>
-<p class="notfound-text">Có thể đường dẫn bị sai chính tả, hoặc sản phẩm bạn tìm đã ngừng bán. Danh sách dưới đây là những gì đang có.</p>
-<div class="notfound-links" id="notfound-links"><p class="related-empty">Đang tải sản phẩm…</p></div>
-<div class="notfound-actions"><a class="button button-primary" href="/">Về trang chủ <span>→</span></a><a class="button button-secondary" href="/lookup">Tra cứu đơn hàng</a></div>
+<p class="eyebrow" data-i18n="notfound.eyebrow">Lỗi 404</p>
+<h1 data-i18n="notfound.title">Không tìm thấy trang này</h1>
+<p class="notfound-text" data-i18n="notfound.text">Có thể đường dẫn bị sai chính tả, hoặc sản phẩm bạn tìm đã ngừng bán. Danh sách dưới đây là những gì đang có.</p>
+<div class="notfound-links" id="notfound-links"><p class="related-empty" data-i18n="notfound.loading">Đang tải sản phẩm…</p></div>
+<div class="notfound-actions"><a class="button button-primary" href="/"><span data-i18n="nav.home">Về trang chủ</span> <span>→</span></a><a class="button button-secondary" href="/lookup" data-i18n="nav.lookup">Tra cứu đơn hàng</a></div>
 </div>
 </main>
-<footer class="site-footer wrap"><p>© {{year}} SonVuDev · <a href="/terms">Điều khoản</a> · <a href="/refund">Hoàn tiền</a> · <a href="/privacy">Bảo mật</a> · <a href="/about">Về chúng tôi</a></p></footer>
+<footer class="site-footer wrap"><p>© {{year}} {{brandName}} · <a href="/terms" data-i18n="nav.terms">Điều khoản</a> · <a href="/refund" data-i18n="nav.refund">Hoàn tiền</a> · <a href="/privacy" data-i18n="nav.privacy">Bảo mật</a> · <a href="/about" data-i18n="nav.about">Về chúng tôi</a></p></footer>
 <!--
   Same loader as a product page. It used to be an inline block, and the server's
   script-src 'self' with no 'unsafe-inline' refused to run it, so every 404 showed
   an empty box where the product list should have been. Same fix, same file.
 -->
+<script src="i18n.js"></script>
 <script src="/related.js" data-target="notfound-links"></script>
 </body>
 </html>

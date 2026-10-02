@@ -53,8 +53,8 @@ function context(order) {
     // The deadline the buyer was promised is the one the sweep enforces. Reading
     // the number from config is the whole point: an email that says "24 hours"
     // while the server cancels at 12 tells the buyer to stop waiting for an
-    // order that is already gone.
-    windowHours: Math.max(1, Number(env.orders.paymentWindowHours) || 24),
+    // order that is already gone. config.js has already clamped it.
+    windowHours: env.orders.paymentWindowHours,
     deadline: stamp(order.expiresAt),
     paidAt: stamp(order.paidAt),
     refundReason: order.refundReason || "không rõ",

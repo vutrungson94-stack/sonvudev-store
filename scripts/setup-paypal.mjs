@@ -78,7 +78,7 @@ async function main() {
 
   if (clientId === clientSecret) {
     console.error("PAYPAL_CLIENT_ID va PAYPAL_CLIENT_SECRET dang giong nhau.");
-    console.error("Ban da copy Client ID sang ca hai o trong dashboard.");
+    console.error("Bạn đã copy Client ID sang cả hai ô trong dashboard.");
     process.exitCode = 1;
     return;
   }
@@ -98,7 +98,7 @@ async function main() {
     process.exitCode = 1;
     return;
   }
-  console.log("Credential hop le. Da lay access token.");
+  console.log("Credential hợp lệ. Đã lấy access token.");
 
   const auth = { Authorization: `Bearer ${tokenBody.access_token}`, "Content-Type": "application/json" };
   const listResponse = await fetch(`${apiBase}/v1/notifications/webhooks`, { headers: auth });
@@ -124,9 +124,9 @@ async function main() {
       if (detail) console.error(`Chi tiet: ${detail}`);
       if (createResponse.status === 400) {
         console.error("PayPal tu choi event_types cho app nay. Nguyen nhan thuong gap:");
-        console.error("  - Tai khoan Personal chua nang ky webhook qua REST API.");
+        console.error("  - Tài khoản Personal chưa đăng ký webhook qua REST API.");
         console.error("  - Hay tao webhook thu cong trong Developer Dashboard > Apps & Credentials > Webhooks.");
-        console.error("  - Sau khi co Webhook ID, dien vao .env roi chay lai check:production.");
+        console.error("  - Sau khi có Webhook ID, điền vào .env rồi chạy lại check:production.");
       } else if (createResponse.status === 422 || createResponse.status === 404) {
         console.error("PayPal khong truy cap duoc URL nay. Kiem tra DNS + HTTPS cua APP_URL truoc khi tao lai.");
       }

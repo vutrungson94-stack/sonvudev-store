@@ -50,7 +50,7 @@ const i18nSource = await read(path.join("public", "i18n.js"));
 // build, not a silently accepted 404. /llms.txt, /feed.json and the English
 // product path were all missing here when they were first written, and each one
 // was caught by the same check that has been catching bad links all along.
-const dynamicRoute = /^(?:\/$|\/en(?:\/product\/[^/]+)?$|\/product\/[^/]+$|\/order\/[^/]+$|\/og\/[^/]+$|\/robots\.txt$|\/sitemap\.xml$|\/llms\.txt$|\/feed\.json$|\/api\/|\/admin(?:\.html)?$|\/paypal-return(?:\.html)?$|\/lookup$|\/google[0-9a-z]+\.html$|\/ms[0-9a-z]+\.txt$|\/[0-9a-z-]{8,128}\.txt$)/;
+const dynamicRoute = /^(?:\/$|\/en(?:\/product\/[^/]+)?$|\/product\/[^/]+$|\/order\/[^/]+$|\/og\/[^/]+$|\/robots\.txt$|\/sitemap\.xml$|\/llms\.txt$|\/feed\.json$|\/api\/|\/admin(?:\.js|\.html)?$|\/paypal-return(?:\.html)?$|\/lookup(?:\.html)?$|\/google[0-9a-z]+\.html$|\/ms[0-9a-z]+\.txt$|\/[0-9a-z-]{8,128}\.txt$)/;
 // Pages that are entry points rather than link targets: the buyer reaches them
 // from an email or a PayPal redirect, and robots.txt deliberately keeps crawlers
 // away from all three.
@@ -133,8 +133,87 @@ const usedKeys = new Set([
   // the code next to it is not.
   ...[...i18nCode.matchAll(/'([\w.]+)'/g)].map((m) => m[1]),
 ]);
+
+// ---------------------------------------------------------------------------
+// 3b. A key the server hands to the browser by name.
+//
+//     "Used" is not only "named in a page script". src/payments.js sends the
+//     checkout form a labelKey and a hintKey, and the form resolves them against
+//     the dictionary at render time — eleven working keys, not one character of
+//     which appears in public/. Reading only the pages reported every one of them
+//     as dead, which is how a correct change gets "fixed" back into a hardcode.
+//
+//     So the modules that produce content for the browser are read too. These two
+//     answer with keys and nothing else: the other modules either answer with
+//     errors, which the caller decides how to present, or render the page itself,
+//     in a locale of their own.
+// ---------------------------------------------------------------------------
+const keyProducers = [];
+for (const name of ["payments.js", "reviews.js"]) {
+  const file = path.join("src", name);
+  if (existsSync(file)) keyProducers.push([`src/${name}`, await read(file)]);
+}
+for (const [, source] of keyProducers) {
+  // Both quote styles: src/payments.js is written in double quotes like the rest
+  // of src/, and a single-quoted pattern reported every payment key as dead.
+  for (const match of source.matchAll(/'([a-z][\w]*(?:\.[\w]+)+)'|"([a-z][\w]*(?:\.[\w]+)+)"/g)) {
+    usedKeys.add(match[1] || match[2]);
+  }
+}
+
 const orphans = [...viKeys].filter((key) => !usedKeys.has(key)).sort();
 if (orphans.length) fail("khoá i18n mồ côi", "public/i18n.js", `${orphans.length} khoá không nơi nào dùng: ${orphans.join(", ")}`);
+
+// ---------------------------------------------------------------------------
+// 3c. The same key written twice in one dictionary.
+//
+//     Object literals accept it: the last one wins, silently. vi had
+//     'nav.refund' twice, one of them already superseded, so correcting it changed
+//     nothing and the mistake stayed invisible to every other check — including the
+//     ones that read every key to decide whether it is used. Two halves of one file
+//     disagreeing with each other is the same failure as a key missing from one
+//     language, and it gets the same treatment.
+// ---------------------------------------------------------------------------
+// Reads the object literal that starts at a marker, by counting braces and
+// ignoring anything inside a string. The obvious version of this — from
+// "vi: {" to the next "};" — runs straight past the end of the vi block, because
+// a dictionary is written `{ vi: {…}, en: {…} };` and the first thing that looks
+// like its end belongs to the whole DICT two hundred keys later. Every key then
+// appeared to be declared twice, and the check reported the entire file.
+const objectLiteralAt = (source, marker) => {
+  const markerAt = source.indexOf(marker);
+  if (markerAt < 0) return "";
+  const open = source.indexOf("{", markerAt);
+  let depth = 0;
+  let quote = "";
+  for (let i = open; i < source.length; i += 1) {
+    const char = source[i];
+    if (quote) {
+      if (char === "\\") { i += 1; continue; }
+      if (char === quote) quote = "";
+      continue;
+    }
+    if (char === "'" || char === '"' || char === "`") { quote = char; continue; }
+    if (char === "{") depth += 1;
+    else if (char === "}" && (depth -= 1) === 0) return source.slice(open, i + 1);
+  }
+  return "";
+};
+
+for (const [name, label] of [["vi", "tiếng Việt"], ["en", "tiếng Anh"]]) {
+  const block = objectLiteralAt(i18nSource, `${name}: {`);
+  if (!block) {
+    fail("khoá i18n trùng", "public/i18n.js", `không đọc được khối ${label} — có lẽ tên ${name}: { đã đổi`);
+    continue;
+  }
+  const seen = new Set();
+  for (const match of block.matchAll(/^ {4}'([\w.]+)':/gm)) {
+    if (seen.has(match[1])) {
+      fail("khoá i18n trùng", "public/i18n.js", `khoá "${match[1]}" khai báo hai lần trong ${label} — bản sau âm thầm ghi đè bản trước`);
+    }
+    seen.add(match[1]);
+  }
+}
 
 // ---------------------------------------------------------------------------
 // 4. A value that belongs in config and is also written into a file.
@@ -152,8 +231,8 @@ if (orphans.length) fail("khoá i18n mồ côi", "public/i18n.js", `${orphans.le
 // configured. Now a missing value fails, loudly, naming itself.
 const appUrl = env("APP_URL");
 const supportEmail = (env("SUPPORT_EMAIL") || "").toLowerCase();
-if (!appUrl) fail("cau hinh thieu", "process.env", "APP_URL chưa được đặt — audit không thể biết domain nào là chính");
-if (!supportEmail) fail("cau hinh thieu", "process.env", "SUPPORT_EMAIL chưa được đặt — audit không thể biết địa chỉ hỗ trợ nào là chính");
+if (!appUrl) fail("cấu hình thiếu", "process.env", "APP_URL chưa được đặt — audit không thể biết domain nào là chính");
+if (!supportEmail) fail("cấu hình thiếu", "process.env", "SUPPORT_EMAIL chưa được đặt — audit không thể biết địa chỉ hỗ trợ nào là chính");
 const appHost = appUrl ? new URL(appUrl).hostname.toLowerCase() : "";
 const thirdParty = new Set(["www.w3.org", "schema.org", "www.sitemaps.org", "localhost", "img.vietqr.io", "fonts.googleapis.com", "fonts.gstatic.com", "resend.com", "supabase.com", "supabase.co", "paypal.com", "google.com", "cloudflare.com", "render.com", "ipapi.co", "ipwho.is", "er-api.com", "exchangerate-api.com", "indexnow.org"]);
 // i18n.js is scanned too: brand.supportEmail is the configured default the pages
@@ -179,11 +258,17 @@ for (const name of testFiles) {
   // honest option: a pattern meant to recognise "this is a fixture" would eventually
   // match a real hardcode written in the same shape.
   if (name === "audit.test.js") continue;
+  // With no APP_URL there is no host to look for, and an empty pattern matches at
+  // every position in every file. The missing-configuration failure is already
+  // reported above; adding one finding per character on top of it buried the report
+  // in output until the process was killed for writing too much, which is a much
+  // worse way to be told the environment is unset.
+  if (!appHost) continue;
   const relative = path.join("test", name);
   const source = await read(relative);
   for (const match of source.matchAll(new RegExp(`(?<![/.\\w-])${appHost.replace(/\./g, "\\.")}(?![\\w-])`, "gi"))) {
     const line = source.slice(0, match.index).split("\n").length;
-    fail("domain gõ tay", `${relative}:${line}`, `${match[0]} — APP_URL là ${appUrl}. Test phai doc tu process.env.APP_URL, khong ghi cung domain.`);
+    fail("domain gõ tay", `${relative}:${line}`, `${match[0]} — APP_URL là ${appUrl}. Test phải đọc từ process.env.APP_URL, không ghi cứng domain.`);
   }
 }
 
@@ -218,6 +303,154 @@ for (const relative of emailBearing) {
     if (address === supportEmail) continue;
     if (/@(example|sonvudev|localhost|test|your-paypal)/.test(address)) continue;
     fail("email gõ tay", relative, `${match[0]} — SUPPORT_EMAIL là ${supportEmail}`);
+  }
+}
+
+// ---------------------------------------------------------------------------
+// 4b. The site's own host written into a file the audit never looked at.
+//
+//     Section 4 above reads public/, src/pages.js and i18n.js. deploy/ and
+//     scripts/ were never in the list, so Caddyfile could pin the reverse proxy to
+//     one domain and deploy.sh to one install root, and publish-product.mjs could
+//     tell the operator to go and check one specific address at the end of a
+//     release. Every gate was green and none of those files had ever been
+//     examined.
+//
+//     Only this project's own host is checked here, not arbitrary hosts: a script
+//     legitimately talks to api.render.com and supabase.com, and flagging those
+//     would only teach people to ignore the audit. What must never be written down
+//     is the value APP_URL already holds.
+// ---------------------------------------------------------------------------
+const infraFiles = [];
+for (const [dir, filter] of [["deploy", () => true], ["scripts", (name) => /\.(mjs|js|sh|ps1)$/.test(name)]]) {
+  const full = path.join(root, dir);
+  if (!existsSync(full)) continue;
+  for (const name of await readdir(full)) {
+    if (filter(name)) infraFiles.push(path.join(dir, name));
+  }
+}
+for (const relative of infraFiles) {
+  // This file exists to name the mistake, so it necessarily quotes the address
+  // that mistake takes. Same reasoning as skipping audit.test.js above. Compared
+  // on the file name: path.join uses a backslash on Windows, and "audit-web.mjs"
+  // never equals "scripts\audit-web.mjs".
+  if (path.basename(relative) === "audit-web.mjs") continue;
+  const source = await read(relative);
+  if (!appHost) continue;
+  for (const match of source.matchAll(new RegExp(`(?<![/.\\w-])${appHost.replace(/\./g, "\\.")}(?![\\w-])`, "gi"))) {
+    const line = source.slice(0, match.index).split("\n").length;
+    fail("domain gõ tay", `${relative}:${line}`, `${match[0]} — APP_URL là ${appUrl}. Dùng biến môi trường thay vì ghi tên miền.`);
+  }
+}
+
+const accented = (value) => /[àáâãèéêìíòóôõùúýăđĩũơưạảấầẩẫậắằẳẵặẹẻẽếềểễệỉịọỏốồổỗộớờởỡợụủứừửữựỳỵỷỹ]/i.test(value);
+// ---------------------------------------------------------------------------
+// 4c. Content the storefront prints, written in a language the reader may not
+//     speak.
+//
+//     /api/checkout/options used to answer with Vietnamese labels — "Chuyển khoản
+//     ngân hàng / Quét mã QR", "Hỗ trợ MoMo, ZaloPay và quét mã VietQR" — and the
+//     checkout form printed them straight into the markup. A visitor who switched
+//     the site to English chose a payment method labelled in the language they had
+//     chosen not to read, on the one screen where the money is.
+//
+//     The server now names a key and the browser resolves it, so no sentence can
+//     survive in this file by accident. src/pages.js is deliberately exempt: it
+//     renders the page itself and keeps one table per locale, which is the only
+//     place a sentence is allowed to belong to one language.
+// ---------------------------------------------------------------------------
+for (const name of ["payments.js"]) {
+  const file = path.join("src", name);
+  if (!existsSync(file)) continue;
+  const source = await read(file);
+  for (const match of source.matchAll(/(['"`])((?:[^'"`\\]|\\.)*?)\1/g)) {
+    const value = match[2];
+    if (value.length > 2 && accented(value)) {
+      const line = source.slice(0, match.index).split("\n").length;
+      fail("tiếng Việt ở phía máy chủ", `src/${name}:${line}`, `"${value}" — nội dung hiển thị phải đến từ từ điển, máy chủ chỉ gửi khoá`);
+    }
+  }
+}
+
+// ---------------------------------------------------------------------------
+// 4d. The same identity declared twice on one page.
+//
+//     og:site_name, og:brand and twitter:site are added to every rendered page by
+//     brandMeta() from BRAND_NAME. index.html also typed its own, with the brand
+//     written into og:site_name, og:title, og:image:alt and twitter:title — so a
+//     page carried two og:site_name tags with no way to say which one a scraper
+//     would believe, and changing BRAND_NAME left the homepage announcing the old
+//     shop on every share card while the product pages announced the new one.
+//
+//     "Declared once" is the property worth checking. Whether a page may add one of
+//     its own is a question about the brand, and the audit cannot answer that.
+// ---------------------------------------------------------------------------
+for (const name of htmlFiles) {
+  const source = await read(path.join("public", name));
+  for (const property of ["og:site_name", "og:brand"]) {
+    const declared = [...source.matchAll(new RegExp(`property="${property}"`, "g"))];
+    if (declared.length > 1) {
+      fail("thương hiệu khai báo hai lần", `public/${name}`, `${property} xuất hiện ${declared.length} lần — để brandMeta() lo, đừng gõ thêm vào template`);
+    }
+  }
+}
+
+// ---------------------------------------------------------------------------
+// 4e. A language switch the page cannot honour.
+//
+//     index.html offers EN and can deliver it. The legal pages and the 404 do not
+//     load i18n.js at all, so they cannot — and none of them pretend to. That is a
+//     known, counted gap rather than an accident, but the failure mode is a page
+//     that grows a .lang-toggle while its prose is still one language: the button
+//     appears, is translated by the dictionary, and flips nothing.
+//
+//     So the rule is only about the contradiction, not about the gap. metrics.mjs
+//     counts how many pages carry the dictionary, and its direction is "up", so the
+//     gap is visible as a number that has to be moved on purpose.
+// ---------------------------------------------------------------------------
+for (const name of htmlFiles) {
+  const source = await read(path.join("public", name));
+  const hasToggle = /data-lang-toggle/.test(source);
+  const hasDictionary = /src="i18n\.js"/.test(source);
+  if (hasToggle && !hasDictionary) {
+    fail("nút đổi ngữ không có từ điển", `public/${name}`, `có data-lang-toggle nhưng không nạp i18n.js — nút sẽ không làm gì`);
+  }
+  if (!hasToggle && hasDictionary && !name.endsWith(".html")) {
+    fail("thừa nhiệu", `public/${name}`, `nạp từ điển mà không có nút đổi ngôn ngữ`);
+  }
+}
+
+// ---------------------------------------------------------------------------
+// 4f. A placeholder the renderer does not know how to fill.
+//
+//     A product description may contain {{founder}}, and it is filled on the way out
+//     from BRAND_FOUNDER_NAME. That is the whole reason it is a placeholder: the name
+//     was typed by hand once, into one product's text, in a spelling the owner does
+//     not use — "Vũng Trọng Sơn" where the name is "Vũ Trung Sơn". Nothing could
+//     compare the two, because every other mention of the owner on the site read
+//     from configuration and that one read from a text field.
+//
+//     A placeholder the renderer does not recognise is the failure this design has
+//     instead, and a worse-looking one: the buyer reads the braces. So an unknown
+//     {{token}} in a template is a FAIL rather than something that quietly ships.
+//
+//     Scoped to the templates, which is where a placeholder can reach a customer.
+//     The audit's own source quotes several of them in the explanation of this very
+//     check, and a check that fires on the description of the bug it is looking for
+//     is a check that gets switched off.
+const KNOWN_TOKENS = new Set([
+  "site", "support", "year", "jsonLd", "legalEntity", "paymentWindowHours",
+  "reviewMinLength", "reviewMaxLength", "brandName", "brand",
+  // Filled by fillCopy() on the way out, from BRAND_FOUNDER_NAME and BRAND_NAME,
+  // so a person's name in product copy cannot be misspelled independently of it.
+  "founder",
+]);
+for (const name of htmlFiles) {
+  const source = await read(path.join("public", name));
+  for (const token of source.matchAll(/\{\{\s*([a-zA-Z]+)\s*\}\}/g)) {
+    if (!KNOWN_TOKENS.has(token[1])) {
+      fail("placeholder lạ", `public/${name}`, `{{${token[1]}}} không nằm trong danh sách token mà renderPage biết điền`);
+    }
   }
 }
 
@@ -259,7 +492,6 @@ for (const match of pagesSource.matchAll(/"(?:urlTemplate|item|url)"\s*:\s*`?\$\
 //     tune and cannot fire on a phrase the project has never written.
 // ---------------------------------------------------------------------------
 const stripDiacritics = (value) => value.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase();
-const accented = (value) => /[àáâãèéêìíòóôõùúýăđĩũơưạảấầẩẫậắằẳẵặẹẻẽếềểễệỉịọỏốồổỗộớờởỡợụủứừửữựỳỵỷỹ]/i.test(value);
 const PHRASES = new Map();
 for (const source of [i18nSource, ...htmlSources, ...pageScriptSources, await read(path.join("src", "pages.js")), await read(path.join("src", "app.js"))]) {
   const words = source.replace(/<[^>]+>/g, " ").match(/[\wÀ-ỹĐđ]{2,}/g) || [];
@@ -295,16 +527,106 @@ for (const relative of customerFacing) {
   }
 }
 
-// A token the server never substitutes is a value the page prints verbatim. The
-// {{support}}, {{site}}, {{year}} and {{paymentWindowHours}} tokens each cover
-// their own pages; a new one added to a template and never wired up is invisible
-// until a buyer reads "{{legalEntity}}" in the middle of the terms.
-const wiredTokens = ["site", "support", "year", "paymentWindowHours", "legalEntity", "jsonLd"];
+// The same rule for the text a person reads when something is wrong rather than
+// when they buy something: script output and test names.
+//
+// Those two were never scanned, so the missing diacritics accumulated in exactly
+// the places that get read under pressure — an unaccented "Khong tim thay san pham",
+// an unaccented "phai tra ve cung mot don", an unaccented "trang sau khac trang
+// truoc". Unaccented Vietnamese is not illegible, which is why it survived: it
+// reads as written, just wrong, and only someone who already knows the correct
+// spelling notices. A customer on the storefront would have spotted it at once.
+//
+// Longer phrases only, and comments are stripped as they are above. Two Vietnamese
+// words collide with ordinary English often enough to be useless ("on it", "so the"),
+// and this repository writes its code comments in English on purpose — the Vietnamese
+// that appears in a comment is a quotation of a message that was wrong, and a check
+// that fires on the description of a fixed bug is a check people disable.
+//
+// Strings and test titles are not ambiguous: if three or more accented words appear
+// bare together, they are a sentence in this language.
+const operatorFacing = [];
+for (const dir of ["scripts", "test", "deploy"]) {
+  const full = path.join(root, dir);
+  if (!existsSync(full)) continue;
+  for (const name of await readdir(full)) {
+    if (/\.(mjs|js|sh|service|example)$/.test(name) || name === "Caddyfile") operatorFacing.push(path.join(dir, name));
+  }
+}
+if (existsSync(path.join(root, ".env.example"))) operatorFacing.push(".env.example");
+const longSuspects = [...PHRASES.entries()].filter(([bare]) => bare.split(" ").length >= 3).map(([bare]) => bare).sort((a, b) => b.length - a.length);
+for (const relative of operatorFacing) {
+  // This test exists to make the check fail, so it has to contain the mistake. Same
+  // reasoning as skipping this file's own domain scan above, and the same cost: a
+  // deliberate hole in one file, for the file that proves the rule works.
+  if (path.basename(relative) === "audit.test.js") continue;
+  const text = stripComments(await read(relative));
+  for (const phrase of longSuspects) {
+    const match = new RegExp(`(?<![\\wÀ-ỹ])${phrase.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}(?![\\wÀ-ỹ])`, "i").exec(text);
+    if (match) fail("tiếng Việt không dấu", relative, `"${match[0]}" — viết đúng là "${PHRASES.get(match[0].toLowerCase())}"`);
+  }
+}
+
+// A token the server never substitutes is a value the page prints verbatim, and a
+// token on a page the renderer never sees is the same thing for a second reason.
+// Both used to hide behind one hand-written list of token *names*, which answered
+// the wrong question twice over: it could not tell that {{reviewMax}} had no
+// substitute anywhere, and it could not tell that {{support}} had one and was still
+// being printed raw — because lookup.html was never routed through renderPage at
+// all. /lookup served the literal "{{support}}" as the support address on the
+// recovery page, and /404.html printed "© {{year}}". Four gates, all green.
+//
+// So the names are read out of renderPage instead of being written down, and a
+// file carrying any token has to be named in the renderer at all. If renderPage
+// ever moves, the slice below is empty and every token fails loudly rather than
+// silently passing again.
+const renderStart = serverSource.indexOf("async function renderPage");
+const renderBody = serverSource.slice(renderStart, serverSource.indexOf("const sendPage", renderStart));
+const wiredTokens = new Set([...renderBody.matchAll(/replaceAll\(\s*"\{\{\s*([a-zA-Z]+)\s*\}\}"/g)].map((m) => m[1]));
 for (const name of htmlFiles) {
   const source = await read(path.join("public", name));
   for (const match of source.matchAll(/\{\{\s*([a-zA-Z]+)\s*\}\}/g)) {
-    if (wiredTokens.includes(match[1])) continue;
-    fail("token chua noi", `public/${name}`, `{{${match[1]}}} không có chỗ nào trong renderPage điền vào`);
+    if (!wiredTokens.has(match[1])) {
+      fail("token chưa nối", `public/${name}`, `{{${match[1]}}} không có chỗ nào trong renderPage điền vào`);
+    }
+    if (!serverSource.includes(`"${name}"`)) {
+      fail("trang chưa render", `public/${name}`, `có token {{${match[1]}}} nhưng tên file không xuất hiện trong src/app.js — express.static sẽ serve file thô và token lọt thẳng ra trang`);
+    }
+  }
+}
+
+// ---------------------------------------------------------------------------
+// 5d. An hreflang pointing at a URL the site does not answer.
+//
+//     index.html declared hreflang="en" href="{{site}}/en" for as long as the
+//     language switch existed. There is no /en route and never was: the English
+//     pages are /en/product/<slug>, rendered by pages.js. So the homepage told a
+//     crawler the English version of itself lived at a 404.
+//
+//     This audit could not catch it, because the hand-written dynamicRoute list in
+//     section 1 included /en — it asserted the existence of the very route it was
+//     meant to check. The routes are read out of src/app.js instead, so the check
+//     can no longer pass by believing something the server does not register.
+// ---------------------------------------------------------------------------
+const routeMatches = [...serverSource.matchAll(/app\.(?:get|post|patch|put|delete)\(\s*(?:"([^"]*)"|\[([^\]]*)\])/g)];
+const routePaths = routeMatches.flatMap((m) => (m[2] ? [...m[2].matchAll(/"([^"]*)"/g)].map((x) => x[1]) : [m[1]])).filter(Boolean);
+const toRouteRegex = (route) => new RegExp(`^${route.split("/").map((part) => (part.startsWith(":") ? "[^/]+" : part.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"))).join("\\/")}/?$`);
+const answers = (target) => isRealTarget(target) || routePaths.some((route) => toRouteRegex(route).test(target));
+
+for (const name of htmlFiles) {
+  const source = await read(path.join("public", name));
+  for (const match of source.matchAll(/hreflang="([^"]+)"\s+href="\{\{site\}\}([^"]+)"/g)) {
+    if (!answers(match[2])) {
+      fail("hreflang chết", `public/${name}`, `hreflang="${match[1]}" trỏ tới ${match[2]} mà máy chủ không có route nào trả lời`);
+    }
+  }
+}
+// The product renderer picks its own two shapes, one per language, and hangs the
+// alternate links off them. Neither is written in a template, so it is asserted
+// against the route list here instead of being read out of a tag.
+for (const shape of ["/product/:slug", "/en/product/:slug"]) {
+  if (!routePaths.includes(shape)) {
+    fail("hreflang chết", "src/pages.js", `productUrl() sinh ra ${shape} nhưng src/app.js không đăng ký route đó`);
   }
 }
 
@@ -381,8 +703,33 @@ for (const name of htmlFiles) {
 }
 
 // ---------------------------------------------------------------------------
-const groups = 7;
+// Every family of defect this file knows how to catch. Kept as a number because it
+// is the number a reader checks: a project that discovers a new way to break
+// itself and cannot make the mechanism fail has not fixed anything, and "7" is
+// easy to notice go stale and "several" is not.
+//
+//  1 link or asset with no file behind it
+//  2 the same route registered twice
+//  3 an i18n key in one language and missing in the other
+//  3b an i18n key no page and no server module can reach
+//  3c the same key written twice in one dictionary
+//  4 a configured value also written into a file
+//  4b the site's own host in deploy/ or scripts/
+//  4c display content sent in one language
+//  4d the same identity declared twice on one page
+//  4e a language switch the page cannot honour
+//  4f a template placeholder nothing knows how to fill
+//  5 structured data pointing at a page robots.txt forbids
+//  5b Vietnamese written without its diacritics, in the storefront and in the
+//     operator-facing text of scripts/ and test/
+//  5c a template token the renderer never fills
+//  5d a template the renderer never sees, token or not
+//  5e an hreflang pointing at a URL nothing answers
+//  6 a page nothing links to
+//  7 a phrase from the fallback dictionary inside the dictionary itself
+//  8 the same global declared by two scripts on one page
+const groups = 17;
 for (const item of findings) console.error(`FAIL  ${item.check.padEnd(18)} ${item.file}: ${item.detail}`);
 console.log(`\n[audit] ${groups} nhom kiem tra, ${findings.length} van de.`);
-if (!findings.length) console.log("[audit] PASS: khong co domain ghi tay, route trung, link gay hay khoa i18n mo coi.");
+if (!findings.length) console.log("[audit] PASS: không có domain gõ tay, route trùng, link gãy, tiếng Việt mất dấu hay khoá i18n mồ côi.");
 else process.exitCode = 1;

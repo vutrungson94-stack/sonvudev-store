@@ -3,6 +3,9 @@ import assert from 'node:assert/strict';
 import { promises as fs } from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
+import { fileURLToPath } from 'node:url';
+
+const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 
 // Reviews, and the rule behind them: no stars, ever.
 //
@@ -167,8 +170,23 @@ test('đánh giá lưu trên chính đơn, và không mang theo dữ liệu riê
 test('bỏ tên thì hiển thị ẩn danh, không lộ tên trống', async () => {
   const fulfilled = await purchase({ deliver: true });
   const created = await (await send({ orderId: fulfilled.order.id, accessToken: fulfilled.token, productId: product.id, body: GOOD })).json();
-  assert.equal(created.review.authorName, 'Khách hàng', 'không có tên thì dùng nhãn chung, không để trống');
+  // The name is left empty, and the page decides what to print from the
+  // dictionary. This used to send the Vietnamese word "Khách hàng" as a literal,
+  // which the page printed over its own English one — so an anonymous review on an
+  // English product page was credited in a language the reader had not chosen.
+  assert.equal(created.review.authorName, '', 'không có tên thì để trống cho trang tự dịch, không ghi sẵn một ngôn ngữ');
   assert.ok(!('anonymous' in created.review), 'cờ ẩn danh là chi tiết nội bộ');
+  // And the page really does substitute — in both languages, from its own table.
+  const page = await fs.readFile(path.join(root, 'src', 'pages.js'), 'utf8');
+  assert.match(page, /review\.authorName \|\| copy\.anonymous/, 'trang sản phẩm phải thay nhãn chung khi không có tên');
+  const vi = page.slice(page.indexOf('COPY_VI'), page.indexOf('COPY_EN'));
+  const en = page.slice(page.indexOf('COPY_EN'));
+  assert.match(vi, /anonymous: "Khách hàng"/, 'bản tiếng Việt phải có nhãn chung');
+  assert.match(en, /anonymous: "Customer"/, 'bản tiếng Anh phải có nhãn chung riêng');
+  // And the word must not be coming from the server any more, or the table is
+  // decorative.
+  const reviews = await fs.readFile(path.join(root, 'src', 'reviews.js'), 'utf8');
+  assert.ok(!/authorName: review\.anonymous \? "Khách hàng"/.test(reviews), 'máy chủ không được ghi sẵn nhãn ẩn danh');
 });
 
 test('đánh giá hiện trên trang sản phẩm, và mất khi đơn bị hoàn tiền', async () => {

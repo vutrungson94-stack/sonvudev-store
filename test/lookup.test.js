@@ -118,7 +118,7 @@ test('the legal pages are published and linked from the storefront', async () =>
     // to assert on a literal shop mailbox, which meant the test only
     // passed on one machine with one .env — and failed outright in CI, where
     // APP_URL and SUPPORT_EMAIL are deliberately set to fixture values.
-    assert.ok(html.includes(`mailto:${process.env.SUPPORT_EMAIL}`), `${page} phai lien he bang SUPPORT_EMAIL`);
+    assert.ok(html.includes(`mailto:${process.env.SUPPORT_EMAIL}`), `${page} phải liên hệ bằng SUPPORT_EMAIL`);
     assert.ok(!html.includes('{{support}}'), `${page} con sot token chua thay`);
   }
   const home = await (await fetch(`${base}/`)).text();

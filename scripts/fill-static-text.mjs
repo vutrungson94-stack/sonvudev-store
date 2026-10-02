@@ -35,5 +35,5 @@ const updated = html.replace(/(<(?:span|p|h1|h2|h3|a|button|summary|li|div)[^>]*
 
 await writeFile(path.join(root, "public", "index.html"), updated, "utf8");
 console.log(`Da dien ${filled} phan tu.`);
-if (missing.length) console.log(`Khong tim thay trong i18n.js: ${[...new Set(missing)].join(", ")}`);
+if (missing.length) console.log(`Không tìm thấy trong i18n.js: ${[...new Set(missing)].join(", ")}`);
 console.log(`Con lai phan tu rong: ${(updated.match(/data-i18n="[\w.]+"[^>]*>\s*</g) || []).length}`);

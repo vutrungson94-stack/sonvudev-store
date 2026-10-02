@@ -40,7 +40,7 @@ const json = (payload, method = 'POST', id) => ({
 const create = (payload) => fetch(`${base}/api/admin/products`, json(payload)).then((r) => r.json());
 const patch = (id, payload) => fetch(`${base}/api/admin/products/${encodeURIComponent(id)}`, json(payload, 'PATCH')).then((r) => r.json());
 
-test('trang quan tri co o nhap SEO title va mo ta', async () => {
+test('trang quản trị có ô nhập SEO title và mô tả', async () => {
   const html = await readPublic('admin.html');
   // Without these two inputs the only way to set the fields was to edit the
   // database by hand, which is why the two live products had copy and a new
@@ -51,34 +51,34 @@ test('trang quan tri co o nhap SEO title va mo ta', async () => {
   assert.match(html, /maxlength="175"/, 'mo ta phai gioi han 175 ky tu');
 });
 
-test('trang quan tri mo duoc san pham de sua SEO, khong phai chi them moi', async () => {
+test('trang quản trị mở được sản phẩm để sửa SEO, không phải chỉ thêm mới', async () => {
   const source = await readPublic('admin.js');
-  assert.match(source, /data-seo-form=/, 'thieu form sua SEO tren tung san pham');
-  assert.match(source, /seoEditor/, 'thieu ham seoEditor');
+  assert.match(source, /data-seo-form=/, 'thiếu form sửa SEO trên từng sản phẩm');
+  assert.match(source, /seoEditor/, 'thiếu hàm seoEditor');
   assert.match(source, /method:'PATCH'.*seoTitle/s, 'phai luu bang PATCH de khong ghi de truong khac');
   // A create-only form cannot fix a product that is already published, and the
   // title is the thing most worth revisiting after seeing real search queries.
-  assert.match(source, /data-seo-toggle/, 'thieu nut mo form sua SEO');
+  assert.match(source, /data-seo-toggle/, 'thiếu nút mở form sửa SEO');
 });
 
-test('form sua SEO do loi bao khi vuot gioi han search result cat', async () => {
+test('form sửa SEO báo lỗi khi vượt giới hạn search result cắt', async () => {
   const source = await readPublic('admin.js');
   // Google cuts a title around 60 characters and a description around 160. A
   // field that silently accepts 175 characters teaches the owner to write copy
   // that half of which nobody ever reads.
   assert.match(source, /\['Tiêu đề',form\.elements\.seoTitle,70,60\]/, 'thieu nguong canh bao cho tieu de');
   assert.match(source, /\['Mô tả',form\.elements\.seoDescription,175,160\]/, 'thieu nguong canh bao cho mo ta');
-  assert.match(source, /bị cắt/, 'phai hien thi canh bao bi cat');
+  assert.match(source, /bị cắt/, 'phải hiển thị cảnh báo bị cắt');
 });
 
-test('co duong dan CSS cho form sua SEO', async () => {
+test('có đường dẫn CSS cho form sửa SEO', async () => {
   const css = await readPublic('styles.css');
-  assert.match(css, /\.admin-seo-form\{[^}]*grid-column:1\/-1/, 'form phai tran het chieu rong hang');
+  assert.match(css, /\.admin-seo-form\{[^}]*grid-column:1\/-1/, 'form phải tràn hết chiều rộng hàng');
   assert.match(css, /@media \(max-width:700px\)\{\.admin-seo-form\{grid-template-columns:1fr\}\}/, 'phai xep doc tren dien thoai');
   assert.ok(existsSync(path.join(root, 'public', 'styles.css')));
 });
 
-test('tao san pham co giu nguyen SEO title va mo ta', async () => {
+test('tạo sản phẩm có giữ nguyên SEO title và mô tả', async () => {
   const created = await create({
     name: 'SEO Tester', slug: 'seo-tester', price: 99000, currency: 'VND', status: 'active', fileKey: 'products/seo/1.0.0/s.exe',
     seoTitle: 'Bật macro Excel không cần chỉnh tay từng file',
@@ -107,15 +107,15 @@ test('sau khi luu, nut khoa lai va form bao "Đã lưu"', async () => {
   // behaviour. They pin the contract rather than the formatting.
   const source = await readPublic('admin.js');
   const saveSeo = source.slice(source.indexOf('async function saveSeo'), source.indexOf('async function uploadExistingProduct'));
-  assert.ok(saveSeo.length > 0, 'khong tim thay saveSeo');
+  assert.ok(saveSeo.length > 0, 'không tìm thấy saveSeo');
 
   // The baseline is what "dirty" is measured against, so it has to be updated or the
   // form can never be clean again. It holds what the server stored, not what was
   // typed — the API truncates a title to 70 characters, so a long paste would
   // otherwise leave the form permanently dirty.
-  assert.match(saveSeo, /storedTitle/, 'baseline phai lay tu gia tri server tra ve');
-  assert.match(saveSeo, /form\.dataset\.seoTitle\s*=\s*storedTitle/, 'phai ghi gia tri vua luu vao baseline');
-  assert.match(saveSeo, /form\.dataset\.seoDescription\s*=\s*storedDescription/, 'phai ghi gia tri vua luu vao baseline');
+  assert.match(saveSeo, /storedTitle/, 'baseline phải lấy từ giá trị server trả về');
+  assert.match(saveSeo, /form\.dataset\.seoTitle\s*=\s*storedTitle/, 'phải ghi giá trị vừa lưu vào baseline');
+  assert.match(saveSeo, /form\.dataset\.seoDescription\s*=\s*storedDescription/, 'phải ghi giá trị vừa lưu vào baseline');
 
   // No full re-render in the save path. It is the thing that detached the form, and
   // it also closed the form the owner was working in.
@@ -128,39 +128,39 @@ test('sau khi luu, nut khoa lai va form bao "Đã lưu"', async () => {
   assert.match(after, /countSeo\(form\)/, 'khi that bai cung phai cap nhat lai de mo nut cho thu lai');
 
   // A clean form has to say so. A greyed button on its own reads as a broken button.
-  assert.match(source, /Đã lưu/, 'form da luu phai hien thi trang thai');
+  assert.match(source, /Đã lưu/, 'form đã lưu phải hiển thị trạng thái');
   assert.match(source, /'admin-seo-count'\+\(clean\?' clean':''\)/, 'trang thai da luu phai co class rieng');
   const css = await readPublic('styles.css');
-  assert.match(css, /\.admin-seo-count\.clean\{/, 'can co CSS cho trang thai da luu');
+  assert.match(css, /\.admin-seo-count\.clean\{/, 'cần có CSS cho trạng thái đã lưu');
 });
 
-test('sua SEO khong duoc xoa mo ta va tinh nang', async () => {
+test('sửa SEO không được xoá mô tả và tính năng', async () => {
   const created = await create({
     name: 'Keep My Text', slug: 'keep-my-text', price: 99000, currency: 'VND', status: 'active', fileKey: 'products/keep/1.0.0/k.exe',
-    description: 'Mo ta dai ma khong duoc mat khi sua SEO', features: ['Tinh nang A', 'Tinh nang B'],
+    description: 'Mô tả dài mà không được mất khi sửa SEO', features: ['Tinh nang A', 'Tinh nang B'],
   });
   // The editor sends only the two SEO keys. A merge that treated them as a
   // whole-product replacement would blank the copy on every save.
   const updated = await patch(created.product.id, { seoTitle: 'Tieu de moi', seoDescription: 'Mo ta moi' });
-  assert.equal(updated.product.description, 'Mo ta dai ma khong duoc mat khi sua SEO', 'mo ta phai con nguyen');
+  assert.equal(updated.product.description, 'Mô tả dài mà không được mất khi sửa SEO', 'mô tả phải còn nguyên');
   assert.deepEqual(updated.product.features, ['Tinh nang A', 'Tinh nang B'], 'tinh nang phai con nguyen');
   assert.equal(updated.product.name, 'Keep My Text', 'ten phai con nguyen');
   assert.equal(updated.product.seoTitle, 'Tieu de moi');
 });
 
-test('muc do dai SEO bi cat o tang may chu, khong dua vao database', async () => {
+test('mức độ dài SEO bị cắt ở tầng máy chủ, không đưa vào database', async () => {
   const created = await create({ name: 'Cap Test', slug: 'cap-test', price: 99000, currency: 'VND', status: 'active', fileKey: 'products/cap/1.0.0/c.exe' });
   const updated = await patch(created.product.id, { seoTitle: 'A'.repeat(200), seoDescription: 'B'.repeat(400) });
-  assert.equal(updated.product.seoTitle.length, 70, 'tieu de phai cat con 70 ky tu');
-  assert.equal(updated.product.seoDescription.length, 175, 'mo ta phai cat con 175 ky tu');
+  assert.equal(updated.product.seoTitle.length, 70, 'tiêu đề phải cắt còn 70 ký tự');
+  assert.equal(updated.product.seoDescription.length, 175, 'mô tả phải cắt còn 175 ký tự');
 });
 
-test('sua san pham khong ton tai tra 404 chu khong phai loi 500', async () => {
+test('sửa sản phẩm không tồn tại trả 404 chứ không phải lỗi 500', async () => {
   const response = await fetch(`${base}/api/admin/products/does-not-exist`, json({ seoTitle: 'x' }, 'PATCH'));
   assert.equal(response.status, 404);
 });
 
-test('sua SEO khong duoc bo qua khi thieu token', async () => {
+test('sửa SEO không được bỏ qua khi thiếu token', async () => {
   const created = await create({ name: 'Locked', slug: 'locked', price: 99000, currency: 'VND', status: 'active', fileKey: 'products/lock/1.0.0/l.exe' });
   const response = await fetch(`${base}/api/admin/products/${encodeURIComponent(created.product.id)}`, {
     method: 'PATCH', headers: { 'content-type': 'application/json' },

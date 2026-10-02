@@ -1,4 +1,15 @@
-sonvudev.com, www.sonvudev.com {
+# The shop's own host comes from the environment, not from a line written here.
+#
+# This file pinned the reverse proxy to one domain, so moving the shop to another
+# host meant the proxy kept serving the old name and nothing said so. Caddy reads
+# this value at load, so it is set where the service is started:
+#
+#   SITE_DOMAIN=example.com caddy run --config /etc/caddy/Caddyfile
+#
+# and deploy.sh passes it through from /etc/sonvudev-store.env. Two domains are
+# served because the app 308s www to the bare host; that redirect is the app's
+# job, not the proxy's.
+{$SITE_DOMAIN}, www.{$SITE_DOMAIN} {
   encode zstd gzip
   reverse_proxy 127.0.0.1:3000
 

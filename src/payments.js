@@ -25,6 +25,11 @@ export function vietQrUrl({ amount, transferNote }) {
  * note already filled in. Wallet channels use uploaded QR images when present and
  * fall back to showing the wallet number, because a static wallet QR cannot carry
  * the order amount.
+ *
+ * `label` stays a literal because it is the merchant's own name and account number
+ * — data, not prose. Everything a person has to be told is a `hintKey`, resolved
+ * by the reader's own dictionary: the server names the sentence, the browser picks
+ * the language, and neither has to know what the other speaks.
  */
 function paymentChannels(order) {
   const transferNote = `${env.bank.notePrefix} ${order.id}`.trim();
@@ -36,7 +41,7 @@ function paymentChannels(order) {
     channels.push({
       id: "bank",
       label: `${env.bank.name} · ${env.bank.accountNumber}`,
-      hint: "Quét trong app ngân hàng, số tiền và nội dung đã điền sẵn",
+      hintKey: "pay.channel.bank",
       qrUrl: vietQrUrl({ amount, transferNote }),
       account: env.bank.accountNumber,
       accountName: env.bank.accountName,
@@ -50,9 +55,9 @@ function paymentChannels(order) {
     channels.push({
       id: "momo",
       label: "MoMo",
-      hint: "Quét mã MoMo, tự nhập số tiền nếu mã không hiện sẵn",
+      hintKey: "pay.channel.momo",
       qrImage: env.bank.momoQrAmount || env.bank.momoQr || null,
-      qrHint: env.bank.momoQrAmount ? null : "Mã MoMo dùng chung, khách phải tự nhập số tiền",
+      qrHintKey: env.bank.momoQrAmount ? null : "pay.channel.momo.shared",
       account: env.bank.momo,
       deepLink: env.bank.momoDeepLink || null,
       amount,
@@ -65,7 +70,7 @@ function paymentChannels(order) {
     channels.push({
       id: "zalopay",
       label: "ZaloPay",
-      hint: "Chuyển qua số điện thoại ZaloPay",
+      hintKey: "pay.channel.zalopay",
       qrImage: env.bank.zalopayQr || null,
       account: env.bank.zalopay,
       amount,
@@ -84,6 +89,10 @@ function paymentChannels(order) {
  * overseas buyer can still pick a bank transfer; the country only changes the
  * order and the explanation next to each option, so nobody is ever shown a
  * method that has silently disappeared.
+ *
+ * Labels and hints are dictionary keys, not sentences. This endpoint is read by
+ * the checkout form, which is the one page a buyer in another country is certain
+ * to reach, and it used to answer in Vietnamese whatever language the page was in.
  */
 export function paymentOptions(country, { bank, momo, zalopay, paypal } = {}) {
   // An unknown country must stay permissive, so the domestic hint is used and
@@ -95,12 +104,12 @@ export function paymentOptions(country, { bank, momo, zalopay, paypal } = {}) {
   if (bank) {
     options.push({
       id: "bank_transfer",
-      label: "Chuyển khoản ngân hàng / Quét mã QR",
+      labelKey: "pay.option.bank",
       // VietQR, MoMo and ZaloPay are domestic rails, so for a buyer outside
       // Vietnam they are worth flagging rather than burying.
-      hint: domestic
-        ? (momo || zalopay ? "Hỗ trợ MoMo, ZaloPay và quét mã VietQR" : "Quét mã VietQR trong app ngân hàng")
-        : "Cần tài khoản ngân hàng Việt Nam. Phù hợp hơn nếu bạn đang ở trong nước.",
+      hintKey: domestic
+        ? (momo || zalopay ? "pay.option.bank.vi.wallets" : "pay.option.bank.vi")
+        : "pay.option.bank.intl",
       available: domestic,
     });
   }
@@ -108,10 +117,8 @@ export function paymentOptions(country, { bank, momo, zalopay, paypal } = {}) {
   if (paypal) {
     options.push({
       id: "paypal",
-      label: "PayPal",
-      hint: domestic
-        ? "Thanh toán quốc tế bằng ví PayPal, trừ thẻ và tài khoản quốc tế"
-        : "Thanh toán bằng thẻ quốc tế hoặc tài khoản PayPal. Nên dùng nhất nếu bạn ở nước ngoài.",
+      labelKey: "pay.option.paypal",
+      hintKey: domestic ? "pay.option.paypal.vi" : "pay.option.paypal.intl",
       available: true,
     });
   }

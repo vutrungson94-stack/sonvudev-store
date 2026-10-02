@@ -58,7 +58,7 @@ test.before(async () => {
 });
 test.after(async () => { server?.close(); await fs.rm(tempDir, { recursive: true, force: true }); });
 
-test('quet het han chi doc don con co the canh bao hoac huy', async () => {
+test('quét hết hạn chỉ đọc đơn còn có thể cảnh báo hoặc huỷ', async () => {
   // History that can never be acted on: long settled, or a deadline days away.
   const settled = await makeOrder();
   await store.updateOrder(settled.id, { status: 'paid', paidAt: hours(-1), createdAt: hours(-500), expiresAt: hours(-476) });
@@ -77,7 +77,7 @@ test('quet het han chi doc don con co the canh bao hoac huy', async () => {
   assert.ok(!ids.includes(delivered.id), 'đơn đã giao thì đóng, không được quét');
 });
 
-test('ranh giinh canh bao duoc lay vao, khong loai bang cach bang le', async () => {
+test('ranh giới cảnh báo được lấy vào, không loại bằng cách bằng lẻ', async () => {
   // An order exactly one warning window from its deadline is at the very start
   // of the window and is owed a reminder. An exclusive bound dropped it — the
   // one order the buyer was closest to losing.
@@ -102,7 +102,7 @@ test('đơn cũ không có expires_at vẫn được quét', async () => {
   assert.ok(result.expired.includes(legacy.id), 'đơn cũ không có expires_at vẫn phải bị hủy');
 });
 
-test('danh sach don han co phan trang, khong tra het bang', async () => {
+test('danh sách đơn hàng có phân trang, không trả hết bằng', async () => {
   const page = await store.listOrders({ limit: 2, offset: 0 });
   assert.equal(page.length, 2, 'phải giới hạn số dòng trả về');
   const second = await store.listOrders({ limit: 2, offset: 2 });

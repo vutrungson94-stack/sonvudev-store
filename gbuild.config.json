@@ -1,5 +1,4 @@
 {
-  "$schema": "D:/_Build/gbuild.config.schema.json",
   "security": {
     "sbom": {
       "enabled": true,

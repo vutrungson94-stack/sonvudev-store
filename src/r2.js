@@ -3,14 +3,27 @@ import { S3Client } from "@aws-sdk/client-s3";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 import { env, isConfigured } from "./config.js";
 
+/**
+ * The R2 client, built from config.
+ *
+ * Exported so that everything which writes to the bucket speaks to R2 the same way:
+ * the admin upload endpoint and scripts/publish-product.mjs. The script used to
+ * construct its own, and the two agreed only until one of them was changed — a
+ * release published by hand would then have landed under a key shape the download
+ * endpoint did not look for, with no error anywhere.
+ *
+ * S3-compatible, region "auto": Cloudflare's convention rather than an AWS one.
+ */
+export const releaseClient = () => new S3Client({
+  region: "auto",
+  endpoint: `https://${env.r2.accountId}.r2.cloudflarestorage.com`,
+  credentials: { accessKeyId: env.r2.accessKeyId, secretAccessKey: env.r2.secretAccessKey },
+});
+
 let client;
 function getClient() {
   if (!isConfigured.r2) throw new Error("R2 chưa được cấu hình");
-  client ||= new S3Client({
-    region: "auto",
-    endpoint: `https://${env.r2.accountId}.r2.cloudflarestorage.com`,
-    credentials: { accessKeyId: env.r2.accessKeyId, secretAccessKey: env.r2.secretAccessKey },
-  });
+  client ||= releaseClient();
   return client;
 }
 

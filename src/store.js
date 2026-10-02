@@ -3,6 +3,7 @@ import { promises as fs } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { env, isConfigured } from "./config.js";
+import { supabaseRequest } from "./supabase-http.js";
 
 /**
  * Where this process keeps its files.
@@ -14,7 +15,12 @@ import { env, isConfigured } from "./config.js";
  */
 export const projectRoot = process.env.DATA_DIR ? path.resolve(process.env.DATA_DIR) : path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const root = projectRoot;
-const files = { products: path.join(root, "data", "products.json"), orders: path.join(root, "data", "orders.json") };
+// Exported because it is a thing the health probe has to be able to test. A check
+// that cannot ask "can this process write where it says it writes" is a
+// configuration report, and a configuration report answers "ok" for a server whose
+// disk is full.
+export const dataDir = path.join(root, "data");
+const files = { products: path.join(dataDir, "products.json"), orders: path.join(dataDir, "orders.json") };
 let writeChain = Promise.resolve();
 const readJson = async (file, fallback) => { try { return JSON.parse(await fs.readFile(file, "utf8")); } catch { return fallback; } };
 const writeJson = (file, data) => { writeChain = writeChain.then(() => fs.writeFile(file, JSON.stringify(data, null, 2))); return writeChain; };
@@ -47,13 +53,17 @@ const seedProducts = [
 
 export async function ensureSeed() { await fs.mkdir(path.join(root, "data"), { recursive: true }); if (local) { if (!(await fs.stat(files.products).catch(() => null))) await writeJson(files.products, seedProducts); if (!(await fs.stat(files.orders).catch(() => null))) await writeJson(files.orders, []); return; } try { const rows = await supabase("products?select=id&limit=1"); if (!rows?.length) await supabase("products", { method: "POST", body: JSON.stringify(seedProducts.map(toProduct)) }); } catch (error) { console.warn(`[store] Supabase unavailable, using local JSON fallback: ${error.message}`); local = true; persistenceMode = "local-json"; if (!(await fs.stat(files.products).catch(() => null))) await writeJson(files.products, seedProducts); if (!(await fs.stat(files.orders).catch(() => null))) await writeJson(files.orders, []); } }
 
-async function supabase(pathname, options = {}) {
-  const headers = { apikey: env.supabase.serviceRoleKey, "Content-Type": "application/json", Prefer: "return=representation", ...(options.headers || {}) };
-  if (env.supabase.serviceRoleKey.startsWith("eyJ")) headers.Authorization = `Bearer ${env.supabase.serviceRoleKey}`;
-  const response = await fetch(`${env.supabase.url}/rest/v1/${pathname}`, { ...options, headers });
-  if (!response.ok) throw new Error(`Supabase ${response.status}: ${await response.text()}`);
-  return response.status === 204 ? null : response.json();
-}
+// The one way this project talks to Postgres: one header set, one error shape, one
+// file. See src/supabase-http.js for why the client lives on its own.
+//
+// `Prefer: return=representation` makes PostgREST hand back the row it wrote, so a
+// create does not have to read it again and lose a write that landed in between.
+// The thrown error keeps the status and the SQLSTATE, which is what lets a caller
+// tell "this exact checkout attempt already produced an order" — 23505 on the
+// unique idempotency key — apart from "the database is unreachable". The first is
+// a success the buyer should be shown; the second is an outage. Both used to arrive
+// as one opaque "Supabase 409/500" string, so the checkout path had to guess.
+const supabase = (pathname, options = {}) => supabaseRequest(pathname, options);
 const fromProduct = (row) => row ? { ...row, shortDescription: row.shortDescription ?? row.short_description ?? "", description: row.description ?? "", fileKey: row.fileKey ?? row.file_key ?? "", shortDescriptionEn: row.shortDescriptionEn ?? row.short_description_en ?? "", descriptionEn: row.descriptionEn ?? row.description_en ?? "", featuresEn: row.featuresEn ?? row.features_en ?? [], seoTitle: row.seoTitle ?? row.seo_title ?? "", seoDescription: row.seoDescription ?? row.seo_description ?? "", createdAt: row.createdAt ?? row.created_at, updatedAt: row.updatedAt ?? row.updated_at } : null;
 const fromOrder = (row) => row ? { ...row, orderNumber: row.orderNumber ?? row.order_number, accessTokenHash: row.accessTokenHash ?? row.access_token_hash, providerOrderId: row.providerOrderId ?? row.provider_order_id, customerEmail: row.customerEmail ?? row.customer_email, customerName: row.customerName ?? row.customer_name, paymentProvider: row.paymentProvider ?? row.payment_provider, paidAt: row.paidAt ?? row.paid_at, expiresAt: row.expiresAt ?? row.expires_at ?? null, cancelledAt: row.cancelledAt ?? row.cancelled_at ?? null, cancelReason: row.cancelReason ?? row.cancel_reason ?? null, deliveredAt: row.deliveredAt ?? row.delivered_at ?? null, paidCount: row.paidCount ?? row.paid_count ?? 0, paidAmount: row.paidAmount ?? row.paid_amount ?? 0, paidProviderAmount: row.paidProviderAmount ?? row.paid_provider_amount ?? 0, paidProviderCurrency: row.paidProviderCurrency ?? row.paid_provider_currency ?? null, refundedAt: row.refundedAt ?? row.refunded_at ?? null, refundReason: row.refundReason ?? row.refund_reason ?? null, refundedCount: row.refundedCount ?? row.refunded_count ?? 0, refundedAmount: row.refundedAmount ?? row.refunded_amount ?? 0, refundedProviderAmount: row.refundedProviderAmount ?? row.refunded_provider_amount ?? 0, idempotencyKey: row.idempotencyKey ?? row.idempotency_key ?? null, notifications: row.notifications ?? {}, reviews: row.reviews ?? [], createdAt: row.createdAt ?? row.created_at, updatedAt: row.updatedAt ?? row.updated_at } : null;
 const toProduct = (p) => { const { shortDescription, fileKey, shortDescriptionEn, descriptionEn, featuresEn, seoTitle, seoDescription, createdAt, updatedAt, ...columns } = p; return { ...columns, ...(shortDescription !== undefined ? { short_description: shortDescription } : {}), ...(fileKey !== undefined ? { file_key: fileKey } : {}), ...(shortDescriptionEn !== undefined ? { short_description_en: shortDescriptionEn } : {}), ...(descriptionEn !== undefined ? { description_en: descriptionEn } : {}), ...(seoTitle !== undefined ? { seo_title: seoTitle } : {}), ...(seoDescription !== undefined ? { seo_description: seoDescription } : {}), ...(featuresEn !== undefined ? { features_en: featuresEn } : {}), ...(createdAt !== undefined ? { created_at: createdAt } : {}), ...(updatedAt !== undefined ? { updated_at: updatedAt } : {}) }; };
@@ -244,7 +254,39 @@ export const isOrderOwner = (order, accessToken) => {
 // Lets a buyer who lost the response to checkout find the order they already
 // created, instead of opening a second one for the same purchase.
 export async function findOrderByIdempotencyKey(key) { if (!key) return null; return local ? (await readJson(files.orders, [])).find((o) => o.idempotencyKey === key) || null : fromOrder((await supabase(`orders?idempotency_key=eq.${encodeURIComponent(key)}&limit=1`))[0]); }
-export async function createOrder(order) { if (!local) return fromOrder((await supabase("orders", { method: "POST", body: JSON.stringify(toOrder(order)) }))[0]); let saved = null; await mutateJson(files.orders, (orders) => { saved = order; return [order, ...orders]; }); return saved; }
+/**
+ * Stores a new order, or returns the one this checkout attempt already created.
+ *
+ * The idempotency key is unique in the database, so the race the check-then-insert
+ * in the route could not close is closed here instead: whichever request loses
+ * gets 23505, reads the row the winner wrote, and returns it. From the buyer's
+ * side the two requests are indistinguishable, which is the point — a checkout
+ * that answers the same way twice is safe, and one that answers with two orders is
+ * not, whatever the code believed.
+ *
+ * A 23505 for any other reason is not swallowed: only one that names the
+ * idempotency key counts, so a genuine collision on the primary key still surfaces.
+ */
+export async function createOrder(order) {
+  if (!local) {
+    try {
+      return fromOrder((await supabase("orders", { method: "POST", body: JSON.stringify(toOrder(order)) }))[0]);
+    } catch (error) {
+      if (error.code !== "23505" || !order.idempotencyKey || !/idempotency/i.test(error.details || "")) throw error;
+      return findOrderByIdempotencyKey(order.idempotencyKey);
+    }
+  }
+  let saved = null;
+  await mutateJson(files.orders, (orders) => {
+    // The same rule, enforced in the only place that can enforce it without a
+    // transaction: inside the write queue, where reading and writing are one step.
+    const existing = orders.find((o) => o.idempotencyKey && o.idempotencyKey === order.idempotencyKey);
+    if (existing) { saved = existing; return orders; }
+    saved = order;
+    return [order, ...orders];
+  });
+  return saved;
+}
 export async function updateOrder(id, patch) { if (!local) return fromOrder((await supabase(`orders?id=eq.${encodeURIComponent(id)}`, { method: "PATCH", body: JSON.stringify(toOrder(patch)) }))[0]); let saved = null; await mutateJson(files.orders, (orders) => { const order = orders.find((o) => o.id === id); if (!order) return orders; Object.assign(order, patch, { updatedAt: new Date().toISOString() }); saved = order; return orders; }); return saved; }
 /**
  * Orders whose file was actually handed over, with just enough on each to answer

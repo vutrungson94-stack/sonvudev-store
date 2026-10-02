@@ -74,6 +74,14 @@ export function createDom(ids) {
       return null;
     },
     querySelectorAll: (sel) => {
+      // Class selectors. The storefront binds the category row with
+      // querySelectorAll('.filter') at load, and a stub that answered only the
+      // attribute form made those handlers silently unreachable — so a test could
+      // not tell whether the filter row works or was never wired up.
+      if (typeof sel === 'string' && sel.startsWith('.')) {
+        const cls = sel.slice(1);
+        return [...nodes.values()].filter((el) => el.classList.contains(cls));
+      }
       if (typeof sel === 'string' && sel.startsWith('[')) {
         const attr = sel.slice(1, sel.indexOf(']'));
         return [...nodes.values()].filter((el) => el.attrs?.[attr] !== undefined);

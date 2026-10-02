@@ -4,22 +4,44 @@ import { promises as fs } from "node:fs";
 import { fileURLToPath } from "node:url";
 import crypto from "node:crypto";
 import { env, isConfigured } from "./config.js";
-import { countOrders, ensureSeed, findOrderByIdempotencyKey, getOrder, getProduct, getProductBySlug, isOrderOwner, isSellable, latestOrder, listExpiringOrders, listOpenOrders, listOrders, listOrdersForRevenue, listProducts, createOrder, updateOrder, createProduct, updateProduct, persistenceMode } from "./store.js";
+import { countOrders, dataDir, ensureSeed, findOrderByIdempotencyKey, getOrder, getProduct, getProductBySlug, isOrderOwner, isSellable, latestOrder, listExpiringOrders, listOpenOrders, listOrders, listOrdersForRevenue, listProducts, createOrder, updateOrder, createProduct, updateProduct, persistenceMode } from "./store.js";
+import { supabaseRequest } from "./supabase-http.js";
 import { createDownloadUrl, createUploadUrl } from "./r2.js";
 import { captureOrder, createOrder as createPayPalOrder, hashToken, newOrderId, newToken, paypalChargeFor, paypalChargeForProduct, paymentMatchesOrder, readOrder, verifyWebhook } from "./paypal.js";
 import { paymentInstructions, paymentOptions } from "./payments.js";
-import { brandMeta, esc, jsonLdGraph, renderFeed, renderIndexCount, renderIndexGrid, renderLlmsTxt, renderOgImage, renderProductPage, verificationFile, verificationMeta } from "./pages.js";
+import { brandMeta, esc, fillCopy, jsonLdGraph, renderFeed, renderIndexCount, renderIndexFilters, renderIndexGrid, renderLlmsTxt, renderOgImage, renderProductPage, renderStats, verificationFile, verificationMeta } from "./pages.js";
 import { hasPayment, isClosed, isUnpaid, markOrderDelivered, markOrderPaid, paymentDeadline, voidPayment } from "./orders.js";
 import { notifyOrder, notifyMode } from "./notify.js";
 import { resolveCountry } from "./geo.js";
 import { pingIndexNow, isIndexNowConfigured } from "./indexnow.js";
 import { vndPerUsd } from "./rates.js";
-import { createReview, listReviewsForProduct } from "./reviews.js";
+import { createReview, listReviewsForProduct, reviewLimits } from "./reviews.js";
 
 const app = express();
 const publicDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "public");
 const json = express.json({ limit: "1mb" });
-const publicProduct = (product) => { if (!product) return null; const { fileKey, file_key, ...safe } = product; return safe; };
+// What the storefront and the public API are allowed to see of a product.
+//
+// The copy is filled on the way out, not on the way in, so a description that
+// carries {{founder}} resolves to the owner named in configuration rather than to
+// whatever spelling someone typed into the text field once. It is done here as well
+// as on the rendered pages because the catalogue API feeds the product modal and the
+// homepage grid, and a name that reads one way on the server and another way in the
+// modal is the same defect in a smaller window.
+const publicProduct = (product) => {
+  if (!product) return null;
+  const { fileKey, file_key, ...safe } = product;
+  // Both naming conventions, because both are present: PostgREST hands back the
+  // column names as they are, and fromProduct adds the camelCase spelling on top.
+  // Filling only one of them left description_en coming out of the API with the
+  // placeholder still in it while descriptionEn came out filled — the same field,
+  // two answers, which is the defect this function exists to prevent.
+  const copy = ["name", "shortDescription", "short_description", "description", "descriptionEn", "description_en", "shortDescriptionEn", "short_description_en", "seoTitle", "seo_title", "seoDescription", "seo_description"];
+  const filled = { ...safe };
+  for (const field of copy) if (typeof filled[field] === "string") filled[field] = fillCopy(filled[field]);
+  for (const field of ["features", "featuresEn", "features_en"]) if (Array.isArray(filled[field])) filled[field] = filled[field].map(fillCopy);
+  return filled;
+};
 const publicOrder = (order) => { if (!order) return null; const { accessTokenHash, access_token_hash, idempotencyKey, idempotency_key, notifications, ...safe } = order; return { ...safe, items: (safe.items || []).map(({ fileKey, file_key, ...item }) => item) }; };
 // A countdown is only correct if it is measured against the server's clock, so
 // the deadline and the server's own time always travel together.
@@ -192,10 +214,22 @@ const indexablePages = {
 // static pages, and a change made in one place used to leave the others pointing
 // at an address nobody reads.
 const supportPages = ["order.html", "paypal-return.html"];
-// One lookup for both groups. renderPage asks what a given file needs, and a file
-// missing from this table fell through to being served raw — which is how
-// /order/<id> kept its template tokens while /order had none left.
-const served = { ...indexablePages, ...Object.fromEntries(supportPages.map((file) => [file, {}])) };
+// Rendered but reached by their own route rather than by a bare filename.
+//
+// lookup.html carries {{support}} and 404.html carries {{year}}. Neither was in
+// the table below, so express.static answered both from the file on disk and the
+// substitution never ran: /lookup printed the literal "{{support}}" as the support
+// address — on the recovery page, the one a PayPal buyer reaches after losing
+// their session — and the 404 footer printed "© {{year}}". Every other gate was
+// green, because the token name itself was known and only the page's route was
+// not.
+//
+// So being rendered and being routed are now separate questions, and a file that
+// carries a token has to be in the first list. See renderPage and the audit's
+// "token chua noi" check, which reads this list rather than guessing.
+const renderedPages = { ...Object.fromEntries(supportPages.map((file) => [file, {}])) };
+const extraRendered = { "lookup.html": {}, "404.html": {} };
+const served = { ...indexablePages, ...renderedPages, ...extraRendered };
 const pageCache = new Map();
 // Short-lived on purpose. A price change in the admin panel has to reach the
 // bytes a crawler reads: a search result that shows last week's price is worse
@@ -215,15 +249,24 @@ async function renderPage(file) {
   const cached = pageCache.get(file);
   if (cached && Date.now() - cached.at < PAGE_TTL_MS) return cached.html;
   const template = await fs.readFile(path.join(publicDir, file), "utf8");
-  const products = served[file].catalog ? await listProducts() : [];
+  // Optional rather than assumed: a file missing from the table is rendered with
+  // no catalogue and no verification tags instead of throwing on the first read.
+  const products = served[file]?.catalog ? await listProducts() : [];
   const html = template
     .replaceAll("{{site}}", env.appUrl)
+    .replaceAll("{{brandName}}", esc(env.brand.name))
     .replaceAll("{{support}}", env.email.supportEmail)
     // The payment window is quoted in the terms rather than decided silently by
     // the server. It used to be the number 24 written into three files, so
     // changing ORDER_PAYMENT_WINDOW_HOURS made the terms promise something the
     // server did not do.
     .replaceAll("{{paymentWindowHours}}", String(env.orders.paymentWindowHours))
+    // The review box's own limits, as the server set them. They used to be a
+    // literal 1200 on the textarea, which meant the two numbers that decide
+    // whether a sentence is publishable lived in different files and nothing
+    // could tell when they disagreed.
+    .replaceAll("{{reviewMinLength}}", String(reviewLimits.minLength))
+    .replaceAll("{{reviewMaxLength}}", String(reviewLimits.maxLength))
     .replaceAll("{{year}}", String(new Date().getFullYear()))
     // The legal entity behind the shop. It belongs on the terms page because that
     // is the page a buyer reads when they are deciding whether to dispute a
@@ -236,6 +279,14 @@ async function renderPage(file) {
     .replaceAll("{{jsonLd}}", jsonLdGraph(products))
     .replace("</head>", `${verificationMeta()}\n${brandMeta()}\n</head>`)
     .replace(/(<span class="product-count" id="product-count">)[\s\S]*?(<\/span>)/, `$1${esc(renderIndexCount(products))}$2`)
+    .replace(/<!--filters:start-->[\s\S]*?<!--filters:end-->/, `<!--filters:start-->${renderIndexFilters(products)}<!--filters:end-->`)
+    .replace(/(<section class="stats wrap" id="stats">)([\s\S]*?)(<\/section>)/, (_all, open, _body, close) => {
+      // The three counts come from the catalogue, so they are never stale. With
+      // nothing on sale the strip is removed rather than zeroed — see renderStats.
+      const stats = renderStats(products);
+      if (!stats) return "";
+      return `${open}<div data-stat="products"><strong><span id="stat-products">${stats.products}</span></strong><small data-i18n="stats.1">Sản phẩm đang bán</small></div><div data-stat="platforms"><strong><span id="stat-platforms">${stats.platforms}</span></strong><small data-i18n="stats.2">Nền tảng được hỗ trợ</small></div><div data-stat="releases"><strong><span id="stat-releases">${stats.releases}</span></strong><small data-i18n="stats.3">Bản phát hành đã xuất bản</small></div><div class="stats-note"><span class="spark">✦</span><p data-i18n="stats.note">Mỗi sản phẩm đều được làm ra để giải quyết một vấn đề thật.</p></div>${close}`;
+    })
     .replace(/<!--catalog:start-->[\s\S]*?<!--catalog:end-->/, `<!--catalog:start-->${renderIndexGrid(products)}<!--catalog:end-->`);
   pageCache.set(file, { at: Date.now(), html });
   return html;
@@ -250,10 +301,43 @@ const sendPage = (file) => async (_req, res) => {
     res.sendFile(path.join(publicDir, file));
   }
 };
+
+// The 404 page. Declared here, next to the routes that use it, because one of
+// them does: /404.html is a real file in public/, so express.static answers it
+// before the catch-all ever runs and hands back the raw template. The one URL
+// where someone is already lost is not the place to show them "© {{year}}".
+const notFound = async (_req, res) => {
+  try {
+    res.status(404).set("Cache-Control", "public, max-age=300").type("html").send(await renderPage("404.html"));
+  } catch (error) {
+    console.error(error);
+    res.status(404).sendFile(path.join(publicDir, "404.html"));
+  }
+};
 for (const file of Object.keys(served)) {
-  app.get(file === "index.html" ? "/" : `/${file}`, sendPage(file));
-  if (file !== "index.html") app.get(`/${file.replace(/\.html$/, "")}`, sendPage(file));
+  // 404.html and lookup.html are registered below, at the URLs they should answer
+  // on. Giving them the generic bare-name routes here would add a /404 that means
+  // "found", and duplicate the one lookup already has.
+  if (file in extraRendered) continue;
+  // index.html answers on "/" and, deliberately, on its own name too. The bare
+  // filename is a real file in public/, so express.static would otherwise answer
+  // /index.html with the raw template — tokens, links and all — after the home
+  // page had been rendering correctly for years. It was the one URL in the project
+  // where a person could paste the address bar they were given and get a different
+  // page from the one they were looking at.
+  if (file === "index.html") {
+    app.get(["/", "/index.html"], sendPage(file));
+    continue;
+  }
+  app.get(`/${file}`, sendPage(file));
+  app.get(`/${file.replace(/\.html$/, "")}`, sendPage(file));
 }
+// The recovery form, served by the renderer rather than by express.static: it
+// prints the support address, and the raw file leaves {{support}} in the markup
+// for the dictionary to resolve to a literal. This is the page a PayPal buyer
+// reaches after losing their session.
+app.get(["/lookup", "/lookup.html"], sendPage("lookup.html"));
+app.get("/404.html", notFound);
 // The order page is reached as /order/<id> — the lookup form and the PayPal
 // return both link that shape. Registering only /order and /order.html left the
 // page a buyer actually lands on being served as a raw file, with the template
@@ -360,6 +444,38 @@ app.get("/sitemap.xml", async (_req, res) => {
   res.type("application/xml").send(`<?xml version="1.0" encoding="UTF-8"?><urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9" xmlns:xhtml="http://www.w3.org/1999/xhtml">${urls.join("")}</urlset>`);
 });
 
+// One line per request, with an id that also comes back on the error.
+//
+// There was no request log at all: the only things the process ever said were the
+// five lines at boot and whatever an unhandled error printed. So "a buyer says it
+// did not work" could not be turned into a question the logs could answer, and the
+// first place anyone looked was PayPal's dashboard — which knows about a payment
+// and nothing about the eleven requests around it.
+//
+// The id is the point. A buyer can read it off a failed checkout if it is shown to
+// them, and one grep finds every line that request produced, including the ones
+// from a worker or a sweep that happened in the middle. The id is taken from
+// X-Request-Id when something upstream already set one, so a proxy's id and ours
+// stay the same line.
+//
+// One line per request, not one per event. A shop's whole traffic is a handful of
+// humans and their crawlers, and the log is read by a person.
+app.use((req, res, next) => {
+  const startedAt = process.hrtime.bigint();
+  const requestId = String(req.headers["x-request-id"] || "").slice(0, 64) || crypto.randomUUID();
+  req.requestId = requestId;
+  res.setHeader("X-Request-Id", requestId);
+  res.on("finish", () => {
+    const ms = Number(process.hrtime.bigint() - startedAt) / 1e6;
+    // Skipped for the crawlers' asset requests, which is most of them: a 404 on a
+    // .png is still logged, because that is the thing worth seeing, but a hit on
+    // every stylesheet is noise that buries the one line that mattered.
+    const query = req.originalUrl.includes("?") ? `${req.originalUrl.split("?")[0]}?…` : req.originalUrl;
+    console.log(`${requestId} ${res.statusCode} ${req.method} ${query} ${ms.toFixed(1)}ms`);
+  });
+  next();
+});
+
 app.use((req, res, next) => {
   if (wwwHost && req.hostname === wwwHost) return res.redirect(308, `${canonicalOrigin}${req.originalUrl}`);
   next();
@@ -369,12 +485,59 @@ app.use((req, res, next) => {
 // the renderer like every other page, because this is the shape the lookup form
 // and the PayPal return both link to: serving the raw file here left the real
 // order page carrying template tokens that nothing would ever replace.
-app.use(express.static(publicDir, { extensions: ["html"] }));
+// Static assets only: css, js, images, fonts, the og card.
+//
+// `extensions: ["html"]` used to be here, which quietly added a second,
+// unrendered way to reach every page. With it on, /index.html and /index answered
+// from disk while / answered from renderPage — so the homepage had two addresses
+// and one of them returned the raw template, links pointing at {{site}} and a
+// footer reading {{year}}. No route was registered for it, so every check that
+// read the route list saw a clean page.
+//
+// Every multi-shape URL the shop wants is registered above, explicitly. Anything
+// not registered now falls through to the 404 page, which is rendered — so a URL
+// that does not exist cannot hand a visitor a page with its own variables still
+// inside it.
+app.use(express.static(publicDir, { maxAge: "1h", index: false }));
 
-app.get("/api/health", async (_req, res) => {
+// Reports which configuration is active and whether the three things an order
+// depends on are usable. Used by the deploy script and by anyone checking a
+// running server without a browser.
+//
+// The report used to answer 200 unconditionally. It read configuration flags —
+// which is a report, not a probe — and never touched the database or the data
+// directory, so it said OK for a server that could not reach Supabase, could not
+// write a single order, or was pointing at a bucket that no longer existed.
+// Anything monitoring this URL saw green while orders were failing, which is worse
+// than having no probe at all: it is a probe that reports on the wrong thing.
+//
+// So the answer now comes from touching the two things an order needs, each with
+// its own short timeout so a slow dependency cannot make the probe hang, and the
+// status code is 503 when either fails — which is the entire purpose of a probe,
+// since whatever watches it acts on the code and not on the words in the body.
+//
+// The configuration flags stay, because they are genuinely useful when something
+// has gone wrong: "paypal: off" alongside a failed checkout explains the failure in
+// a way a stack trace never will.
+//
+// The probes are the cheapest honest ones. Nothing here writes an order, confirms a
+// payment, or sends a mail.
+app.get("/api/health", async (req, res) => {
+  const checks = {};
+  const startedAt = process.hrtime.bigint();
+  // One row, no columns: enough to prove the network path, the service key and the
+  // database all work, and it cannot be slow because of the size of the result.
+  if (isConfigured.supabase) checks.database = await probe(async () => { await supabaseRequest("products?select=id&limit=1"); return "ok"; }, "supabase");
+  else checks.database = `skipped (${persistenceMode})`;
+  checks.storage = await probe(async () => { await fs.mkdir(dataDir, { recursive: true }); await fs.access(dataDir, fs.constants.W_OK); return "ok"; }, `${dataDir} not writable`);
   const rate = await vndPerUsd().catch(() => null);
-  res.json({
-    ok: true, appUrl: env.appUrl, persistence: persistenceMode,
+  const ok = !Object.values(checks).some((value) => typeof value !== "string" || value.startsWith("!"));
+  res.status(ok ? 200 : 503).json({
+    ok, requestId: req.requestId,
+    checks,
+    elapsedMs: Math.round(Number(process.hrtime.bigint() - startedAt) / 1e6),
+    uptime: Math.round(process.uptime()),
+    appUrl: env.appUrl, persistence: persistenceMode,
     r2: isConfigured.r2, paypal: isConfigured.paypal, paypalWebhook: isConfigured.paypalWebhook,
     bank: isConfigured.bank, momo: Boolean(env.bank.momo), zalopay: Boolean(env.bank.zalopay), admin: isConfigured.admin,
     // "outbox" means there is no mail provider yet: order mail is being written
@@ -387,6 +550,17 @@ app.get("/api/health", async (_req, res) => {
     vndPerUsd: rate ? { rate: Math.round(rate.rate * 100) / 100, source: rate.source, live: env.paypal.vndToUsdRate === "live" } : null,
   });
 });
+
+// One dependency check, one short timeout, and the reason it failed rather than a
+// bare "false". A probe that only says "not ok" sends whoever is on call looking
+// for what failed; one without a timeout takes the monitoring down with it.
+async function probe(check, label) {
+  try {
+    return await Promise.race([check(), new Promise((_, reject) => setTimeout(() => reject(new Error("timeout")), 3000))]);
+  } catch (error) {
+    return `!${label}: ${error.message}`;
+  }
+}
 app.get("/api/products", async (_req, res) => {
   try { res.json({ products: (await listProducts()).filter(isSellable).map(publicProduct) }); }
   catch (error) { console.error(error); res.status(500).json({ error: "Không thể tải danh mục" }); }
@@ -493,7 +667,7 @@ app.post("/api/checkout", json, async (req, res) => {
       providerOrderId: null, amount: Number(product.price), currency: product.currency || "VND",
       // The deadline the buyer is shown on the form is written down here, so the
       // countdown they read and the moment the sweep acts on cannot drift apart.
-      expiresAt: new Date(Date.now() + Math.max(1, env.orders.paymentWindowHours) * 60 * 60 * 1000).toISOString(),
+      expiresAt: new Date(Date.now() + env.orders.paymentWindowHours * 60 * 60 * 1000).toISOString(),
       idempotencyKey: idempotencyKey || null, notifications: {},
       items: [{ productId: product.id, name: product.name, version: product.version, price: product.price, currency: product.currency, fileKey: product.fileKey || "", paypalAmount: paypalCharge?.amount ?? null, paypalCurrency: paypalCharge?.currency ?? null, paypalRate: paypalQuote?.rate?.vndPerUsd ?? null }],
       createdAt: now, updatedAt: now,
@@ -587,7 +761,7 @@ app.post("/api/reviews", json, async (req, res) => {
       body: req.body.body,
       authorName: req.body.authorName,
     });
-    if (result.error) return res.status(result.status || 400).json({ error: result.error });
+    if (result.error) return res.status(result.status || 400).json({ error: result.error, code: result.code || null });
     res.status(201).json({ review: result.review });
     // The words are now on the product page, which was already rendered and cached.
     invalidatePages();
@@ -815,18 +989,32 @@ app.get("/api/admin/revenue", admin, async (_req, res) => {
 });
 
 app.patch("/api/admin/orders/:id", admin, json, async (req, res) => {
+  // Every change a person makes to an order is written down with the id of the
+  // request that caused it.
+  //
+  // The order row remembers *what* happened — it moved to refunded, with a reason
+  // — and nothing recorded *who* or *when it was asked for*, so the shop had no way
+  // to answer "was this refunded, and was it a mistake", which is exactly the
+  // question that arrives when a buyer says they never got the money back. The
+  // order keeps the reason because the order is the durable record; this keeps the
+  // provenance, because the log is the only place that has it.
+  //
+  // One line, on the same stream as the access log and tagged with the same
+  // request id, so a refund is one grep away from the request that caused it.
+  const acted = (action, extra = {}) => console.log(`${req.requestId} admin ${action} ${req.params.id} ${JSON.stringify(extra)}`);
   try {
     const status = req.body.status;
     const existing = await getOrder(req.params.id);
     if (!existing) return res.status(404).json({ error: "Không tìm thấy đơn hàng" });
     // Closes a paid order the same way the buyer's browser does, for the times
     // the download link was handed over by hand.
-    if (req.body.delivered === true) return res.json({ order: publicOrder(await markOrderDelivered(existing)) });
+    if (req.body.delivered === true) { acted("deliver"); return res.json({ order: publicOrder(await markOrderDelivered(existing)) }); }
     // The mirror image. A download that dies halfway still counts as handed
     // over, because the server cannot see a file arrive, so the owner needs one
     // click to undo it when a customer says the file never made it.
     if (req.body.reopen === true) {
       if (!isClosed(existing)) return res.status(409).json({ error: "Đơn này chưa đóng" });
+      acted("reopen");
       const now = new Date().toISOString();
       return res.json({ order: publicOrder(await updateOrder(existing.id, { status: "paid", paidAt: existing.paidAt || now, deliveredAt: null, updatedAt: now })) });
     }
@@ -839,23 +1027,28 @@ app.patch("/api/admin/orders/:id", admin, json, async (req, res) => {
       if (!hasPayment(existing)) return res.status(409).json({ error: "Chỉ hoàn tiền được đơn đã nhận tiền" });
       const reason = typeof req.body.reason === "string" ? req.body.reason.trim() : "";
       if (!reason) return res.status(400).json({ error: "Cần ghi lý do hoàn tiền" });
+      // The reason is in the order row; the request that carried it is here.
+      acted("refund", { amount: existing.amount, currency: existing.currency, reason });
       return res.json({ order: publicOrder(await voidPayment(existing, { reason })) });
     }
     if (!["pending", "pending_transfer", "paid", "payment_failed", "cancelled", "refunded"].includes(status)) return res.status(400).json({ error: "Trạng thái không hợp lệ" });
     // Confirming by hand goes through the same path as a webhook, so the buyer
     // still gets the mail and paid_count still reflects the real revenue.
-    if (status === "paid") return res.json({ order: publicOrder(await markOrderPaid(existing, { source: "admin" })) });
+    if (status === "paid") { acted("confirm-paid", { amount: existing.amount, currency: existing.currency }); return res.json({ order: publicOrder(await markOrderPaid(existing, { source: "admin" })) }); }
+    acted("status", { to: status });
     const item = await updateOrder(req.params.id, { status, paidAt: null, updatedAt: new Date().toISOString() });
     res.json({ order: publicOrder(item) });
   } catch (error) { console.error(error); res.status(500).json({ error: "Không thể cập nhật đơn hàng" }); }
 });
 
-// Anything that fell through is a 404 page, not Express's bare error. It is
+// Anything that fell through is the 404 page, not Express's bare error. It is
 // declared noindex, so broken links a crawler discovers do not become thin
-// duplicate pages competing with the products.
+// duplicate pages competing with the products. Rendered rather than sendFile, so
+// the footer carries the year instead of the template token; the handler itself is
+// defined with the other page routes.
 app.use((req, res) => {
   if (req.path.startsWith("/api/")) return res.status(404).json({ error: "Not found" });
-  res.status(404).sendFile(path.join(publicDir, "404.html"));
+  return notFound(req, res);
 });
 
 app.use((error, _req, res, _next) => { console.error(error); res.status(500).json({ error: "Internal server error" }); });

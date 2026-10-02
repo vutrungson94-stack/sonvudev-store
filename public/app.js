@@ -50,17 +50,23 @@ function toastMsg(message, isError = false) {
 // visitor's country. Nothing is filtered out client side: if the request fails
 // the fallback below lists every configured method in domestic-first order, so
 // a blocked or slow lookup can never remove a way to pay.
+//
+// The server sends keys, not sentences — labelKey and hintKey. It used to send
+// Vietnamese text and this page printed it as-is, so a buyer who had switched the
+// site to English chose a payment method labelled in a language they had chosen
+// not to read, on the one screen where the money is. The key is resolved here,
+// against the dictionary the rest of the page already uses.
 function paymentList() {
   return payOptions && payOptions.length ? payOptions : [
-    { id: 'bank_transfer', label: T('pay.bank'), hint: T('pay.bankHint') },
-    { id: 'paypal', label: 'PayPal', hint: T('pay.paypalHint') },
+    { id: 'bank_transfer', labelKey: 'pay.option.bank', hintKey: 'pay.option.bank.vi' },
+    { id: 'paypal', labelKey: 'pay.option.paypal', hintKey: 'pay.option.paypal.vi' },
   ];
 }
 
 function renderPaymentOptions() {
   return paymentList().map((o, i) => `<label class="payment-option">
     <input type="radio" name="paymentMethod" value="${esc(o.id)}"${i === 0 ? ' checked' : ''}>
-    <span><b>${esc(o.label)}</b><small>${esc(o.hint || '')}</small></span>
+    <span><b>${esc(T(o.labelKey))}</b><small>${esc(o.hintKey ? T(o.hintKey) : '')}</small></span>
     <em>${o.id === 'paypal' ? '◉' : '◎'}</em>
   </label>`).join('');
 }
@@ -77,9 +83,16 @@ function geoNote() {
 
 // The form has to state the deadline before the buyer commits, not after: the
 // whole point of cancelling a stale order is that the buyer was told it would
-// happen. The number comes from the same env var the sweep enforces.
+// happen. The number comes from the same env var the sweep enforces, read off
+// /api/checkout/options.
+//
+// When that call has not answered, the note is omitted rather than filled with a
+// guess. A hardcoded "24 hours" here was a fourth copy of a number the server
+// owns: it would have kept promising the old window on exactly the screen where
+// the request failed, to a buyer who could not reach us to ask.
 function expiryNote() {
-  const hours = Number(payOptions && payOptions.paymentWindowHours) || 24;
+  const hours = Number(payOptions && payOptions.paymentWindowHours);
+  if (!Number.isFinite(hours) || hours <= 0) return '';
   return `<p class="expiry-note">${esc(T('cart.expiry').replace('{hours}', String(hours)))}</p>`;
 }
 
@@ -96,8 +109,42 @@ async function loadProducts() {
   }
 }
 
+// Two ways to narrow the catalogue, and they compose.
+//
+// The filter row answers "what kind of thing"; the search box answers "which one".
+// Both are here because the catalogue is meant to grow — the stats strip counts it,
+// the admin panel publishes into it — and a name like "Excel Trusted Locations
+// Setup" does not announce itself from a grid of cards.
+//
+// Client-side on purpose. The whole catalogue is already in the page and already in
+// `products`, so this is a filter over an array: no endpoint, no index, no round
+// trip, and nothing new to keep in step with the catalogue. A search endpoint would
+// be the wrong shape for a list that fits in one screen, and it would be a second
+// place for a product to be visible in or not.
+//
+// Vietnamese carries no word breaks between the parts of a name, so a prefix match
+// is wrong for "bật macro": the words appear in any order and often not adjacent.
+// Matching on the whole string, in the reader's own language, is what makes this
+// usable — and searching the English copy while the page is in English, so a reader
+// typing the name they were given finds it.
+const searchInput = document.getElementById('product-search');
+let searchTerm = '';
+
+// Diacritics are folded so "trong tin cay" finds "Trong tin cây". A Vietnamese
+// keyboard is easier with accents switched on, a Latin one is not, and a customer
+// who cannot type the word they are looking for will not report that the search box
+// is broken.
+const foldDiacritics = (value) => String(value).normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/đ/g, 'd').toLowerCase().trim();
+
+function matchesSearch(p) {
+  if (!searchTerm) return true;
+  const local = localized(p);
+  const haystack = [p.name, p.shortDescription, p.shortDescriptionEn, p.description, p.descriptionEn, p.category, p.platform, ...(p.features || []), ...(p.featuresEn || [])];
+  return foldDiacritics(haystack.filter(Boolean).join(' ')).includes(searchTerm);
+}
+
 function visibleProducts() {
-  return products.filter((p) => activeFilter === 'all' || p.category === activeFilter || p.platform === activeFilter);
+  return products.filter((p) => (activeFilter === 'all' || p.category === activeFilter || p.platform === activeFilter) && matchesSearch(p));
 }
 
 // Products carry an optional English copy. When the visitor switches to English
@@ -117,6 +164,9 @@ function localized(p) {
 
 function render() {
   const list = visibleProducts();
+  // A count that only exists when something is hidden would move the row under the
+  // reader's cursor while they type. It appears only once the search is doing
+  // something, so the page looks the same at rest.
   count.textContent = `${list.length.toString().padStart(2, '0')} ${T('products.count')}`;
   grid.innerHTML = list.length
     ? list.map((p) => card(localized(p))).join('')
@@ -154,9 +204,9 @@ function openProduct(id) {
   stopWatch();
   stopCountdown();
   const p = localized(raw);
-  modalContent.innerHTML = `<div class="detail-art">
+  modalContent.innerHTML = `      <div class="detail-art">
       <div class="product-logo large">${initials(p.name)}</div>
-      <span>${esc(p.badge || 'SonVuDev')}</span>
+      <span>${esc(p.badge || T('products.new'))}</span>
     </div>
     <div class="detail-copy">
       <p class="eyebrow">${esc(p.platform)} · ${esc(T('product.version'))} ${esc(p.version)}</p>
@@ -230,7 +280,7 @@ async function submitCheckout(event, p) {
     if (!res.ok && !res.status) throw Error(T('cart.errNetwork'));
     const json = await res.json();
     if (!res.ok) throw Error(json.error || T('cart.errCreate'));
-    sessionStorage.setItem('sonvudev_order', JSON.stringify({ id: json.order.id, token: json.accessToken }));
+    sessionStorage.setItem(window.OrderClient.storageKey, JSON.stringify({ id: json.order.id, token: json.accessToken }));
     checkoutKey = null;
     if (json.approvalUrl) {
       location.href = json.approvalUrl;
@@ -245,10 +295,10 @@ async function submitCheckout(event, p) {
 }
 
 const channelCard = (c, first) => `<section class="pay-channel${first ? ' is-active' : ''}" data-channel="${esc(c.id)}">
-  <header class="pay-channel-head"><b>${esc(c.label)}</b><span>${esc(c.hint || '')}</span></header>
+  <header class="pay-channel-head"><b>${esc(c.label)}</b><span>${esc(c.hintKey ? T(c.hintKey) : '')}</span></header>
   ${c.qrUrl ? `<img class="payment-qr" src="${esc(c.qrUrl)}" alt="${esc(c.label)}" width="240" height="240" loading="lazy" referrerpolicy="no-referrer">` : ''}
   ${c.qrImage ? `<img class="payment-qr" src="${esc(c.qrImage)}" alt="${esc(c.label)}" loading="lazy" referrerpolicy="no-referrer">` : ''}
-  ${c.qrHint ? `<small class="pay-warn">${esc(c.qrHint)}</small>` : ''}
+  ${c.qrHintKey ? `<small class="pay-warn">${esc(T(c.qrHintKey))}</small>` : ''}
   <span class="pay-account">${esc(T('pay.accountLabel'))}: <b>${esc(c.account)}</b></span>
   <span class="payment-amount">${esc(T('pay.amountLabel'))}: <b>${money(c.amount, c.currency)}</b></span>
   <div class="payment-note"><small>${esc(T('pay.transferNote'))}</small><code>${esc(c.transferNote)}</code></div>
@@ -264,7 +314,11 @@ const remainingMs = () => clock().remaining;
 // expects. One object rather than three loose arguments, because the hint is
 // asked for it as one thing.
 const deadlineOptions = () => ({ expiresAt: deadlineState.expiresAt, serverTime: deadlineState.serverTime, support: window.I18N.t('brand.supportEmail') });
-const closedOrder = (order) => Boolean(order && order.deliveredAt) && order.status !== 'paid';
+// An order is closed once its file has been handed over and no payment is
+// expected. Delivering deliberately resets the status to pending so a second
+// download is possible, so this cannot be read off `status` alone — the order page
+// used to carry its own copy of this and the two were free to drift.
+const closedOrder = (order) => window.OrderClient.isClosed(order);
 
 function countdownText() {
   return clock().text();
@@ -400,22 +454,15 @@ async function checkOrder(id, token, quiet = false) {
 async function downloadOrder(id, token) {
   const button = document.getElementById('download-order');
   if (button) button.disabled = true;
-  try {
-    const res = await fetch(`/api/orders/${encodeURIComponent(id)}/download`, { headers: { 'x-order-token': token } });
-    if (!res.ok && !res.status) throw Error(T('order.errOffline'));
-    const data = await res.json();
-    if (!res.ok) throw Error(data.error || T('order.errDownload'));
-    // The server cannot watch a file arrive in someone's browser, so the
-    // download click is what closes the order. A failure here must never block
-    // the transfer that is already under way.
-    location.href = data.url;
-    fetch(`/api/orders/${encodeURIComponent(id)}/delivered`, { method: 'POST', headers: { 'x-order-token': token, 'content-type': 'application/json' } }).catch(() => {});
-  } catch (error) {
-    toastMsg(error.message, true);
-  } finally {
-    const b = document.getElementById('download-order');
-    if (b) b.disabled = lastOrder ? lastOrder.status !== 'paid' : false;
-  }
+  // The two steps — send the browser to the file, then tell the server the file
+  // was handed over — are shared with the order page and the PayPal return, in
+  // order-client.js. They are not separable: doing only the first leaves an order
+  // that can never be downloaded again, and doing only the second hands nothing
+  // over.
+  const result = await window.OrderClient.download(id, token);
+  if (!result.ok) toastMsg(result.offline ? T('order.errOffline') : (result.error || T('order.errDownload')), true);
+  const b = document.getElementById('download-order');
+  if (b) b.disabled = lastOrder ? lastOrder.status !== 'paid' : false;
 }
 
 async function loadPayOptions() {
@@ -435,6 +482,24 @@ document.querySelectorAll('.filter').forEach((btn) => {
     render();
   };
 });
+
+// Typing re-filters on every keystroke. The catalogue is already in memory, so
+// there is nothing to wait for and nothing to debounce — a request would only add a
+// way for the list to arrive out of order with the letters being typed.
+//
+// Esc clears it, which is the shortcut people already expect from a search field
+// and which costs one line. A result that follows the cursor into a hidden state
+// is not obvious otherwise: the box still reads what was typed.
+if (searchInput) {
+  searchInput.addEventListener('input', () => { searchTerm = foldDiacritics(searchInput.value); render(); });
+  searchInput.addEventListener('keydown', (e) => {
+    if (e.key !== 'Escape' || !searchInput.value) return;
+    e.preventDefault();
+    searchInput.value = '';
+    searchTerm = '';
+    render();
+  });
+}
 modal.addEventListener('click', (e) => { if (e.target === modal || e.target.hasAttribute('data-close')) closeModal(); });
 document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && !modal.hidden) closeModal(); });
 

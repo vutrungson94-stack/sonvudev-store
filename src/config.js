@@ -10,6 +10,25 @@ if (process.env.NODE_ENV !== "test") {
 }
 
 const value = (name, fallback = "") => (process.env[name] || fallback).trim();
+
+/**
+ * What a setting that was never filled in looks like from the inside.
+ *
+ * It is a value, not an absence, so that anything reading env.bank.name gets
+ * something printable. Which means "not set" has to be recognisable, and the rule
+ * for recognising it was a second copy of the same Vietnamese sentence: the string
+ * appeared here as a default, again in the check that decides whether bank
+ * transfer is available, and a third time in scripts/production-check.mjs, with
+ * its own regex. Changing the wording in one place left the other two deciding the
+ * opposite thing, and the shop would happily accept bank transfers it had no
+ * account details for.
+ *
+ * Exported so that isConfigured, the production check and anything else asking the
+ * same question read the same value.
+ */
+export const NOT_SET = "Chưa cập nhật";
+const looksUnset = (item) => new RegExp(`^(${NOT_SET}|not configured|replace-with)`, "i").test(String(item).trim());
+
 const configured = (name) => {
   const v = value(name);
   const placeholders = ["your_", "your-project", "your-service", "your-account", "your-secret", "your_paypal", "your_bucket"];
@@ -80,9 +99,14 @@ export const env = {
     // Unpaid orders are cancelled once this many hours have passed. The window
     // is what the checkout form promises the buyer, so it is shown in the UI
     // and in the terms page rather than being a silent server rule.
-    paymentWindowHours: numberValue("ORDER_PAYMENT_WINDOW_HOURS", 24),
+    //
+    // Clamped here, once. It used to be read raw and then re-guarded with
+    // `Math.max(1, ... || 24)` in three modules that each had their own idea of
+    // the fallback number, so a typo in the env var produced three different
+    // answers to "how long does a buyer have".
+    paymentWindowHours: Math.max(1, numberValue("ORDER_PAYMENT_WINDOW_HOURS", 24)),
     // How long before the deadline the "about to expire" notice is sent.
-    expiringWarnHours: numberValue("ORDER_EXPIRY_WARN_HOURS", 1),
+    expiringWarnHours: Math.max(0, numberValue("ORDER_EXPIRY_WARN_HOURS", 1)),
     sweepIntervalMs: numberValue("ORDER_SWEEP_INTERVAL_MS", 60000),
   },
   email: {
@@ -104,9 +128,9 @@ export const env = {
     accountEmail: value("PAYPAL_ACCOUNT_EMAIL"),
   },
   bank: {
-    name: value("BANK_NAME", "Chưa cập nhật"),
+    name: value("BANK_NAME", NOT_SET),
     accountName: value("BANK_ACCOUNT_NAME", value("BRAND_NAME", "SonVuDev")),
-    accountNumber: value("BANK_ACCOUNT_NUMBER", "Chưa cập nhật"),
+    accountNumber: value("BANK_ACCOUNT_NUMBER", NOT_SET),
     notePrefix: value("BANK_TRANSFER_NOTE_PREFIX", value("BRAND_NAME", "SonVuDev")),
     bin: value("BANK_BIN", "970436"),
     momo: value("MOMO_ACCOUNT_NUMBER"),
@@ -143,5 +167,5 @@ export const isConfigured = {
   // data/outbox, so the flow is testable end to end before an account exists.
   email: configured("RESEND_API_KEY"),
   bank: Boolean(env.bank.name && env.bank.accountName && env.bank.accountNumber)
-    && !/^(chưa cập nhật|not configured|replace-with)/i.test(`${env.bank.name} ${env.bank.accountNumber}`.trim()),
+    && !looksUnset(`${env.bank.name} ${env.bank.accountNumber}`.trim()),
 };

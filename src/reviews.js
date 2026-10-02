@@ -1,3 +1,4 @@
+import crypto from "node:crypto";
 import { hasPayment } from "./orders.js";
 import { getOrder, isOrderOwner, listFulfilledOrderReviews, updateOrder } from "./store.js";
 
@@ -44,9 +45,31 @@ const isVouched = (order) => order && order.status !== "refunded";
 /** Only the fields a product page shows. The order id and the email stay private. */
 const publicReview = (review) => ({
   body: review.body,
-  authorName: review.anonymous ? "Khách hàng" : review.authorName,
+  // Empty for an anonymous review, and the page substitutes the dictionary's own
+  // word for it. Returning a Vietnamese literal here put it under an English page.
+  authorName: review.anonymous ? "" : review.authorName,
   createdAt: review.createdAt,
 });
+
+/**
+ * A refusal, as a translation key the reader can render rather than a sentence
+ * they cannot.
+ *
+ * The order page renders this straight into the form's status line, and it used
+ * to render a Vietnamese sentence written here — so a buyer who switched the site
+ * to English and then sent a review too short to publish was told why in a
+ * language they had chosen not to read.
+ *
+ * The key is the whole one, not a suffix. `refuse("review.err.notFound", …)` and a client
+ * that assembled `review.err.${code}` worked, but then no key name appears in any
+ * file: the audit could not see them used, reported eleven working keys as dead,
+ * and the cheapest way to satisfy it would have been to delete the translations.
+ * Spelled out, the server and the dictionary are visibly connected.
+ *
+ * `error` stays for anything reading the API as a human — curl, a log line, the
+ * audit. The browser uses `code`.
+ */
+const refuse = (key, error, status) => ({ code: key, error, status });
 
 /**
  * The reviews a product page prints.
@@ -94,25 +117,32 @@ export async function createReview({ orderId, accessToken, productId, body, auth
   const order = await getOrder(orderId);
   // The same message as a missing order, so a wrong token cannot be used to find
   // out which order ids exist.
-  if (!isOrderOwner(order, accessToken)) return { error: "Không tìm thấy đơn hàng này.", status: 404 };
-  if (!wasFulfilled(order)) return { error: "Chỉ đơn đã nhận được file mới viết đánh giá được.", status: 409 };
-  if (!isVouched(order)) return { error: "Đơn này đã được hoàn tiền nên không viết đánh giá được.", status: 409 };
+  if (!isOrderOwner(order, accessToken)) return refuse("review.err.notFound", "Không tìm thấy đơn hàng này.", 404);
+  if (!wasFulfilled(order)) return refuse("review.err.notFulfilled", "Chỉ đơn đã nhận được file mới viết đánh giá được.", 409);
+  if (!isVouched(order)) return refuse("review.err.refunded", "Đơn này đã được hoàn tiền nên không viết đánh giá được.", 409);
 
   const item = (order.items || []).find((entry) => entry.productId === productId);
-  if (!item) return { error: "Sản phẩm này không nằm trong đơn hàng.", status: 400 };
+  if (!item) return refuse("review.err.wrongProduct", "Sản phẩm này không nằm trong đơn hàng.", 400);
 
   const text = clean(body);
-  if (text.length < MIN_LENGTH) return { error: `Viết thêm một chút để người khác tin được, tối thiểu ${MIN_LENGTH} ký tự.`, status: 400 };
-  if (text.length > MAX_LENGTH) return { error: `Tối đa ${MAX_LENGTH} ký tự.`, status: 400 };
+  if (text.length < MIN_LENGTH) return refuse("review.err.tooShort", `Viết thêm một chút để người khác tin được, tối thiểu ${MIN_LENGTH} ký tự.`, 400);
+  if (text.length > MAX_LENGTH) return refuse("review.err.tooLong", `Tối đa ${MAX_LENGTH} ký tự.`, 400);
 
   const existing = (order.reviews || []).filter((review) => review.productId === productId);
-  if (existing.length) return { error: "Bạn đã viết đánh giá cho sản phẩm này rồi.", status: 409 };
+  // Already written, so the box is gone entirely (see reviewForm) and this is the
+  // race where two tabs both saw it empty. It reuses the existing key rather than
+  // introducing a second sentence that says the same thing.
+  if (existing.length) return refuse("review.already", "Bạn đã viết đánh giá cho sản phẩm này rồi.", 409);
 
   const review = {
     id: `rev_${crypto.randomUUID()}`,
     productId,
     body: text,
-    authorName: clean(authorName).slice(0, 60) || "Khách hàng",
+    // Left empty when the buyer chose to stay anonymous. The product page decides
+    // what to print from `anonymous`, and a name written here would win over the
+    // dictionary — which is how an English product page ended up with "Khách hàng"
+    // under a review.
+    authorName: clean(authorName).slice(0, 60),
     // The buyer is not named in public unless they chose to be. Keeping the email
     // off the record entirely means a leaked order row still says nothing about
     // who reviewed what.
@@ -130,7 +160,7 @@ export async function createReview({ orderId, accessToken, productId, body, auth
     await updateOrder(order.id, { reviews: [...(order.reviews || []), review] });
   } catch (error) {
     console.warn(`[reviews] could not store a review on ${order.id}: ${error.message}`);
-    return { error: "Chưa lưu được đánh giá. Cứ bỏ qua — phần còn lại của đơn hàng vẫn bình thường.", status: 503 };
+    return refuse("review.err.storeFailed", "Chưa lưu được đánh giá. Cứ bỏ qua — phần còn lại của đơn hàng vẫn bình thường.", 503);
   }
 
   return { review: publicReview(review) };

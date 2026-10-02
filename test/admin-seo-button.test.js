@@ -18,7 +18,7 @@ const source = await fs.readFile(path.join(root, 'public', 'admin.js'), 'utf8');
 // anything about whether the button reacts to a keystroke.
 const pick = (name) => {
   const start = source.indexOf(`function ${name}(`);
-  assert.notEqual(start, -1, `khong tim thay ham ${name}`);
+  assert.notEqual(start, -1, `không tìm thấy hàm ${name}`);
   let depth = 0;
   for (let i = source.indexOf('{', start); i < source.length; i += 1) {
     if (source[i] === '{') depth += 1;
@@ -49,30 +49,30 @@ const makeForm = ({ title = '', description = '' } = {}) => {
   return { form, button, counter };
 };
 
-test('nut luu xam khi mo form ma chua sua gi', () => {
+test('nút lưu xám khi mở form mà chưa sửa gì', () => {
   const { form, button } = makeForm({ title: 'Tieu de cu', description: 'Mo ta cu' });
   sandbox.countSeo(form);
-  assert.equal(button.disabled, true, 'mo form ra chua sua gi thi khong duoc bat nut luu');
+  assert.equal(button.disabled, true, 'mở form ra chưa sửa gì thì không được bật nút lưu');
 });
 
-test('nut sang len khi sua tieu de', () => {
+test('nút sáng lên khi sửa tiêu đề', () => {
   const { form, button } = makeForm({ title: 'Tieu de cu', description: 'Mo ta cu' });
   sandbox.countSeo(form);
   form.elements.seoTitle.value = 'Tieu de moi';
   sandbox.countSeo(form);
-  assert.equal(button.disabled, false, 'sua roi thi nut phai sang de bam duoc');
+  assert.equal(button.disabled, false, 'sửa rồi thì nút phải sáng để bấm được');
 });
 
-test('nut sang len khi sua ca hai o', () => {
+test('nút sáng lên khi sửa cả hai ô', () => {
   const { form, button } = makeForm();
   sandbox.countSeo(form);
-  assert.equal(button.disabled, true, 'san pham chua co SEO thi nut xam');
+  assert.equal(button.disabled, true, 'sản phẩm chưa có SEO thì nút xám');
   form.elements.seoDescription.value = 'Mo ta moi';
   sandbox.countSeo(form);
   assert.equal(button.disabled, false);
 });
 
-test('sua xong bo lai chu thi nut xam tro lai', () => {
+test('sửa xong bỏ lại chữ thì nút xám trở lại', () => {
   const { form, button } = makeForm({ title: 'Tieu de cu' });
   sandbox.countSeo(form);
   form.elements.seoTitle.value = 'Tieu de khac';
@@ -81,18 +81,18 @@ test('sua xong bo lai chu thi nut xam tro lai', () => {
   // Typing back to what it was is not a change, and the button says so.
   form.elements.seoTitle.value = 'Tieu de cu';
   sandbox.countSeo(form);
-  assert.equal(button.disabled, true, 've lai gia tri cu thi nut phai xam');
+  assert.equal(button.disabled, true, 'về lại giá trị cũ thì nút phải xám');
 });
 
-test('khoang trang thua duoc bo qua khi so sanh', () => {
+test('khoảng trắng thừa được bỏ qua khi so sánh', () => {
   const { form, button } = makeForm({ title: 'Tieu de cu' });
   sandbox.countSeo(form);
   form.elements.seoTitle.value = '  Tieu de cu  ';
   sandbox.countSeo(form);
-  assert.equal(button.disabled, true, 'khoang trang quanh van la gia tri cu');
+  assert.equal(button.disabled, true, 'khoảng trắng quanh vẫn là giá trị cũ');
 });
 
-test('bo dem canh bao khi chu bi cat o nguong search result', () => {
+test('bộ đếm cảnh báo khi chữ bị cắt ở ngưỡng search result', () => {
   const { form, counter } = makeForm({ title: 'A'.repeat(65), description: 'B'.repeat(170) });
   sandbox.countSeo(form);
   assert.match(counter.textContent, /Tiêu đề 65\/70/);
@@ -101,7 +101,7 @@ test('bo dem canh bao khi chu bi cat o nguong search result', () => {
   assert.match(counter.className, /over/);
 });
 
-test('form sua SEO ghi lai gia tri luc mo, va do la noi so sanh', () => {
+test('form sửa SEO ghi lại giá trị lúc mở, và đó là nơi so sánh', () => {
   assert.ok(/data-seo-title="\$\{esc\(p\.seoTitle\|\|''\)\}"/.test(source), 'phai luu tieu de tai thoi diem mo');
   assert.ok(/data-seo-description="\$\{esc\(p\.seoDescription\|\|''\)\}"/.test(source), 'phai luu mo ta tai thoi diem mo');
   assert.ok(/form\.dataset\.seoTitle/.test(source), 'phai so sanh voi gia tri da luu');
@@ -109,7 +109,7 @@ test('form sua SEO ghi lai gia tri luc mo, va do la noi so sanh', () => {
   assert.ok(/return\s*\(?\s*form\.elements\.seoTitle/.test(source), 'phai so sanh voi o nhap chu khong phai voi hang so');
 });
 
-test('sau khi luu, nut phai theo dung quy tac so sanh chu khong duoc ai bat', () => {
+test('sau khi lưu, nút phải theo đúng quy tắc so sánh chữ, không được ai bắt', () => {
   // The requirement, not the mechanism: after a save the button's state comes from
   // the same comparison that governs typing, and nothing switches it on regardless.
   //
@@ -119,16 +119,16 @@ test('sau khi luu, nut phai theo dung quy tac so sanh chu khong duoc ai bat', ()
   // never written back, so even an intact form stayed "dirty" for ever: lit button,
   // counters still saying unsaved, and a second save writing the same two fields.
   const save = source.slice(source.indexOf('async function saveSeo'), source.indexOf('async function uploadExistingProduct'));
-  assert.ok(save.length > 0, 'khong tim thay saveSeo');
+  assert.ok(save.length > 0, 'không tìm thấy saveSeo');
 
   // The baseline comes from what the server stored. The API truncates a title to 70
   // characters and a description to 175, so a long paste comes back shorter;
   // comparing against the typed text would leave the form permanently dirty and
   // quietly re-send the over-length value on the next save.
-  assert.match(save, /stored\.seoTitle/, 'baseline phai lay tu gia tri server tra ve');
-  assert.match(save, /stored\.seoDescription/, 'baseline phai lay tu gia tri server tra ve');
-  assert.match(save, /form\.dataset\.seoTitle\s*=/, 'phai ghi baseline');
-  assert.match(save, /form\.dataset\.seoDescription\s*=/, 'phai ghi baseline');
+  assert.match(save, /stored\.seoTitle/, 'baseline phải lấy từ giá trị server trả về');
+  assert.match(save, /stored\.seoDescription/, 'baseline phải lấy từ giá trị server trả về');
+  assert.match(save, /form\.dataset\.seoTitle\s*=/, 'phải ghi baseline');
+  assert.match(save, /form\.dataset\.seoDescription\s*=/, 'phải ghi baseline');
 
   // The button state is computed by the shared rule, on both paths, and never
   // assigned directly after the fact.
@@ -140,7 +140,7 @@ test('sau khi luu, nut phai theo dung quy tac so sanh chu khong duoc ai bat', ()
     'nut SEO khong duoc duoc bat cuong nguon sau khi luu');
 });
 
-test('nut kiem tra chi do bang mau, khong phai chi bien mat', async () => {
+test('nút kiểm tra chỉ đổ bằng màu, không phải chỉ biến mất', async () => {
   const css = await fs.readFile(path.join(root, 'public', 'styles.css'), 'utf8');
   // The logic disables the button correctly and the owner still sees it lit,
   // which reads as "the fix did not work" and costs an hour of debugging.
@@ -186,19 +186,19 @@ test('bam Luu SEO that thi nut khoa lai va form bao "Đã lưu"', async () => {
   // Open the editor and type. The button lights up.
   const typed = build('Tieu de cu', 'Mo ta cu');
   box.countSeo(typed.form);
-  typed.form.elements.seoTitle.value = 'Bam macro Excel khong can chinh tay';
+  typed.form.elements.seoTitle.value = 'Bật macro Excel không cần chỉnh tay';
   typed.form.elements.seoDescription.value = 'Tu them thu muc tin cay, co cach hoan tac.';
   box.countSeo(typed.form);
-  assert.equal(typed.button.disabled, false, 'da sua thi nut phai sang de bam duoc');
+  assert.equal(typed.button.disabled, false, 'đã sửa thì nút phải sáng để bấm được');
 
   // Save. This is the step that did nothing visible.
   await box.saveSeo({ preventDefault() {}, currentTarget: typed.form });
 
-  assert.equal(sent.length, 1, 'phai gui mot request');
-  assert.equal(sent[0].body.seoTitle, 'Bam macro Excel khong can chinh tay');
+  assert.equal(sent.length, 1, 'phải gửi một request');
+  assert.equal(sent[0].body.seoTitle, 'Bật macro Excel không cần chỉnh tay');
   assert.equal(toasts.at(-1).message, 'Đã lưu SEO');
   assert.equal(typed.button.disabled, true, 'luu xong nut phai khoa lai — day la loi dang bao cao');
-  assert.match(typed.counter.textContent, /Đã lưu/, 'form phai noi la da luu');
+  assert.match(typed.counter.textContent, /Đã lưu/, 'form phải nói là đã lưu');
   assert.match(typed.counter.className, /clean/);
   assert.equal(toggle.textContent, 'Sửa SEO', 'nut cua dong phai doi sangSua SEO');
 
@@ -226,12 +226,12 @@ test('bam Luu SEO that thi nut khoa lai va form bao "Đã lưu"', async () => {
   box.countSeo(long.form);
   long.form.elements.seoTitle.value = 'A'.repeat(90);
   await box.saveSeo({ preventDefault() {}, currentTarget: long.form });
-  assert.equal(long.form.elements.seoTitle.value.length, 70, 'o nhap phai hien dung do dai da luu');
-  assert.equal(long.button.disabled, true, 'form phai sach sau khi server cat ngan');
+  assert.equal(long.form.elements.seoTitle.value.length, 70, 'ô nhập phải hiện đúng độ dài đã lưu');
+  assert.equal(long.button.disabled, true, 'form phải sạch sau khi server cắt ngắn');
   assert.equal(long.form.dataset.seoTitle.length, 70);
 });
 
-test('luu that bai thi nut phai mo lai de thu lai duoc', async () => {
+test('lưu thất bại thì nút phải mở lại để thử lại được', async () => {
   const save = source.slice(source.indexOf('async function saveSeo'), source.indexOf('async function uploadExistingProduct'));
   const box = vm.createContext({ encodeURIComponent, console, JSON });
   vm.runInContext(`${pick('seoDirty')}\n${pick('countSeo')}\n${pick('seoLock')}\n${save}`, box);
@@ -250,6 +250,6 @@ test('luu that bai thi nut phai mo lai de thu lai duoc', async () => {
   await box.saveSeo({ preventDefault() {}, currentTarget: form });
   // A save that failed must not leave the owner with a dead button and no way to
   // retry — which is the one outcome worse than the bug being reported.
-  assert.equal(button.disabled, false, 'that bai thi nut phai mo cho thu lai');
+  assert.equal(button.disabled, false, 'thất bại thì nút phải mở cho thử lại');
   assert.notEqual(form.dataset.seoTitle, 'Thu lai di', 'baseline khong duoc doi khi chua luu duoc');
 });

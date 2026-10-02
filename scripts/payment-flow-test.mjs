@@ -165,7 +165,7 @@ if (live) {
   console.log("Bước trên chạy trên server thật và có ghi dữ liệu. Một đơn sẽ được tạo.\nNếu bạn chỉ muốn xem có gì sai, dùng lệnh không có tham số.");
 }
 if (failed.length) {
-  console.error("\nFAIL — phan chua xac nhan duoc:");
+  console.error("\nFAIL — phần chưa xác nhận được:");
   for (const f of failed) console.error(`  ${f.name}${f.detail ? ` — ${f.detail}` : ""}`);
   process.exit(1);
 }

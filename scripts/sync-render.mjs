@@ -20,6 +20,23 @@ const api = "https://api.render.com/v1";
 // credentials nor PORT belong in this list. Each key is written individually
 // via PUT /env-vars/{key} rather than the collection endpoint, which replaces
 // every variable and would wipe those.
+// Every variable src/config.js reads, and nothing else.
+//
+// The list is the problem, not the copy. The script pushes each of these to Render
+// before every deploy, and it omitted the five BRAND_ ones: the shop name, the
+// legal entity, the founder and the social links. So on the Render host those kept
+// falling back to the defaults baked into config.js while .env held the real
+// values, and a deploy did nothing about it — the name on a buyer's bank
+// statement, the entity named in the terms they agree to, and the profile links
+// that tell a crawler the homepage and the product pages describe one shop all
+// disagreed with each other, and only on that host.
+//
+// PORT is the one deliberate omission: Render assigns it, and pushing a local one
+// would make the service bind somewhere it was not given.
+//
+// Kept next to a test that holds it against config.js, because this is the third
+// place these names are written down and the only one with no caller to complain
+// when it falls behind.
 const ALLOWED = [
   "HOST", "APP_URL", "ADMIN_API_TOKEN", "NODE_ENV",
   "R2_ACCOUNT_ID", "R2_ACCESS_KEY_ID", "R2_SECRET_ACCESS_KEY", "R2_BUCKET_NAME",
@@ -35,6 +52,7 @@ const ALLOWED = [
   "ZALOPAY_ACCOUNT_NUMBER", "ZALOPAY_QR_IMAGE",
   "ORDER_PAYMENT_WINDOW_HOURS", "ORDER_EXPIRY_WARN_HOURS", "ORDER_SWEEP_INTERVAL_MS",
   "RESEND_API_KEY", "EMAIL_FROM", "SUPPORT_EMAIL",
+  "BRAND_NAME", "BRAND_LEGAL_ENTITY", "BRAND_FOUNDER_NAME", "BRAND_FOUNDER_URL", "BRAND_SOCIAL_LINKS",
 ];
 
 // .env carries local-development values that are wrong on Render.
@@ -76,15 +94,15 @@ async function findService() {
     || services.find((item) => normalise(item.name) === normalise(wanted))
     || services.find((item) => normalise(item.name).includes(normalise(wanted)));
   if (!match) {
-    console.error(`Khong tim thay service nao khop voi "${wanted}".`);
+    console.error(`Không tìm thấy service nào khớp với "${wanted}".`);
     if (services.length) {
-      console.error("Cac service dang co trong tai khoan Render:");
+      console.error("Các service đang có trong tài khoản Render:");
       for (const item of services) console.error(`  - ${item.name}  (${item.id})  ${item.type}`);
       console.error(`\nDat RENDER_SERVICE trong .env bang mot trong cac ten tren.`);
     } else {
-      console.error("Tai khoan Render chua co service nao. Hay tao service truoc.");
+      console.error("Tài khoản Render chưa có service nào. Hãy tạo service trước.");
     }
-    throw new Error("Khong xac dinh duoc service.");
+    throw new Error("Không xác định được service.");
   }
   return { service: match, name: match.name };
 }
@@ -147,7 +165,7 @@ async function main() {
     if (apply && redeploy) {
       const deploy = await call("POST", `${api}/services/${serviceId}/deploys`, { clearCache: "do_not_clear" });
       console.log(`Da trigger deploy: ${deploy?.deploy?.id || deploy?.id || "unknown"}`);
-      console.log("Deploy mat vai phut. Kiem tra bang: npm run check:production");
+      console.log("Deploy mất vài phút. Kiểm tra bằng: npm run check:production");
     }
     return;
   }
@@ -156,8 +174,8 @@ async function main() {
   console.log(`\n${changes.length} thay doi tren ${wanted.size} bien.`);
 
   if (!apply) {
-    console.log("Chua ghi gi len Render. Day moi la phan kiem tra.");
-    console.log("De ghi that:  npm run render:sync:apply");
+    console.log("Chưa ghi gì lên Render. Đây mới là phần kiểm tra.");
+    console.log("Để ghi thật:  npm run render:sync:apply");
     // A dry run that reports "4 changes" reads like four changes happened. It
     // matters most for PayPal, where PAYPAL_ENVIRONMENT and the credential pair
     // have to move together: a live deployment left holding sandbox credentials
@@ -165,9 +183,9 @@ async function main() {
     // customers, with no error on the machine that made the change.
     const money = changes.filter((change) => /^(PAYPAL_|SUPABASE_|R2_|BANK_|RESEND_|ADMIN_|APP_URL)/.test(change.key));
     if (money.length) {
-      console.log(`\n${money.length} trong cac thay doi nay la thong tin thanh toan va ket noi du lieu:`);
+      console.log(`\n${money.length} trong các thay đổi này là thông tin thanh toán và kết nối dữ liệu:`);
       console.log(`  ${money.map((change) => change.key).join(", ")}`);
-      console.log("  Chua thay thi site dang chay tren cau hinh CU, khong phai cau hinh moi.");
+      console.log("  Chưa thay thì site đang chạy trên cấu hình CŨ, không phải cấu hình mới.");
     }
     return;
   }
@@ -179,12 +197,12 @@ async function main() {
   console.log(`\nDa cap nhat ${changes.length} bien tren Render.`);
 
   if (!redeploy) {
-    console.log("Chay lai voi --deploy de trigger deploy moi, hoac bam Manual Deploy tren Dashboard.");
+    console.log("Chạy lại với --deploy để trigger deploy mới, hoặc bấm Manual Deploy trên Dashboard.");
     return;
   }
   const deploy = await call("POST", `${api}/services/${serviceId}/deploys`, { clearCache: "do_not_clear" });
   console.log(`Da trigger deploy: ${deploy?.deploy?.id || deploy?.id || "unknown"}`);
-  console.log("Deploy mat vai phut. Kiem tra bang: npm run check:production");
+  console.log("Deploy mất vài phút. Kiểm tra bằng: npm run check:production");
 }
 
 try {

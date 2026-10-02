@@ -14,7 +14,8 @@ import fs from "node:fs";
 import path from "node:path";
 import { PutObjectCommand, S3Client, HeadObjectCommand, DeleteObjectCommand } from "@aws-sdk/client-s3";
 import { env, isConfigured } from "../src/config.js";
-import { releaseKey } from "../src/r2.js";
+import { supabaseRequest, requireSupabase } from "../src/supabase-http.js";
+import { releaseKey, releaseClient } from "../src/r2.js";
 
 const args = process.argv.slice(2);
 const usage = [
@@ -24,7 +25,7 @@ const usage = [
   "  --dry-run          chi in ke hoach, khong ghi gi len R2 hay Supabase",
   "  --slug <slug>      san pham theo slug (mac dinh tu nhan dien)",
   "  --id <id>          san pham theo id",
-  "  --version <x.y.z>  ban phat hanh moi (mac dinh giu version hien tai)",
+  "  --version <x.y.z>  bản phát hành mới (mặc định giữ version hiện tại)",
   "  --prune            xoa ban cu tren R2 sau khi gan ban moi",
 ].join("\n");
 
@@ -47,33 +48,23 @@ if (!filePath) {
   console.error(usage);
   process.exit(1);
 }
-if (!isConfigured.r2 || !isConfigured.supabase) {
-  console.error("Thieu cau hinh R2 hoac Supabase trong .env");
+requireSupabase();
+if (!isConfigured.r2) {
+  console.error("Thiếu cấu hình R2 trong .env");
   process.exit(1);
 }
 if (!fs.existsSync(filePath) || !fs.statSync(filePath).isFile()) {
-  console.error(`Khong tim thay file: ${filePath}`);
+  console.error(`Không tìm thấy file: ${filePath}`);
   process.exit(1);
 }
 
-const r2 = new S3Client({
-  region: "auto",
-  endpoint: `https://${env.r2.accountId}.r2.cloudflarestorage.com`,
-  credentials: { accessKeyId: env.r2.accessKeyId, secretAccessKey: env.r2.secretAccessKey },
-});
-
-const supabase = async (pathname, options = {}) => {
-  const headers = {
-    apikey: env.supabase.serviceRoleKey,
-    "Content-Type": "application/json",
-    Prefer: "return=representation",
-    ...(options.headers || {}),
-  };
-  if (env.supabase.serviceRoleKey.startsWith("eyJ")) headers.Authorization = `Bearer ${env.supabase.serviceRoleKey}`;
-  const res = await fetch(`${env.supabase.url}/rest/v1/${pathname}`, { ...options, headers });
-  if (!res.ok) throw new Error(`Supabase ${res.status}: ${(await res.text()).slice(0, 300)}`);
-  return res.status === 204 ? null : res.json();
-};
+// The R2 client and the PostgREST call come from src/. This script used to build
+// both itself, in a second copy of each. They agreed, which is why nothing broke
+// until the moment one of them was changed and the other was not — a release
+// published by hand would have written to a bucket under a key the server did not
+// expect, with no error to say so.
+const r2 = releaseClient();
+const supabase = (pathname, options) => supabaseRequest(pathname, options);
 
 const bytes = (n) => `${(n / 1048576).toFixed(1)} MB`;
 const contentTypeFor = (name) => (/\.zip$/i.test(name) ? "application/zip"
@@ -87,7 +78,7 @@ async function resolveProduct() {
   if (slug || id) {
     const column = slug ? "slug" : "id";
     const rows = await supabase(`products?${column}=eq.${encodeURIComponent(slug || id)}&select=*&limit=1`);
-    if (!rows[0]) throw new Error(`Khong tim thay san pham voi ${column}=${slug || id}.`);
+    if (!rows[0]) throw new Error(`Không tìm thấy sản phẩm với ${column}=${slug || id}.`);
     return rows[0];
   }
   const all = await supabase("products?select=id,slug,name,version,status,file_key&order=created_at.desc");
@@ -96,8 +87,8 @@ async function resolveProduct() {
   const published = all.filter((p) => p.file_key);
   if (published.length === 1) return published[0];
   throw new Error(
-    `Khong doan duoc san pham nao (${all.length} san pham trong bang). Chon bang --slug hoac --id:\n`
-    + all.map((p) => `  ${p.slug}  [${p.id}]  v${p.version}  ${p.file_key ? "da co file" : "chua co file"}`).join("\n"),
+    `Không đoán được sản phẩm nào (${all.length} sản phẩm trong bảng). Chọn bằng --slug hoặc --id:\n`
+    + all.map((p) => `  ${p.slug}  [${p.id}]  v${p.version}  ${p.file_key ? "đã có file" : "chưa có file"}`).join("\n"),
   );
 }
 
@@ -115,8 +106,8 @@ async function main() {
   console.log(`Dung luong: ${bytes(stat.size)}`);
   console.log(`Version : ${version}${product.version && product.version !== version ? ` (truoc: ${product.version})` : ""}`);
   console.log(`R2 key  : ${key}`);
-  if (previousKey) console.log(`Ban cu  : ${previousKey}${prune ? " (se xoa)" : " (giu lai, them --prune de xoa)"}`);
-  console.log(`Trang thai: ${dryRun ? "DRY-RUN, khong ghi gi" : "se upload that + gan file_key + status=active"}`);
+  if (previousKey) console.log(`Ban cu  : ${previousKey}${prune ? " (sẽ xoá)" : " (giữ lại, thêm --prune để xoá)"}`);
+  console.log(`Trang thai: ${dryRun ? "DRY-RUN, không ghi gì" : "se upload that + gan file_key + status=active"}`);
 
   if (dryRun) {
     console.log("\nDRY-RUN xong. Bo --dry-run de phat hanh that.");
@@ -141,14 +132,17 @@ async function main() {
     method: "PATCH",
     body: JSON.stringify(patch),
   });
-  if (updated?.file_key !== key) throw new Error("Supabase khong xac nhan lai file_key. Kiem tra lai.");
+  if (updated?.file_key !== key) throw new Error("Supabase không xác nhận lại file_key. Kiểm tra lại.");
   console.log(`Supabase OK: file_key -> ${updated.file_key}, status=${updated.status}, version=${updated.version}`);
 
   if (prune && previousKey && previousKey !== key) {
     await r2.send(new DeleteObjectCommand({ Bucket: env.r2.bucket, Key: previousKey }));
     console.log(`Da xoa ban cu tren R2: ${previousKey}`);
   }
-  console.log("\nPhat hanh xong. Kiem tra tai sonvudev.com.");
+  // The address to check comes from APP_URL, which is the value the storefront
+  // itself was built from. A literal domain here meant that publishing to a
+  // different host still told the operator to go and look at the old one.
+  console.log(`\nPhat hanh xong. Kiem tra tai ${env.appUrl}.`);
 }
 
 main().catch((error) => {

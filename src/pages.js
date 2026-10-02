@@ -22,12 +22,47 @@ const absolute = (path) => `${site()}${path.startsWith("/") ? path : `/${path}`}
 
 
 /**
+ * Fills the placeholders a product's copy is allowed to contain.
+ *
+ * `{{founder}}` is the owner's name, and it was typed by hand into the description
+ * of a real product — as "Vũng Trọng Sơn" where the owner is "Vũ Trung Sơn". The
+ * mistake lived in the database, appeared on the storefront in both languages, and
+ * nothing could catch it: the name was correct in every other place on the site,
+ * because everywhere else it came from BRAND_FOUNDER_NAME.
+ *
+ * So a product description no longer carries the name. It carries the placeholder,
+ * and the one place that decides what it means is the same environment variable the
+ * terms, the schema and the about page already read. Changing the name in one place
+ * changes it everywhere, and a misspelling becomes impossible rather than
+ * detectable.
+ *
+ * Called on the way out rather than on the way in, deliberately: the stored value
+ * stays a placeholder, so the admin panel shows the author what is actually
+ * happening instead of baking one spelling of the name into a text field where the
+ * next person to save it would silently freeze a new one.
+ *
+ * The name is escaped for HTML because it lands inside page markup and inside
+ * structured data, and it comes from configuration like anything else.
+ */
+export const fillCopy = (value) => {
+  const text = String(value ?? "");
+  if (!text.includes("{{")) return text;
+  const founder = env.brand.founderName || env.brand.name;
+  return text
+    .replaceAll("{{founder}}", esc(founder))
+    // An unknown placeholder is left alone and reported by the audit rather than
+    // silently blanked, so a typo shows up as {{typo}} in the page instead of a
+    // sentence with a hole in it.
+    .replaceAll("{{brand}}", esc(env.brand.name));
+};
+
+/**
  * A short, honest summary for search results and link previews. The full
  * description can run to several thousand characters, and both Google and
  * Facebook truncate well before that, so a truncated wall of text buys nothing.
  */
 export function productSummary(product, max = 155) {
-  const source = String(product.short_description || product.shortDescription || product.description || "").replace(/\s+/g, " ").trim();
+  const source = fillCopy(product.short_description || product.shortDescription || product.description || "").replace(/\s+/g, " ").trim();
   if (source.length <= max) return source;
   const cut = source.slice(0, max);
   return `${cut.slice(0, cut.lastIndexOf(" "))}…`;
@@ -216,7 +251,26 @@ export const verificationMeta = () => {
  * it is injected once here and every page reads it back, exactly the way the support
  * address already is.
  */
-export const brandMeta = () => `<meta name="x-brand" content="${esc(env.brand.name)}">`;
+/**
+ * The site's identity, in the form link previews read.
+ *
+ * Every page gets this, so the shop's name is stated once from configuration rather
+ * than typed into each template's head. It used to be typed into index.html's
+ * og:site_name, og:title, og:image:alt, twitter:title and twitter:description —
+ * eleven literals of the same name across one file, while the product pages read
+ * the same thing from env.brand.name. Change BRAND_NAME and the homepage kept
+ * announcing the old shop on every share.
+ *
+ * Only the identity tags live here. The title and description are per page: the
+ * homepage sells the shop and a product page sells one thing, and a shared tag
+ * would have one of them wrong.
+ */
+export const brandMeta = () => [
+  `<meta name="x-brand" content="${esc(env.brand.name)}">`,
+  `<meta property="og:site_name" content="${esc(env.brand.name)}">`,
+  `<meta property="og:brand" content="${esc(env.brand.name)}">`,
+  `<meta name="twitter:site" content="${esc(env.brand.name)}">`,
+].join("\n");
 
 /**
  * The verification file a search engine fetches from the site root.
@@ -296,19 +350,24 @@ export function renderIndexGrid(products) {
   const cards = (products || []).filter(isSellable).map((product) => {
     const art = esc(String(product.category || "khac").toLowerCase().replace(/\s+/g, "-"));
     const url = absolute(`/product/${encodeURIComponent(product.slug)}`);
+    // Filled here as well as on the product page. The card and the detail page are
+    // both places a buyer reads the feature list, and a placeholder resolved on one
+    // and not the other puts the braces in front of them on whichever they load
+    // first — the homepage, in fact, which is the one the product page test never
+    // looked at.
     const features = (product.features || []).slice(0, 2)
-      .map((item) => `<li>✓ ${esc(item)}</li>`).join("");
+      .map((item) => `<li>✓ ${esc(fillCopy(item))}</li>`).join("");
     return `<article class="product-card" data-id="${esc(product.id)}">
     <div class="product-art art-${art}">
-      <span class="product-badge">${esc(product.badge || "Mới")}</span>
+      <span class="product-badge">${esc(fillCopy(product.badge) || "Mới")}</span>
       <div class="product-logo">${esc(initials(product.name))}</div>
       <div class="art-grid"></div>
       <span class="art-spark">✦</span>
     </div>
     <div class="product-info">
       <div class="product-meta"><span>${esc(product.platform || "Windows")} · v${esc(product.version || "1.0")}</span><span>${esc(product.category || "")}</span></div>
-      <h3><a href="${esc(url)}">${esc(product.name)}</a></h3>
-      <p>${esc(product.shortDescription || product.short_description || product.description || "")}</p>
+      <h3><a href="${esc(url)}">${esc(fillCopy(product.name))}</a></h3>
+      <p>${esc(fillCopy(product.shortDescription || product.short_description || product.description || ""))}</p>
       <ul>${features}</ul>
       <div class="product-buy">
         <strong>${esc(money(product.price, product.currency))}</strong>
@@ -328,6 +387,66 @@ export function renderIndexGrid(products) {
 export const renderIndexCount = (products) => {
   const total = (products || []).filter(isSellable).length;
   return `${String(total).padStart(2, "0")} sản phẩm`;
+};
+
+/**
+ * The homepage's category filter row, built from what is actually for sale.
+ *
+ * It used to be three literals in index.html — two categories and a platform —
+ * sitting beside a grid that was loaded live. Nothing connected the two, so a
+ * product published in a fourth category appeared in the grid with no button that
+ * reached it, while the three buttons offered a subset nobody had chosen. One of
+ * them was not filtering on the same thing as the other two.
+ *
+ * The buttons come from the same products the grid renders, so one exists exactly
+ * when there is something behind it, and stops existing when there is not.
+ *
+ * "All" keeps its data-i18n key because it is a word in the interface. The
+ * categories are not translated, because they are data — the same call the product
+ * names make, and the reason a category can be in any language at all.
+ */
+export const renderIndexFilters = (products) => {
+  const counts = new Map();
+  for (const product of products || []) {
+    const category = String(product.category || "").trim();
+    if (!category) continue;
+    counts.set(category, (counts.get(category) || 0) + 1);
+  }
+  const buttons = [...counts.entries()]
+    .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0], "vi"))
+    .map(([category, count]) => `<button class="filter" data-filter="${esc(category)}" data-count="${count}">${esc(category)}</button>`)
+    .join("");
+  return `<button class="filter active" data-filter="all" data-i18n="products.all">Tất cả</button>${buttons}`;
+};
+
+/**
+ * The three numbers under the hero, counted from the catalogue.
+ *
+ * These were 01+, 4.9/5 and 100% written into the template. None of the three was a
+ * measurement of anything: there is no rating in this shop, and nothing behind the
+ * third one. So the strip was making claims in numbers, on the page whose whole
+ * argument is that the work is careful.
+ *
+ * What replaced them can be counted, which means it is true at every moment without
+ * anyone remembering to update it. A shop with one product reads "1", which is a
+ * smaller and less impressive number and also the correct one.
+ *
+ * Returns null when there is nothing to count, so the caller can drop the strip
+ * rather than print zeros: a shop with an empty catalogue saying "0 products" is
+ * still making a statement about itself.
+ */
+export const renderStats = (products) => {
+  const sellable = (products || []).filter(isSellable);
+  if (!sellable.length) return null;
+  const platforms = new Set(sellable.map((product) => String(product.platform || "").trim()).filter(Boolean));
+  return {
+    products: sellable.length,
+    platforms: platforms.size,
+    // Counting versions rather than summing a field nobody maintains: a product
+    // with a `version` has at least that one release, and the catalogue does not
+    // record a release history.
+    releases: sellable.reduce((total, product) => total + (product.version ? 1 : 0), 0),
+  };
 };
 
 const initials = (name) => String(name || "SV").split(/\s+/).map((part) => part[0]).join("").slice(0, 2).toUpperCase();
@@ -421,7 +540,17 @@ const paragraphBlocks = (text) => String(text || "").split(/\n{2,}/).map((block)
  * Vietnamese.
  */
 export function localize(product, lang) {
-  if (!product || lang !== "en") return product;
+  if (!product) return product;
+  const resolved = lang === "en" ? localizeToEnglish(product) : product;
+  // Placeholders are filled after the language is chosen, so the same stored text
+  // carries the owner's name in both. Filling them first would put the name into
+  // whatever was picked as the fallback, and the English page would then show a
+  // Vietnamese sentence with an English name in it.
+  return { ...resolved, shortDescription: fillCopy(resolved.shortDescription), description: fillCopy(resolved.description), features: (resolved.features || []).map(fillCopy) };
+}
+
+/** Chooses the English text where it exists and the Vietnamese where it does not. */
+function localizeToEnglish(product) {
   const pick = (en, vi) => (String(en || "").trim() ? en : vi);
   const featuresEn = Array.isArray(product.featuresEn) ? product.featuresEn.filter((item) => String(item || "").trim()) : [];
   return {
@@ -452,9 +581,12 @@ export function renderProductPage(rawProduct, lang = "vi", reviews = []) {
   // product's own name, which nobody outside this site has heard of. The two are
   // the same sentence read differently: "bật macro Excel" is the problem, "Excel
   // Trusted Locations Setup" is the thing that solves it.
-  const title = product.seoTitle || (en
-    ? `${product.name} v${product.version} — ${product.platform || "Windows"} | ${brand()}`
-    : `${product.name} v${product.version} — ${product.platform || "Windows"} | ${brand()}`);
+  //
+  // One shape for both languages, and the language enters through productSummary
+  // and the copy table below. The ternary that used to sit here had an identical
+  // arm on each side — an editor had edited one and not the other, and a page that
+  // looked localized was emitting the same title twice.
+  const title = product.seoTitle || `${product.name} v${product.version} — ${product.platform || "Windows"} | ${brand()}`;
   const description = product.seoDescription || productSummary(product);
   const copy = en ? COPY_EN : COPY_VI;
   const faq = faqSchema(product, lang);
@@ -623,9 +755,10 @@ export function renderFeed(products) {
   };
 }
 
-// Only `esc` and `jsonLdGraph` are imported by app.js. The other three were
-// re-exported without a caller, which meant each had two homes and neither could
-// be removed.
+// `esc` is re-exported because app.js builds its own markup with it — one
+// implementation, two consumers, rather than a second copy of the escape rules.
+// The other three that used to sit here had no caller at all, which meant each had
+// two homes and neither could be removed.
 export { esc };
 
 /**

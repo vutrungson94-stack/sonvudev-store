@@ -81,6 +81,31 @@ alter table public.orders add column if not exists paid_provider_amount numeric(
 alter table public.orders add column if not exists paid_provider_currency text;
 -- Set once per checkout attempt so a lost response cannot create a duplicate.
 alter table public.orders add column if not exists idempotency_key text;
+
+-- And enforced, which is the part that was missing.
+--
+-- The column carried an index and the application looked the key up before
+-- inserting, which is a check-then-act with nothing holding the middle: two
+-- requests that arrive together both find nothing, and both insert. On Postgres
+-- the duplicate never showed up anywhere — the orders list showed two paid-for
+-- orders, the buyer had paid once, and the webhook that arrived second had no way
+-- to tell which of the two it belonged to. PostgREST cannot run a transaction,
+-- so no amount of care in src/ closes that window; only the database can.
+--
+-- Before applying this to an existing database, clear any duplicates the old
+-- index let through, or the create will fail and the migration stops:
+--
+--   delete from public.orders a using public.orders b
+--    where a.id > b.id
+--      and a.idempotency_key is not null
+--      and a.idempotency_key = b.idempotency_key;
+--
+-- Rows with a null key are excluded: every historical row has one, and a unique
+-- index still treats repeated nulls as distinct.
+create unique index if not exists orders_idempotency_key_uniq on public.orders(idempotency_key) where idempotency_key is not null;
+-- The lookup index stays, because the sweep and any report that asks "which order
+-- did this attempt become" reads by key far more often than it inserts.
+create index if not exists orders_idempotency_key_idx on public.orders(idempotency_key);
 -- What went back out. Kept alongside paid_amount rather than subtracted from
 -- it, so the gross figure survives and a report can show collected, refunded
 -- and net instead of quietly losing the history of a sale.

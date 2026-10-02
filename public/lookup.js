@@ -31,7 +31,7 @@ async function lookup(event){
     // server's message is written in the server's language, not the reader's.
     if(response.status===429)throw Error(T('lookup.errRate'));
     if(!response.ok)throw Error(T('lookup.errNotFound'));
-    sessionStorage.setItem('sonvudev_order',JSON.stringify({id:payload.order.id,token:payload.accessToken}));
+    window.OrderClient.write(payload.order.id,payload.accessToken);
     status.className='form-message ok';
     status.textContent='✓ '+payload.order.id;
     location.href='/order/'+encodeURIComponent(payload.order.id);

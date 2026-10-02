@@ -60,7 +60,7 @@ test('ràng buộc trạng thái đơn hàng được gắn sau khi bảng đã 
   const createOrders = code.indexOf('create table if not exists public.orders');
   const closeOrders = code.indexOf(');', createOrders);
   const dropConstraint = code.indexOf('orders_status_check');
-  assert.ok(createOrders > -1 && closeOrders > -1, 'phai tim thay khoi tao bang orders');
+  assert.ok(createOrders > -1 && closeOrders > -1, 'phải tìm thấy khối tạo bảng orders');
   assert.ok(dropConstraint > closeOrders, 'ràng buộc phải nằm sau khi bảng orders đã đóng');
 });
 
@@ -80,15 +80,45 @@ test('mọi cột mà store.js dùng đều có trong schema', () => {
   }
 });
 
+test('idempotency_key có ràng buộc UNIQUE, không chỉ có index', () => {
+  // This is the difference between the checkout promising "a lost response cannot
+  // create a second order" and the database enforcing it.
+  //
+  // A plain index makes the lookup fast and does nothing else. The application
+  // looked the key up before inserting, which is a check-then-act with nothing
+  // holding the middle: two requests arriving together both find nothing and both
+  // insert. PostgREST cannot run a transaction, so no amount of care in src/ closes
+  // that window — two orders, one payment, and a webhook that cannot tell which of
+  // them it belongs to.
+  //
+  // So the guarantee has to be a constraint. `create index if not exists` accepts
+  // an existing index of the same name and leaves it non-unique, which is why the
+  // test looks for the word `unique` on this index and not merely for its name.
+  const lines = statements.filter((s) => /orders_idempotency_key/i.test(s));
+  assert.ok(lines.length >= 1, 'phai co index cho idempotency_key');
+  const unique = lines.filter((s) => /create\s+unique\s+index/i.test(s));
+  assert.equal(unique.length, 1, 'dung mot index unique cho idempotency_key');
+  assert.match(unique[0], /orders_idempotency_key_uniq/);
+  // Excluding nulls keeps every historical row, all of which have one, from
+  // having to be cleaned before the index can be created.
+  assert.match(unique[0], /where\s+idempotency_key\s+is\s+not\s+null/i, 'index unique phải bỏ qua dòng có key NULL');
+  // And the file has to say how to clean up a database that already has duplicates,
+  // because the create fails on them and a failed migration reads like a broken
+  // schema rather than like "you have old duplicates".
+  assert.match(schema, /delete\s+from\s+public\.orders[\s\S]{0,240}idempotency_key\s*=\s*b\.idempotency_key/i,
+    'schema.sql phai kem cach don du lieu trung truoc khi tao index unique');
+});
+
 test('index mà truy vấn phụ thuộc đều có trong schema', () => {
   // The store's hot queries all assume these. Without them nothing errors, the
   // queries simply scan and sort the whole table on every request.
   const required = [
     ['orders_customer_email_idx', 'tra cứu đơn theo email'],
     ['orders_provider_order_id_idx', 'webhook PayPal khớp đơn'],
-    ['orders_idempotency_key_idx', 'chống tạo đơn trùng khi retry'],
+    ['orders_idempotency_key_idx', 'đọc lại đơn của một lần thanh toán'],
     ['orders_open_idx', 'quét hết hạn, chỉ đọc đơn còn mở'],
     ['orders_created_at_idx', 'lịch sử đơn và badge sắp xếp theo thời gian'],
+    ['orders_delivered_idx', 'đọc đánh giá mà không quét cả bảng đơn'],
     ['products_active_idx', 'cửa hàng lấy sản phẩm đang bán, mới nhất trước'],
   ];
   for (const [name, why] of required) {

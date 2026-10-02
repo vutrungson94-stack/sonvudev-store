@@ -72,32 +72,32 @@ const age = async (id, hours) => {
   return iso;
 };
 
-test('checkout ghi han thanh toan 24 gio va bao qua cho nguoi mua', async () => {
+test('checkout ghi hạn thanh toán 24 giờ và báo qua cho người mua', async () => {
   const { response, data } = await checkout();
   assert.equal(response.status, 200);
   const hours = (new Date(data.expiresAt) - new Date(data.order.createdAt)) / 3600000;
   assert.equal(Math.round(hours), 24, 'han thanh toan phai dung 24 gio');
   assert.equal(data.order.status, 'pending_transfer');
-  assert.ok(data.serverTime, 'phai tra server time de dem nguoc chinh dong ho');
+  assert.ok(data.serverTime, 'phải trả server time để đếm ngược đúng đồng hồ');
   // The countdown is only meaningful if the browser can read the deadline back.
   const read = await fetch(`${base}/api/orders/${data.order.id}`, { headers: { 'x-order-token': data.accessToken } });
   const payload = await read.json();
   assert.equal(payload.expiresAt, data.expiresAt);
-  assert.equal(payload.order.accessTokenHash, undefined, 'khong ro token hash ra ngoai');
-  assert.equal(payload.order.notifications, undefined, 'khong ro nhat ky gui mail ra ngoai');
+  assert.equal(payload.order.accessTokenHash, undefined, 'không rò token hash ra ngoài');
+  assert.equal(payload.order.notifications, undefined, 'không rò nhật ký gửi mail ra ngoài');
 });
 
-test('checkout options tra so gio de bien muc dang ky tu server', async () => {
+test('checkout options trả số giờ để biết mức đăng ký từ server', async () => {
   const response = await fetch(`${base}/api/checkout/options`);
   assert.equal((await response.json()).paymentWindowHours, 24);
 });
 
-test('checkout lai voi cung idempotencyKey tra ve chinh don do, khong tao don moi', async () => {
+test('checkout lại với cùng idempotencyKey trả về chính đơn đó, không tạo đơn mới', async () => {
   const key = 'retry-key-1';
   const first = await checkout({ idempotencyKey: key });
   const second = await checkout({ idempotencyKey: key });
-  assert.equal(first.data.order.id, second.data.order.id, 'phai tra ve cung mot don');
-  assert.notEqual(first.data.accessToken, second.data.accessToken, 'phai cap lai ma tra cuu cho lan thu lai');
+  assert.equal(first.data.order.id, second.data.order.id, 'phải trả về cùng một đơn');
+  assert.notEqual(first.data.accessToken, second.data.accessToken, 'phải cấp lại mã tra cứu cho lần thử lại');
   const rows = (await listOrders()).filter((o) => o.idempotencyKey === key);
   assert.equal(rows.length, 1, 'khong duoc tao hai don cho mot lan thanh toán');
   // The recovered token has to actually work, or the buyer is locked out.
@@ -105,7 +105,7 @@ test('checkout lai voi cung idempotencyKey tra ve chinh don do, khong tao don mo
   assert.equal(read.status, 200);
 });
 
-test('don chua thanh toan het han se bi huy va gui mail', async () => {
+test('đơn chưa thanh toán hết hạn sẽ bị huỷ và gửi mail', async () => {
   const { data, email } = await checkout();
   await age(data.order.id, 25);
   const result = await sweepOrders();
@@ -115,12 +115,12 @@ test('don chua thanh toan het han se bi huy va gui mail', async () => {
   assert.equal(order.cancelReason, 'expired');
   assert.equal(order.cancelledAt !== null, true);
   const sent = await notifyOrder(order, 'cancelled');
-  assert.equal(sent.sent, false, 'mail huy phai gui dung mot lan');
+  assert.equal(sent.sent, false, 'mail huỷ phải gửi đúng một lần');
   const files = await fs.readdir(outboxPath);
   assert.ok(files.some((f) => f.includes(order.id) && f.endsWith('.txt')), 'phai co mail trong outbox');
 });
 
-test('quet khong huy don da duoc giao', async () => {
+test('quét không huỷ đơn đã được giao', async () => {
   const { data, email } = await checkout();
   await updateOrder(data.order.id, { status: 'paid', paidAt: new Date().toISOString(), paidCount: 1 });
   await markOrderDelivered(await getOrder(data.order.id));
@@ -129,12 +129,12 @@ test('quet khong huy don da duoc giao', async () => {
   assert.equal(result.expired.includes(data.order.id), false, 'don da giao khong duoc huy nua');
   const order = await getOrder(data.order.id);
   assert.equal(order.status, 'pending', 'truoc khi het han, don phai o trang thai don moi');
-  assert.equal(order.paidCount, 1, 'doanh thu phai con lai sau khi dong don');
+  assert.equal(order.paidCount, 1, 'doanh thu phải còn lại sau khi đóng đơn');
   assert.equal(order.paidAt, null);
-  assert.ok(order.deliveredAt, 'phai ghi thoi diem giao');
+  assert.ok(order.deliveredAt, 'phải ghi thời điểm giao');
 });
 
-test('thanh toan den sau khi don da bi huy van mo duoc nut tai', async () => {
+test('thanh toán đến sau khi đơn đã bị huỷ vẫn mở được nút tải', async () => {
   const { data, email } = await checkout();
   await age(data.order.id, 25);
   await sweepOrders();
@@ -148,36 +148,36 @@ test('thanh toan den sau khi don da bi huy van mo duoc nut tai', async () => {
   assert.equal(download.status, 200, 'tiền đã về thì phải tải được');
 });
 
-test('markOrderPaid chay lai nhieu lan chi gui mot mail', async () => {
+test('markOrderPaid chạy lại nhiều lần chỉ gửi một mail', async () => {
   const { data, email } = await checkout();
   const first = await markOrderPaid(await getOrder(data.order.id), { source: 'admin' });
   const second = await markOrderPaid(first, { source: 'webhook' });
-  assert.equal(second.paidCount, 1, 'thanh toan trung khong duoc tinh lai');
-  assert.equal(second.paidAt, first.paidAt, 'thoi diem thanh toan goc phai giu nguyen');
+  assert.equal(second.paidCount, 1, 'thanh toán trùng không được tính lại');
+  assert.equal(second.paidAt, first.paidAt, 'thời điểm thanh toán gốc phải giữ nguyên');
 });
 
-test('nut tai bi khoa truoc khi thanh toan va se mo khi da thanh toan', async () => {
+test('nút tải bị khoá trước khi thanh toán và sẽ mở khi đã thanh toán', async () => {
   const { data, email } = await checkout();
   const locked = await fetch(`${base}/api/orders/${data.order.id}/download`, { headers: { 'x-order-token': data.accessToken } });
-  assert.equal(locked.status, 409, 'chua thanh toan thi server phai tu choi');
+  assert.equal(locked.status, 409, 'chưa thanh toán thì server phải từ chối');
   await markOrderPaid(await getOrder(data.order.id), { source: 'capture' });
   const unlocked = await fetch(`${base}/api/orders/${data.order.id}/download`, { headers: { 'x-order-token': data.accessToken } });
   assert.equal(unlocked.status, 200);
 });
 
-test('sau khi giao, don quay ve trang thai don moi va khoa lai', async () => {
+test('sau khi giao, đơn quay về trạng thái đơn mới và khoá lại', async () => {
   const { data, email } = await checkout();
   await markOrderPaid(await getOrder(data.order.id), { source: 'admin' });
   const response = await fetch(`${base}/api/orders/${data.order.id}/delivered`, { method: 'POST', headers: { 'x-order-token': data.accessToken } });
   assert.equal(response.status, 200);
   const payload = await response.json();
   assert.equal(payload.order.status, 'pending');
-  assert.equal(payload.order.paidCount, 1, 'phai giu lai so lan da thu');
+  assert.equal(payload.order.paidCount, 1, 'phải giữ lại số lần đã thử');
   const again = await fetch(`${base}/api/orders/${data.order.id}/download`, { headers: { 'x-order-token': data.accessToken } });
   assert.equal(again.status, 409, 'đơn đã giao thì không tải lại được');
 });
 
-test('admin xac nhan tay cung gui mail cho khach', async () => {
+test('admin xác nhận tay cũng gửi mail cho khách', async () => {
   const { data, email } = await checkout();
   const response = await fetch(`${base}/api/admin/orders/${data.order.id}`, { method: 'PATCH', headers: jsonHeaders, body: JSON.stringify({ status: 'paid' }) });
   assert.equal(response.status, 200);
@@ -186,7 +186,7 @@ test('admin xac nhan tay cung gui mail cho khach', async () => {
   assert.equal(order.paidCount, 1, 'xác nhận tay cũng phải được tính vào doanh thu');
 });
 
-test('admin dong don thu cong bang giao da', async () => {
+test('admin đóng đơn thủ công bằng giao đã', async () => {
   const { data, email } = await checkout();
   await fetch(`${base}/api/admin/orders/${data.order.id}`, { method: 'PATCH', headers: jsonHeaders, body: JSON.stringify({ status: 'paid' }) });
   const response = await fetch(`${base}/api/admin/orders/${data.order.id}`, { method: 'PATCH', headers: jsonHeaders, body: JSON.stringify({ delivered: true }) });
@@ -196,7 +196,7 @@ test('admin dong don thu cong bang giao da', async () => {
   assert.ok(order.deliveredAt);
 });
 
-test('quet khong huy don da duoc chuyen sang paid', async () => {
+test('quét không huỷ đơn đã được chuyển sang paid', async () => {
   const { data, email } = await checkout();
   await markOrderPaid(await getOrder(data.order.id), { source: 'admin' });
   await age(data.order.id, 30);
@@ -205,7 +205,7 @@ test('quet khong huy don da duoc chuyen sang paid', async () => {
   assert.equal((await getOrder(data.order.id)).status, 'paid');
 });
 
-test('canh bao het han chi gui mot lan', async () => {
+test('cảnh báo hết hạn chỉ gửi một lần', async () => {
   const { data, email } = await checkout();
   // 23 hours old with a 24 hour window: inside the one hour warning, not expired.
   const created = new Date(Date.now() - 23 * 60 * 60 * 1000).toISOString();
@@ -218,7 +218,7 @@ test('canh bao het han chi gui mot lan', async () => {
   assert.equal((await getOrder(data.order.id)).status, 'pending_transfer', 'đơn chưa hết hạn thì chưa hủy');
 });
 
-test('paymentDeadline dung expiresAt da ghi, khong dung lai bien moi', async () => {
+test('paymentDeadline dùng expiresAt đã ghi, không dùng lại biến mới', async () => {
   const { data, email } = await checkout();
   await age(data.order.id, 5);
   const order = await getOrder(data.order.id);
@@ -240,7 +240,7 @@ test('tra cuu don cua người đã giao van tra ve duoc', async () => {
   assert.equal(read.status, 200, 'người mua vẫn phải xem được đơn của mình sau khi đóng');
 });
 
-test('health bao cao trang thai gui mail', async () => {
+test('health báo cáo trạng thái gửi mail', async () => {
   const health = await (await fetch(`${base}/api/health`)).json();
   assert.equal(health.email, 'outbox', 'chưa có RESEND_API_KEY thì phải ghi ra outbox');
   assert.equal(health.orderWindowHours, 24);
