@@ -110,14 +110,32 @@ add("Order payment window", Number.isFinite(windowHours) && windowHours >= 1, `$
 function isConfigured(keys) { return keys.every((key) => !placeholder(value(key))); }
 if (appUrl) {
   const host = new URL(appUrl).hostname;
-  // dns.resolve4() queries DNS servers directly, so it fails whenever a local
-  // resolver blocks direct queries (127.0.0.1, AdGuard, corporate DNS).
-  // dns.lookup() goes through the OS resolver and matches what the browser sees.
+  // The address, on its own, proves very little — and the version of this check that
+  // printed it as a PASS was wrong in a way worth writing down.
+  //
+  // A network that filters the web — a corporate resolver, an endpoint agent, a
+  // parental filter — answers DNS with the address of its own block page rather than
+  // an error. So the lookup succeeds, this row goes green, and it names an address
+  // belonging to the filter. It read "PASS DNS A record: 208.91.112.55" on a machine
+  // where that address was Fortinet's: it had verified the local filter and called
+  // it the shop's DNS.
+  //
+  // A green check that reports something other than what it measured is worse than no
+  // check, because it is trusted. So the address is kept — it is the first thing worth
+  // knowing — and the HTTP result below is folded in, because an address that does not
+  // serve the shop is not this domain's address. The two are read together and the
+  // reason is named.
+  let resolved = [];
+  let lookupError = null;
   try {
+    // dns.resolve4() queries DNS servers directly, so it fails whenever a local
+    // resolver blocks direct queries (127.0.0.1, AdGuard, corporate DNS).
+    // dns.lookup() goes through the OS resolver and matches what the browser sees.
     const addresses = await dns.lookup(host, { all: true });
-    const public4 = [...new Set(addresses.filter((entry) => entry.family === 4).map((entry) => entry.address))];
-    add("DNS A record", public4.length > 0, public4.join(", "));
-  } catch (error) { add("DNS A record", false, `lookup failed: ${error.message}`); }
+    resolved = [...new Set(addresses.filter((entry) => entry.family === 4).map((entry) => entry.address))];
+  } catch (error) { lookupError = error.message; }
+
+  let reachable = false;
   try {
     const response = await fetch(`${appUrl}/api/health`, { redirect: "manual", signal: AbortSignal.timeout(8000) });
     const body = response.ok ? await response.text() : "";
@@ -145,6 +163,11 @@ if (appUrl) {
         add("Database persistent", health.persistence === "supabase", health.persistence === "supabase" ? "supabase" : `${health.persistence}, orders are not durable`);
       }
     }
+    // The DNS row, decided by what was actually reached. An address that came back
+    // while the shop did not is this network's filter answering, not this domain's
+    // record — and saying so is the difference between "your DNS is wrong" and "your
+    // wifi blocks the shop", which are different problems with different fixes.
+    reachable = response.ok && !blocked;
   } catch (error) {
     // A TLS failure and a dead server are different problems with different fixes,
     // and undici buries the real reason one level down: `fetch` rejects with
@@ -174,7 +197,20 @@ if (appUrl) {
         : filtered
           ? `may nay khong pho giao duoc domain (${chain[chain.length - 1]}) — thu lai tren mang khac bi chan`
           : cause);
+    reachable = false;
   }
+
+  // The DNS row, decided by what was actually reached rather than by the fact that
+  // something came back.
+  //
+  // An address that arrived while the shop did not is this network's filter
+  // answering, not this domain's record. Saying so is the difference between "your
+  // DNS is misconfigured" and "your wifi blocks the shop" — different problems,
+  // different fixes, and only one of them is worth touching a domain for.
+  add("DNS A record", lookupError ? false : resolved.length > 0 && reachable,
+    lookupError ? `lookup failed: ${lookupError}`
+      : resolved.length && !reachable ? `${resolved.join(", ")} — có địa chỉ nhưng máy này không mở được shop, nên đây là trang chặn của mạng bạn chứ không phải bản ghi DNS thật. Chạy lại trên 4G.`
+      : resolved.join(", "));
 }
 
 // When the live site is unreachable from this machine, the checks that depend on

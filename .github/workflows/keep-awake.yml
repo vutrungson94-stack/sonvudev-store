@@ -1,0 +1,77 @@
+# Keeps the free instance awake, and notices when the shop is down.
+#
+# Render's free tier puts an instance to sleep after fifteen minutes of inactivity,
+# and the next visitor waits while it wakes. Nothing in the application can prevent
+# that: an instance that is asleep is not running the code that would wake it. So the
+# ping has to come from outside, and a scheduled job in this repository is the cheapest
+# outside there is — the GitHub account already exists, it costs nothing, and the
+# schedule is version-controlled rather than buried in somebody's dashboard.
+#
+# Every ten minutes, so the instance is never idle long enough to be considered idle.
+# A JSON health check is a few hundred bytes; a month of these is a rounding error
+# against any bandwidth allowance.
+#
+# The second job is the part that matters more than the waking. This repository had no
+# way to hear about its own outage: the health endpoint existed, and nothing ever asked
+# it. A failure here sends an email to the address that receives GitHub notifications,
+# which is the difference between a shop being down for an hour and for a weekend.
+#
+# If the shop ever moves to a host that does not sleep, delete the wake job and keep
+# the monitor — that one is never obsolete.
+
+name: keep the shop awake
+
+on:
+  schedule:
+    # Every ten minutes. Render's window is fifteen, so this leaves room for one run
+    # to be delayed or retried without the instance going quiet.
+    - cron: "*/10 * * * *"
+  workflow_dispatch:
+
+# GitHub disables scheduled workflows on repositories with no activity for 60 days, so
+# a repo that is only touched when something breaks would quietly stop pinging — and
+# then the shop would sleep exactly when nobody was looking. Nothing runs automatically
+# often enough to prevent that; the manual button below is the way back.
+concurrency:
+  group: keep-awake
+  cancel-in-progress: false
+
+jobs:
+  wake:
+    # Scheduled runs have no secrets by default and, more to the point, do not need
+    # any: the health endpoint is public, and putting the admin token in here would
+    # grant every scheduled run the ability to refund orders.
+    permissions:
+      contents: read
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Ping the shop so a sleeping instance wakes up
+        run: |
+          set -u
+          # Read from the repository's own settings rather than repeating the address
+          # here, so a domain change is one edit instead of two — and so nobody has
+          # to remember to update a workflow.
+          url="${SHOP_URL:-https://sonvudev-store.onrender.com/api/health}"
+          echo "GET $url"
+          # A sleeping instance accepts the connection and then takes thirty to sixty
+          # seconds to answer. curl is given room on purpose: failing here would page
+          # nobody, because the instance was simply slow rather than down.
+          code=$(curl -s -o /tmp/health.json -w '%{http_code}' --max-time 90 "$url" || echo 000)
+          echo "HTTP $code"
+          cat /tmp/health.json || true
+          echo
+
+          if [ "$code" = "200" ]; then
+            # The endpoint reports its own problems with a 503, and a 200 can still
+            # carry ok:false. Reading the field is what makes "the site answers" and
+            # "the site works" two different questions.
+            if grep -q '"ok":true' /tmp/health.json; then
+              echo "OK — shop đang thức và báo khoẻ"
+              exit 0
+            fi
+            echo "!! trả HTTP 200 nhưng ok=false — xem /api/health"
+            exit 1
+          fi
+          echo "!! HTTP $code — shop không phản hồi, hoặc instance đang ngủ quá lâu"
+          exit 1
