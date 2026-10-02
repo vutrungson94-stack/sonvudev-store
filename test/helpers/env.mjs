@@ -20,6 +20,13 @@
 // ones that would need real bytes are the ones that must not be trusted to this.
 export const TEST_ENV = {
   NODE_ENV: 'test',
+  // Not secrets, and not cosmetic: the sitemap, the feed, llms.txt and every
+  // canonical link are absolute URLs built from this. Left empty they came out as
+  // "/product/x", and the two tests that check the storefront and the sitemap agree
+  // with each other about that — so the storefront looked linked from nowhere and the
+  // sitemap looked empty, both on a machine with no .env and neither here.
+  APP_URL: 'https://shop.example',
+  SUPPORT_EMAIL: 'support@shop.example',
   // Off, and explicitly blank rather than absent, so a .env full of real values does
   // not get a chance to fill them in. dotenv is loaded with override, and a key the
   // file does not mention survives that — which is how a test run once created real
