@@ -3,6 +3,10 @@ import assert from 'node:assert/strict';
 import { promises as fs } from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
+// The shop's test environment, applied before anything imports src/ — config.js
+// reads the environment once at load, so this has to come first and has to be
+// complete. See helpers/env.mjs for what a missing entry used to cost.
+import './helpers/env.mjs';
 
 // The owner's name is written into the shop's own copy: in the terms, in the
 // structured data, on the about page. All of that reads BRAND_FOUNDER_NAME.

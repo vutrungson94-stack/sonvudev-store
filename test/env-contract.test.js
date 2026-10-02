@@ -3,6 +3,10 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+// The shop's test environment, applied before anything imports src/ — config.js
+// reads the environment once at load, so this has to come first and has to be
+// complete. See helpers/env.mjs for what a missing entry used to cost.
+import './helpers/env.mjs';
 
 // Three files in this project hold the same list of environment variable names:
 // src/config.js (which reads them), .env.example (which documents them) and
@@ -65,7 +69,42 @@ test('danh sách không đẩy gì không tồn tại', () => {
   assert.deepEqual(unknown, [], `sync-render.mjs đẩy biến không ai đọc: ${unknown.join(', ')}`);
 });
 
-test('file env cho VPS được ship kèm, không phải tự đoán', () => {
+// The suite grew one file at a time and each new file set only the variables it
+// happened to need. That works on the machine it was written on, where .env fills in
+// whatever a file forgot — and fails on a fresh clone, where nothing is filled in.
+// Twenty-six tests passed here and failed there, which is the worst thing a test
+// suite can do: it reports the health of the machine instead of the code.
+//
+// So the environment is one file now, imported by every test before anything loads
+// src/. This test is what stops it drifting apart again — a new test file that rolls
+// its own environment reintroduces the whole failure, and nothing else would notice.
+test('mọi file test dùng chung một môi trường', async () => {
+  const dir = new URL('./', import.meta.url);
+  const names = (await fs.promises.readdir(dir)).filter((name) => name.endsWith('.test.js'));
+  const without = [];
+  for (const name of names) {
+    const source = await fs.promises.readFile(new URL(name, dir), 'utf8');
+    if (!/helpers\/env\.mjs/.test(source)) without.push(name);
+  }
+  assert.deepEqual(without, [], `các file test chưa dùng môi trường chung: ${without.join(', ')}`);
+});
+
+test('môi trường test tự đủ, không phụ thuộc .env của máy', async () => {
+  // Every value that would reach a real service has to be blanked, not merely absent:
+  // dotenv is loaded with override, and a key the file does not mention survives that.
+  // A test run once created real products in the real catalogue because of it.
+  const source = await fs.promises.readFile(new URL('./helpers/env.mjs', import.meta.url), 'utf8');
+  for (const key of ['SUPABASE_URL', 'SUPABASE_SERVICE_ROLE_KEY', 'RESEND_API_KEY', 'INDEXNOW_KEY']) {
+    assert.match(source, new RegExp(`${key}: ''`), `${key} phải được đặt rỗng — không được để .env của máy điền vào`);
+  }
+  // And the shop still has to be sellable, or every checkout in the suite answers 503
+  // and the failures look like a product bug rather than a missing key.
+  for (const key of ['R2_ACCOUNT_ID', 'R2_ACCESS_KEY_ID', 'R2_SECRET_ACCESS_KEY', 'R2_BUCKET_NAME', 'ADMIN_API_TOKEN']) {
+    assert.match(source, new RegExp(`${key}: `), `${key} phải có giá trị trong môi trường test`);
+  }
+});
+
+test('file env cho VPS được ship kèm, không phải tự đoán', async () => {
   // deploy.sh copies /etc/sonvudev-store.env into place and refuses to run without
   // it, and the repository shipped no template for it: the first thing a new owner
   // had to do was reverse-engineer the list from the service unit and the error

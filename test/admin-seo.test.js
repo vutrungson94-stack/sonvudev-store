@@ -4,6 +4,10 @@ import { existsSync, promises as fs } from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+// The shop's test environment, applied before anything imports src/ — config.js
+// reads the environment once at load, so this has to come first and has to be
+// complete. See helpers/env.mjs for what a missing entry used to cost.
+import './helpers/env.mjs';
 
 // The SEO fields exist in the database, the API renders them onto the product
 // page, and they decide whether anyone clicks a result. But the admin panel had

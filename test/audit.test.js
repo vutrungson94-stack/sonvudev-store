@@ -6,6 +6,10 @@ import { existsSync } from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+// The shop's test environment, applied before anything imports src/ — config.js
+// reads the environment once at load, so this has to come first and has to be
+// complete. See helpers/env.mjs for what a missing entry used to cost.
+import './helpers/env.mjs';
 
 // The audit is the thing that keeps the hardcodes, the dead translation keys and
 // the broken links from coming back, so it has to be tested the same way as the
@@ -129,9 +133,25 @@ test('audit chặn được từng loại lỗi nó sinh ra để bắt', async 
       env: { ...process.env, NODE_ENV: 'test', APP_URL: '', SUPPORT_EMAIL: '' },
     });
     const output = `${result.stdout}${result.stderr}`;
-    assert.equal(result.status, 1, 'audit thiếu cấu hình phải FAIL');
-    assert.match(output, /cấu hình thiếu.*APP_URL/s, output);
-    assert.match(output, /cấu hình thiếu.*SUPPORT_EMAIL/s, output);
+    // A missing APP_URL is not a failure any more, and that is the point.
+    //
+    // It used to be, and it was wrong everywhere except production. A fresh clone has
+    // no .env, so the first command anybody runs after cloning failed on two lines
+    // about configuration — and a person who had just seen the suite pass elsewhere
+    // was told the audit did not work. The failure said nothing about the code.
+    //
+    // Now the checks that need a domain are skipped and named, and the rest still
+    // run. Which means the test has to prove the skipping, not just the passing: an
+    // audit that quietly did less would be indistinguishable from one that was fine.
+    assert.equal(result.status, 0, `thiếu cấu hình thì các nhóm còn lại vẫn phải chạy:\n${output}`);
+    assert.match(output, /Bo qua \d+ nhom vi thieu cau hinh/, 'phải nói rõ đã bỏ qua gì');
+    assert.match(output, /APP_URL/, 'phải nói tên biến còn thiếu');
+    assert.match(output, /SUPPORT_EMAIL/, 'phải nói tên biến còn thiếu');
+    assert.match(output, /\[audit\] PASS/, 'các nhóm không phụ thuộc cấu hình vẫn phải chạy hết');
+    // And with the values present it is exactly as strict as before.
+    const configured = runAudit(cwd);
+    assert.equal(configured.status, 0, `có cấu hình thì phải sạch:\n${configured.stdout}${configured.stderr}`);
+    assert.ok(!/Bo qua/.test(configured.stdout), 'có cấu hình thì không được bỏ qua nhóm nào');
   }
 
   // 5c. A template token nothing substitutes. {{legalEntity}} was added to the

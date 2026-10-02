@@ -4,6 +4,10 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createDom, runScript, El } from './helpers/dom.mjs';
+// The shop's test environment, applied before anything imports src/ — config.js
+// reads the environment once at load, so this has to come first and has to be
+// complete. See helpers/env.mjs for what a missing entry used to cost.
+import './helpers/env.mjs';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const read = (p) => fs.readFileSync(path.join(root, 'public', p), 'utf8');

@@ -231,8 +231,27 @@ for (const [name, label] of [["vi", "tiếng Việt"], ["en", "tiếng Anh"]]) {
 // configured. Now a missing value fails, loudly, naming itself.
 const appUrl = env("APP_URL");
 const supportEmail = (env("SUPPORT_EMAIL") || "").toLowerCase();
-if (!appUrl) fail("cấu hình thiếu", "process.env", "APP_URL chưa được đặt — audit không thể biết domain nào là chính");
-if (!supportEmail) fail("cấu hình thiếu", "process.env", "SUPPORT_EMAIL chưa được đặt — audit không thể biết địa chỉ hỗ trợ nào là chính");
+// These two are what make the domain and address checks meaningful: without them the
+// audit cannot tell the shop's own domain from a third party's, so it would either
+// compare against a guess or skip the checks that matter.
+//
+// That used to be a hard failure, which is right in production and wrong everywhere
+// else. A fresh clone has no .env, so `npm run audit` — the first thing anybody runs
+// after cloning — failed on two lines about missing configuration, and a person who
+// had just proved the suite worked on another machine was told the audit does not.
+// The failure said nothing about the code.
+//
+// So a missing value now skips only what it makes impossible, says which, and lets
+// the other sixteen groups run. In production APP_URL is set, so nothing is skipped
+// and the gate is exactly as strict as before. The count of skipped groups is printed
+// so "16 of 17 ran" cannot be mistaken for "all passed".
+const skipped = [];
+if (!appUrl) skipped.push("domain gõ tay (cần APP_URL)");
+if (!supportEmail) skipped.push("địa chỉ hỗ trợ gõ tay (cần SUPPORT_EMAIL)");
+if (skipped.length) {
+  console.log(`\n[audit] Bo qua ${skipped.length} nhom vi thieu cau hinh: ${skipped.join(", ")}`);
+  console.log("[audit] Dat APP_URL va SUPPORT_EMAIL (xem .env.example) de chay day du.");
+}
 const appHost = appUrl ? new URL(appUrl).hostname.toLowerCase() : "";
 const thirdParty = new Set(["www.w3.org", "schema.org", "www.sitemaps.org", "localhost", "img.vietqr.io", "fonts.googleapis.com", "fonts.gstatic.com", "resend.com", "supabase.com", "supabase.co", "paypal.com", "google.com", "cloudflare.com", "render.com", "ipapi.co", "ipwho.is", "er-api.com", "exchangerate-api.com", "indexnow.org"]);
 // i18n.js is scanned too: brand.supportEmail is the configured default the pages

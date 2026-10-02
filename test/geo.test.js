@@ -3,6 +3,10 @@ import assert from 'node:assert/strict';
 import { paymentOptions } from '../src/payments.js';
 import { isRoutable, createGeoResolver } from '../src/geo.js';
 import { dictionary } from './helpers/dictionary.mjs';
+// The shop's test environment, applied before anything imports src/ — config.js
+// reads the environment once at load, so this has to come first and has to be
+// complete. See helpers/env.mjs for what a missing entry used to cost.
+import './helpers/env.mjs';
 
 // The checkout form prints whatever key it is handed, resolved in the reader's
 // own language. So the assertions here read the key the server sends and then ask

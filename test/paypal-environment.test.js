@@ -4,6 +4,10 @@ import { promises as fs } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { resolvePaypalEnvironment } from '../src/paypal-environment.js';
+// The shop's test environment, applied before anything imports src/ — config.js
+// reads the environment once at load, so this has to come first and has to be
+// complete. See helpers/env.mjs for what a missing entry used to cost.
+import './helpers/env.mjs';
 
 // PAYPAL_ENVIRONMENT decides whether the shop can take real money, and it used to
 // fall back to "sandbox" when unset — or when a typo made it anything but the exact
