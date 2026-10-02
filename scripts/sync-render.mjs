@@ -158,11 +158,17 @@ async function main() {
 
   if (!changes.length) {
     console.log(`Khong co thay doi. ${wanted.size} bien da khop voi Render.`);
-    // A redeploy is worth doing even with nothing to write: env vars only reach
-    // a running process on restart, which is the whole reason --deploy exists.
-    // Returning here would make the script tell the user to run --apply --deploy
-    // and then silently do nothing when they did.
-    if (apply && redeploy) {
+    // A redeploy is worth doing even with nothing to write, and it is asked for
+    // separately from writing: --apply means "put the environment on Render",
+    // --deploy means "restart the thing".
+    //
+    // Gating this on `apply` meant `npm run render:deploy` did nothing whenever the
+    // environment already matched — which is every code-only change, the most common
+    // reason to redeploy at all. The script printed "Khong co thay doi" and exited
+    // successfully, so the redeploy it was named after never happened and nothing
+    // said so. It is still gated on `redeploy`, so a plain `render:sync` stays a
+    // read-only check.
+    if (redeploy) {
       const deploy = await call("POST", `${api}/services/${serviceId}/deploys`, { clearCache: "do_not_clear" });
       console.log(`Da trigger deploy: ${deploy?.deploy?.id || deploy?.id || "unknown"}`);
       console.log("Deploy mất vài phút. Kiểm tra bằng: npm run check:production");
