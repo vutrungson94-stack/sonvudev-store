@@ -32,17 +32,35 @@ const pick = (name) => {
   throw new Error(`khong dong duoc ham ${name}`);
 };
 
+// The four-field list the counters, the dirty check and the save payload all read.
+// It is a const rather than a literal inside each, so the snippets below have to
+// carry it — which is the point: a test that extracts only the functions would
+// otherwise pass while the panel counted two fields and the form declared four.
+const pickConst = (name) => {
+  const start = source.indexOf(`const ${name}=`);
+  assert.notEqual(start, -1, `không tìm thấy hằng ${name}`);
+  const end = source.indexOf('];', start);
+  assert.notEqual(end, -1, `không đóng được hằng ${name}`);
+  return source.slice(start, end + 2);
+};
+const seoList = `${pickConst('SEO_FIELDS')}\n`;
+
 const sandbox = {};
 vm.createContext(sandbox);
-new vm.Script(`${pick('seoDirty')}\n${pick('countSeo')}`).runInContext(sandbox);
+new vm.Script(`${seoList}${pick('seoDirty')}\n${pick('countSeo')}`).runInContext(sandbox);
 
-const makeForm = ({ title = '', description = '' } = {}) => {
+const makeForm = ({ title = '', description = '', titleEn = '', descriptionEn = '' } = {}) => {
   const button = { disabled: false };
   const counter = { className: '', textContent: '' };
   const classes = new Set();
   const form = {
-    dataset: { seoTitle: title, seoDescription: description },
-    elements: { seoTitle: { value: title, readOnly: false }, seoDescription: { value: description, readOnly: false } },
+    dataset: { seoTitle: title, seoDescription: description, seoTitleEn: titleEn, seoDescriptionEn: descriptionEn },
+    elements: {
+      seoTitle: { value: title, readOnly: false },
+      seoDescription: { value: description, readOnly: false },
+      seoTitleEn: { value: titleEn, readOnly: false },
+      seoDescriptionEn: { value: descriptionEn, readOnly: false },
+    },
     querySelector: (selector) => (selector === 'button[type=submit]' ? button : counter),
     // seoLock marks the form and sets readOnly on both fields, so the stub has to
     // carry all three or the assertion below would pass on a no-op.
@@ -110,7 +128,7 @@ test('form sửa SEO ghi lại giá trị lúc mở, và đó là nơi so sánh'
   assert.ok(/data-seo-description="\$\{esc\(p\.seoDescription\|\|''\)\}"/.test(source), 'phai luu mo ta tai thoi diem mo');
   assert.ok(/form\.dataset\.seoTitle/.test(source), 'phai so sanh voi gia tri da luu');
   // A comparison against something written in the script would be a constant.
-  assert.ok(/return\s*\(?\s*form\.elements\.seoTitle/.test(source), 'phai so sanh voi o nhap chu khong phai voi hang so');
+  assert.ok(/form\.elements\[field\]/.test(source), 'phai so sanh voi o nhap chu khong phai voi hang so');
 });
 
 test('sau khi lưu, nút phải theo đúng quy tắc so sánh chữ, không được ai bắt', () => {
@@ -156,7 +174,7 @@ test('nút kiểm tra chỉ đổ bằng màu, không phải chỉ biến mất'
 test('bam Luu SEO that thi nut khoa lai va form bao "Đã lưu"', async () => {
   const save = source.slice(source.indexOf('async function saveSeo'), source.indexOf('async function uploadExistingProduct'));
   const box = vm.createContext({ encodeURIComponent, console, JSON });
-  vm.runInContext(`${pick('seoDirty')}\n${pick('countSeo')}\n${pick('seoLock')}\n${save}`, box);
+  vm.runInContext(`${seoList}${pick('seoDirty')}\n${pick('countSeo')}\n${pick('seoLock')}\n${save}`, box);
 
   const sent = [];
   const toasts = [];
@@ -165,10 +183,15 @@ test('bam Luu SEO that thi nut khoa lai va form bao "Đã lưu"', async () => {
   box.showToast = (message, isError) => toasts.push({ message, isError });
   // Stands in for the server, and echoes back what it stored — including the
   // truncation it really performs, which is what the baseline has to be measured
-  // against.
+  // against. All four fields, because the panel now sends all four.
   box.api = async (url, options) => {
     sent.push({ url, body: JSON.parse(options.body) });
-    const stored = { seoTitle: sent.at(-1).body.seoTitle.slice(0, 70), seoDescription: sent.at(-1).body.seoDescription.slice(0, 175) };
+    const stored = {
+      seoTitle: sent.at(-1).body.seoTitle.slice(0, 70),
+      seoDescription: sent.at(-1).body.seoDescription.slice(0, 175),
+      seoTitleEn: sent.at(-1).body.seoTitleEn.slice(0, 70),
+      seoDescriptionEn: sent.at(-1).body.seoDescriptionEn.slice(0, 175),
+    };
     return { product: stored };
   };
   // A real FormData is iterable, and the code calls Object.fromEntries on it
@@ -200,6 +223,11 @@ test('bam Luu SEO that thi nut khoa lai va form bao "Đã lưu"', async () => {
 
   assert.equal(sent.length, 1, 'phải gửi một request');
   assert.equal(sent[0].body.seoTitle, 'Bật macro Excel không cần chỉnh tay');
+  // The English pair rides along. A save that carried only the Vietnamese fields
+  // left /en/ on whatever it derived, which is the thing the owner opened the
+  // editor to change.
+  assert.equal(sent[0].body.seoTitleEn, '', 'cặp tiếng Anh phải được gửi kèm, kể cả khi để trống');
+  assert.ok('seoDescriptionEn' in sent[0].body, 'phải gửi cả mô tả tiếng Anh');
   assert.equal(toasts.at(-1).message, 'Đã lưu SEO');
   assert.equal(typed.button.disabled, true, 'luu xong nut phai khoa lai — day la loi dang bao cao');
   assert.match(typed.counter.textContent, /Đã lưu/, 'form phải nói là đã lưu');
@@ -238,7 +266,7 @@ test('bam Luu SEO that thi nut khoa lai va form bao "Đã lưu"', async () => {
 test('lưu thất bại thì nút phải mở lại để thử lại được', async () => {
   const save = source.slice(source.indexOf('async function saveSeo'), source.indexOf('async function uploadExistingProduct'));
   const box = vm.createContext({ encodeURIComponent, console, JSON });
-  vm.runInContext(`${pick('seoDirty')}\n${pick('countSeo')}\n${pick('seoLock')}\n${save}`, box);
+  vm.runInContext(`${seoList}${pick('seoDirty')}\n${pick('countSeo')}\n${pick('seoLock')}\n${save}`, box);
 
   const { form, button } = makeForm({ title: 'Cu', description: 'Cu' });
   form.dataset.seoForm = 'prod-1';

@@ -38,7 +38,7 @@ const publicProduct = (product) => {
   // Filling only one of them left description_en coming out of the API with the
   // placeholder still in it while descriptionEn came out filled — the same field,
   // two answers, which is the defect this function exists to prevent.
-  const copy = ["name", "shortDescription", "short_description", "description", "descriptionEn", "description_en", "shortDescriptionEn", "short_description_en", "seoTitle", "seo_title", "seoDescription", "seo_description"];
+  const copy = ["name", "shortDescription", "short_description", "description", "descriptionEn", "description_en", "shortDescriptionEn", "short_description_en", "seoTitle", "seo_title", "seoDescription", "seo_description", "seoTitleEn", "seo_title_en", "seoDescriptionEn", "seo_description_en"];
   const filled = { ...safe };
   for (const field of copy) if (typeof filled[field] === "string") filled[field] = fillCopy(filled[field]);
   for (const field of ["features", "featuresEn", "features_en"]) if (Array.isArray(filled[field])) filled[field] = filled[field].map(fillCopy);
@@ -912,7 +912,7 @@ app.post("/api/admin/products", admin, json, async (req, res) => {
     const item = await createProduct({
       slug, name,
       shortDescription: text(req.body.shortDescription, 180), description: text(req.body.description, 2000), category: text(req.body.category, 50) || "Khác", platform: text(req.body.platform, 50) || "Windows", version: text(req.body.version, 30) || "1.0.0", price, currency: text(req.body.currency, 8) || "VND",
-      features: Array.isArray(req.body.features) ? req.body.features.map((v) => text(v, 120)).filter(Boolean) : [], featuresEn: Array.isArray(req.body.featuresEn) ? req.body.featuresEn.map((v) => text(v, 200)).filter(Boolean) : [], shortDescriptionEn: text(req.body.shortDescriptionEn, 180), descriptionEn: text(req.body.descriptionEn, 4000), requirements: text(req.body.requirements, 240), seoTitle: text(req.body.seoTitle, 70), seoDescription: text(req.body.seoDescription, 175), status: text(req.body.fileKey, 500) ? (req.body.status === "draft" ? "draft" : "active") : "draft", fileKey: text(req.body.fileKey, 500), badge: text(req.body.badge, 40) || null, featured: Boolean(req.body.featured),
+      features: Array.isArray(req.body.features) ? req.body.features.map((v) => text(v, 120)).filter(Boolean) : [], featuresEn: Array.isArray(req.body.featuresEn) ? req.body.featuresEn.map((v) => text(v, 200)).filter(Boolean) : [], shortDescriptionEn: text(req.body.shortDescriptionEn, 180), descriptionEn: text(req.body.descriptionEn, 4000), requirements: text(req.body.requirements, 240), seoTitle: text(req.body.seoTitle, 70), seoDescription: text(req.body.seoDescription, 175), seoTitleEn: text(req.body.seoTitleEn, 70), seoDescriptionEn: text(req.body.seoDescriptionEn, 175), status: text(req.body.fileKey, 500) ? (req.body.status === "draft" ? "draft" : "active") : "draft", fileKey: text(req.body.fileKey, 500), badge: text(req.body.badge, 40) || null, featured: Boolean(req.body.featured),
     });
     // Publishing a product is the one event a crawler cannot guess at: the
     // sitemap is only re-read on its own schedule, so without this a new page
@@ -928,14 +928,15 @@ app.post("/api/admin/products", admin, json, async (req, res) => {
 });
 app.patch("/api/admin/products/:id", admin, json, async (req, res) => {
   try {
-    // The admin's SEO editor sends only these two fields. Passing the body
+    // The admin's SEO editor sends only these fields. Passing the body
     // through as-is is deliberate: toProduct() sends only the keys it was
     // given, so a partial edit cannot blank out the description or features.
-    // The one exception is the two SEO fields, which are trimmed and capped
+    // The exception is the four SEO fields, which are trimmed and capped
     // here so no caller can store a title longer than a search result shows.
     const patch = { ...req.body, updatedAt: new Date().toISOString() };
-    if (req.body.seoTitle !== undefined) patch.seoTitle = text(req.body.seoTitle, 70);
-    if (req.body.seoDescription !== undefined) patch.seoDescription = text(req.body.seoDescription, 175);
+    for (const field of ["seoTitle", "seoDescription", "seoTitleEn", "seoDescriptionEn"]) {
+      if (req.body[field] !== undefined) patch[field] = text(req.body[field], field.startsWith("seoTitle") ? 70 : 175);
+    }
     const item = await updateProduct(req.params.id, patch);
     if (!item) return res.status(404).json(refuse("api.err.productNotFound", "Không tìm thấy sản phẩm", 404));
     // Price and description are what a search result shows, so an edit here is

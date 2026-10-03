@@ -643,6 +643,17 @@ function localizeToEnglish(product) {
     shortDescription: pick(product.shortDescriptionEn, product.shortDescription),
     description: pick(product.descriptionEn, product.description),
     features: featuresEn.length ? featuresEn : product.features,
+    // SEO copy is the one pair that does NOT fall back to Vietnamese.
+    //
+    // Everything else falls back because missing English is better than a hole.
+    // Here the fallback is a page that serves Vietnamese words in its <title> and
+    // meta description, on a URL declared as the English alternative of the
+    // Vietnamese one — two hreflang pages with identical metadata, which reads as
+    // duplicate content rather than as a translation, and puts a Vietnamese search
+    // result in front of an English-language query. A derived title from the English
+    // product name is worse copy and better markup, so that is what it falls back to.
+    seoTitle: pick(product.seoTitleEn, ""),
+    seoDescription: pick(product.seoDescriptionEn, ""),
   };
 }
 

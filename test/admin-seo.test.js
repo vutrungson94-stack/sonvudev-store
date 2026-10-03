@@ -70,8 +70,15 @@ test('form sửa SEO báo lỗi khi vượt giới hạn search result cắt', a
   // Google cuts a title around 60 characters and a description around 160. A
   // field that silently accepts 175 characters teaches the owner to write copy
   // that half of which nobody ever reads.
-  assert.match(source, /\['Tiêu đề',form\.elements\.seoTitle,70,60\]/, 'thieu nguong canh bao cho tieu de');
-  assert.match(source, /\['Mô tả',form\.elements\.seoDescription,175,160\]/, 'thieu nguong canh bao cho mo ta');
+  //
+  // The thresholds live in SEO_FIELDS, the one list the counters and the save
+  // payload both read. It used to be an inline literal inside countSeo, which
+  // meant the four fields added for English had to be re-typed there or their
+  // length was never counted at all.
+  assert.match(source, /const SEO_FIELDS=\[\['seoTitle','Tiêu đề',70,60\]/, 'thieu nguong canh bao cho tieu de');
+  assert.match(source, /\['seoDescription','Mô tả',175,160\]/, 'thieu nguong canh bao cho mo ta');
+  assert.match(source, /\['seoTitleEn','SEO EN tiêu đề',70,60\]/, 'thieu nguong canh bao cho tieu de tieng Anh');
+  assert.match(source, /\['seoDescriptionEn','SEO EN mô tả',175,160\]/, 'thieu nguong canh bao cho mo ta tieng Anh');
   assert.match(source, /bị cắt/, 'phải hiển thị cảnh báo bị cắt');
 });
 
@@ -136,6 +143,77 @@ test('sau khi luu, nut khoa lai va form bao "Đã lưu"', async () => {
   assert.match(source, /'admin-seo-count'\+\(clean\?' clean':''\)/, 'trang thai da luu phai co class rieng');
   const css = await readPublic('styles.css');
   assert.match(css, /\.admin-seo-count\.clean\{/, 'cần có CSS cho trạng thái đã lưu');
+});
+
+test('trang /en/ không được mượn tiêu đề tiếng Việt — đó là trùng nội dung', async () => {
+  // The defect this file's sibling exists to prevent, one level down: the English
+  // page served the Vietnamese <title> and meta description verbatim. Two hreflang
+  // URLs with identical metadata is a duplicate-content signal, not a translation,
+  // and it puts Vietnamese wording in front of an English query.
+  const created = await create({
+    name: 'Hreflang Probe', slug: 'hreflang-probe', price: 99000, currency: 'VND', status: 'active',
+    fileKey: 'products/hreflang/1.0.0/h.exe',
+    description: 'Mô tả tiếng Việt đầy đủ cho trang tiếng Việt.', descriptionEn: 'The full English description for the English page.',
+    shortDescription: 'Mô tả ngắn tiếng Việt.', shortDescriptionEn: 'Short English summary.',
+    seoTitle: 'Tiêu đề từ khoá tiếng Việt đầy đủ cho sản phẩm này', seoDescription: 'Mô tả SEO tiếng Việt đầy đủ cho sản phẩm này.',
+  });
+  const vi = await (await fetch(`${base}/product/hreflang-probe`)).text();
+  const en = await (await fetch(`${base}/en/product/hreflang-probe`)).text();
+  const titleOf = (html) => /<title>([^<]*)<\/title>/i.exec(html)?.[1] || '';
+  const descOf = (html) => /<meta\s+name="description"\s+content="([^"]*)"/i.exec(html)?.[1] || '';
+
+  assert.match(titleOf(vi), /Tiêu đề từ khoá tiếng Việt đầy đủ/, 'trang tieng Viet phai dung SEO tieng Viet');
+  assert.ok(!titleOf(en).includes('Tiêu đề từ khoá tiếng Việt'),
+    `trang /en/ phai co tieu de rieng, thuc te la: ${titleOf(en)}`);
+  assert.notEqual(titleOf(vi), titleOf(en), 'hai trang hreflang phai khac nhau');
+  assert.ok(!descOf(en).includes('Mo ta SEO tieng Viet'),
+    `mo ta /en/ khong duoc la tieng Viet, thuc te la: ${descOf(en)}`);
+  // And what it does serve comes from the English copy, not from an empty string.
+  assert.match(descOf(en), /English/i, 'trang /en/ phai lay mo ta tu ban tieng Anh');
+  // The schema follows the same rule: an English page advertising a Vietnamese
+  // alternateName is the same mistake in the structured data.
+  const enGraph = JSON.parse(/<script type="application\/ld\+json">([\s\S]*?)<\/script>/.exec(en)[1].replace(/\\u003c/g, '<'));
+  const software = (Array.isArray(enGraph) ? enGraph : enGraph['@graph'] || [enGraph]).find((n) => n['@type'] === 'SoftwareApplication');
+  assert.ok(!JSON.stringify(software).includes('Tiêu đề từ khoá tiếng Việt'), 'schema cua trang /en/ khong duoc chua tieu do tieng Viet');
+});
+
+test('SEO tiếng Anh lưu được và lên đúng trang /en/', async () => {
+  const created = await create({
+    name: 'English SEO', slug: 'english-seo', price: 99000, currency: 'VND', status: 'active',
+    fileKey: 'products/en/1.0.0/e.exe',
+    seoTitle: 'Tiêu đề tiếng Việt', seoDescription: 'Mô tả tiếng Việt.',
+  });
+  const updated = await patch(created.product.id, {
+    seoTitleEn: 'English title for the same product', seoDescriptionEn: 'English description written for an English search.',
+  });
+  assert.equal(updated.product.seoTitleEn, 'English title for the same product');
+  assert.equal(updated.product.seoTitle, 'Tiêu đề tiếng Việt', 'sua SEO tieng Anh khong duoc xoa SEO tieng Viet');
+  const en = await (await fetch(`${base}/en/product/english-seo`)).text();
+  assert.match(en, /<title>English title for the same product<\/title>/, 'trang /en/ phai dung tieu do tieng Anh vua luu');
+  assert.match(en, /content="English description written for an English search\."/, 'mo ta /en/ phai dung mo ta tieng Anh vua luu');
+});
+
+test('SEO tiếng Anh bị cắt ở tầng máy chủ, không đưa vào database', async () => {
+  const created = await create({ name: 'Cap EN', slug: 'cap-en', price: 99000, currency: 'VND', status: 'active', fileKey: 'products/capen/1.0.0/c.exe' });
+  const updated = await patch(created.product.id, { seoTitleEn: 'A'.repeat(200), seoDescriptionEn: 'B'.repeat(400) });
+  assert.equal(updated.product.seoTitleEn.length, 70, 'tieu de tieng Anh phai cat con 70 ky tu');
+  assert.equal(updated.product.seoDescriptionEn.length, 175, 'mo ta tieng Anh phai cat con 175 ky tu');
+});
+
+test('trang quản trị có ô nhập SEO tiếng Anh, cả khi thêm mới lẫn khi sửa', async () => {
+  const html = await readPublic('admin.html');
+  assert.match(html, /name="seoTitleEn"/, 'thieu o SEO tieng Anh khi thêm sản phẩm');
+  assert.match(html, /name="seoDescriptionEn"/, 'thieu o mo ta tieng Anh khi thêm sản phẩm');
+  const source = await readPublic('admin.js');
+  assert.match(source, /name="seoTitleEn"/, 'thieu o SEO tieng Anh trong form sua');
+  assert.match(source, /name="seoDescriptionEn"/, 'thieu o mo ta tieng Anh trong form sua');
+  // All four travel together: a form that saves the Vietnamese pair and forgets the
+  // English one leaves /en/ with whatever it derived, which is what the owner asked
+  // to edit in the first place.
+  assert.match(source, /SEO_FIELDS=\[\['seoTitle','Tiêu đề',70,60\]/, 'danh sach 4 truong SEO phai la noi duy nhat');
+  for (const field of ['seoTitle', 'seoDescription', 'seoTitleEn', 'seoDescriptionEn']) {
+    assert.ok(source.includes(`'${field}'`), `danh sach truong SEO thieu ${field}`);
+  }
 });
 
 test('sửa SEO không được xoá mô tả và tính năng', async () => {

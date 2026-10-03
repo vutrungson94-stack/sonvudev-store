@@ -62,6 +62,13 @@ alter table public.products add column if not exists features_en jsonb not null 
 -- back to the product name, which nobody outside this site is searching for.
 alter table public.products add column if not exists seo_title text not null default '';
 alter table public.products add column if not exists seo_description text not null default '';
+-- The same two fields for the English page. Without them /en/product/:slug served
+-- the Vietnamese title and description verbatim: two hreflang pages with identical
+-- metadata, which is a duplicate-content signal and puts Vietnamese text in front of
+-- an English-language result. Left blank, the English page derives its own wording
+-- from the English copy — it never borrows the Vietnamese one.
+alter table public.products add column if not exists seo_title_en text not null default '';
+alter table public.products add column if not exists seo_description_en text not null default '';
 
 -- Order lifecycle. An unpaid order stops being payable at expires_at and is
 -- cancelled by the background sweep; a proven payment sets paid_at and bumps
