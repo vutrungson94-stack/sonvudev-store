@@ -130,3 +130,22 @@ jobs:
         run: npm run seo:check -- "${{ secrets.APP_URL }}"
         env:
           GOOGLE_SITE_VERIFICATION: ${{ secrets.GOOGLE_SITE_VERIFICATION }}
+
+      # The step above is the last line of defence and it is not a good one.
+      #
+      # seo:check exits 0 with a "skipped" message when it has no URL, which is
+      # right when someone runs it locally and has not got a .env — but inside a
+      # job whose entire purpose is to check the live site, an absent secret
+      # produces a green run that verified nothing. That is the worst shape a
+      # check can have: it reports the thing it exists to report, without having
+      # looked at it.
+      #
+      # So the absence is made explicit and fatal here. A skipped run is never
+      # mistaken for a passing one, and the fix is written on the log: the
+      # secret is not set, in this repository, under this name.
+      - name: fail if the URL was not configured
+        if: ${{ secrets.APP_URL == '' }}
+        run: |
+          echo "::error::secrets.APP_URL chua duoc dat, nen bo deploy nay KHONG kiem tra gi ca."
+          echo "::error::Dat no trong Settings > Secrets and variables > Actions > Repository secrets, ten APP_URL, gia tri https://<domain-cua-ban>"
+          exit 1
