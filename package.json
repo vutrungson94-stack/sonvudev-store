@@ -30,7 +30,8 @@
     "seo:check": "node scripts/seo-check.mjs",
     "start": "node src/server.js",
     "dev": "node --watch src/server.js",
-    "test": "node scripts/run-tests.mjs"
+    "test": "node scripts/run-tests.mjs",
+    "health:check": "node scripts/health-check.mjs"
   },
   "files": [
     "src",
