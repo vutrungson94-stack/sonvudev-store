@@ -507,7 +507,19 @@ app.use((req, res, next) => {
 // not registered now falls through to the 404 page, which is rendered — so a URL
 // that does not exist cannot hand a visitor a page with its own variables still
 // inside it.
-app.use(express.static(publicDir, { maxAge: "1h", index: false }));
+// Five minutes, not an hour.
+//
+// A stylesheet fix that takes an hour to reach a browser is indistinguishable from
+// a fix that did not work: the deploy lands, every gate is green, and the person
+// who just shipped it is told the page is still wrong. That cost was paid twice
+// here before the cause turned out to be this header rather than the CSS — and the
+// second time it was this line of reasoning that found it.
+//
+// express still sends ETag and Last-Modified, so a revalidation is a 304 with no
+// body. Five minutes of reuse per asset is plenty for a shop with this little
+// traffic, and a deploy becomes visible on the next page load instead of an hour
+// later — which is the only property that actually matters here.
+app.use(express.static(publicDir, { maxAge: "5m", index: false }));
 
 // Reports which configuration is active and whether the three things an order
 // depends on are usable. Used by the deploy script and by anyone checking a
