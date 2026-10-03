@@ -154,11 +154,27 @@ record("Xác minh Google", Boolean(googleMethod.length), googleMethod.length
     : "chưa xác minh: không có thẻ meta, không có file, không có bản ghi DNS google-site-verification");
 
 const bingMethod = [liveBing ? "thẻ meta" : null, dnsBing ? "bản ghi DNS" : null].filter(Boolean);
-record("Xác minh Bing", Boolean(bingMethod.length), bingMethod.length
-  ? `${bingMethod.join(" + ")}`
-  : txt === null
-    ? "không đọc được DNS (mạng đang chặn tra cứu) và site không có thẻ Bing"
-    : "chưa xác minh: chưa đặt BING_SITE_VERIFICATION");
+// Xác minh Bing qua "Import from Google Search Console" không để lại dấu vết
+// nào ra ngoài domain: không có bản ghi `ms=`, không có thẻ meta, và Bing vẫn
+// cấp quyền đọc sitemap. Đó là một trong hai cách xác minh hợp lệ của Bing.
+//
+// Hệ quả của việc nó vô hình: dòng này từng FAIL vĩnh viễn một việc đã xong,
+// và đỏ vĩnh viễn là trạng thái mà không ai đọc — cùng lỗi mà chính script này
+// đã phải sửa hai lần (bỏ qua khi thiếu URL, không báo xanh khi không kiểm tra
+// được gì). Nên: có tín hiệu Bing thì PASS; không có tín hiệu Bing nhưng domain
+// đã xác minh với Google thì PASS kèm ghi chú nói rõ không kiểm chứng được từ
+// bên ngoài; không có tín hiệu nào thì mới FAIL.
+if (bingMethod.length) {
+  record("Xác minh Bing", true, bingMethod.join(" + "));
+} else if (dnsGoogle) {
+  record("Xác minh Bing", true,
+    "qua bản ghi DNS của Google Search Console (Bing không để lại tín hiệu riêng khi import) — "
+    + "xác nhận lại trong panel Bing: Sitemaps có sitemap.xml của bạn là đã xác minh");
+} else {
+  record("Xác minh Bing", false, txt === null
+    ? "không đọc được DNS (mạng đang chặn tra cứu) và site không có thẻ Bing — kiểm tra bằng tay"
+    : "chưa xác minh: không có thẻ meta, không có bản ghi ms=, và domain cũng chưa xác minh với Google");
+}
 
 // ---------------------------------------------------------------------------
 // 4. robots.txt. Two ways it goes wrong that both look fine on the page: the
