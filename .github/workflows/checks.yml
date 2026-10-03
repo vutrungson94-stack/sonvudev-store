@@ -143,9 +143,16 @@ jobs:
       # So the absence is made explicit and fatal here. A skipped run is never
       # mistaken for a passing one, and the fix is written on the log: the
       # secret is not set, in this repository, under this name.
+      #
+      # NOTE: the `secrets` context is NOT available in an `if:` expression
+      # (startup failure: "Unrecognized named-value: 'secrets'", 0 jobs run).
+      # So the secret is passed via `env` and tested inside `run` instead.
       - name: fail if the URL was not configured
-        if: ${{ secrets.APP_URL == '' }}
+        env:
+          CHECK_URL: ${{ secrets.APP_URL }}
         run: |
-          echo "::error::secrets.APP_URL chua duoc dat, nen bo deploy nay KHONG kiem tra gi ca."
-          echo "::error::Dat no trong Settings > Secrets and variables > Actions > Repository secrets, ten APP_URL, gia tri https://<domain-cua-ban>"
-          exit 1
+          if [ -z "$CHECK_URL" ]; then
+            echo "::error::secrets.APP_URL chua duoc dat, nen bo deploy nay KHONG kiem tra gi ca."
+            echo "::error::Dat no trong Settings > Secrets and variables > Actions > Repository secrets, ten APP_URL, gia tri https://<domain-cua-ban>"
+            exit 1
+          fi
