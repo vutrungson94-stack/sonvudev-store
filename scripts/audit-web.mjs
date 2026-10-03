@@ -623,13 +623,13 @@ for (const name of ["app.js", "store.js", "orders.js", "payments.js", "r2.js", "
   }
   for (const match of source.matchAll(/res\.status\([^)]*\)\.json\(\{\s*error:\s*"([^"]+)"/g)) {
     if (VIETNAMESE_SENTENCE.test(match[1])) {
-      fail("lỗi tiếng Việt cho trình duyệt", `src/${name}`,
+      fail("lỗi tiếng Việt cho trình duyệt", "ngôn ngữ khai báo sai", `src/${name}`,
         `gửi thẳng "${match[1].slice(0, 60)}" mà không có code — dùng refuse("khoá", "câu tiếng Việt", status) để trình duyệt dịch được`);
     }
   }
   // And the same, for a body built as a variable rather than an object literal.
   for (const match of source.matchAll(/json\(\{\s*error:\s*`([^`]+)`/g)) {
-    fail("lỗi tiếng Việt cho trình duyệt", `src/${name}`,
+    fail("lỗi tiếng Việt cho trình duyệt", "ngôn ngữ khai báo sai", `src/${name}`,
       `gửi thẳng một câu nội suy "${match[1].slice(0, 60)}" mà không có code — dùng refuse()`);
   }
 }
@@ -650,6 +650,35 @@ for (const [name, source] of keyProducers) {
     if (!declared.has(match[1])) {
       fail("khoá i18n chưa định nghĩa", name, `máy chủ gửi "${match[1]}" mà từ điển không có — trình duyệt sẽ hiện tiếng Việt`);
     }
+  }
+}
+
+// ---------------------------------------------------------------------------
+// 4i. A page claiming a translation it does not have.
+//
+//     terms.html, privacy.html, refund.html and about.html each carried
+//     `<meta property="og:locale:alternate" content="en_US">` — a statement to
+//     every social scraper that an English version of the page exists. None of them
+//     had one: they do not load i18n.js, and their prose is Vietnamese.
+//
+//     What made it worse than a harmless wrong tag is that each of those four
+//     pages already said the opposite in its own hreflang, which listed `vi` and
+//     `x-default` and nothing else. The page told two crawlers contradictory
+//     things about itself, in markup written to agree.
+//
+//     So the rule is: if a page lists an alternate locale, it has to serve that
+//     locale. index.html keeps its en_US because it genuinely has /en/ routes.
+//     When the legal pages get English versions this stops being a finding, and
+//     the check is the thing that has to notice — not the author.
+// ---------------------------------------------------------------------------
+for (const name of htmlFiles) {
+  const source = await read(path.join("public", name));
+  const alternate = /property="og:locale:alternate" content="([^"]+)"/.exec(source);
+  if (!alternate) continue;
+  const hasAlternateRoute = /hreflang="en"/.test(source) || /\/en\//.test(source);
+  if (!hasAlternateRoute) {
+    fail("ngôn ngữ khai báo sai", `public/${name}`,
+      `khai báo og:locale:alternate="${alternate[1]}" nhưng không phục vụ bản ${alternate[1].slice(0, 2)} — hreflang của chính trang này cũng chỉ liệt kê vi`);
   }
 }
 
@@ -1046,7 +1075,7 @@ const DECLARED = [
   "schema chặn", "tiếng Việt không dấu", "tiếng Việt ở phía máy chủ", "token chưa nối",
   "trang chưa render", "hreflang chết", "thương hiệu gõ cứng", "trang mồ côi",
   "trùng tên toàn cục", "chữ rỗng", "thiếu font thương hiệu",
-  "lỗi tiếng Việt cho trình duyệt",
+  "lỗi tiếng Việt cho trình duyệt", "ngôn ngữ khai báo sai",
 ];
 const unknown = [...REGISTERED].filter((label) => !DECLARED.includes(label));
 if (unknown.length) {
