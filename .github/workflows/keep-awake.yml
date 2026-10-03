@@ -20,14 +20,22 @@
 # without saying so. On a public repository Actions are free and this would work; this
 # one is private.
 #
-# Waking is therefore UptimeRobot's job: it pings every five minutes from outside
-# GitHub, and costs nothing either way. This workflow does the half it can afford, and
-# does it well — a ping every thirty minutes fits in the free minutes with room to
-# spare, and finds an outage a little later.
+# Waking is therefore a Cloudflare Worker's job: cloudflare/keep-awake runs once a
+# minute on the Workers cron, which is free and has none of GitHub's queue delay.
+# That delay is not theoretical — this workflow's own runs were landing three to six
+# hours apart, which is longer than Render's fifteen-minute sleep, so at a `*/30`
+# cadence it was not keeping anything awake. It only ever appeared to work because
+# somebody was visiting the shop.
 #
-# Keeping both is deliberate. They fail differently: UptimeRobot is a third party that
-# can be blocked, rate-limited or forgotten, and GitHub runs from the repository this
-# shop lives in. Either one alone leaves a gap; together the gap is small.
+# So this file is the net under that, and the alarm if it stops. Once a day is 30
+# jobs a month against the 2,000 minutes above, so the quota stopped being the
+# binding constraint; what the daily run buys is that a Worker which has stopped
+# firing — deleted, misconfigured, or quietly failing — is noticed within a day
+# instead of never.
+#
+# Keeping both is deliberate. They fail differently: the Worker is Cloudflare's
+# scheduler against your account, and this runs from the repository this shop lives
+# in. Either one alone leaves a gap; together the gap is small.
 #
 # To change the address, set the repository variable SHOP_URL rather than editing this
 # file — a domain change is then one edit, and the check that watches the shop is
@@ -49,11 +57,11 @@ name: shop is awake
 
 on:
   schedule:
-    # Every thirty minutes. Frequent enough that an outage is found while there is
-    # still somebody awake, rare enough to fit the free minutes on a private
-    # repository. The ten-minute version that looks obviously better is the one that
-    # exhausts the quota halfway through the month; see the note above.
-    - cron: "*/30 * * * *"
+    # Once a day, at 5am. The Cloudflare Worker does the waking; this is the net
+    # under it and the alarm when it stops. Every thirty minutes spent 1,440 of the
+    # 2,000 free minutes on a private repository duplicating a worker Cloudflare
+    # runs for free — see the note above for why that cadence never worked anyway.
+    - cron: "0 5 * * *"
   workflow_dispatch:
 
 concurrency:

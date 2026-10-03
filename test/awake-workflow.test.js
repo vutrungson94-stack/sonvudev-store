@@ -24,33 +24,57 @@ const file = path.join(root, '.github', 'workflows', 'keep-awake.yml');
 const source = await fs.readFile(file, 'utf8');
 
 const cron = (source.match(/cron:\s*"([^"]+)"/) || [])[1] || '';
-const minutesBetween = (expression) => {
-  if (!expression.startsWith('*/')) return null;
-  return Number(expression.slice(2).split(' ')[0]);
+// Both shapes a schedule here can take, because the cadence changed once already
+// and a checker that only understood the old one would have blocked the fix.
+//   "*/30 * * * *"  every 30 minutes
+//   "0 5 * * *"     once a day, at 05:00
+// GitHub rounds every job on a private repository up to a whole minute, so the
+// number of jobs per month IS the number of minutes spent. That is the constraint,
+// not a guideline.
+const jobsPerMonth = (expression) => {
+  const parts = expression.trim().split(/\s+/);
+  if (parts.length !== 5) return 0;
+  const [minute, hour] = parts;
+  if (minute.startsWith('*/')) {
+    const every = Number(minute.slice(2));
+    return Number.isFinite(every) && every > 0 ? (60 * 24 * 30) / every : 0;
+  }
+  // A pinned minute and hour, every day. Anything with a day-of-month or day-of-week
+  // field is not a daily schedule and is not counted here, so an exotic expression
+  // reports 0 and fails loudly instead of passing unnoticed.
+  if (hour === '*' || minute === '*') return 0;
+  if (!/^\d+$/.test(minute) || !/^\d+$/.test(hour)) return 0;
+  if (parts[2] !== '*' || parts[3] !== '*' || parts[4] !== '*') return 0;
+  return 30;
 };
 
 test('nhịp giám sát phải nằm trong hạn mức GitHub Actions miễn phí', () => {
-  // A private repository gets 2,000 minutes a month and GitHub rounds every job up
-  // to one. So the number of jobs per month is the number of minutes, and this is
-  // the whole constraint — not a guideline that can be nudged.
   assert.ok(cron, 'phải có một lịch chạy');
-  const every = minutesBetween(cron);
-  assert.ok(every, `cron "${cron}" phải là một khoảng phút cụ thể để tính được — ví dụ "*/30 * * * *"`);
-  const jobsPerMonth = (60 * 24 * 30) / every;
+  const jobs = jobsPerMonth(cron);
+  assert.ok(jobs > 0, `không tính được số job/tháng từ cron "${cron}" — thêm dạng mới vào jobsPerMonth()`);
   assert.ok(
-    jobsPerMonth <= 2000,
-    `${jobsPerMonth} job/tháng × 1 phút làm tròn = ${jobsPerMonth} phút, vượt hạn mức 2000 phút miễn phí của repo private. Render free sẽ ngủ và job sẽ bị chặn.`,
+    jobs <= 2000,
+    `${jobs} job/tháng × 1 phút làm tròn = ${jobs} phút, vượt hạn mức 2000 phút miễn phí của repo private. Render free sẽ ngủ và job sẽ bị chặn.`,
   );
+  // And the headroom is deliberate, not luck: the daily cadence is what pays for
+  // `checks.yml`, which runs the real suite on three Node versions.
+  assert.ok(jobs <= 200,
+    `${jobs} job/tháng là quá nhiều cho một lưới an toàn — Worker đã giữ thức mỗi phút, lịch này chỉ còn báo động`);
 });
 
 test('file này phải nói rõ mình không phải thứ đánh thức', () => {
-  // Thirty minutes is correct here and would be wrong in a waker, which is why the
-  // file says so in its own words. A reader who skims to the cron line and assumes it
-  // keeps the instance up would not notice anything wrong for weeks — the instance
-  // would simply be slow, sometimes, and eventually cold.
+  // A daily check is even more obviously not a waker than a thirty-minute one was,
+  // so the file has to say so in its own words. A reader who skims to the cron line
+  // and assumes it keeps the instance up would not notice anything wrong for weeks —
+  // the instance would simply be slow, sometimes, and eventually cold.
   assert.ok(!/workflow_dispatch:[\s\S]*?cron/.test(source), 'cron phải nằm trong schedule');
   assert.match(source, /it cannot be that|is not the waker|Waking is therefore/i, 'phải nói rõ đây không phải thứ đánh thức');
-  assert.match(source, /UptimeRobot/, 'phải chỉ ra ai đảm nhiệm việc đánh thức');
+  assert.match(source, /Cloudflare Worker/i, 'phải chỉ ra ai đảm nhiệm việc đánh thức');
+  // UptimeRobot was named here for months and is not configured anywhere in this
+  // repository. A comment that credits the wrong component is worse than none: it
+  // sends the next person to inspect a service that does not exist, and it hides the
+  // fact that the real waker is one file away in cloudflare/keep-awake.
+  assert.ok(!/UptimeRobot/.test(source), 'UptimeRobot không được cấu hình ở đâu — đừng ghi nó là thứ đánh thức');
   // And the reason has to be the arithmetic, so that nobody re-derives it by hand.
   assert.match(source, /4[.,]?320/, 'phải ghi con số tính ra');
   assert.match(source, /2[.,]?000/, 'phải ghi hạn mức');
