@@ -17,22 +17,20 @@
   "main": "worker.js",
   "compatibility_date": "2024-11-06",
 
-  // No public URL, deliberately.
-  //
-  // This Worker exports only `scheduled` — there is no `fetch` handler, because
-  // nothing should be able to reach it. It is woken by Cloudflare's cron
-  // scheduler, not routed to it, so it needs no hostname to do its job.
-  //
-  // Left at the default, `wrangler deploy` asks to register a workers.dev
-  // subdomain and publishes the Worker there: a public URL, on a domain that
-  // lives on a shared global namespace, answering every request with
-  // "nothing to see here". It is an entry point that exists only to be closed.
-  //
-  // The subdomain name is also a permanent, account-wide choice — the prompt
-  // offers whatever is free, and taking a random one to satisfy a question that
-  // does not apply is how you end up with an address you regret holding for the
-  // life of the account.
-  "workers_dev": false,
+// Not published to a public URL, even though the account has a workers.dev
+// subdomain. Two different things, and they were confused here once:
+//
+//   The subdomain is account-wide and one-time. Cloudflare will not accept ANY
+//   cron trigger until one exists on the account — cron fails with code 10063,
+//   "You need a workers.dev subdomain in order to proceed". That is a property of
+//   the account, not of this Worker, and it is why the subdomain is registered
+//   once in the dashboard.
+//
+//   workers_dev publishes *this* Worker at a hostname. It exports only
+//   `scheduled` and has no fetch handler, so a URL for it would answer every
+//   request with "nothing to see here" — an entry point that exists only to be
+//   closed. Registering the subdomain does not require publishing to it.
+"workers_dev": false,
 
   // Once a minute. Free on the Workers free tier, and one invocation is one
   // request against the 100,000/day allowance — 1,020 calls on a 19-hour window
