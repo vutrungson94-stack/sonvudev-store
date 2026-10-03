@@ -1,12 +1,12 @@
 {
-  "generatedAt": "2026-10-02T04:53:09.735Z",
+  "generatedAt": "2026-10-03T04:22:24.488Z",
   "measurements": {
     "tests": {
-      "value": 290,
+      "value": 338,
       "direction": "up"
     },
     "testFiles": {
-      "value": 30,
+      "value": 38,
       "direction": "up"
     },
     "routes": {
@@ -18,15 +18,15 @@
       "direction": "down"
     },
     "escCopies": {
-      "value": 4,
+      "value": 2,
       "direction": "down"
     },
     "moneyCopies": {
-      "value": 4,
+      "value": 2,
       "direction": "down"
     },
     "i18nKeys": {
-      "value": 404,
+      "value": 510,
       "direction": "up"
     },
     "indexablePages": {
@@ -38,7 +38,7 @@
       "direction": "up"
     },
     "localizedPages": {
-      "value": 4,
+      "value": 5,
       "direction": "up"
     },
     "productPageRenderers": {

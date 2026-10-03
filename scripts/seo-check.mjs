@@ -11,7 +11,8 @@
 // and all of them are silent until traffic does not arrive. This turns them into
 // a line of output with the URL on it.
 //
-// Exit code is non-zero on any failure so it can gate a deploy.
+// Exit code is non-zero on any failure so it can gate a deploy — but only when there
+// was something to check. See the missing-URL case below.
 import dns from "node:dns/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -23,11 +24,23 @@ dotenv.config({ path: path.join(root, ".env") });
 // No fallback domain. The old one was the shop's own address, so a run with no
 // APP_URL and no argument quietly audited production from a machine that may not
 // have been pointed at it — and reported the result as if it had been asked for.
-// With nothing to audit, say so and stop.
 const base = String(process.argv[2] || process.env.APP_URL || "").replace(/\/$/, "");
 if (!base) {
-  console.error("Thiếu APP_URL. Chạy: npm run seo:check -- https://ten-mien-cua-ban");
-  process.exit(1);
+  // Nothing to check is not the same as a check that failed, and treating them the
+  // same is what put six red runs in a row before anybody asked why: the
+  // deployed-site job has no .env and no APP_URL secret, so this ran, printed one
+  // line and exited 1 on every single push. A permanently red job is a job nobody
+  // reads, which makes the one push where the site really is broken invisible too.
+  //
+  // So an unconfigured run skips and says so. It stays distinguishable from a pass:
+  // a real audit prints a line per check and a count, and this prints neither.
+  //
+  // The boundary is deliberately narrow. A URL that was given and does not answer is
+  // still a failure — that is the case this script exists for, and skipping it would
+  // mean a dead site passes because the workflow forgot to configure itself.
+  console.log("[seo:check] Bo qua: khong co APP_URL va khong co dia chi nao truyen vao.");
+  console.log("[seo:check] De chay that: npm run seo:check -- https://ten-mien-cua-ban");
+  process.exit(0);
 }
 const expectedToken = (process.env.GOOGLE_SITE_VERIFICATION || "").trim();
 const TIMEOUT_MS = 12000;
@@ -69,7 +82,14 @@ try {
     ? `may nay khong pho giao duoc domain — ${last}. Do proxy/endpoint cua may chan hoac giai phong TLS, KHONG phai loi cua site. Chay lai tren 4G.`
     : (error.name === "TimeoutError" ? "timeout" : cause));
   for (const item of results) console.log(`${item.ok ? "PASS" : "FAIL"}  ${item.name}: ${item.detail}`);
-  if (networkBlocked) console.error("\nKHONG KET LUAN DUOC ve site — may nay khong nhin thay no. CI chay phan nay tren runner cua GitHub nen van chay binh thuong.");
+  // Still non-zero, and deliberately different from the missing-URL case above.
+  //
+  // A URL was asked for and this machine could not see it. Whether the site is down
+  // or the network in front of it is, the answer here is "not verified" — and a gate
+  // that reports "not verified" as "verified" is the thing we just removed. This one
+  // fails closed on purpose; the fix is to run it somewhere that can see the site,
+  // not to treat the silence as a pass.
+  if (networkBlocked) console.error("\nKHONG KET LUAN DUOC ve site — may nay khong nhin thay no, va day KHONG phai bang chung site binh thuong.");
   process.exit(1);
 }
 

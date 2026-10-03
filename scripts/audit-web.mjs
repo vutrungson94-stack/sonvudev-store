@@ -16,6 +16,7 @@ import { existsSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import dotenv from "dotenv";
+import { corsDiff, isFixtureHost } from "./lib/cors.mjs";
 
 const rootFlag = process.argv.indexOf("--root");
 const root = rootFlag > -1
@@ -143,13 +144,25 @@ const usedKeys = new Set([
 //     which appears in public/. Reading only the pages reported every one of them
 //     as dead, which is how a correct change gets "fixed" back into a hardcode.
 //
-//     So the modules that produce content for the browser are read too. These two
+//     So the modules that produce content for the browser are read too. These
 //     answer with keys and nothing else: the other modules either answer with
 //     errors, which the caller decides how to present, or render the page itself,
 //     in a locale of their own.
-// ---------------------------------------------------------------------------
+//
+//     src/app.js joins them, because that changed. It used to answer with a
+//     Vietnamese sentence and `error`, which is not translatable, so it was
+//     excluded — correctly, at the time. It now answers through src/refuse.js,
+//     carrying `code` beside the sentence, and 46 of these keys come from nowhere
+//     else in the repository. Listed here or nowhere, this list is what tells the
+//     dictionary which of its own entries are live, so a key added to app.js and
+//     forgotten here reads as dead copy and gets deleted.
+//
+//     src/refuse.js is deliberately not in it. That file documents the shape with
+//     a worked example — `refuse("api.err.rateLimited", …)` — and a name that
+//     appears only in prose is not a key anybody sends. Including it reported
+//     thirty-eight phantom usages of a string that does not exist.
 const keyProducers = [];
-for (const name of ["payments.js", "reviews.js"]) {
+for (const name of ["payments.js", "reviews.js", "app.js"]) {
   const file = path.join("src", name);
   if (existsSync(file)) keyProducers.push([`src/${name}`, await read(file)]);
 }
@@ -163,6 +176,40 @@ for (const [, source] of keyProducers) {
 
 const orphans = [...viKeys].filter((key) => !usedKeys.has(key)).sort();
 if (orphans.length) fail("khoá i18n mồ côi", "public/i18n.js", `${orphans.length} khoá không nơi nào dùng: ${orphans.join(", ")}`);
+
+// ---------------------------------------------------------------------------
+// 3a. The other direction: a key a page asks for that the dictionary does not
+//     have.
+//
+//     Everything above asked whether the dictionary holds something nobody reads.
+//     Nothing asked whether what a page reads exists at all, so the failure was
+//     invisible in both directions at once.
+//
+//     It is not a crash. I18N.t falls back to the caller's string, and for
+//     markup that fallback is the element's existing textContent — the Vietnamese
+//     written into the HTML. So a missing key produces a page that renders
+//     correctly in the language it was authored in and silently refuses to switch
+//     to any other. public/404.html used `data-i18n="nav.home"` on both of its
+//     home links; the dictionary has eleven nav.* keys and that is not one of
+//     them, so an English visitor arriving from a broken link got "Về trang chủ"
+//     in a language they did not choose, from the page whose entire job is to
+//     help a lost visitor get somewhere else.
+//
+//     The specific page does not matter. The gap did: any data-i18n key with a
+//     typo, or a key renamed in the dictionary and not in the pages, produced the
+//     same silent bilingual leak.
+// ---------------------------------------------------------------------------
+const declared = viKeys.size > enKeys.size ? viKeys : enKeys;
+const requested = new Set([
+  ...[...allHtml.matchAll(/\bdata-i18n="([^"]+)"/g)].map((m) => m[1]),
+  ...[...allHtml.matchAll(/\bdata-i18n-attr="([^"]+)"/g)]
+    .flatMap((m) => m[1].split(",").map((pair) => pair.split(":")[1]?.trim()).filter(Boolean)),
+]);
+const undefinedKeys = [...requested].filter((key) => !declared.has(key)).sort();
+if (undefinedKeys.length) {
+  fail("khoá i18n chưa định nghĩa", "public/*.html",
+    `${undefinedKeys.length} khoá trang dùng mà từ điển không có: ${undefinedKeys.join(", ")} — trang sẽ không đổi được ngữ`);
+}
 
 // ---------------------------------------------------------------------------
 // 3c. The same key written twice in one dictionary.
@@ -188,6 +235,26 @@ const objectLiteralAt = (source, marker) => {
   let quote = "";
   for (let i = open; i < source.length; i += 1) {
     const char = source[i];
+    // Comments have to be skipped, and this is not a refinement. The loop tracks
+    // whether it is inside a string so that a brace inside one does not count,
+    // but a `//` comment is not a string — so a single double quote in a comment
+    // opened a "string" that ran until the next quote hundreds of lines later,
+    // swallowing the real braces and desynchronising the depth count. The
+    // consequence is not a missed duplicate key: the parser reads past the end
+    // of the block it was asked for, and then reports every key in the file as
+    // declared twice. 209 findings, one of them an apostrophe in a Vietnamese
+    // comment, and the gate that exists to prevent confusion became the thing
+    // producing it.
+    if (!quote && char === "/" && source[i + 1] === "/") {
+      while (i < source.length && source[i] !== "\n") i += 1;
+      continue;
+    }
+    if (!quote && char === "/" && source[i + 1] === "*") {
+      i += 2;
+      while (i < source.length && !(source[i] === "*" && source[i + 1] === "/")) i += 1;
+      i += 1;
+      continue;
+    }
     if (quote) {
       if (char === "\\") { i += 1; continue; }
       if (char === quote) quote = "";
@@ -242,16 +309,16 @@ const supportEmail = (env("SUPPORT_EMAIL") || "").toLowerCase();
 // The failure said nothing about the code.
 //
 // So a missing value now skips only what it makes impossible, says which, and lets
-// the other sixteen groups run. In production APP_URL is set, so nothing is skipped
-// and the gate is exactly as strict as before. The count of skipped groups is printed
-// so "16 of 17 ran" cannot be mistaken for "all passed".
+// the other groups run. In production APP_URL is set, so nothing is skipped and the
+// gate is exactly as strict as before.
+//
+// The list is printed at the end rather than here, next to the group count. Printing
+// it here meant the count on screen was the number known at this line, not the number
+// that was skipped — and the R2 CORS check below adds a third reason, so a reader
+// comparing the two numbers would have been told three groups ran when four did not.
 const skipped = [];
 if (!appUrl) skipped.push("domain gõ tay (cần APP_URL)");
 if (!supportEmail) skipped.push("địa chỉ hỗ trợ gõ tay (cần SUPPORT_EMAIL)");
-if (skipped.length) {
-  console.log(`\n[audit] Bo qua ${skipped.length} nhom vi thieu cau hinh: ${skipped.join(", ")}`);
-  console.log("[audit] Dat APP_URL va SUPPORT_EMAIL (xem .env.example) de chay day du.");
-}
 const appHost = appUrl ? new URL(appUrl).hostname.toLowerCase() : "";
 const thirdParty = new Set(["www.w3.org", "schema.org", "www.sitemaps.org", "localhost", "img.vietqr.io", "fonts.googleapis.com", "fonts.gstatic.com", "resend.com", "supabase.com", "supabase.co", "paypal.com", "google.com", "cloudflare.com", "render.com", "ipapi.co", "ipwho.is", "er-api.com", "exchangerate-api.com", "indexnow.org"]);
 // i18n.js is scanned too: brand.supportEmail is the configured default the pages
@@ -362,6 +429,54 @@ for (const relative of infraFiles) {
   }
 }
 
+// ---------------------------------------------------------------------------
+// 4bb. The R2 bucket's origin list, which is the one place a browser can be refused.
+//
+//     cloudflare/r2-cors.json is applied to the bucket by hand and read by nothing.
+//     No other check in this repository can see it, and the failure it produces is
+//     the single release-publishing action in the shop: public/admin.js asks the
+//     server for a presigned URL and then PUTs to *.r2.cloudflarestorage.com from
+//     the browser, so a stale AllowedOrigins refuses the upload with a CORS error
+//     and nothing else in the project notices — not the build, not /api/health,
+//     not check:production.
+//
+//     So the file is compared against APP_URL by the same function the fix command
+//     uses (scripts/lib/cors.mjs), which means the check and the repair cannot
+//     disagree about what "correct" is.
+//
+//     Skipped on a fixture APP_URL, and it says so. CI sets APP_URL to
+//     https://ci-fixture.example so that a fresh clone and this machine run the
+//     same checks — a value whose host is a reserved .example domain cannot be a
+//     shop anybody buys from, so asking whether the committed CORS file matches it
+//     would report a false failure on every push. The real comparison happens on a
+//     machine with a real .env, and again in check:production before a deploy.
+// ---------------------------------------------------------------------------
+if (appUrl && isFixtureHost(appUrl)) {
+  skipped.push("R2 CORS khớp APP_URL (APP_URL là giá trị giả)");
+} else if (appUrl) {
+  let corsRules = [];
+  let corsReadable = true;
+  try {
+    corsRules = JSON.parse(await read(path.join("cloudflare", "r2-cors.json")));
+  } catch (error) {
+    corsReadable = false;
+    fail("R2 CORS lệch", "cloudflare/r2-cors.json", `không đọc được: ${error.message}`);
+  }
+  if (corsReadable) {
+    const diff = corsDiff(corsRules, appUrl);
+    if (diff.missing.length) {
+      fail("R2 CORS lệch", "cloudflare/r2-cors.json",
+        `thiếu ${diff.missing.join(", ")} — upload từ trang quản trị sẽ bị CORS chặn. Chạy: npm run r2:cors:write`);
+    }
+    // An extra origin is a widening of who may upload to the bucket rather than a
+    // break, so it is reported with the same fix but not as the same severity.
+    if (diff.extra.length) {
+      fail("R2 CORS thừa origin", "cloudflare/r2-cors.json",
+        `${diff.extra.join(", ")} không do APP_URL sinh ra — ai đó có thể upload vào bucket`);
+    }
+  }
+}
+
 const accented = (value) => /[àáâãèéêìíòóôõùúýăđĩũơưạảấầẩẫậắằẳẵặẹẻẽếềểễệỉịọỏốồổỗộớờởỡợụủứừửữựỳỵỷỹ]/i.test(value);
 // ---------------------------------------------------------------------------
 // 4c. Content the storefront prints, written in a language the reader may not
@@ -434,8 +549,107 @@ for (const name of htmlFiles) {
   if (hasToggle && !hasDictionary) {
     fail("nút đổi ngữ không có từ điển", `public/${name}`, `có data-lang-toggle nhưng không nạp i18n.js — nút sẽ không làm gì`);
   }
-  if (!hasToggle && hasDictionary && !name.endsWith(".html")) {
-    fail("thừa nhiệu", `public/${name}`, `nạp từ điển mà không có nút đổi ngôn ngữ`);
+  // The second half of this check was unreachable: the loop is over htmlFiles, so
+  // `name.endsWith(".html")` was always true and the branch never ran. The
+  // condition it was reaching for is the mirror of the one above — a page that
+  // loads the dictionary but offers no way to change language — and it is a real
+  // finding, not a style preference: the dictionary applies on load, so such a
+  // page translates itself into the reader's stored preference and then offers no
+  // control over it. It was dead code written to catch that.
+  if (hasDictionary && !hasToggle) {
+    fail("thừa nhiệu", `public/${name}`, `nạp từ điển mà không có nút đổi ngôn ngữ — trang dịch theo sở thích đã lưu mà không có cách đổi`);
+  }
+}
+
+// ---------------------------------------------------------------------------
+// 4g. A page that uses the brand fonts without loading them.
+//
+//     styles.css names 'Space Grotesk' for .brand, the headings and the numerals
+//     that carry the product prices. A page that links the stylesheet but not the
+//     font gets those rules with nothing to resolve to, and falls back to the
+//     generic sans-serif — the brand's own typeface, gone, on exactly the page a
+//     buyer is looking at.
+//
+//     public/admin.html did this, and nothing reported it: there was no check, and
+//     the omission is invisible in a diff that only compares HTML structure. The
+//     link block is copied into ten pages by hand, so "the other pages have it"
+//     is not a property anything enforces.
+//
+//     It stays copied. Eleven occurrences of a 200-character <link> is a smaller
+//     problem than a token every page has to resolve before its CSS applies, and
+//     the check below is what makes the copies safe: a new page that forgets gets
+//     told, instead of quietly rendering in Arial.
+// ---------------------------------------------------------------------------
+for (const name of htmlFiles) {
+  const source = await read(path.join("public", name));
+  // Both forms. public/about.html links "/styles.css" and every other page links
+  // "styles.css"; matching only one left the page with the absolute path — the
+  // one that had actually lost its fonts — unexamined by a check written to catch
+  // exactly that.
+  if (!/href="\/?styles\.css"/.test(source)) continue;
+  if (!/Space\+Grotesk/.test(source)) {
+    fail("thiếu font thương hiệu", `public/${name}`,
+      "nạp styles.css nhưng không nạp Space Grotesk/DM Sans — chữ thương hiệu sẽ rơi về sans-serif mặc định");
+  }
+}
+
+// ---------------------------------------------------------------------------
+// 4h. A refusal the browser cannot translate.
+//
+//     src/app.js answered 43 failures with `res.json({ error: "…tiếng Việt…" })`
+//     and every page read that sentence before its own dictionary — the shape was
+//     `payload.error || T('some.fallback')`, and the server was first. The visitor
+//     who switched the shop to English was therefore told what went wrong in
+//     Vietnamese, by the shop, including on the checkout form.
+//
+//     Nothing caught it, and nothing would have: the string was in the right place
+//     grammatically, the audit only looked at HTML and at keys, and the sentence
+//     was correct Vietnamese. It was a correct sentence in the wrong language for
+//     the reader, which no spelling or accent check can see.
+//
+//     The rule is the one src/refuse.js exists to make possible: a refusal that
+//     goes into a JSON body has to carry a `code` the dictionary can resolve. Both
+//     halves of it. A sentence on its own is only allowed where nothing reads the
+//     body as prose.
+// ---------------------------------------------------------------------------
+const VIETNAMESE_SENTENCE = /[\u00c0-\u1ef9]{2,}/;
+for (const name of ["app.js", "store.js", "orders.js", "payments.js", "r2.js", "reviews.js", "rates.js", "geo.js", "notify.js"]) {
+  const file = path.join("src", name);
+  if (!existsSync(file)) continue;
+  const source = await read(file);
+  if (source.includes('from "./refuse.js"')) {
+    // Strip the module's own error field from the pattern: refuse() is defined
+    // to carry the Vietnamese sentence for logs, and it lives in refuse.js.
+  }
+  for (const match of source.matchAll(/res\.status\([^)]*\)\.json\(\{\s*error:\s*"([^"]+)"/g)) {
+    if (VIETNAMESE_SENTENCE.test(match[1])) {
+      fail("lỗi tiếng Việt cho trình duyệt", `src/${name}`,
+        `gửi thẳng "${match[1].slice(0, 60)}" mà không có code — dùng refuse("khoá", "câu tiếng Việt", status) để trình duyệt dịch được`);
+    }
+  }
+  // And the same, for a body built as a variable rather than an object literal.
+  for (const match of source.matchAll(/json\(\{\s*error:\s*`([^`]+)`/g)) {
+    fail("lỗi tiếng Việt cho trình duyệt", `src/${name}`,
+      `gửi thẳng một câu nội suy "${match[1].slice(0, 60)}" mà không có code — dùng refuse()`);
+  }
+}
+
+// Every key the server sends must exist in both halves of the dictionary. The
+// orphan check above asks the opposite question — is anything in the dictionary
+// unread — and neither would notice a key that is sent, is read, and is simply
+// not there: the browser falls through to the sentence and the page is Vietnamese
+// again, with no finding anywhere.
+// Comments are removed before the scan. A key that appears only in prose is not
+// a key anyone sends, and reading documentation as code produced thirty-eight
+// phantom usages on the first run of this check — the same mistake
+// objectLiteralAt above made, in a different parser.
+const withoutComments = (source) => source.replace(/\/\*[\s\S]*?\*\//g, "").replace(/(^|[^:])\/\/.*$/gm, "$1");
+
+for (const [name, source] of keyProducers) {
+  for (const match of withoutComments(source).matchAll(/refuse\("([\w.]+)"/g)) {
+    if (!declared.has(match[1])) {
+      fail("khoá i18n chưa định nghĩa", name, `máy chủ gửi "${match[1]}" mà từ điển không có — trình duyệt sẽ hiện tiếng Việt`);
+    }
   }
 }
 
@@ -457,13 +671,19 @@ for (const name of htmlFiles) {
 //     The audit's own source quotes several of them in the explanation of this very
 //     check, and a check that fires on the description of the bug it is looking for
 //     is a check that gets switched off.
-const KNOWN_TOKENS = new Set([
-  "site", "support", "year", "jsonLd", "legalEntity", "paymentWindowHours",
-  "reviewMinLength", "reviewMaxLength", "brandName", "brand",
-  // Filled by fillCopy() on the way out, from BRAND_FOUNDER_NAME and BRAND_NAME,
-  // so a person's name in product copy cannot be misspelled independently of it.
-  "founder",
-]);
+//
+//     The list itself is not written here. It is read out of src/pages.js, next to
+//     the builder that fills the values, so a token the renderer learns is known
+//     here the same edit — the hand-written copy this replaces had already drifted
+//     ({{brandWordmark}} filled, "unknown"), failing the build on correct pages.
+const readTokenList = (exportName) => {
+  const block = pagesSource.match(new RegExp(`export const ${exportName} = \\[([\\s\\S]*?)\\];`))?.[1] || "";
+  return (block.match(/"([^"]+)"/g) || []).map((quoted) => quoted.replace(/"/g, ""));
+};
+const KNOWN_TOKENS = new Set([...readTokenList("PAGE_TOKENS"), ...readTokenList("COPY_TOKENS")]);
+if (!KNOWN_TOKENS.size) {
+  fail("placeholder lạ", "src/pages.js", "không đọc được PAGE_TOKENS/COPY_TOKENS — audit không thể biết token nào là hợp lệ");
+}
 for (const name of htmlFiles) {
   const source = await read(path.join("public", name));
   for (const token of source.matchAll(/\{\{\s*([a-zA-Z]+)\s*\}\}/g)) {
@@ -595,13 +815,18 @@ for (const relative of operatorFacing) {
 // all. /lookup served the literal "{{support}}" as the support address on the
 // recovery page, and /404.html printed "© {{year}}". Four gates, all green.
 //
-// So the names are read out of renderPage instead of being written down, and a
-// file carrying any token has to be named in the renderer at all. If renderPage
-// ever moves, the slice below is empty and every token fails loudly rather than
-// silently passing again.
+// So the names are read out of the renderer's own wiring instead of being written
+// down, and a file carrying any token has to be named in the renderer at all. The
+// wiring used to be eleven replaceAll literals inside renderPage; it is now one
+// shared filler fed by PAGE_TOKENS in src/pages.js, so this check reads that list
+// and additionally asserts renderPage still goes through the filler. If renderPage
+// ever stops using it, every token fails loudly rather than silently passing again.
 const renderStart = serverSource.indexOf("async function renderPage");
 const renderBody = serverSource.slice(renderStart, serverSource.indexOf("const sendPage", renderStart));
-const wiredTokens = new Set([...renderBody.matchAll(/replaceAll\(\s*"\{\{\s*([a-zA-Z]+)\s*\}\}"/g)].map((m) => m[1]));
+if (!/fillPageTokens\s*\(/.test(renderBody)) {
+  fail("token chưa nối", "src/app.js", "renderPage không còn dùng fillPageTokens — kiểm tra này không còn nhìn thấy token nào được nối");
+}
+const wiredTokens = new Set(readTokenList("PAGE_TOKENS"));
 for (const name of htmlFiles) {
   const source = await read(path.join("public", name));
   for (const match of source.matchAll(/\{\{\s*([a-zA-Z]+)\s*\}\}/g)) {
@@ -611,6 +836,44 @@ for (const name of htmlFiles) {
     if (!serverSource.includes(`"${name}"`)) {
       fail("trang chưa render", `public/${name}`, `có token {{${match[1]}}} nhưng tên file không xuất hiện trong src/app.js — express.static sẽ serve file thô và token lọt thẳng ra trang`);
     }
+  }
+}
+
+// ---------------------------------------------------------------------------
+// 5f. A header that spells the brand out instead of reading it from configuration.
+//
+//     Every page's header carries the wordmark, and its last segment is styled
+//     separately, so it cannot be a plain {{brandName}} substitution — which is
+//     exactly why it was typed into fourteen places: seven HTML files, twice in most
+//     of them, plus the product page the server builds in code.
+//
+//     Fourteen copies is fourteen chances to answer a rename with the old shop, and it
+//     already happened: the product page is the surface a crawler reads most, and its
+//     header kept announcing the old brand while the title, the canonical, the
+//     structured data and every email had moved on.
+//
+//     The check above it could not see this. Section 4d counts og:site_name inside
+//     public/*.html, and src/pages.js never exists as a file — so the one header that
+//     is generated in code, and the one most likely to drift, was the one it was blind
+//     to. So this asks a question with no brand value in it: does a site header carry
+//     literal text, or does it carry the token?
+//
+//     Brand-value independent on purpose. CI sets BRAND_NAME to a fixture, so a check
+//     built around the real name would pass there and catch nothing.
+// ---------------------------------------------------------------------------
+for (const name of htmlFiles) {
+  const source = await read(path.join("public", name));
+  for (const header of source.matchAll(/<a class="brand"[^>]*>([\s\S]*?)<\/a>/g)) {
+    if (!header[1].includes("{{brandWordmark}}")) {
+      fail("thương hiệu gõ cứng", `public/${name}`, `header viết chữ thật thay vì {{brandWordmark}} — đổi BRAND_NAME sẽ không áp dụng ở đây`);
+    }
+  }
+}
+// The generated one. src/pages.js is the header most likely to drift and the one no
+// file-based check can reach.
+for (const header of pagesSource.matchAll(/<a class="brand"[^>]*>([\s\S]*?)<\/a>/g)) {
+  if (!header[1].includes("${brandWordmark()}")) {
+    fail("thương hiệu gõ cứng", "src/pages.js", `header trang sản phẩm viết chữ thật thay vì \${brandWordmark()} — đây là trang crawler đọc nhiều nhất`);
   }
 }
 
@@ -722,10 +985,17 @@ for (const name of htmlFiles) {
 }
 
 // ---------------------------------------------------------------------------
-// Every family of defect this file knows how to catch. Kept as a number because it
-// is the number a reader checks: a project that discovers a new way to break
-// itself and cannot make the mechanism fail has not fixed anything, and "7" is
-// easy to notice go stale and "several" is not.
+// Every family of defect this file knows how to catch.
+//
+// The number used to be a literal — 17 — sitting under a comment that listed 19, so
+// the one figure a reader was meant to sanity-check had already drifted from the
+// list above it. That is the exact failure the file exists to prevent, committed by
+// the file itself, and no gate could see it: a test asserting "groups === 17" would
+// have kept passing while the list said 19.
+//
+// So the count is derived from the check labels the code actually registered. A new
+// family cannot be added without the number moving, the number cannot be wrong, and
+// the comment below stays a readable index rather than the source of truth.
 //
 //  1 link or asset with no file behind it
 //  2 the same route registered twice
@@ -734,21 +1004,61 @@ for (const name of htmlFiles) {
 //  3c the same key written twice in one dictionary
 //  4 a configured value also written into a file
 //  4b the site's own host in deploy/ or scripts/
+//  4bb the R2 bucket's origin list against APP_URL
 //  4c display content sent in one language
 //  4d the same identity declared twice on one page
 //  4e a language switch the page cannot honour
 //  4f a template placeholder nothing knows how to fill
 //  5 structured data pointing at a page robots.txt forbids
-//  5b Vietnamese written without its diacritics, in the storefront and in the
-//     operator-facing text of scripts/ and test/
+//  5b Vietnamese written without its diacritics, in the storefront, in src/ and in
+//     the operator-facing text of scripts/ and test/
 //  5c a template token the renderer never fills
 //  5d a template the renderer never sees, token or not
 //  5e an hreflang pointing at a URL nothing answers
+//  5f a hardcoded brand wordmark in HTML the server renders
 //  6 a page nothing links to
 //  7 a phrase from the fallback dictionary inside the dictionary itself
 //  8 the same global declared by two scripts on one page
-const groups = 17;
+const REGISTERED = new Set(findings.map((item) => item.check));
+// Families that ran and found nothing leave no trace in `findings`, so the labels
+// they use have to be declared here. Adding a check without adding its label is
+// still possible, and the audit.test.js test below is what holds this honest.
+// Every label fail() can be called with. It is checked against the labels the
+// run actually used, because a mismatch makes the audit report the wrong reason
+// for a real finding: "check not declared in the list at the end of the file"
+// tells whoever is looking that the gate itself is broken, which is both true
+// and useless.
+//
+// It had drifted in six places, and in four of them only by a diacritic —
+// "khoá" at the call site against "khóa" in this list, the same word written two
+// ways. Nothing failed while that was true, because REGISTERED is built from the
+// findings and a clean run produces none, so `unknown` is empty and the check
+// passes. It would only have spoken up at the exact moment it was needed: the
+// first real orphaned translation key, reported as a problem with the audit
+// instead of with the dictionary.
+//
+// The labels below are the call sites' spelling, character for character.
+const DECLARED = [
+  "link gãy", "route trùng", "thiếu bản dịch", "khoá i18n mồ côi", "khoá i18n chưa định nghĩa",
+  "khoá i18n trùng", "nút đổi ngữ không có từ điển", "thừa nhiệu",
+  "domain gõ tay", "email gõ tay", "R2 CORS lệch", "R2 CORS thừa origin",
+  "ngôn ngữ thiếu", "thương hiệu khai báo hai lần", "thừa ngôn ngữ", "placeholder lạ",
+  "schema chặn", "tiếng Việt không dấu", "tiếng Việt ở phía máy chủ", "token chưa nối",
+  "trang chưa render", "hreflang chết", "thương hiệu gõ cứng", "trang mồ côi",
+  "trùng tên toàn cục", "chữ rỗng", "thiếu font thương hiệu",
+  "lỗi tiếng Việt cho trình duyệt",
+];
+const unknown = [...REGISTERED].filter((label) => !DECLARED.includes(label));
+if (unknown.length) {
+  console.error(`[audit] Nhom kiem tra chua khai bao trong danh sach cuoi file: ${unknown.join(", ")}`);
+  process.exitCode = 1;
+}
+const groups = new Set([...DECLARED, ...REGISTERED]).size;
 for (const item of findings) console.error(`FAIL  ${item.check.padEnd(18)} ${item.file}: ${item.detail}`);
 console.log(`\n[audit] ${groups} nhom kiem tra, ${findings.length} van de.`);
+if (skipped.length) {
+  console.log(`[audit] Bo qua ${skipped.length} nhom vi thieu cau hinh: ${skipped.join(", ")}`);
+  console.log("[audit] Dat APP_URL va SUPPORT_EMAIL (xem .env.example) de chay day du.");
+}
 if (!findings.length) console.log("[audit] PASS: không có domain gõ tay, route trùng, link gãy, tiếng Việt mất dấu hay khoá i18n mồ côi.");
 else process.exitCode = 1;

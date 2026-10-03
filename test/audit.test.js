@@ -148,10 +148,17 @@ test('audit chặn được từng loại lỗi nó sinh ra để bắt', async 
     assert.match(output, /APP_URL/, 'phải nói tên biến còn thiếu');
     assert.match(output, /SUPPORT_EMAIL/, 'phải nói tên biến còn thiếu');
     assert.match(output, /\[audit\] PASS/, 'các nhóm không phụ thuộc cấu hình vẫn phải chạy hết');
-    // And with the values present it is exactly as strict as before.
+    // And with the values present it is exactly as strict as before — except for
+    // the one documented exception: AUDIT_DOMAIN is a fixture host by design, and
+    // the R2 CORS group deliberately skips on a fixture host rather than comparing
+    // the shop's real origin list against a throwaway domain. So "configured"
+    // means exactly that one named skip and nothing else: any new skip, or any
+    // finding, still fails here.
     const configured = runAudit(cwd);
-    assert.equal(configured.status, 0, `có cấu hình thì phải sạch:\n${configured.stdout}${configured.stderr}`);
-    assert.ok(!/Bo qua/.test(configured.stdout), 'có cấu hình thì không được bỏ qua nhóm nào');
+    const configuredOutput = `${configured.stdout}${configured.stderr}`;
+    assert.equal(configured.status, 0, `có cấu hình thì phải sạch:\n${configuredOutput}`);
+    const skips = [...configured.stdout.matchAll(/Bo qua \d+ nhom vi thieu cau hinh: ([^\n]+)/g)].map((m) => m[1].trim());
+    assert.deepEqual(skips, ['R2 CORS khớp APP_URL (APP_URL là giá trị giả)'], `có cấu hình thì chỉ được bỏ qua đúng nhóm R2 đã nêu danh, không thêm không bớt:\n${configured.stdout}`);
   }
 
   // 5c. A template token nothing substitutes. {{legalEntity}} was added to the
@@ -167,6 +174,40 @@ test('audit chặn được từng loại lỗi nó sinh ra để bắt', async 
     const output = `${result.stdout}${result.stderr}`;
     assert.equal(result.status, 1, 'token không được điền phải FAIL');
     assert.match(output, /token chưa nối.*chuaCoAiDien/s, output);
+  }
+
+  // 5d. The R2 CORS group on a host it can actually judge. Every run above uses
+  //     a fixture APP_URL, on which this group skips by design — so until now no
+  //     test had ever seen it pass or fail, and a check nobody exercises is a
+  //     check that can rot unnoticed. The domain below is fake but deliberately
+  //     not a fixture (.example is exactly what triggers the documented skip),
+  //     following the same precedent as the corsDiff unit tests.
+  {
+    const cwd = await copy('r2-cors-positive');
+    const { requiredOrigins } = await import('../scripts/lib/cors.mjs');
+    const appUrl = 'https://r2check.example.org';
+    await fs.cp(path.join(projectRoot, 'cloudflare'), path.join(cwd, 'cloudflare'), { recursive: true });
+    const origins = requiredOrigins(appUrl);
+    const rule = [{ AllowedOrigins: origins, AllowedMethods: ['GET', 'PUT', 'HEAD'], AllowedHeaders: ['Content-Type'], ExposeHeaders: ['ETag'], MaxAgeSeconds: 900 }];
+    await fs.writeFile(path.join(cwd, 'cloudflare', 'r2-cors.json'), JSON.stringify(rule, null, 2));
+    const runWith = () => spawnSync(process.execPath, [path.join(projectRoot, 'scripts', 'audit-web.mjs'), '--root', cwd], {
+      cwd: projectRoot,
+      encoding: 'utf8',
+      env: { ...process.env, NODE_ENV: 'test', APP_URL: appUrl, SUPPORT_EMAIL: AUDIT_EMAIL },
+    });
+    const ok = runWith();
+    const okOutput = `${ok.stdout}${ok.stderr}`;
+    assert.equal(ok.status, 0, `CORS khớp APP_URL thì phải sạch:\n${okOutput}`);
+    assert.ok(!/Bo qua/.test(ok.stdout), 'không phải fixture thì không được bỏ qua nhóm nào');
+    // And a stale file must fail naming the repair, not pass quietly.
+    const stale = [...origins.filter((origin) => !origin.includes('r2check')), 'https://cu-ten-mien.example.net'];
+    rule[0].AllowedOrigins = stale;
+    await fs.writeFile(path.join(cwd, 'cloudflare', 'r2-cors.json'), JSON.stringify(rule, null, 2));
+    const bad = runWith();
+    const badOutput = `${bad.stdout}${bad.stderr}`;
+    assert.equal(bad.status, 1, 'thiếu origin phải FAIL');
+    assert.match(badOutput, /R2 CORS lệch.*r2check/s, badOutput);
+    assert.match(badOutput, /r2:cors:write/, 'lỗi phải chỉ ra cách sửa');
   }
 
   // 6. Structured data aimed at a page robots.txt forbids.
@@ -315,7 +356,7 @@ test('không còn lệnh npm run nào dùng "-- --cờ"', async () => {
   // And each flagged operation really does have an entry that carries its flag,
   // so the fix is not just removing the documentation and leaving nothing behind.
   const scripts = JSON.parse(await fs.readFile(path.join(projectRoot, 'package.json'), 'utf8')).scripts;
-  for (const required of ['metrics:update', 'render:sync:apply', 'render:sync:deploy', 'render:deploy', 'db:migrate:apply', 'paypal:detect']) {
+  for (const required of ['metrics:update', 'render:sync:apply', 'render:sync:deploy', 'render:deploy', 'db:migrate:apply', 'paypal:detect', 'r2:cors:write', 'r2:cors:command']) {
     assert.ok(scripts[required], `package.json thiếu script "${required}"`);
     assert.ok(/(^|\s)--[a-z-]+/.test(scripts[required]), `"${required}" phải tự mang cờ`);
   }

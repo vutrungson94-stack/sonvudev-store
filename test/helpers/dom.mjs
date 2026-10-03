@@ -1,4 +1,21 @@
 import vm from 'node:vm';
+import fs from 'node:fs';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
+
+// Every page loads public/format.js before any other script, so the harness
+// does the same: bundles under test assume window.SVDFormat exists exactly the
+// way the browser guarantees it. Prepending here rather than in each test keeps
+// the load order in one place — twelve call sites concatenating scripts by hand
+// is how a new shared file gets forgotten by the suite but not by the page.
+const helpersRoot = path.dirname(fileURLToPath(import.meta.url));
+const projectRoot = path.resolve(helpersRoot, '..', '..');
+let sharedFormat = null;
+const withSharedFormat = (code) => {
+  if (String(code).includes('window.SVDFormat =')) return String(code);
+  if (!sharedFormat) sharedFormat = fs.readFileSync(path.join(projectRoot, 'public', 'format.js'), 'utf8');
+  return `${sharedFormat}\n${code}`;
+};
 
 
 // Minimal DOM stand-in so public/app.js can be executed in Node. It implements
@@ -176,7 +193,7 @@ export async function runScript(code, { document, window: winOverrides = {}, ...
   win.globalThis = win;
   win.self = win;
   try {
-    const script = new vm.Script(code, { filename: 'storefront.js' });
+    const script = new vm.Script(withSharedFormat(code), { filename: 'storefront.js' });
     script.runInContext(vm.createContext(win));
   } catch (error) {
     errors.push(`${error.name}: ${error.message}`);

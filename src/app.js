@@ -4,19 +4,20 @@ import { promises as fs } from "node:fs";
 import { fileURLToPath } from "node:url";
 import crypto from "node:crypto";
 import { env, isConfigured } from "./config.js";
-import { countOrders, dataDir, ensureSeed, findOrderByIdempotencyKey, getOrder, getProduct, getProductBySlug, isOrderOwner, isSellable, latestOrder, listExpiringOrders, listOpenOrders, listOrders, listOrdersForRevenue, listProducts, createOrder, updateOrder, createProduct, updateProduct, persistenceMode } from "./store.js";
+import { ORDER_STATUSES, countOrders, dataDir, ensureSeed, findOrderByIdempotencyKey, getOrder, getProduct, getProductBySlug, isOrderOwner, isSellable, latestOrder, listExpiringOrders, listOpenOrders, listOrders, listOrdersForRevenue, listProducts, createOrder, updateOrder, createProduct, updateProduct, persistenceMode } from "./store.js";
 import { supabaseRequest } from "./supabase-http.js";
 import { paypalEnvironmentIsSet } from "./config.js";
 import { createDownloadUrl, createUploadUrl } from "./r2.js";
 import { captureOrder, createOrder as createPayPalOrder, hashToken, newOrderId, newToken, paypalChargeFor, paypalChargeForProduct, paymentMatchesOrder, readOrder, verifyWebhook } from "./paypal.js";
 import { paymentInstructions, paymentOptions } from "./payments.js";
-import { brandMeta, esc, fillCopy, jsonLdGraph, renderFeed, renderIndexCount, renderIndexFilters, renderIndexGrid, renderLlmsTxt, renderOgImage, renderProductPage, renderStats, verificationFile, verificationMeta } from "./pages.js";
-import { hasPayment, isClosed, isUnpaid, markOrderDelivered, markOrderPaid, paymentDeadline, voidPayment } from "./orders.js";
+import { brandMeta, esc, fillCopy, fillPageTokens, pageTokenValues, renderFeed, renderIndexCount, renderIndexFilters, renderIndexGrid, renderLlmsTxt, renderOgImage, renderProductPage, renderStats, verificationFile, verificationMeta } from "./pages.js";
+import { hasPayment, isClosed, isUnpaid, markOrderDelivered, markOrderPaid, paymentDeadline, sweeperRunning, voidPayment } from "./orders.js";
 import { notifyOrder, notifyMode } from "./notify.js";
 import { resolveCountry } from "./geo.js";
 import { pingIndexNow, isIndexNowConfigured } from "./indexnow.js";
 import { vndPerUsd } from "./rates.js";
 import { createReview, listReviewsForProduct, reviewLimits } from "./reviews.js";
+import { refuse } from "./refuse.js";
 
 const app = express();
 const publicDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "public");
@@ -58,7 +59,7 @@ const isAdmin = (req) => {
   if (!expected || !supplied || supplied.length !== expected.length) return false;
   return crypto.timingSafeEqual(Buffer.from(supplied), Buffer.from(expected));
 };
-const admin = (req, res, next) => { if (!isAdmin(req)) return res.status(401).json({ error: "Unauthorized" }); next(); };
+const admin = (req, res, next) => { if (!isAdmin(req)) return res.status(401).json(refuse("api.err.unauthorized", "Unauthorized", 401)); next(); };
 
 // Order ids are short, so a lookup endpoint without a limit would let anyone
 // walk the id space. A per-key window is enough here: the app runs as a single
@@ -82,7 +83,7 @@ const tooMany = (key, limit) => {
 };
 const tooManyAttempts = (req) => tooMany(`ip:${req.ip || "unknown"}`, 10);
 
-app.set("trust proxy", 1);
+app.set("trust proxy", env.trustProxy);
 app.disable("x-powered-by");
 
 // Where the site canonically lives, read from APP_URL instead of written out.
@@ -190,8 +191,21 @@ app.get(/^\/[0-9a-z-]{8,128}\.txt$/i, (req, res, next) => {
 // script sits in a browser for weeks. When a fix finally lands, the owner keeps
 // running the old one and the panel silently does the wrong thing with no error
 // anywhere. Freshness beats caching for a page nobody but the owner visits.
-app.get(["/admin", "/admin.html", "/admin.js"], (_req, res) => {
-  res.set("Cache-Control", "no-store").sendFile(path.join(publicDir, _req.path === "/admin" ? "admin.html" : _req.path.slice(1)));
+//
+// Only the page tokens are substituted, and deliberately so: the panel is served as a
+// file rather than through renderPage, so nothing else could be filled in there
+// without handing the admin page the ownership tags and the catalogue the other
+// pages get. The one thing it still had hardcoded was the shop's name.
+app.get(["/admin", "/admin.html", "/admin.js"], async (_req, res) => {
+  res.set("Cache-Control", "no-store");
+  if (_req.path === "/admin.js") return res.sendFile(path.join(publicDir, "admin.js"));
+  try {
+    const html = await fs.readFile(path.join(publicDir, "admin.html"), "utf8");
+    res.type("html").send(fillPageTokens(html, pageTokenValues()));
+  } catch (error) {
+    console.error(error);
+    res.sendFile(path.join(publicDir, "admin.html"));
+  }
 });
 
 // The pages a search engine is meant to index, and what the server has to decide
@@ -253,31 +267,12 @@ async function renderPage(file) {
   // Optional rather than assumed: a file missing from the table is rendered with
   // no catalogue and no verification tags instead of throwing on the first read.
   const products = served[file]?.catalog ? await listProducts() : [];
-  const html = template
-    .replaceAll("{{site}}", env.appUrl)
-    .replaceAll("{{brandName}}", esc(env.brand.name))
-    .replaceAll("{{support}}", env.email.supportEmail)
-    // The payment window is quoted in the terms rather than decided silently by
-    // the server. It used to be the number 24 written into three files, so
-    // changing ORDER_PAYMENT_WINDOW_HOURS made the terms promise something the
-    // server did not do.
-    .replaceAll("{{paymentWindowHours}}", String(env.orders.paymentWindowHours))
-    // The review box's own limits, as the server set them. They used to be a
-    // literal 1200 on the textarea, which meant the two numbers that decide
-    // whether a sentence is publishable lived in different files and nothing
-    // could tell when they disagreed.
-    .replaceAll("{{reviewMinLength}}", String(reviewLimits.minLength))
-    .replaceAll("{{reviewMaxLength}}", String(reviewLimits.maxLength))
-    .replaceAll("{{year}}", String(new Date().getFullYear()))
-    // The legal entity behind the shop. It belongs on the terms page because that
-    // is the page a buyer reads when they are deciding whether to dispute a
-    // payment, and a page that names a brand but no entity behind it gives them
-    // nothing to name. Whatever goes here should be the entity a customer would
-    // actually see on their PayPal or bank statement, not the trading name.
-    .replaceAll("{{legalEntity}}", env.brand.legalEntity)
-    // The homepage's structured data comes from the same functions the product
-    // pages use, so the two can no longer describe the shop differently.
-    .replaceAll("{{jsonLd}}", jsonLdGraph(products))
+  // The page tokens come from pageTokenValues() in src/pages.js — one list, one
+  // builder — so a token the renderer fills can never be unknown to the audit or
+  // the byte-level tests again. What follows the tokens is structure, not values:
+  // verification tags, the catalogue and the counts, each derived from the same
+  // product list the tokens describe.
+  const html = fillPageTokens(template, pageTokenValues({ products, reviewLimits }))
     .replace("</head>", `${verificationMeta()}\n${brandMeta()}\n</head>`)
     .replace(/(<span class="product-count" id="product-count">)[\s\S]*?(<\/span>)/, `$1${esc(renderIndexCount(products))}$2`)
     .replace(/<!--filters:start-->[\s\S]*?<!--filters:end-->/, `<!--filters:start-->${renderIndexFilters(products)}<!--filters:end-->`)
@@ -390,14 +385,24 @@ const productPage = (lang) => async (req, res) => {
     // A draft, or one with no file behind it, must read as a 404 rather than as a
     // noindex page: the second is a page Google has already been told about, and
     // leaving it reachable invites the URL being kept and re-submitted.
+    //
+    // Rendered through the same 404 handler as every other missing page. This
+    // used to sendFile the raw template, so /product/<anything> answered with
+    // the literal {{brandWordmark}} and {{year}} while every other 404 was
+    // substituted — a leak no file-based check could see, because the file on
+    // disk is meant to carry those tokens.
     if (!product || product.status !== "active" || !product.fileKey || !isConfigured.r2) {
-      return res.status(404).sendFile(path.join(publicDir, "404.html"));
+      return notFound(req, res);
     }
     const reviews = await listReviewsForProduct(product.id);
     res.set("Cache-Control", "public, max-age=600").type("html").send(renderProductPage(product, lang, reviews));
   } catch (error) {
     console.error(error);
-    res.status(500).sendFile(path.join(publicDir, "404.html"));
+    try {
+      res.status(500).type("html").send(await renderPage("404.html"));
+    } catch {
+      res.status(500).sendFile(path.join(publicDir, "404.html"));
+    }
   }
 };
 app.get("/product/:slug", productPage("vi"));
@@ -549,7 +554,12 @@ app.get("/api/health", async (req, res) => {
     bank: isConfigured.bank, momo: Boolean(env.bank.momo), zalopay: Boolean(env.bank.zalopay), admin: isConfigured.admin,
     // "outbox" means there is no mail provider yet: order mail is being written
     // to data/outbox instead of being delivered.
-    email: notifyMode(), orderWindowHours: env.orders.paymentWindowHours, sweeper: Boolean(process.env.ORDER_SWEEP_DISABLED) ? false : true,
+    email: notifyMode(), orderWindowHours: env.orders.paymentWindowHours,
+    // The real timer, not a restatement of the flag that would have disabled it.
+    // See sweeperRunning() in src/orders.js: this used to read ORDER_SWEEP_DISABLED
+    // directly, which nothing but two test files ever set and which startSweeper()
+    // never consulted — so the monitor's only view of the sweeper was fiction.
+    sweeper: sweeperRunning(),
     // Whether the domain has been claimed with the search engines that crawl it.
     // A store can be perfectly healthy and still invisible, and this is the one
     // fact about that which is not visible anywhere else.
@@ -570,16 +580,16 @@ async function probe(check, label) {
 }
 app.get("/api/products", async (_req, res) => {
   try { res.json({ products: (await listProducts()).filter(isSellable).map(publicProduct) }); }
-  catch (error) { console.error(error); res.status(500).json({ error: "Không thể tải danh mục" }); }
+  catch (error) { console.error(error); res.status(500).json(refuse("api.err.catalogLoad", "Không thể tải danh mục", 500)); }
 });
 app.get("/api/products/:id", async (req, res) => {
   try {
     const product = await getProduct(req.params.id);
     // Same rule as the storefront and the sitemap, so a product cannot be
     // readable through the API while being invisible on the page.
-    if (!isSellable(product)) return res.status(404).json({ error: "Không tìm thấy sản phẩm" });
+    if (!isSellable(product)) return res.status(404).json(refuse("api.err.productNotFound", "Không tìm thấy sản phẩm", 404));
     res.json({ product: publicProduct(product) });
-  } catch (error) { console.error(error); res.status(500).json({ error: "Không thể tải sản phẩm" }); }
+  } catch (error) { console.error(error); res.status(500).json(refuse("api.err.productLoad", "Không thể tải sản phẩm", 500)); }
 });
 
 // Tells the storefront where the visitor is, so checkout can put the sensible
@@ -603,7 +613,7 @@ app.get("/api/checkout/options", async (req, res) => {
         paypal: isConfigured.paypal,
       }),
     });
-  } catch (error) { console.error(error); res.status(500).json({ error: "Không tải được phương thức thanh toán" }); }
+  } catch (error) { console.error(error); res.status(500).json(refuse("api.err.methodsLoad", "Không tải được phương thức thanh toán", 500)); }
 });
 
 // Re-issues the access token for an order the buyer already started. Without
@@ -650,19 +660,19 @@ app.post("/api/checkout", json, async (req, res) => {
     const productId = text(req.body.productId, 80);
     const method = req.body.paymentMethod === "paypal" ? "paypal" : "bank_transfer";
     const idempotencyKey = text(req.body.idempotencyKey, 64);
-    if (!isEmail(email)) return res.status(400).json({ error: "Email không hợp lệ" });
+    if (!isEmail(email)) return res.status(400).json(refuse("api.err.invalidEmail", "Email không hợp lệ", 400));
     // A buyer whose connection dropped mid-request may already have an order.
     // Handing it back beats silently opening a second one.
     const repeated = idempotencyKey ? await findOrderByIdempotencyKey(idempotencyKey) : null;
     if (repeated) return res.json(await resumeOrder(repeated));
     const product = await getProduct(productId);
-    if (!product || product.status !== "active") return res.status(404).json({ error: "Sản phẩm không khả dụng" });
-    if (!product.fileKey || !isConfigured.r2) return res.status(503).json({ error: "Sản phẩm chưa sẵn sàng để nhận thanh toán" });
-    if (method === "bank_transfer" && !isConfigured.bank) return res.status(503).json({ error: "Phương thức chuyển khoản chưa được cấu hình" });
-    if (method === "paypal" && !isConfigured.paypal) return res.status(503).json({ error: "PayPal chưa được cấu hình. Hãy chọn chuyển khoản hoặc cấu hình PayPal trên server." });
+    if (!product || product.status !== "active") return res.status(404).json(refuse("api.err.productUnavailable", "Sản phẩm không khả dụng", 404));
+    if (!product.fileKey || !isConfigured.r2) return res.status(503).json(refuse("api.err.productNotSellable", "Sản phẩm chưa sẵn sàng để nhận thanh toán", 503));
+    if (method === "bank_transfer" && !isConfigured.bank) return res.status(503).json(refuse("api.err.transferUnconfigured", "Phương thức chuyển khoản chưa được cấu hình", 503));
+    if (method === "paypal" && !isConfigured.paypal) return res.status(503).json(refuse("api.err.paypalUnconfigured", "PayPal chưa được cấu hình. Hãy chọn chuyển khoản hoặc cấu hình PayPal trên server.", 503));
     // Placed here, after everything above has already proved this request is a
     // genuinely new order. See checkoutThrottled for why the position matters.
-    if (checkoutThrottled(req, email)) return res.status(429).json({ error: "Bạn đã tạo quá nhiều đơn hàng. Vui lòng thử lại sau 15 phút." });
+    if (checkoutThrottled(req, email)) return res.status(429).json(refuse("api.err.rateLimitedCreate", "Bạn đã tạo quá nhiều đơn hàng. Vui lòng thử lại sau 15 phút.", 429));
     const accessToken = newToken();
     const id = newOrderId();
     const now = new Date().toISOString();
@@ -691,7 +701,7 @@ app.post("/api/checkout", json, async (req, res) => {
     const approvalUrl = (paypal.links || []).find((link) => link.rel === "payer-action" || link.rel === "approve")?.href;
     const saved = await updateOrder(order.id, { providerOrderId: paypal.id, updatedAt: now });
     res.json({ order: publicOrder(saved), accessToken, approvalUrl, ...deadlinePayload(saved) });
-  } catch (error) { console.error(error); res.status(500).json({ error: "Không thể tạo đơn hàng" }); }
+  } catch (error) { console.error(error); res.status(500).json(refuse("api.err.orderCreate", "Không thể tạo đơn hàng", 500)); }
 });
 
 function validOrderToken(req) { return req.get("x-order-token") || text(req.query.token, 100) || null; }
@@ -701,12 +711,12 @@ async function requireOrder(req, res) {
   // isOrderOwner hashes and compares in constant time. The inline comparison this
   // replaced was a plain === on a hash, which leaks how many leading characters
   // matched, and it was the fourth copy of this check in the codebase.
-  if (!isOrderOwner(order, token)) { res.status(404).json({ error: "Không tìm thấy đơn hàng" }); return null; }
+  if (!isOrderOwner(order, token)) { res.status(404).json(refuse("api.err.orderNotFound", "Không tìm thấy đơn hàng", 404)); return null; }
   return order;
 }
 app.get("/api/orders/:id", async (req, res) => {
   try { const order = await requireOrder(req, res); if (order) res.json({ order: publicOrder(order), payment: order.paymentProvider === "bank_transfer" ? paymentInstructions(order) : null, ...deadlinePayload(order) }); }
-  catch (error) { console.error(error); res.status(500).json({ error: "Không thể tải đơn hàng" }); }
+  catch (error) { console.error(error); res.status(500).json(refuse("api.err.orderLoad", "Không thể tải đơn hàng", 500)); }
 });
 app.get("/api/orders/:id/download", async (req, res) => {
   try {
@@ -714,12 +724,14 @@ app.get("/api/orders/:id/download", async (req, res) => {
     if (!order) return;
     // The only gate that matters is here. The button state in the browser is a
     // convenience; this is what actually decides whether bytes leave R2.
-    if (order.status !== "paid") return res.status(409).json({ error: isClosed(order) ? "Đơn hàng đã được giao, không thể tải lại" : "Đơn hàng chưa được thanh toán" });
+    if (order.status !== "paid") return res.status(409).json(isClosed(order)
+      ? refuse("api.err.orderAlreadyDelivered", "Đơn hàng đã được giao, không thể tải lại", 409)
+      : refuse("api.err.orderUnpaid", "Đơn hàng chưa được thanh toán", 409));
     const item = order.items?.[0];
-    if (!item?.fileKey) return res.status(409).json({ error: "Sản phẩm chưa có file phát hành" });
-    if (!isConfigured.r2) return res.status(503).json({ error: "R2 chưa được cấu hình" });
+    if (!item?.fileKey) return res.status(409).json(refuse("api.err.noReleaseFile", "Sản phẩm chưa có file phát hành", 409));
+    if (!isConfigured.r2) return res.status(503).json(refuse("api.err.r2Unconfigured", "R2 chưa được cấu hình", 503));
     res.json({ url: await createDownloadUrl(item.fileKey, `${item.name}-${item.version}.zip`), expiresIn: env.r2.downloadTtl });
-  } catch (error) { console.error(error); res.status(500).json({ error: "Không thể tạo link tải" }); }
+  } catch (error) { console.error(error); res.status(500).json(refuse("api.err.downloadLink", "Không thể tạo link tải", 500)); }
 });
 // Called once the browser has actually started the transfer. The server cannot
 // observe the file arriving, so the client is what tells it the release is out.
@@ -729,26 +741,26 @@ app.post("/api/orders/:id/delivered", json, async (req, res) => {
     if (!order) return;
     const updated = await markOrderDelivered(order);
     res.json({ order: publicOrder(updated), ...deadlinePayload(updated) });
-  } catch (error) { console.error(error); res.status(500).json({ error: "Không thể cập nhật đơn hàng" }); }
+  } catch (error) { console.error(error); res.status(500).json(refuse("api.err.orderUpdate", "Không thể cập nhật đơn hàng", 500)); }
 });
 
 app.post("/api/orders/lookup", json, async (req, res) => {
   try {
-    if (tooManyAttempts(req)) return res.status(429).json({ error: "Bạn đã tra cứu quá nhiều lần. Vui lòng thử lại sau 15 phút." });
+    if (tooManyAttempts(req)) return res.status(429).json(refuse("api.err.rateLimitedLookup", "Bạn đã tra cứu quá nhiều lần. Vui lòng thử lại sau 15 phút.", 429));
     const id = text(req.body.orderId, 80).toUpperCase();
     const email = text(req.body.email, 160).toLowerCase();
-    if (!id || !isEmail(email)) return res.status(400).json({ error: "Mã đơn hoặc email không hợp lệ" });
+    if (!id || !isEmail(email)) return res.status(400).json(refuse("api.err.invalidOrderRef", "Mã đơn hoặc email không hợp lệ", 400));
     const order = await getOrder(id);
     // One message for "no such order" and "email does not match", so the
     // endpoint never reveals which order ids exist.
-    const invalid = { error: "Không tìm thấy đơn hàng với mã và email này" };
+    const invalid = refuse("api.err.lookupMismatch", "Không tìm thấy đơn hàng với mã và email này", 404);
     if (!order || String(order.customerEmail || order.customer_email || "").toLowerCase() !== email) return res.status(404).json(invalid);
     // The original token only ever existed in the buyer's browser, so recovery
     // means issuing a new one and invalidating the old.
     const accessToken = newToken();
     await updateOrder(order.id, { accessTokenHash: hashToken(accessToken), updatedAt: new Date().toISOString() });
     res.json({ order: publicOrder(await getOrder(order.id)), accessToken, ...deadlinePayload(await getOrder(order.id)) });
-  } catch (error) { console.error(error); res.status(500).json({ error: "Không thể tra cứu đơn hàng" }); }
+  } catch (error) { console.error(error); res.status(500).json(refuse("api.err.lookupFailed", "Không thể tra cứu đơn hàng", 500)); }
 });
 
 /**
@@ -769,15 +781,20 @@ app.post("/api/reviews", json, async (req, res) => {
       authorName: req.body.authorName,
     });
     if (result.error) return res.status(result.status || 400).json({ error: result.error, code: result.code || null });
+    // Pass-through, and deliberately not wrapped in refuse(): src/reviews.js
+    // already returns {code, error, status} and its key is spelled out at the
+    // call site there. Re-wrapping it here would build the key a second time and
+    // put the dictionary's connection to the server back out of the audit's
+    // reach — the reason the whole key travels with the refusal.
     res.status(201).json({ review: result.review });
     // The words are now on the product page, which was already rendered and cached.
     invalidatePages();
-  } catch (error) { console.error(error); res.status(500).json({ error: "Không thể lưu đánh giá" }); }
+  } catch (error) { console.error(error); res.status(500).json(refuse("api.err.reviewSave", "Không thể lưu đánh giá", 500)); }
 });
 
 app.post("/api/paypal/webhook", express.raw({ type: "application/json" }), async (req, res) => {
   try {
-    if (!(await verifyWebhook(req.body, req.headers))) return res.status(400).json({ error: "Webhook signature invalid" });
+    if (!(await verifyWebhook(req.body, req.headers))) return res.status(400).json(refuse("api.err.webhookSignature", "Webhook signature invalid", 400));
     const event = JSON.parse(req.body.toString("utf8"));
     if (event.event_type === "PAYMENT.CAPTURE.COMPLETED") {
       const resource = event.resource || {};
@@ -793,13 +810,13 @@ app.post("/api/paypal/webhook", express.raw({ type: "application/json" }), async
       }
     }
     res.json({ received: true });
-  } catch (error) { console.error(error); res.status(400).json({ error: "Webhook rejected" }); }
+  } catch (error) { console.error(error); res.status(400).json(refuse("api.err.webhookRejected", "Webhook rejected", 400)); }
 });
 app.post("/api/paypal/capture", json, async (req, res) => {
   try {
     const order = await requireOrder(req, res);
     if (!order) return;
-    if (order.paymentProvider !== "paypal" || !order.providerOrderId) return res.status(400).json({ error: "Đơn hàng không dùng PayPal" });
+    if (order.paymentProvider !== "paypal" || !order.providerOrderId) return res.status(400).json(refuse("api.err.notPaypalOrder", "Đơn hàng không dùng PayPal", 400));
     if (order.status === "paid") return res.json({ order: publicOrder(order) });
     let capture;
     try {
@@ -814,12 +831,12 @@ app.post("/api/paypal/capture", json, async (req, res) => {
       capture = remote;
     }
     if (capture.status !== "COMPLETED" || !paymentMatchesOrder(capture, order)) {
-      return res.status(409).json({ error: "PayPal chưa xác nhận đúng đơn hàng hoặc số tiền" });
+      return res.status(409).json(refuse("api.err.paypalMismatch", "PayPal chưa xác nhận đúng đơn hàng hoặc số tiền", 409));
     }
     const capture0 = capture.purchase_units?.[0]?.payments?.captures?.[0] || capture;
     const updated = await markOrderPaid(order, { source: "capture", providerAmount: Number(capture0.amount?.value || 0), providerCurrency: capture0.amount?.currency_code || null });
     res.json({ order: publicOrder(updated), ...deadlinePayload(updated) });
-  } catch (error) { console.error(error); res.status(502).json({ error: "Không thể xác nhận thanh toán PayPal" }); }
+  } catch (error) { console.error(error); res.status(502).json(refuse("api.err.paypalConfirm", "Không thể xác nhận thanh toán PayPal", 502)); }
 });
 
 // Poll target for the admin badge. It used to read the whole order table every
@@ -837,7 +854,7 @@ app.get("/api/admin/orders/pending", admin, async (_req, res) => {
       // alert without a second request.
       newest: newest ? { id: newest.id, status: newest.status, createdAt: newest.createdAt || newest.created_at || null } : null,
     });
-  } catch (error) { console.error(error); res.status(500).json({ error: "Không kiểm tra được đơn hàng" }); }
+  } catch (error) { console.error(error); res.status(500).json(refuse("api.err.orderCheck", "Không kiểm tra được đơn hàng", 500)); }
 });
 
 // The history view, paged. Capping it matters for the same reason: an admin
@@ -850,24 +867,24 @@ app.get("/api/admin/orders", admin, async (req, res) => {
     const [orders, open, total] = await Promise.all([listOrders({ limit, offset }), listOpenOrders(), countOrders()]);
     res.json({ orders: orders.map(publicOrder), live: open.length, limit, offset, hasMore: orders.length === limit, total });
   }
-  catch (error) { console.error(error); res.status(500).json({ error: "Không thể tải đơn hàng" }); }
+  catch (error) { console.error(error); res.status(500).json(refuse("api.err.orderLoad", "Không thể tải đơn hàng", 500)); }
 });
 app.get("/api/admin/products", admin, async (_req, res) => {
   try { res.json({ products: await listProducts({ includeDrafts: true }) }); }
-  catch (error) { console.error(error); res.status(500).json({ error: "Không thể tải sản phẩm" }); }
+  catch (error) { console.error(error); res.status(500).json(refuse("api.err.productLoad", "Không thể tải sản phẩm", 500)); }
 });
 app.post("/api/admin/products", admin, json, async (req, res) => {
   try {
     const name = text(req.body.name, 120); const price = Number(req.body.price);
-    if (!name || !Number.isFinite(price) || price < 0) return res.status(400).json({ error: "Tên hoặc giá sản phẩm không hợp lệ" });
+    if (!name || !Number.isFinite(price) || price < 0) return res.status(400).json(refuse("api.err.invalidProductInput", "Tên hoặc giá sản phẩm không hợp lệ", 400));
     const slug = text(req.body.slug, 80) || name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
     // Checked here as well as by the unique index, so the panel gets a sentence it
     // can show rather than a 500. Postgres rejects the second row with a 23505
     // that used to reach the owner as "server error" with no way to tell which
     // field was the problem. The index stays the real guarantee; this is the
     // message.
-    if (!slug) return res.status(400).json({ error: "Tên sản phẩm không tạo được đường dẫn. Hãy nhập slug." });
-    if (await getProductBySlug(slug)) return res.status(409).json({ error: `Đường dẫn /product/${slug} đã có sản phẩm khác dùng rồi.` });
+    if (!slug) return res.status(400).json(refuse("api.err.slugRequired", "Tên sản phẩm không tạo được đường dẫn. Hãy nhập slug.", 400));
+    if (await getProductBySlug(slug)) return res.status(409).json(refuse("api.err.slugTaken", `Đường dẫn /product/${slug} đã có sản phẩm khác dùng rồi.`, 409));
     const item = await createProduct({
       slug, name,
       shortDescription: text(req.body.shortDescription, 180), description: text(req.body.description, 2000), category: text(req.body.category, 50) || "Khác", platform: text(req.body.platform, 50) || "Windows", version: text(req.body.version, 30) || "1.0.0", price, currency: text(req.body.currency, 8) || "VND",
@@ -883,7 +900,7 @@ app.post("/api/admin/products", admin, json, async (req, res) => {
     // all three were allowed to keep serving the previous catalogue for a minute.
     // Creating is rare; being wrong about a price is not.
     invalidatePages();
-  } catch (error) { console.error(error); res.status(500).json({ error: "Không thể tạo sản phẩm" }); }
+  } catch (error) { console.error(error); res.status(500).json(refuse("api.err.productCreate", "Không thể tạo sản phẩm", 500)); }
 });
 app.patch("/api/admin/products/:id", admin, json, async (req, res) => {
   try {
@@ -896,27 +913,27 @@ app.patch("/api/admin/products/:id", admin, json, async (req, res) => {
     if (req.body.seoTitle !== undefined) patch.seoTitle = text(req.body.seoTitle, 70);
     if (req.body.seoDescription !== undefined) patch.seoDescription = text(req.body.seoDescription, 175);
     const item = await updateProduct(req.params.id, patch);
-    if (!item) return res.status(404).json({ error: "Không tìm thấy sản phẩm" });
+    if (!item) return res.status(404).json(refuse("api.err.productNotFound", "Không tìm thấy sản phẩm", 404));
     // Price and description are what a search result shows, so an edit here is
     // exactly as indexable as a new page.
     await pingIndexNow(["/", `/product/${item.slug}`]);
     res.json({ product: item });
     invalidatePages();
   }
-  catch (error) { console.error(error); res.status(500).json({ error: "Không thể cập nhật sản phẩm" }); }
+  catch (error) { console.error(error); res.status(500).json(refuse("api.err.productUpdate", "Không thể cập nhật sản phẩm", 500)); }
 });
 app.post("/api/admin/uploads/presign", admin, json, async (req, res) => {
   try {
     const productRef = text(req.body.productRef ?? req.body.productId, 80); const version = text(req.body.version, 30); const fileName = text(req.body.fileName, 140);
-    if (!productRef || !version || !fileName) return res.status(400).json({ error: "Thiếu productRef, version hoặc fileName" });
+    if (!productRef || !version || !fileName) return res.status(400).json(refuse("api.err.missingFileRef", "Thiếu productRef, version hoặc fileName", 400));
     // The release formats, in one place. This gate used to name three extensions
     // while the shop sells Windows software, which is the whole catalogue: there
     // is no Apple or Linux build, and pretending otherwise in the uploader would
     // only produce a file the product page then misdescribes.
-    if (!/\.(zip|exe|msi|7z)$/i.test(fileName)) return res.status(400).json({ error: "Chỉ hỗ trợ file .zip, .exe, .msi hoặc .7z" });
-    if (!isConfigured.r2) return res.status(503).json({ error: "R2 chưa được cấu hình" });
+    if (!/\.(zip|exe|msi|7z)$/i.test(fileName)) return res.status(400).json(refuse("api.err.unsupportedFileType", "Chỉ hỗ trợ file .zip, .exe, .msi hoặc .7z", 400));
+    if (!isConfigured.r2) return res.status(503).json(refuse("api.err.r2Unconfigured", "R2 chưa được cấu hình", 503));
     res.json(await createUploadUrl({ productRef, version, fileName, contentType: text(req.body.contentType, 120) }));
-  } catch (error) { console.error(error); res.status(500).json({ error: "Không thể tạo link upload" }); }
+  } catch (error) { console.error(error); res.status(500).json(refuse("api.err.uploadLink", "Không thể tạo link upload", 500)); }
 });
 /**
  * Sums revenue per product, in the currency the buyer actually paid in.
@@ -939,14 +956,23 @@ app.get("/api/admin/revenue", admin, async (_req, res) => {
     let moneyBack = { VND: 0, USD: 0 };
     let paidOrders = 0;
     let refundedOrders = 0;
-    let outstanding = 0;
+    // Outstanding is bucketed per currency for the same reason net is: an unpaid
+    // order is not necessarily a VND one. A PayPal order inside its payment
+    // window is unpaid, and its amount is in PAYPAL_CURRENCY — so summing it into
+    // a single number and labelling the total "VND" reported a live dollar amount
+    // as if it were dong, on the one panel the owner reconciles against a bank
+    // statement with.
+    const waiting = {};
     for (const order of orders) {
       const item = order.items?.[0] || {};
       // paidCount is what makes a delivered order still count as revenue.
       const count = Number(order.paidCount || 0);
       const back = Number(order.refundedCount || 0);
       if (count <= 0 && back <= 0) {
-        if (isUnpaid(order) && !isClosed(order) && paymentDeadline(order) && paymentDeadline(order) > Date.now()) outstanding += Number(order.amount || 0);
+        if (isUnpaid(order) && !isClosed(order) && paymentDeadline(order) && paymentDeadline(order) > Date.now()) {
+          const pendingCurrency = order.currency || "VND";
+          waiting[pendingCurrency] = (waiting[pendingCurrency] || 0) + Number(order.amount || 0);
+        }
         continue;
       }
       paidOrders += count;
@@ -991,8 +1017,8 @@ app.get("/api/admin/revenue", admin, async (_req, res) => {
     for (const currency of new Set([...Object.keys(gross), ...Object.keys(moneyBack)])) {
       net[currency] = (gross[currency] || 0) - (moneyBack[currency] || 0);
     }
-    res.json({ currency: env.paypal.currency, gross, refunds: moneyBack, net, paidOrders, refundedOrders, outstanding, products: rows, generatedAt: new Date().toISOString() });
-  } catch (error) { console.error(error); res.status(500).json({ error: "Không tổng hợp được doanh thu" }); }
+    res.json({ currency: env.paypal.currency, gross, refunds: moneyBack, net, outstanding: waiting, paidOrders, refundedOrders, products: rows, generatedAt: new Date().toISOString() });
+  } catch (error) { console.error(error); res.status(500).json(refuse("api.err.revenue", "Không tổng hợp được doanh thu", 500)); }
 });
 
 app.patch("/api/admin/orders/:id", admin, json, async (req, res) => {
@@ -1012,7 +1038,7 @@ app.patch("/api/admin/orders/:id", admin, json, async (req, res) => {
   try {
     const status = req.body.status;
     const existing = await getOrder(req.params.id);
-    if (!existing) return res.status(404).json({ error: "Không tìm thấy đơn hàng" });
+    if (!existing) return res.status(404).json(refuse("api.err.orderNotFound", "Không tìm thấy đơn hàng", 404));
     // Closes a paid order the same way the buyer's browser does, for the times
     // the download link was handed over by hand.
     if (req.body.delivered === true) { acted("deliver"); return res.json({ order: publicOrder(await markOrderDelivered(existing)) }); }
@@ -1020,7 +1046,7 @@ app.patch("/api/admin/orders/:id", admin, json, async (req, res) => {
     // over, because the server cannot see a file arrive, so the owner needs one
     // click to undo it when a customer says the file never made it.
     if (req.body.reopen === true) {
-      if (!isClosed(existing)) return res.status(409).json({ error: "Đơn này chưa đóng" });
+      if (!isClosed(existing)) return res.status(409).json(refuse("api.err.orderNotClosed", "Đơn này chưa đóng", 409));
       acted("reopen");
       const now = new Date().toISOString();
       return res.json({ order: publicOrder(await updateOrder(existing.id, { status: "paid", paidAt: existing.paidAt || now, deliveredAt: null, updatedAt: now })) });
@@ -1031,21 +1057,21 @@ app.patch("/api/admin/orders/:id", admin, json, async (req, res) => {
     if (req.body.refund === true) {
       // hasPayment, not status === "paid": a delivered order is no longer "paid"
       // by design, and refusing those made the most common refund impossible.
-      if (!hasPayment(existing)) return res.status(409).json({ error: "Chỉ hoàn tiền được đơn đã nhận tiền" });
+      if (!hasPayment(existing)) return res.status(409).json(refuse("api.err.refundNotPaid", "Chỉ hoàn tiền được đơn đã nhận tiền", 409));
       const reason = typeof req.body.reason === "string" ? req.body.reason.trim() : "";
-      if (!reason) return res.status(400).json({ error: "Cần ghi lý do hoàn tiền" });
+      if (!reason) return res.status(400).json(refuse("api.err.refundReasonRequired", "Cần ghi lý do hoàn tiền", 400));
       // The reason is in the order row; the request that carried it is here.
       acted("refund", { amount: existing.amount, currency: existing.currency, reason });
       return res.json({ order: publicOrder(await voidPayment(existing, { reason })) });
     }
-    if (!["pending", "pending_transfer", "paid", "payment_failed", "cancelled", "refunded"].includes(status)) return res.status(400).json({ error: "Trạng thái không hợp lệ" });
+    if (!ORDER_STATUSES.includes(status)) return res.status(400).json(refuse("api.err.invalidStatus", "Trạng thái không hợp lệ", 400));
     // Confirming by hand goes through the same path as a webhook, so the buyer
     // still gets the mail and paid_count still reflects the real revenue.
     if (status === "paid") { acted("confirm-paid", { amount: existing.amount, currency: existing.currency }); return res.json({ order: publicOrder(await markOrderPaid(existing, { source: "admin" })) }); }
     acted("status", { to: status });
     const item = await updateOrder(req.params.id, { status, paidAt: null, updatedAt: new Date().toISOString() });
     res.json({ order: publicOrder(item) });
-  } catch (error) { console.error(error); res.status(500).json({ error: "Không thể cập nhật đơn hàng" }); }
+  } catch (error) { console.error(error); res.status(500).json(refuse("api.err.orderUpdate", "Không thể cập nhật đơn hàng", 500)); }
 });
 
 // Anything that fell through is the 404 page, not Express's bare error. It is
@@ -1054,10 +1080,10 @@ app.patch("/api/admin/orders/:id", admin, json, async (req, res) => {
 // the footer carries the year instead of the template token; the handler itself is
 // defined with the other page routes.
 app.use((req, res) => {
-  if (req.path.startsWith("/api/")) return res.status(404).json({ error: "Not found" });
+  if (req.path.startsWith("/api/")) return res.status(404).json(refuse("api.err.notFound", "Not found", 404));
   return notFound(req, res);
 });
 
-app.use((error, _req, res, _next) => { console.error(error); res.status(500).json({ error: "Internal server error" }); });
+app.use((error, _req, res, _next) => { console.error(error); res.status(500).json(refuse("api.err.internal", "Internal server error", 500)); });
 export async function createApp() { await ensureSeed(); return app; }
 export default app;

@@ -100,7 +100,7 @@ async function loadProducts() {
   try {
     const res = await fetch('/api/products');
     const data = await res.json();
-    if (!res.ok) throw Error(data.error || T('products.loadError'));
+    if (!res.ok) throw Error(I18N.apiError(data, 'products.loadError'));
     products = data.products || [];
     render();
   } catch (error) {
@@ -279,7 +279,7 @@ async function submitCheckout(event, p) {
     // order mail carries both the id and the deadline, so say where to look.
     if (!res.ok && !res.status) throw Error(T('cart.errNetwork'));
     const json = await res.json();
-    if (!res.ok) throw Error(json.error || T('cart.errCreate'));
+    if (!res.ok) throw Error(I18N.apiError(json, 'cart.errCreate'));
     sessionStorage.setItem(window.OrderClient.storageKey, JSON.stringify({ id: json.order.id, token: json.accessToken }));
     checkoutKey = null;
     if (json.approvalUrl) {
@@ -436,7 +436,7 @@ async function checkOrder(id, token, quiet = false) {
     const res = await fetch(`/api/orders/${encodeURIComponent(id)}`, { headers: { 'x-order-token': token } });
     if (!res.ok && !res.status) throw Error(T('order.errOffline'));
     const data = await res.json();
-    if (!res.ok) throw Error(data.error || T('order.errStatus'));
+    if (!res.ok) throw Error(I18N.apiError(data, 'order.errStatus'));
     const wasPaid = lastOrder && lastOrder.status === 'paid';
     lastOrder = data.order;
     // Tell the buyer the moment the button unlocks, rather than making them
@@ -460,7 +460,7 @@ async function downloadOrder(id, token) {
   // that can never be downloaded again, and doing only the second hands nothing
   // over.
   const result = await window.OrderClient.download(id, token);
-  if (!result.ok) toastMsg(result.offline ? T('order.errOffline') : (result.error || T('order.errDownload')), true);
+  if (!result.ok) toastMsg(result.offline ? T('order.errOffline') : I18N.apiError(result, 'order.errDownload'), true);
   const b = document.getElementById('download-order');
   if (b) b.disabled = lastOrder ? lastOrder.status !== 'paid' : false;
 }

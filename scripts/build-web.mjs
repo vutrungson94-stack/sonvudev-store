@@ -1,8 +1,9 @@
-import { access, cp, mkdir, readFile, readdir, rm, writeFile } from 'node:fs/promises';
+import { access, cp, mkdir, readFile, rm, writeFile } from 'node:fs/promises';
 import { constants } from 'node:fs';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
+import { walkProjectFiles, JS_EXTENSIONS } from './lib/files.mjs';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 // The build refuses to package without each of these. Every one was added because
@@ -18,11 +19,12 @@ const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 // discovered by a buyer. public/order-client.js is here for the same reason as
 // the rest: four pages load it, and it holds the access token and the download
 // handshake they all share.
-const required = ['package.json', 'src/server.js', 'src/app.js', 'src/store.js', 'src/r2.js', 'src/paypal.js', 'src/payments.js', 'src/rates.js', 'src/geo.js', 'src/indexnow.js', 'src/pages.js', 'src/reviews.js', 'src/format.js', 'src/supabase-http.js', 'public/index.html', 'public/i18n.js', 'public/styles.css', 'public/order-client.js', 'public/app.js', 'public/admin.html', 'public/admin.js', 'public/paypal-return.html', 'public/paypal-return.js', 'public/lookup.html', 'public/lookup.js', 'public/order.html', 'public/order.js', 'public/404.html', 'public/about.html', 'public/related.js', 'public/favicon.svg', 'public/og.png', 'scripts/production-check.mjs', 'scripts/audit-web.mjs', 'scripts/seo-check.mjs', 'cloudflare/r2-cors.json'];
-const ignored = new Set(['.git', '.gbuildcache', 'build-reports', 'logs']);
-const jsFiles = [];
-async function walk(dir) { for (const entry of await readdir(dir, { withFileTypes: true })) { if (ignored.has(entry.name) || entry.name === 'node_modules' || entry.name.startsWith('node_modules_stale_')) continue; const full = path.join(dir, entry.name); if (entry.isDirectory()) await walk(full); else if (entry.name.endsWith('.js') || entry.name.endsWith('.mjs')) jsFiles.push(full); } }
-await walk(root);
+const required = ['package.json', 'src/server.js', 'src/app.js', 'src/store.js', 'src/r2.js', 'src/paypal.js', 'src/paypal-environment.js', 'src/payments.js', 'src/rates.js', 'src/geo.js', 'src/indexnow.js', 'src/pages.js', 'src/reviews.js', 'src/format.js', 'src/config.js', 'src/notify.js', 'src/supabase-http.js', 'src/refuse.js', 'public/index.html', 'public/i18n.js', 'public/styles.css', 'public/format.js', 'public/order-client.js', 'public/app.js', 'public/admin.html', 'public/admin.js', 'public/paypal-return.html', 'public/paypal-return.js', 'public/lookup.html', 'public/lookup.js', 'public/order.html', 'public/order.js', 'public/terms.html', 'public/privacy.html', 'public/refund.html', 'public/404.html', 'public/about.html', 'public/related.js', 'public/favicon.svg', 'public/og.png', 'scripts/production-check.mjs', 'scripts/audit-web.mjs', 'scripts/seo-check.mjs', 'scripts/r2-cors.mjs', 'scripts/run-tests.mjs', 'scripts/lib/cors.mjs', 'scripts/lib/files.mjs', 'cloudflare/r2-cors.json'];
+// One walk, shared with lint and metrics, so all three measure the same source.
+// This used to keep a private copy of the directory list that did not exclude
+// publish-output, which meant the build re-checked the artifact it had just
+// written and reported 122 JavaScript files where the project has 81.
+const jsFiles = await walkProjectFiles(root, { extensions: JS_EXTENSIONS });
 for (const file of required) await access(path.join(root, file), constants.R_OK);
 const manifest = JSON.parse(await readFile(path.join(root, 'package.json'), 'utf8'));
 if (manifest.type !== 'module') throw new Error('package.json must use type=module');
@@ -44,19 +46,31 @@ const auditSummary = (audit.stdout.match(/\[audit\] .*/g) || []).pop() || '';
 const metrics = spawnSync(process.execPath, [path.join(root, 'scripts', 'metrics.mjs')], { encoding: 'utf8' });
 if (metrics.status !== 0) throw new Error(`Metrics regressed:\n${metrics.stdout}${metrics.stderr}`);
 const metricsSummary = (metrics.stdout.match(/\[metrics\].*/g) || []).pop() || '';
+// The artifact is the single definition of what ships, and deploy/deploy.sh
+// deploys this directory and nothing else. It used to be written here and then
+// ignored: the deploy script copied the entire working tree instead, so the
+// existence gate and the audit re-run were certifying a directory no release
+// path consumed, while the directory that was actually deployed was never
+// checked at all — and it carried .env.backup-*, the build tool's secret cache
+// and the full .git history with it.
+//
+// The list below is also what package.json "files" has to agree with, which
+// test/artifact.test.js enforces. Two places that must name the same files is
+// one more than this project needs.
 const publishRoot = path.join(root, 'publish-output', 'node');
+const ARTIFACT_DIRECTORIES = ['src', 'public', 'scripts', 'supabase', 'cloudflare', 'deploy'];
+const ARTIFACT_FILES = ['package.json', 'package-lock.json', '.env.example', 'README.md'];
+
 await rm(publishRoot, { recursive: true, force: true });
 await mkdir(publishRoot, { recursive: true });
-for (const directory of ['src', 'public', 'scripts', 'supabase', 'cloudflare', 'deploy']) {
+for (const directory of ARTIFACT_DIRECTORIES) {
   await cp(path.join(root, directory), path.join(publishRoot, directory), { recursive: true, force: true });
 }
-for (const file of ['package.json', 'package-lock.json', '.env.example', 'README.md']) {
+for (const file of ARTIFACT_FILES) {
   await cp(path.join(root, file), path.join(publishRoot, file), { force: true });
 }
 await mkdir(path.join(root, 'build-reports'), { recursive: true });
-const artifactFiles = [];
-async function collectArtifacts(dir) { for (const entry of await readdir(dir, { withFileTypes: true })) { const full = path.join(dir, entry.name); if (entry.isDirectory()) await collectArtifacts(full); else artifactFiles.push(path.relative(root, full).replaceAll('\\', '/')); } }
-await collectArtifacts(publishRoot);
-const report = { application: 'SonVuDev Store', mode: 'web-node', generatedAt: new Date().toISOString(), javascriptFilesChecked: jsFiles.length, requiredFilesChecked: required.length, audit: auditSummary, metrics: metricsSummary, artifactFiles: artifactFiles.length, status: 'passed' };
+const artifactFiles = (await walkProjectFiles(publishRoot)).map((file) => path.relative(root, file).replaceAll('\\', '/'));
+const report = { application: 'SonVuDev Store', mode: 'web-node', generatedAt: new Date().toISOString(), javascriptFilesChecked: jsFiles.length, requiredFilesChecked: required.length, audit: auditSummary, metrics: metricsSummary, artifactFiles: artifactFiles.length, artifactPath: 'publish-output/node', status: 'passed' };
 await writeFile(path.join(root, 'build-reports', 'web-build.json'), JSON.stringify(report, null, 2));
-console.log(`[build] PASS: ${required.length} required files, ${jsFiles.length} JavaScript files checked, ${auditSummary}, ${metricsSummary}, ${artifactFiles.length} deploy files packaged.`);
+console.log(`[build] PASS: ${required.length} required files, ${jsFiles.length} JavaScript files checked, ${auditSummary}, ${metricsSummary}, ${artifactFiles.length} deploy files packaged into publish-output/node.`);

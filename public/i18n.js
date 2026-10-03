@@ -33,10 +33,69 @@ const DICT = {
     'brand.supportEmail': supportAddress(),
     'brand.tagline': 'Phần mềm tốt cho công việc tốt.',
     'brand.rights': `© ${YEAR} ${host()} · Đồng sở hữu`,
-    'announce.text': 'SonVuDev đang mở cửa cho các bản phát hành mới',
+    'announce.text': '{brand} đang mở cửa cho các bản phát hành mới',
     'announce.cta': 'Khám phá ngay',
     'nav.products': 'Sản phẩm',
-    'nav.why': 'Vì sao chọn SonVuDev',
+    'nav.home': 'Về trang chủ',
+
+    // Every refusal the API makes. The server sends the key and the Vietnamese
+    // sentence together (src/refuse.js); the browser uses the key, so a visitor who
+    // switched the shop to English is told what went wrong in English.
+    // 45 keys, one per refusal — before this they were Vietnamese sentences chosen by
+    // whichever route happened to fail, and the browser preferred them over its own
+    // dictionary, so a failed checkout explained itself in the wrong language.
+    'api.err.unauthorized': 'Không có quyền.',
+    'api.err.catalogLoad': 'Không thể tải danh mục',
+    'api.err.productNotFound': 'Không tìm thấy sản phẩm',
+    'api.err.productLoad': 'Không thể tải sản phẩm',
+    'api.err.methodsLoad': 'Không tải được phương thức thanh toán',
+    'api.err.invalidEmail': 'Email không hợp lệ',
+    'api.err.orderNotFound': 'Không tìm thấy đơn hàng',
+    'api.err.lookupMismatch': 'Không tìm thấy đơn hàng với mã và email này',
+    'api.err.invalidOrderRef': 'Mã đơn hoặc email không hợp lệ',
+    'api.err.lookupFailed': 'Không thể tra cứu đơn hàng',
+    'api.err.orderLoad': 'Không thể tải đơn hàng',
+    'api.err.orderUpdate': 'Không thể cập nhật đơn hàng',
+    'api.err.orderCreate': 'Không thể tạo đơn hàng',
+    'api.err.productNotSellable': 'Sản phẩm chưa sẵn sàng để nhận thanh toán',
+    'api.err.productUnavailable': 'Sản phẩm không khả dụng',
+    'api.err.orderNotClosed': 'Đơn này chưa đóng',
+    'api.err.orderAlreadyDelivered': 'Đơn hàng đã được giao, không thể tải lại',
+    'api.err.orderUnpaid': 'Đơn hàng chưa được thanh toán',
+    'api.err.paypalConfirm': 'Không thể xác nhận thanh toán PayPal',
+    'api.err.paypalMismatch': 'PayPal chưa xác nhận đúng đơn hàng hoặc số tiền',
+    'api.err.notPaypalOrder': 'Đơn hàng không dùng PayPal',
+    'api.err.paypalUnconfigured': 'PayPal chưa được cấu hình. Hãy chọn chuyển khoản hoặc cấu hình PayPal trên server.',
+    'api.err.rateLimitedCreate': 'Bạn đã tạo quá nhiều đơn hàng. Vui lòng thử lại sau 15 phút.',
+    'api.err.rateLimitedLookup': 'Bạn đã tra cứu quá nhiều lần. Vui lòng thử lại sau 15 phút.',
+    'api.err.invalidProductInput': 'Tên hoặc giá sản phẩm không hợp lệ',
+    'api.err.missingFileRef': 'Thiếu productRef, version hoặc fileName',
+    'api.err.unsupportedFileType': 'Chỉ hỗ trợ file .zip, .exe, .msi hoặc .7z',
+    'api.err.r2Unconfigured': 'R2 chưa được cấu hình',
+    'api.err.downloadLink': 'Không thể tạo link tải',
+    'api.err.uploadLink': 'Không thể tạo link upload',
+    'api.err.refundNotPaid': 'Chỉ hoàn tiền được đơn đã nhận tiền',
+    'api.err.refundReasonRequired': 'Cần ghi lý do hoàn tiền',
+    'api.err.invalidStatus': 'Trạng thái không hợp lệ',
+    'api.err.transferUnconfigured': 'Phương thức chuyển khoản chưa được cấu hình',
+    'api.err.noReleaseFile': 'Sản phẩm chưa có file phát hành',
+    'api.err.productCreate': 'Không thể tạo sản phẩm',
+    'api.err.productUpdate': 'Không thể cập nhật sản phẩm',
+    'api.err.slugRequired': 'Tên sản phẩm không tạo được đường dẫn. Hãy nhập slug.',
+    'api.err.slugTaken': 'Đường dẫn này đã có sản phẩm khác dùng rồi.',
+    'api.err.reviewSave': 'Không thể lưu đánh giá',
+    'api.err.revenue': 'Không tổng hợp được doanh thu',
+    'api.err.orderCheck': 'Không kiểm tra được đơn hàng',
+    'api.err.notFound': 'Không tìm thấy',
+    'api.err.internal': 'Lỗi máy chủ',
+    'api.err.webhookRejected': 'Webhook bị từ chối',
+    'api.err.webhookSignature': 'Chữ ký webhook không hợp lệ',
+    // 404.html links home with this key twice, and it did not exist: the page fell
+    // through to the element's own Vietnamese text, so both "back to home"
+    // buttons stayed Vietnamese on an English 404 — the page a visitor lands on
+    // after a bad link. No gate caught it because the audit only looks for keys
+    // nothing uses, never for keys a page uses and the dictionary is missing.
+    'nav.why': 'Vì sao chọn {brand}',
     'nav.faq': 'FAQ',
     'nav.buy': 'Mua ngay',
     'nav.store': 'Cửa hàng',
@@ -50,9 +109,9 @@ const DICT = {
     'hero.title1': 'Công cụ tốt.',
     'hero.title2': 'Cuộc sống',
     'hero.title3': 'gọn hơn.',
-    'hero.text': 'Những chương trình SonVuDev tự viết cho người dùng Việt — dễ cài đặt, minh bạch và luôn được cập nhật.',
+    'hero.text': 'Những chương trình {brand} tự viết cho người dùng Việt — dễ cài đặt, minh bạch và luôn được cập nhật.',
     'hero.cta1': 'Xem sản phẩm',
-    'hero.cta2': 'Tại sao SonVuDev?',
+    'hero.cta2': 'Tại sao {brand}?',
     'hero.trust1': 'Bảo mật',
     'hero.trust2': 'Hỗ trợ tận tâm',
     'hero.trust3': 'Cập nhật dài hạn',
@@ -85,7 +144,7 @@ const DICT = {
     'products.loadErrorText': 'Lỗi tải dữ liệu',
     'products.new': 'Mới',
     'products.buyAria': 'Mua',
-    'why.eyebrow': 'Đằng sau SonVuDev',
+    'why.eyebrow': 'Đằng sau {brand}',
     'why.title1': 'Ít hào mòn.',
     'why.title2': 'Nhiều hiệu quả.',
     'why.text': 'Chúng tôi tin rằng phần mềm tốt không cần phải phức tạp. Mỗi tính năng đều có một lý do để tồn tại.',
@@ -271,10 +330,58 @@ const DICT = {
     'brand.supportEmail': supportAddress(),
     'brand.tagline': 'Good software for good work.',
     'brand.rights': `© ${YEAR} ${host()} · All rights reserved`,
-    'announce.text': 'SonVuDev is opening up to new releases',
+    'announce.text': '{brand} is opening up to new releases',
     'announce.cta': 'Explore now',
     'nav.products': 'Products',
-    'nav.why': 'Why SonVuDev',
+    'nav.home': 'Back to home',
+
+    'api.err.unauthorized': 'Not authorised.',
+    'api.err.catalogLoad': 'Could not load the catalogue',
+    'api.err.productNotFound': 'Product not found',
+    'api.err.productLoad': 'Could not load the product',
+    'api.err.methodsLoad': 'Could not load the payment methods',
+    'api.err.invalidEmail': 'That email address is not valid',
+    'api.err.orderNotFound': 'Order not found',
+    'api.err.lookupMismatch': 'No order matches that code and email',
+    'api.err.invalidOrderRef': 'That order code or email is not valid',
+    'api.err.lookupFailed': 'Could not look up the order',
+    'api.err.orderLoad': 'Could not load the order',
+    'api.err.orderUpdate': 'Could not update the order',
+    'api.err.orderCreate': 'Could not create the order',
+    'api.err.productNotSellable': 'This product is not on sale',
+    'api.err.productUnavailable': 'This product is not available',
+    'api.err.orderNotClosed': 'This order is not closed yet',
+    'api.err.orderAlreadyDelivered': 'This order was already delivered and cannot be downloaded again',
+    'api.err.orderUnpaid': 'This order has not been paid',
+    'api.err.paypalConfirm': 'Could not confirm the PayPal payment',
+    'api.err.paypalMismatch': 'PayPal did not confirm this order or amount',
+    'api.err.notPaypalOrder': 'This order was not paid with PayPal',
+    'api.err.paypalUnconfigured': 'PayPal is not configured. Choose bank transfer, or configure PayPal on the server.',
+    'api.err.rateLimitedCreate': 'Too many orders placed. Please try again in 15 minutes.',
+    'api.err.rateLimitedLookup': 'Too many lookups. Please try again in 15 minutes.',
+    'api.err.invalidProductInput': 'That product name or price is not valid',
+    'api.err.missingFileRef': 'productRef, version or fileName is missing',
+    'api.err.unsupportedFileType': 'Only .zip, .exe, .msi and .7z files are supported',
+    'api.err.r2Unconfigured': 'R2 is not configured',
+    'api.err.downloadLink': 'Could not create the download link',
+    'api.err.uploadLink': 'Could not create the upload link',
+    'api.err.refundNotPaid': 'Only a paid order can be refunded',
+    'api.err.refundReasonRequired': 'A reason is required to refund',
+    'api.err.invalidStatus': 'That status is not valid',
+    'api.err.transferUnconfigured': 'Bank transfer is not configured',
+    'api.err.noReleaseFile': 'This product has no release file yet',
+    'api.err.productCreate': 'Could not create the product',
+    'api.err.productUpdate': 'Could not update the product',
+    'api.err.slugRequired': 'That product name does not make a valid path. Enter a slug.',
+    'api.err.slugTaken': 'That path already belongs to another product.',
+    'api.err.reviewSave': 'Could not save the review',
+    'api.err.revenue': 'Could not total the revenue',
+    'api.err.orderCheck': 'Could not verify the order',
+    'api.err.notFound': 'Not found',
+    'api.err.internal': 'Something went wrong on our side',
+    'api.err.webhookRejected': 'Webhook rejected',
+    'api.err.webhookSignature': 'Webhook signature is not valid',
+    'nav.why': 'Why {brand}',
     'nav.faq': 'FAQ',
     'nav.buy': 'Buy now',
     'nav.store': 'Store',
@@ -288,9 +395,9 @@ const DICT = {
     'hero.title1': 'Good tools.',
     'hero.title2': 'A simpler',
     'hero.title3': 'daily life.',
-    'hero.text': 'Programs SonVuDev writes from scratch for everyday users — easy to install, transparent, and always updated.',
+    'hero.text': 'Programs {brand} writes from scratch for everyday users — easy to install, transparent, and always updated.',
     'hero.cta1': 'View products',
-    'hero.cta2': 'Why SonVuDev?',
+    'hero.cta2': 'Why {brand}?',
     'hero.trust1': 'Secure',
     'hero.trust2': 'Real support',
     'hero.trust3': 'Long-term updates',
@@ -313,7 +420,7 @@ const DICT = {
     'products.loadErrorText': 'Failed to load data',
     'products.new': 'New',
     'products.buyAria': 'Buy',
-    'why.eyebrow': 'Behind SonVuDev',
+    'why.eyebrow': 'Behind {brand}',
     'why.title1': 'Less friction.',
     'why.title2': 'More results.',
     'why.text': 'We believe good software does not have to be complicated. Every feature exists for a reason.',
@@ -511,7 +618,16 @@ const I18N = {
     // Placeholders are filled here rather than by every caller. A sentence that
     // mentions an order id or a countdown reads as broken the moment one of them
     // is left as a literal brace.
-    const fill = (text) => (vars ? String(text).replace(/\{(\w+)\}/g, (match, name) => (vars[name] !== undefined ? vars[name] : match)) : text);
+    //
+    // {brand} always resolves to the shop name from configuration, so copy never
+    // hardcodes it: a rebrand edits BRAND_NAME, not eleven dictionary entries in
+    // two languages. Explicit vars win over the default, and braces nobody knows
+    // are left alone rather than blanked.
+    const fill = (text) => String(text).replace(/\{(\w+)\}/g, (match, name) => {
+      if (vars && vars[name] !== undefined) return vars[name];
+      if (name === "brand") return host();
+      return match;
+    });
     if (table[key] !== undefined) return fill(table[key]);
     // Never render an empty box for a missing key: fall back to Vietnamese,
     // then to whatever the caller passed, so the gap stays visible.
@@ -536,16 +652,19 @@ const I18N = {
   // recovery form and the order page each had their own escape, money and status
   // helpers; two of those copies had already drifted apart, so one order showed a
   // different status word depending on which screen the buyer was looking at.
+  //
+  // The implementations live in public/format.js, loaded before this file on
+  // every page: one escape and one money formatter for the whole browser side,
+  // counted by scripts/metrics.mjs so a new copy fails the build.
   get locale() { return current === 'en' ? 'en-US' : 'vi-VN'; },
   esc(value) {
-    return String(value ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+    return window.SVDFormat.esc(value);
   },
   money(value, currency = 'VND') {
     // A Vietnamese reader wants 249.000 and an English reader wants 249,000. The
     // separator is part of the language, so it follows the switch rather than
     // being hard-coded to the seller's own locale.
-    const amount = Number(value || 0);
-    return new Intl.NumberFormat(I18N.locale, currency === 'USD' ? { style: 'currency', currency } : { maximumFractionDigits: 0 }).format(amount);
+    return window.SVDFormat.money(value, currency, I18N.locale);
   },
   date(value) {
     const at = value ? new Date(value) : new Date(NaN);
@@ -553,6 +672,33 @@ const I18N = {
   },
   statusKey(status) { return STATUS_KEYS[status] || 'order.status.pending'; },
   status(status) { return I18N.t(I18N.statusKey(status), status); },
+  /**
+   * Turns a failed API response into a sentence in the reader's language.
+   *
+   * Every refusal the server makes carries two fields: `code`, a key in this
+   * dictionary, and `error`, a Vietnamese sentence for curl and for log lines
+   * (src/refuse.js). The browser must use `code`.
+   *
+   * It did not, and the order of the two decided the language. Every call site
+   * was `payload.error || T('some.fallback')` — the server's sentence won, because
+   * it was first — so a visitor who had switched the shop to English and then got
+   * a refusal was told, in Vietnamese, why. On the checkout form, at the moment
+   * of paying, which is where a buyer is least able to tell a real problem from
+   * one they caused.
+   *
+   * So the key is consulted first and the sentence is only reached for when there
+   * is no code — an older server, a proxy in between, or a response that never
+   * came from this one. `fallbackKey` is for the case where even that fails.
+   *
+   * @param {object|null} payload the parsed JSON body of a failed response
+   * @param {string} fallbackKey a key to use when the body carries nothing usable
+   * @returns {string} a sentence ready to put on screen
+   */
+  apiError(payload, fallbackKey) {
+    const code = payload && payload.code;
+    if (code) return I18N.t(code, payload.error || I18N.t(fallbackKey, ''));
+    return payload && payload.error ? payload.error : I18N.t(fallbackKey, '');
+  },
   /**
    * The countdown clock.
    *

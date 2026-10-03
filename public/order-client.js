@@ -97,7 +97,13 @@
       } catch (error) {
         return { ok: false, offline: true };
       }
-      if (!response.ok) return { ok: false, error: (payload && payload.error) || '' };
+      // The whole payload is passed through, not just `error`. It used to forward
+      // the Vietnamese sentence alone, which meant the translation key the server
+      // sends alongside it was discarded here — so the page that called this had
+      // nothing to translate and fell back to whatever language the sentence was
+      // written in. Returning the body keeps the key and the sentence together,
+      // which is what I18N.apiError expects.
+      if (!response.ok) return { ok: false, ...(payload || {}), error: (payload && payload.error) || '' };
       window.location.href = payload.url;
       window.OrderClient.markDelivered(orderId, token);
       return { ok: true, url: payload.url };

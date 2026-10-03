@@ -196,6 +196,23 @@ export async function sweepOrders(now = Date.now()) {
 let timer = null;
 let running = false;
 
+/**
+ * Whether the sweep is actually running in this process.
+ *
+ * The health endpoint used to answer this from an environment variable it never
+ * consulted: it read ORDER_SWEEP_DISABLED, which only two test files ever set and
+ * which startSweeper() does not look at. So the answer was a restatement of a config
+ * flag, not a statement about the server — and it was wrong in the direction that
+ * matters. A host that really had the sweeper turned off would still report
+ * sweeper:false while unpaid orders piled past their deadline, and a host with it
+ * running fine would report true whether or not it had started.
+ *
+ * /api/health is what the 30-minute monitor and UptimeRobot both read, so this field
+ * is the only place a stopped sweeper could ever have been noticed. It now reports
+ * the timer.
+ */
+export const sweeperRunning = () => Boolean(timer);
+
 async function tick() {
   if (running) return;
   running = true;
@@ -208,8 +225,13 @@ async function tick() {
  */
 export function startSweeper() {
   if (timer) return timer;
+  // A shop whose orders are swept by something else — a cron job, a second instance
+  // — does not want a second sweeper racing it. The interval came straight from
+  // config.js, which already applied its default and its floor, so re-guarding it
+  // here could only ever agree with it.
+  if (env.orders.sweepDisabled) return null;
   tick();
-  timer = setInterval(tick, Math.max(5000, Number(env.orders.sweepIntervalMs) || 60000));
+  timer = setInterval(tick, env.orders.sweepIntervalMs);
   // Never hold the process open for it; serverless and test hosts should exit.
   timer.unref?.();
   return timer;

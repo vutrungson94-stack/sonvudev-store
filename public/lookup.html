@@ -1,7 +1,7 @@
 <!doctype html>
 <html lang="vi">
 <head>
-<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="description" content="Tra cứu đơn hàng SonVuDev bằng mã đơn và email đã dùng khi thanh toán."><meta name="robots" content="noindex,follow"><title>Tra cứu đơn hàng — SonVuDev</title><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet"><link rel="stylesheet" href="styles.css">
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="description" content="Tra cứu đơn hàng {{brandName}} bằng mã đơn và email đã dùng khi thanh toán."><meta name="robots" content="noindex,follow"><title>Tra cứu đơn hàng — {{brandName}}</title><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet"><link rel="stylesheet" href="styles.css">
 </head>
 <body class="lookup-page" data-support="{{support}}">
 <main class="lookup-card">
@@ -20,8 +20,14 @@
 <p class="form-message" id="lookup-status"></p>
 </form>
 <a class="lookup-back" href="/"><span data-i18n="lookup.back">Về cửa hàng</span> ←</a>
+<!-- The page loads the dictionary, so it needs the control that goes with it.
+     Without this button the copy follows whatever language was stored from a
+     previous visit, or navigator.language on a first visit, and a buyer who got
+     the wrong one has no way to correct it — on the one page they reach after a
+     payment they may already be worried about. -->
+<button class="lang-toggle lookup-lang" type="button" data-lang-toggle>EN</button>
 </main>
-<script src="i18n.js"></script>
+<script src="format.js"></script><script src="i18n.js"></script>
 <script src="order-client.js"></script>
 <script src="lookup.js"></script>
 </body></html>

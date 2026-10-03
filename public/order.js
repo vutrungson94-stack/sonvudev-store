@@ -219,7 +219,7 @@ ${recoveryBar(order.id)}`;
     // means one order that can be downloaded forever beside one that cannot.
     const result=await window.OrderClient.download(order.id,state.token);
     if(result.ok){render();return}
-    lead.textContent=result.offline?T('order.errDownloadOffline'):(result.error||T('order.errDownload'));
+    lead.textContent=result.offline?T('order.errDownloadOffline'):I18N.apiError(result,'order.errDownload');
     button.disabled=false;
   });
   document.getElementById('order-refresh')?.addEventListener('click',()=>render());

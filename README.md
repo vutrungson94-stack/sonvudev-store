@@ -169,6 +169,11 @@ npm run render:sync:deploy     # ghi len Render roi trigger deploy moi
 npm run render:deploy          # chi deploy, khong doi bien
 ```
 
+Mọi lệnh ghi (`:apply`, `:deploy`) đều chạy build (syntax, audit, metrics) và toàn
+bộ test trước — đỏ ở đâu thì dừng ở đó, chưa ghi gì lên Render. Ghi biến môi
+trường lên Render là restart service trên code hiện tại, nên dry-run (`render:sync`
+không cờ) là lệnh duy nhất không bị chặn.
+
 Cần `RENDER_API_KEY` trong `.env`, lấy ở [Account Settings](https://dashboard.render.com/) → API Keys. Token này quyền truy cập toàn bộ tài khoản Render, chỉ giữ ở máy.
 
 Mặc định lệnh chỉ in ra diff. Thêm `--apply` mới ghi, và mỗi biến được ghi riêng qua `PUT /services/{id}/env-vars/{key}` nên không đụng vào `PORT` và các biến `RENDER_*` do Render tự sinh.
@@ -365,7 +370,7 @@ Sau đó cấu hình reverse proxy và chứng thư HTTPS cho `sonvudev.com` và
 ## Lưu ý production
 
 - Không commit `.env`; secret Supabase, R2, PayPal và admin phải được giữ riêng.
-- Bucket R2 phải private và CORS chỉ cho `https://sonvudev.com` (và `http://localhost:3000` khi phát triển).
+- Bucket R2 phải private, và CORS phải khớp `APP_URL`. File này không được sửa tay: `npm run r2:cors` kiểm tra, `npm run r2:cors:write` sinh lại từ `APP_URL`, `npm run r2:cors:command` in ra lệnh `wrangler` để áp lên bucket. Đổi tên miền mà quên chạy lệnh này là mọi lần upload file phát hành từ trang quản trị bị chặn bằng lỗi CORS, trong khi build, `/api/health` và `check:production` vẫn xanh.
 - Không thu tiền sản phẩm chưa có file phát hành.
 - Admin dùng token dài; production nên đổi sang Supabase Auth + role admin.
 - Cần chính sách bảo mật, điều khoản, hoàn tiền và thuế phù hợp trước khi vận hành lâu dài.

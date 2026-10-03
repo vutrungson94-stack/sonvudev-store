@@ -32,6 +32,18 @@
 # To change the address, set the repository variable SHOP_URL rather than editing this
 # file — a domain change is then one edit, and the check that watches the shop is
 # watching the shop.
+#
+# The mapping below is what makes that sentence true, and it was missing. SHOP_URL in
+# the run step is a *shell* variable: GitHub Actions puts repository variables into a
+# step's environment only when something declares them there. With no `env:` block the
+# shell never saw SHOP_URL, the `${SHOP_URL:-...}` default won every single run, and
+# setting the repository variable did nothing at all — while the comment above
+# promised exactly that it would work.
+#
+# A test asserted that the string "SHOP_URL" appears in this file, which the broken
+# version satisfied. The monitor that watches whether the shop is alive was pointed at
+# last year's host, reported on it faithfully, and had been untouchable by
+# configuration for its whole life. Declaring the variable here is the whole fix.
 
 name: shop is awake
 
@@ -57,19 +69,44 @@ jobs:
       contents: read
     runs-on: ubuntu-latest
     timeout-minutes: 5
+    env:
+      # No default on purpose. The run step carries a fallback for the case where this
+      # is empty, and that fallback is the address the shop had when this workflow was
+      # written. Naming it here too would mean two places to change, which is the thing
+      # this file exists to avoid.
+      SHOP_URL: ${{ vars.SHOP_URL }}
     steps:
       - name: Hỏi shop có thức không
         run: |
           set -u
-          url="${SHOP_URL:-https://sonvudev-store.onrender.com/api/health}"
+
+          # No fallback address. There used to be one — the Render host this shop
+          # ran on before it moved to a VPS — and it was the worst kind of default
+          # for an uptime check: after the move it kept probing a host that answers
+          # perfectly and is nobody's shop. Every run went green, and the monitor
+          # was reporting on a server that had not existed in months. A domain
+          # change that silently disarms the watch is worse than one that stops it.
+          #
+          # So the variable has to be set, and if it is not, this says so loudly
+          # and exits 0. Failing here would be wrong for the same reason the PayPal
+          # warning below does not fail: a scheduled job that is red for a reason
+          # nobody can fix from the log trains everyone to ignore the log.
+          if [ -z "${SHOP_URL:-}" ]; then
+            echo "!! SHOP_URL chua duoc dat trong repository variables — bo the nay KHONG kiem tra gi ca."
+            echo "!! Dat vars.SHOP_URL = https://<domain-cua-ban>/api/health trong Settings > Secrets and variables > Actions."
+            exit 0
+          fi
+
+          url="$SHOP_URL"
           echo "GET $url"
 
           # A sleeping instance takes the connection and then needs thirty to sixty
           # seconds to answer, so the timeout is generous. Failing because it was slow
           # would be the worst kind of alert: one that arrives when the shop is fine.
-          code=$(curl -s -o /tmp/health.json -w '%{http_code}' --max-time 90 "$url" || echo 000)
+          body="$(mktemp)"
+          code=$(curl -s -o "$body" -w '%{http_code}' --max-time 90 "$url" || echo 000)
           echo "HTTP $code"
-          cat /tmp/health.json 2>/dev/null || echo "(khong co noi dung)"
+          cat "$body" 2>/dev/null || echo "(khong co noi dung)"
           echo
 
           # 200 is not the same as working. The endpoint answers 503 when a dependency
@@ -79,10 +116,11 @@ jobs:
             echo "!! shop khong tra HTTP 200 — co the dang nguoi, dang that, hoac domain chua tro ve day"
             exit 1
           fi
-          if ! grep -q '"ok":true' /tmp/health.json; then
+          if ! grep -q '"ok":true' "$body"; then
             echo "!! tra HTTP 200 nhung ok=false — xem /api/health, co thieu R2 hoac database"
             exit 1
           fi
+          rm -f "$body"
 
           # Worth noticing, not worth failing over. A warning that fails on something
           # the shop deliberately turned off trains people to ignore warnings.

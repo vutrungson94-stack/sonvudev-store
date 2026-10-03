@@ -234,6 +234,6 @@ test('isOrderOwner dùng chung một cách so sánh, không phải === trên has
   assert.equal(isOrderOwner(stored, undefined), false);
   // The endpoint used to do this comparison inline with ===, which leaked how many
   // leading characters matched and was a fourth copy of the check.
-  const source = await fs.readFile(path.resolve('src', 'app.js'), 'utf8');
+  const source = await fs.readFile(path.join(root, 'src', 'app.js'), 'utf8');
   assert.ok(!/accessTokenHash\s*!==\s*hashToken/.test(source), 'app.js không được tự so sánh hash');
 });

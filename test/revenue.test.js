@@ -145,14 +145,37 @@ test('đơn quá hạn không tính vào tiền đang chờ thu', async () => {
   const stale = order({ expiresAt: new Date(Date.now() - 3600e3).toISOString() });
   await createOrder(stale);
   const data = await revenue();
-  assert.equal(data.outstanding, 99000, 'chỉ tính đơn còn trong hạn');
+  // Bucketed by currency, not a bare number. An unpaid order inside its window
+  // is not necessarily priced in VND — a PayPal order waiting for capture is
+  // unpaid too, and its amount is in PAYPAL_CURRENCY. Summing those together and
+  // labelling the result "VND" put a live dollar amount into a dong column on
+  // the panel the owner reconciles against a bank statement with.
+  assert.equal(data.outstanding.VND, 99000, 'chỉ tính đơn còn trong hạn, và ghi theo đúng tiền tệ');
+});
+
+test('tiền đang chờ thu tách bạch theo tiền tệ, không cộng chung', async () => {
+  // Measured as a delta, not an absolute. Every test in this file creates orders
+  // in the same store, so the VND total keeps growing from test to test — an
+  // absolute assertion here would pass or fail depending on the order the runner
+  // happened to use, which is the flaky-test pattern this whole file avoids.
+  const before = (await revenue()).outstanding;
+  const vnd = order();
+  await createOrder(vnd);
+  const usd = order({ currency: 'USD', amount: 9 });
+  await createOrder(usd);
+  const after = (await revenue()).outstanding;
+
+  assert.equal((after.VND || 0) - (before.VND || 0), 99000,
+    'đơn VND chưa thanh toán phải tăng bucket VND đúng số tiền');
+  assert.equal((after.USD || 0) - (before.USD || 0), 9,
+    'đơn USD chưa thanh toán phải nằm ở bucket USD — không cộng vào VND, không cộng vào USD của đơn khác');
 });
 
 test('đơn đã hủy không tính vào doanh thu lẫn tiền đang chờ', async () => {
   const o = order({ status: 'cancelled', cancelledAt: new Date().toISOString() });
   await createOrder(o);
   const data = await revenue();
-  assert.equal(data.outstanding, 99000, 'đơn hủy không phải tiền đang chờ');
+  assert.equal(data.outstanding.VND, 198000, 'đơn hủy không phải tiền đang chờ');
   assert.equal(data.products.find((p) => p.productId === tool.id).units, 3, 'đơn hủy không phải doanh thu');
 });
 

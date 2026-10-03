@@ -1,8 +1,19 @@
 import crypto from "node:crypto";
 import { env, isConfigured } from "./config.js";
 import { rateForCharge, vndPerUsd } from "./rates.js";
+import { resolvePaypalEnvironment } from "./paypal-environment.js";
 
-const base = () => env.paypal.environment === "live" ? "https://api-m.paypal.com" : "https://api-m.sandbox.paypal.com";
+// One resolver, not two literals written out again. This function existed here as
+// a second copy of the endpoint list in src/paypal-environment.js, which is the
+// file that exists specifically so there is only one — so it was imported by
+// config.js and never by the module that actually calls PayPal.
+//
+// The two agreed, so nothing was broken. The failure mode was the one the shared
+// file was written to prevent: a future change to how the environment maps to an
+// endpoint (a region, a new sandbox) would be made in the resolver, config.js
+// would pick it up and report the right endpoint in /api/health, and this module
+// would keep calling the old one.
+const base = () => resolvePaypalEnvironment(env.paypal.environment).apiBase;
 const authHeader = () => `Basic ${Buffer.from(`${env.paypal.clientId}:${env.paypal.clientSecret}`).toString("base64")}`;
 
 async function token() {

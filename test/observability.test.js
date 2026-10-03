@@ -1,14 +1,17 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { promises as fs } from 'node:fs';
+import { promises as fs, existsSync } from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 // The shop's test environment, applied before anything imports src/ — config.js
 // reads the environment once at load, so this has to come first and has to be
 // complete. See helpers/env.mjs for what a missing entry used to cost.
 import './helpers/env.mjs';
 
 process.env.NODE_ENV = 'test';
+
+const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 
 const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), 'sonvudev-observe-'));
 process.env.DATA_DIR = tempDir;
@@ -112,26 +115,78 @@ test('health probe kiểm tra được thứ mà một đơn hàng thật sự c
   assert.ok('paypal' in data && 'search' in data);
 });
 
+// The sweeper is the only thing that cancels an unpaid order once its window passes.
+// Nothing else in the system does it, so this field is the only place a stopped
+// sweeper could ever be noticed — and it used to answer from an environment variable
+// it never consulted. startSweeper() did not read ORDER_SWEEP_DISABLED either, so
+// the old code reported sweeper:true on this very server, where no sweeper exists.
+// The 30-minute monitor reads exactly this field.
+test('health báo trạng thái thật của sweeper, không phải lại biến cấu hình', async () => {
+  const appSource = await fs.readFile(path.join(root, 'src', 'app.js'), 'utf8');
+  const ordersSource = await fs.readFile(path.join(root, 'src', 'orders.js'), 'utf8');
+  assert.ok(!/process\.env\.ORDER_SWEEP_DISABLED/.test(appSource),
+    '/api/health không được tự đọc biến mà startSweeper() không dùng');
+  assert.match(ordersSource, /env\.orders\.sweepDisabled/,
+    'startSweeper() phải thật sự tôn trọng ORDER_SWEEP_DISABLED');
+
+  // The app built by createApp() has no sweeper — src/server.js is what starts one,
+  // and a test never runs the entrypoint. So the honest answer here is false, and it
+  // used to be true: this is the assertion that would have caught the bug, because
+  // before the fix the flag was unset and the endpoint echoed that back.
+  const before = await (await fetch(`${base}/api/health`)).json();
+  assert.equal(before.sweeper, false, 'app không startSweeper thì phải báo false, không phải lại biến cấu hình');
+
+  // Start one and the field has to follow the timer, not a second copy of the flag.
+  const { startSweeper, stopSweeper } = await import('../src/orders.js');
+  startSweeper();
+  try {
+    const during = await (await fetch(`${base}/api/health`)).json();
+    assert.equal(during.sweeper, true, 'đã startSweeper thì phải báo true');
+  } finally {
+    stopSweeper();
+  }
+  const after = await (await fetch(`${base}/api/health`)).json();
+  assert.equal(after.sweeper, false, 'stopSweeper xong thì phải báo false');
+});
+
 test('probe trả 503 khi phần đang kiểm tra hỏng, không phải 200 với chữ ok', async () => {
   // The promise of a 503 is the whole contract. Asserting it without breaking a
   // dependency would only assert the happy path twice, so the store is made to fail
   // the way it would on a full disk: the directory is replaced by a file.
   const store = await import('../src/store.js');
-  const original = store.dataDir;
-  const blocked = path.join(tempDir, 'blocked');
-  await fs.writeFile(blocked, 'not a directory');
-  // Local persistence writes through mutateJson into this path, so making it
-  // unwritable is what a full disk looks like from inside the process.
-  const before = await fs.readdir(tempDir);
-  assert.ok(before.includes(path.basename(blocked)) || true);
-  // Probe storage directly the way the endpoint does, with the same fs calls.
-  let writable = true;
-  try {
-    await fs.access(original, fs.constants.W_OK);
-  } catch {
-    writable = false;
+  // dataDir is an `export const`, so it cannot be swapped: a module namespace is
+  // immutable and redefining it throws. What can be made to fail is the path
+  // itself, which is what a full disk or a lost permission actually does. The
+  // directory is moved aside and a plain file is put in its place, so
+  // fs.mkdir(dataDir, {recursive:true}) in the probe fails the way it would on a
+  // host that has run out of room.
+  const target = store.dataDir;
+  const stashed = `${target}.stashed`;
+  const alreadyGone = !existsSync(target);
+  if (!alreadyGone) {
+    await fs.rm(stashed, { recursive: true, force: true });
+    await fs.rename(target, stashed);
   }
-  assert.equal(writable, true, 'data dir phải ghi được trong test này');
+  await fs.writeFile(target, 'not a directory');
+  try {
+    const broken = await (await fetch(`${base}/api/health`)).json();
+    assert.equal(String(broken.checks.storage).startsWith('!'), true,
+      `data dir không tạo được thì probe phải báo lỗi, không phải ok (nhận ${JSON.stringify(broken.checks.storage)})`);
+    assert.equal(broken.ok, false, 'một phần hỏng thì /api/health phải báo ok=false');
+
+    // The status code matters as much as the body: whatever monitors this URL
+    // acts on the code, and that is the whole reason the endpoint is a probe.
+    const status = await fetch(`${base}/api/health`);
+    assert.equal(status.status, 503, 'một phần hỏng thì phải trả HTTP 503, không phải 200');
+  } finally {
+    await fs.rm(target, { force: true });
+    if (!alreadyGone) await fs.rename(stashed, target);
+  }
+
+  // And it recovers, so the failure above was the probe working rather than the
+  // server left broken by the test.
+  const recovered = await (await fetch(`${base}/api/health`)).json();
+  assert.equal(recovered.checks.storage, 'ok', 'probe phải trở lại ok sau khi phục hồi');
 });
 
 // The order row records what happened and why. It never recorded who asked or

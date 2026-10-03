@@ -1,0 +1,46 @@
+# Line endings are a correctness concern here, not a formatting preference.
+#
+# The repository is authored on Windows and deployed to Linux. Without this file
+# Git uses the machine's core.autocrlf, so a shell script or a systemd unit
+# checked out on a Windows host and then deployed arrives with CRLF endings. That
+# is not cosmetic:
+#
+#   * `set -Eeuo pipefail\r` makes bash read the variable as `pipefail` plus a
+#     stray carriage return, and every later line in deploy.sh dies on
+#     `$'\r': command not found`.
+#   * `StandardError=append:/var/log/sonvudev-store.error.log\r` gives systemd a
+#     log path with a carriage return in it, so `systemctl restart` fails on a
+#     file it cannot find.
+#
+# Neither failure is visible on the machine that wrote the file, which is why
+# this has to be enforced by the repository rather than by remembering.
+
+# Anything the shell or an init system executes has to stay LF.
+*.sh        text eol=lf
+*.service   text eol=lf
+Caddyfile   text eol=lf
+
+# Source is checked out with native endings. Nothing in the build or the test
+# suite depends on either choice: the gates that read source as text already
+# split on /\r?\n/ and the indentation-anchored patterns put the \r after the
+# value. Declaring it stops the two forms from drifting into the repository.
+*.js        text eol=lf
+*.mjs       text eol=lf
+*.cjs       text eol=lf
+*.json      text eol=lf
+*.yml       text eol=lf
+*.md        text eol=lf
+*.css       text eol=lf
+*.html      text eol=lf
+*.svg       text eol=lf
+*.txt       text eol=lf
+*.example   text eol=lf
+.gitignore  text eol=lf
+.gitattributes text eol=lf
+
+# Binaries must never be touched, in either direction.
+*.png       binary
+*.jpg       binary
+*.jpeg      binary
+*.ico       binary
+*.woff2     binary

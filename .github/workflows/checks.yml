@@ -33,6 +33,18 @@ concurrency:
 
 jobs:
   checks:
+    # Three Node versions, because three is where the project's support claim
+    # comes from. package.json allows >=20, CI tested exactly one, and production
+    # installs 22 — so version 20 was verified and version 24, which the same
+    # package.json invites an operator to install, was not tested at all.
+    #
+    # The three that matter are the floor (20), what production runs (22), and the
+    # current release (24). A change that breaks on one of them has to say so here
+    # rather than on a user's machine.
+    strategy:
+      fail-fast: false
+      matrix:
+        node-version: ['20', '22', '24']
     runs-on: ubuntu-latest
     timeout-minutes: 10
     env:
@@ -47,12 +59,14 @@ jobs:
       SUPABASE_URL: ''
       SUPABASE_SERVICE_ROLE_KEY: ''
 
+    name: node ${{ matrix.node-version }}
+
     steps:
       - uses: actions/checkout@v4
 
       - uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version: ${{ matrix.node-version }}
           cache: npm
 
       # The lockfile is committed and npm ci is the install. A range in package.json
@@ -105,7 +119,7 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version: '22'
           cache: npm
 
       - run: npm ci

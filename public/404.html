@@ -3,8 +3,8 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title data-i18n-attr="title:notfound.title">Không tìm thấy trang — SonVuDev</title>
-<meta name="description" content="Đường dẫn này không tồn tại. Quay lại danh sách phần mềm của SonVuDev.">
+<title data-i18n-attr="title:notfound.title">Không tìm thấy trang — {{brandName}}</title>
+<meta name="description" content="Đường dẫn này không tồn tại. Quay lại danh sách phần mềm của {{brandName}}.">
 <!-- A 404 that says "found" would be invited into the index. -->
 <meta name="robots" content="noindex,follow">
 <link rel="icon" href="/favicon.svg" type="image/svg+xml">
@@ -28,7 +28,7 @@
   catalogue answers.
 -->
 <body class="page-404">
-<header class="site-header"><a class="brand" href="/"><span class="brand-mark">S</span><span>SonVu<span>Dev</span></span></a><button class="lang-toggle" type="button" data-lang-toggle>EN</button><a class="header-cta" href="/"><span data-i18n="nav.home">Về trang chủ</span> <span>↗</span></a></header>
+<header class="site-header"><a class="brand" href="/">{{brandWordmark}}</a><button class="lang-toggle" type="button" data-lang-toggle>EN</button><a class="header-cta" href="/"><span data-i18n="nav.home">Về trang chủ</span> <span>↗</span></a></header>
 <main class="wrap">
 <div class="notfound">
 <p class="eyebrow" data-i18n="notfound.eyebrow">Lỗi 404</p>
@@ -44,7 +44,7 @@
   script-src 'self' with no 'unsafe-inline' refused to run it, so every 404 showed
   an empty box where the product list should have been. Same fix, same file.
 -->
-<script src="i18n.js"></script>
+<script src="format.js"></script><script src="i18n.js"></script>
 <script src="/related.js" data-target="notfound-links"></script>
 </body>
 </html>

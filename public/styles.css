@@ -320,3 +320,8 @@ body.modal-open{overflow:hidden}
    saying "Chủ thể:" followed by nothing. */
 .legal-entity{color:var(--muted);font-size:12px;margin:-28px 0 38px;padding:0 0 22px;border-bottom:1px solid var(--line)}
 .legal-entity:empty{display:none}
+
+/* The two recovery pages carry the language control the dictionary needs. They have
+   no site header, so there is nowhere for the shared .lang-toggle rules to put it. */
+.lookup-lang{position:absolute;top:18px;right:18px}
+.paypal-page .paypal-lang{position:static;align-self:flex-start;margin-top:26px}

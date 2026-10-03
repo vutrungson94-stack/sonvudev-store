@@ -14,6 +14,9 @@
     "db:migrate:apply": "node scripts/db-migrate.mjs --apply",
     "email:check": "node scripts/mail-check.mjs",
     "product:publish": "node scripts/publish-product.mjs",
+    "r2:cors": "node scripts/r2-cors.mjs",
+    "r2:cors:write": "node scripts/r2-cors.mjs --write",
+    "r2:cors:command": "node scripts/r2-cors.mjs --command",
     "render:sync": "node scripts/sync-render.mjs",
     "render:sync:apply": "node scripts/sync-render.mjs --apply",
     "render:sync:deploy": "node scripts/sync-render.mjs --apply --deploy",
@@ -27,7 +30,7 @@
     "seo:check": "node scripts/seo-check.mjs",
     "start": "node src/server.js",
     "dev": "node --watch src/server.js",
-    "test": "node --test test/**/*.test.js"
+    "test": "node scripts/run-tests.mjs"
   },
   "files": [
     "src",
@@ -35,11 +38,13 @@
     "scripts",
     "supabase",
     "cloudflare",
+    "deploy",
     ".env.example",
     "README.md"
   ],
   "engines": {
-    "node": ">=20"
+    "node": ">=20",
+    "npm": ">=10"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.600.0",

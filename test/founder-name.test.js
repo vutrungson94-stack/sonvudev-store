@@ -3,10 +3,17 @@ import assert from 'node:assert/strict';
 import { promises as fs } from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 // The shop's test environment, applied before anything imports src/ — config.js
 // reads the environment once at load, so this has to come first and has to be
 // complete. See helpers/env.mjs for what a missing entry used to cost.
 import './helpers/env.mjs';
+
+// The walk below reads files inside the repository. Resolving them against
+// process.cwd() would make this test fail on any machine that runs it from
+// somewhere other than the repository root — an IDE, a monorepo wrapper, a
+// `cd test && node --test` — and only there.
+const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 
 // The owner's name is written into the shop's own copy: in the terms, in the
 // structured data, on the about page. All of that reads BRAND_FOUNDER_NAME.
@@ -174,8 +181,8 @@ test('không có tên riêng nào của chủ được gõ thẳng vào mã ngu�
       else if (/\.(mjs|html)$/.test(entry.name)) files.push(full);
     }
   };
-  await walk('public');
-  await walk('scripts');
+  await walk(path.join(root, 'public'));
+  await walk(path.join(root, 'scripts'));
   const founder = process.env.BRAND_FOUNDER_NAME;
   const bare = founder.normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/đ/g, 'd');
   for (const file of files) {

@@ -4,6 +4,7 @@
 //        npm run render:sync:deploy  (writes, then redeploys)
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { spawnSync } from "node:child_process";
 import dotenv from "dotenv";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
@@ -38,7 +39,7 @@ const api = "https://api.render.com/v1";
 // place these names are written down and the only one with no caller to complain
 // when it falls behind.
 const ALLOWED = [
-  "HOST", "APP_URL", "ADMIN_API_TOKEN", "NODE_ENV",
+  "HOST", "APP_URL", "ADMIN_API_TOKEN", "NODE_ENV", "TRUST_PROXY",
   "R2_ACCOUNT_ID", "R2_ACCESS_KEY_ID", "R2_SECRET_ACCESS_KEY", "R2_BUCKET_NAME",
   "R2_UPLOAD_URL_TTL_SECONDS", "R2_DOWNLOAD_URL_TTL_SECONDS",
   "SUPABASE_URL", "SUPABASE_SERVICE_ROLE_KEY",
@@ -133,6 +134,32 @@ async function main() {
     console.error("Lay key tai https://dashboard.render.com/ > Account Settings > API Keys.");
     process.exitCode = 1;
     return;
+  }
+
+  // Writing env vars to Render restarts the service on the current code, with or
+  // without --deploy, so every mutating run is a deploy and is gated like one:
+  // the build (syntax check, audit, metrics) and the test suite run first, and a
+  // red gate aborts before anything is written. A dry run stays read-only and is
+  // never gated, because it changes nothing.
+  //
+  // The test files are listed explicitly rather than passed as a directory: the
+  // runner only discovers what it is pointed at, and a directory argument
+  // silently ran nothing while reporting success on some platforms.
+  if (apply || redeploy) {
+    console.log("Kiểm tra build trước khi ghi lên Render...");
+    const build = spawnSync(process.execPath, [path.join(root, "scripts", "build-web.mjs")], { stdio: "inherit" });
+    if (build.status !== 0) {
+      throw new Error("Build thất bại — đã dừng, chưa ghi gì lên Render. Sửa cho xanh rồi chạy lại.");
+    }
+    console.log("Chạy test trước khi ghi lên Render...");
+    const { readdir } = await import("node:fs/promises");
+    const testFiles = (await readdir(path.join(root, "test")))
+      .filter((name) => name.endsWith(".test.js"))
+      .map((name) => path.join(root, "test", name));
+    const tests = spawnSync(process.execPath, ["--test", ...testFiles], { stdio: "inherit" });
+    if (tests.status !== 0) {
+      throw new Error("Test thất bại — đã dừng, chưa ghi gì lên Render. Sửa cho xanh rồi chạy lại.");
+    }
   }
 
   const { service, name } = await findService();

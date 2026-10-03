@@ -13,7 +13,7 @@ import { supabaseRequest } from "./supabase-http.js";
  * the two could agree was if the two lines never drifted. notify.js imports this
  * instead.
  */
-export const projectRoot = process.env.DATA_DIR ? path.resolve(process.env.DATA_DIR) : path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
+export const projectRoot = env.dataDir ? path.resolve(env.dataDir) : path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const root = projectRoot;
 // Exported because it is a thing the health probe has to be able to test. A check
 // that cannot ask "can this process write where it says it writes" is a
@@ -51,7 +51,17 @@ const seedProducts = [
   { id: "sonvu-lifetime", slug: "sonvu-lifetime", name: "SonVu Lifetime", shortDescription: "Một lần mua, sử dụng lâu dài.", description: "Sản phẩm mẫu cho gói Lifetime.", category: "Bundle", platform: "Windows", version: "1.0.0", price: 699000, currency: "VND", badge: "Tiết kiệm", features: ["Tất cả gói hiện có", "License cá nhân", "Ưu tiên cập nhật"], requirements: "Windows 10/11, 4 GB RAM", status: "active", fileKey: "", featured: false, createdAt: new Date().toISOString() },
 ];
 
-export async function ensureSeed() { await fs.mkdir(path.join(root, "data"), { recursive: true }); if (local) { if (!(await fs.stat(files.products).catch(() => null))) await writeJson(files.products, seedProducts); if (!(await fs.stat(files.orders).catch(() => null))) await writeJson(files.orders, []); return; } try { const rows = await supabase("products?select=id&limit=1"); if (!rows?.length) await supabase("products", { method: "POST", body: JSON.stringify(seedProducts.map(toProduct)) }); } catch (error) { console.warn(`[store] Supabase unavailable, using local JSON fallback: ${error.message}`); local = true; persistenceMode = "local-json"; if (!(await fs.stat(files.products).catch(() => null))) await writeJson(files.products, seedProducts); if (!(await fs.stat(files.orders).catch(() => null))) await writeJson(files.orders, []); } }
+export async function ensureSeed() { await fs.mkdir(path.join(root, "data"), { recursive: true }); if (local) { if (!(await fs.stat(files.products).catch(() => null))) await writeJson(files.products, seedProducts); if (!(await fs.stat(files.orders).catch(() => null))) await writeJson(files.orders, []); return; } try { const rows = await supabase("products?select=id&limit=1"); if (!rows?.length) await supabase("products", { method: "POST", body: JSON.stringify(seedProducts.map(toProduct)) }); } catch (error) {
+  // Fail closed, never silent: when Supabase is configured but unreachable,
+  // falling back to local JSON would write paid orders to this host's ephemeral
+  // disk while every other host keeps writing to Postgres — revenue split across
+  // two stores with no error anywhere. So a configured-but-down database stops
+  // the boot with an error (the host restarts, /api/health goes 503) instead of
+  // quietly becoming a second, forgetful shop. The local fallback remains for
+  // hosts that never configured Supabase at all.
+  console.error(`[store] Supabase configured but unreachable, refusing local fallback: ${error.message}`);
+  throw error;
+} }
 
 // The one way this project talks to Postgres: one header set, one error shape, one
 // file. See src/supabase-http.js for why the client lives on its own.
@@ -164,6 +174,16 @@ export async function listOrders({ limit = 200, offset = 0 } = {}) {
  * module; the other way round is a cycle.
  */
 export const UNPAID_STATUSES = Object.freeze(["pending", "pending_transfer"]);
+
+/**
+ * Every order status the shop can hold, in lifecycle order. This is the one
+ * definition: the admin validation whitelist, the frontend status maps and the
+ * unpaid subset above all derive from it, because a seventh status added in one
+ * place and forgotten in another is an order the panel cannot display and the
+ * API refuses to set. The unpaid subset stays separate — it is a business rule
+ * about money, not the enumeration itself.
+ */
+export const ORDER_STATUSES = Object.freeze(["pending", "pending_transfer", "paid", "payment_failed", "cancelled", "refunded"]);
 
 /** PostgREST `in` filter for the unpaid statuses, from the one list above. */
 const unpaidFilter = () => `status=in.(${UNPAID_STATUSES.join(",")})`;

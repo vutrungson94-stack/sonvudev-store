@@ -38,6 +38,14 @@ const readKeys = new Set([
 const documentedKeys = new Set([...envExample.matchAll(/^#?\s*([A-Z][A-Z0-9_]+)=/gm)].map((m) => m[1]));
 const allowedKeys = new Set((syncSource.match(/const ALLOWED = \[([\s\S]*?)\];/)[1].match(/"([A-Z][A-Z0-9_]+)"/g) || []).map((x) => x.replace(/"/g, '')));
 
+// Variables that belong to the machine, not to the shop. config.js reads them so
+// there is one rule about what an unset value means, and pushing them to a host
+// would be the bug rather than the fix: a Render service must not inherit a local
+// DATA_DIR, and ORDER_SWEEP_DISABLED is only ever set by a test or by an operator
+// who has a second sweeper. PORT and HOST belong to the platform; NODE_ENV is read
+// by Node and by the branches it selects.
+const platformOwned = new Set(['PORT', 'HOST', 'NODE_ENV', 'DATA_DIR', 'ORDER_SWEEP_DISABLED']);
+
 test('mọi biến mà config.js đọc đều được ghi trong .env.example', () => {
   const missing = [...readKeys].filter((key) => !documentedKeys.has(key)).sort();
   assert.deepEqual(missing, [], `thiếu trong .env.example: ${missing.join(', ')}`);
@@ -47,7 +55,7 @@ test('mọi biến mà config.js đọc đều được đẩy lên Render trư�
   // PORT is the one deliberate omission: Render assigns it, and pushing a local one
   // would make the service bind somewhere it was not given. Everything else that
   // config.js reads has to travel, or that host silently runs on defaults.
-  const missing = [...readKeys].filter((key) => !allowedKeys.has(key) && key !== 'PORT').sort();
+  const missing = [...readKeys].filter((key) => !allowedKeys.has(key) && !platformOwned.has(key)).sort();
   assert.deepEqual(missing, [], `sync-render.mjs chưa đẩy: ${missing.join(', ')}`);
 });
 
@@ -62,11 +70,21 @@ test('BRAND_* không bị bỏ sót — đây là năm biến đã từng bị b
 });
 
 test('danh sách không đẩy gì không tồn tại', () => {
-  // PORT and HOST belong to the platform rather than to config.js, and NODE_ENV is
-  // read by Node and by the code paths it selects rather than by name.
   const platform = new Set(['PORT', 'HOST', 'NODE_ENV']);
   const unknown = [...allowedKeys].filter((key) => !readKeys.has(key) && !platform.has(key)).sort();
   assert.deepEqual(unknown, [], `sync-render.mjs đẩy biến không ai đọc: ${unknown.join(', ')}`);
+});
+
+test('không có biến nào bị bỏ sót ở cả hai danh sách', () => {
+  // platformOwned is the only way a variable can escape being pushed to Render. That
+  // is a real hole in the contract — a variable listed nowhere is exactly how
+  // BRAND_FOUNDER_NAME went missing for months — so each exemption says why, and
+  // this test fails if a name is exempted without anyone reading it.
+  assert.deepEqual(
+    [...platformOwned].filter((key) => !readKeys.has(key) && key !== 'NODE_ENV'),
+    [],
+    'platformOwned chỉ được chứa biến config.js thật sự đọc — không thêm tên để lách test',
+  );
 });
 
 // The suite grew one file at a time and each new file set only the variables it
@@ -117,4 +135,99 @@ test('file env cho VPS được ship kèm, không phải tự đoán', async () 
   // SITE_DOMAIN is not read by the application — it is read by the Caddyfile, which
   // is why the two are separate values. Checked here so the reason is written down.
   assert.match(template, /^SITE_DOMAIN=/m, 'template phải nêu SITE_DOMAIN cho Caddy');
+});
+
+test('template deploy không chứa biến không ai đọc', () => {
+  // The reverse direction of the test above. GEOIP_ENABLED sat in this template
+  // promising an on/off switch for the country lookup while no code read it — the
+  // real switch is GEO_LOOKUP, so setting the documented variable changed nothing
+  // and an operator had every reason to believe it did. A template key nobody
+  // reads is a promise the shop will not keep.
+  //
+  // Each exception names its reader, so a new one is a deliberate act: SITE_DOMAIN
+  // belongs to the Caddyfile, the RENDER_* keys belong to scripts/sync-render.mjs,
+  // and SUPABASE_ACCESS_TOKEN belongs to scripts/db-migrate.mjs. None of them is
+  // read by src/config.js, and none of them may travel anywhere else.
+  const template = read(path.join('deploy', 'sonvudev-store.env.example'));
+  const templateKeys = new Set([...template.matchAll(/^#?\s*([A-Z][A-Z0-9_]+)=/gm)].map((m) => m[1]));
+  const infraReaders = {
+    SITE_DOMAIN: path.join('deploy', 'Caddyfile'),
+    RENDER_API_KEY: path.join('scripts', 'sync-render.mjs'),
+    RENDER_SERVICE: path.join('scripts', 'sync-render.mjs'),
+    RENDER_SERVICE_ID: path.join('scripts', 'sync-render.mjs'),
+    SUPABASE_ACCESS_TOKEN: path.join('scripts', 'db-migrate.mjs'),
+  };
+  const orphaned = [...templateKeys].filter((key) => !readKeys.has(key) && !(key in infraReaders)).sort();
+  assert.deepEqual(orphaned, [], `deploy/sonvudev-store.env.example chứa biến không ai đọc: ${orphaned.join(', ')}`);
+  for (const [key, reader] of Object.entries(infraReaders)) {
+    if (!templateKeys.has(key)) continue;
+    assert.ok(read(reader).includes(key), `${key} phải thật sự được ${reader} đọc — nếu không, nó là orphan mang tên ngoại lệ`);
+  }
+});
+
+// The R2 bucket's origin list is the one deployment setting in this project that no
+// code reads: cloudflare/r2-cors.json is applied to the bucket by hand, with wrangler,
+// and nothing in the server looks at it. Until now no gate could see it either, and
+// what it breaks is the admin panel's release upload — public/admin.js fetches a
+// presigned URL from the server and then PUTs to *.r2.cloudflarestorage.com from the
+// browser, so a stale AllowedOrigins refuses the only release-publishing action in
+// the shop, on the only page the owner can open, with nothing on the page saying why.
+//
+// What this test cannot do is compare the file against the real domain: CI sets
+// APP_URL to https://ci-fixture.example precisely so a fresh clone and a developer
+// machine run the same checks, and a reserved .example host is by definition not a
+// shop anybody buys from. So the comparison runs where a real .env exists — in the
+// audit (which skips and says so on a fixture host) and in check:production, which is
+// the pre-deploy gate. What is asserted here is everything a fixture can judge: that
+// the file parses, that it is a usable CORS rule, and that it names exactly one shop.
+test('cloudflare/r2-cors.json là một quy tắc CORS dùng được, và chỉ cho một shop', () => {
+  const rules = JSON.parse(read(path.join('cloudflare', 'r2-cors.json')));
+  assert.ok(Array.isArray(rules) && rules.length > 0, 'phải là mảng quy tắc CORS không rỗng');
+
+  const origins = rules.flatMap((rule) => rule.AllowedOrigins || []);
+  assert.ok(origins.length > 0, 'AllowedOrigins không được rỗng — bucket sẽ chặn mọi upload');
+  for (const rule of rules) {
+    for (const method of rule.AllowedMethods || []) {
+      assert.ok(['GET', 'PUT', 'HEAD'].includes(method), `method không cần thiết trong CORS: ${method}`);
+    }
+    assert.ok((rule.AllowedHeaders || []).some((header) => header.toLowerCase() === 'content-type'),
+      'phải cho phép Content-Type — upload đặt header này và sẽ bị chặn nếu không');
+  }
+
+  // Exactly one registrable domain, plus loopback. Two domains means the file was
+  // half-updated after a rename and still lets the old host publish files; that is a
+  // wider bucket than anybody intended and nothing else in the project would say so.
+  const domains = new Set(origins
+    .filter((origin) => !/^(https?:\/\/)?(localhost|127\.0\.0\.1)(:|\/|$)/.test(origin))
+    .map((origin) => {
+      try { return new URL(origin).hostname.replace(/^www\./, '').toLowerCase(); } catch { return origin.toLowerCase(); }
+    }));
+  assert.equal(domains.size, 1, `một tên miền duy nhất được phép, tìm thấy: ${[...domains].join(', ')}`);
+  assert.ok(![...domains][0].endsWith('.example'), 'không được để lại tên miền ví dụ trong file áp dụng cho bucket thật');
+  // Loopback is not optional: it is where a developer's browser runs, and dropping it
+  // breaks local development with no visible cause.
+  assert.ok(origins.some((origin) => origin.includes('localhost')), 'phải giữ http://localhost:3000 cho phát triển cục bộ');
+});
+
+test('quy tắc origin của R2 được suy ra từ APP_URL, không gõ tay', async () => {
+  // The check and its repair have to read the same function, or the audit reports a
+  // mismatch that `npm run r2:cors:write` then refuses to fix.
+  const { requiredOrigins, corsDiff, isFixtureHost } = await import('../scripts/lib/cors.mjs');
+  for (const appUrl of ['https://shop.example.org', 'https://www.shop.example.org']) {
+    const required = requiredOrigins(appUrl);
+    assert.ok(required.includes('http://localhost:3000'), 'loopback luôn phải có');
+    assert.ok(required.some((origin) => new URL(origin).hostname.endsWith('shop.example.org')),
+      `phải suy ra origin của ${appUrl}`);
+    // Either half of an apex/www pair has to produce both, or renaming a domain
+    // silently loses whichever form the admin panel happens to be open on.
+    assert.equal(required.filter((origin) => origin.includes('shop.example.org')).length, 2,
+      'apex và www phải cùng có mặt');
+    assert.deepEqual(corsDiff([{ AllowedOrigins: required }], appUrl).missing, [],
+      'origin suy ra từ APP_URL phải tự khớp với chính nó');
+    assert.ok(corsDiff([], appUrl).missing.length > 0, 'một danh sách rỗng phải bị báo thiếu');
+  }
+  // .example is reserved by RFC 2606 and cannot be registered, which is what makes it
+  // safe to skip on: a real shop cannot live there.
+  assert.ok(isFixtureHost('https://ci-fixture.example'), 'APP_URL giả của CI phải nhận ra được');
+  assert.ok(!isFixtureHost('https://sonvudev.com'), 'một domain thật không được nhận là giả');
 });

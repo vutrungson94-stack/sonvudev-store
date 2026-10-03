@@ -14,10 +14,11 @@
 /**
  * Escapes a value for interpolation into HTML text or an attribute value.
  *
- * Everything a person or a database supplied goes through this on its way out. The
- * two clients — i18n.js and admin.js — have their own copies for the same reason
- * they have their own code: neither is served by this process, so importing a
- * server module is not an option for them.
+ * Everything a person or a database supplied goes through this on its way out.
+ * The browser side shares one implementation in public/format.js rather than
+ * importing this module, which the static file server cannot provide — the two
+ * are held identical by scripts/metrics.mjs, which counts real implementations
+ * instead of aliases.
  */
 export const esc = (value) => String(value ?? "").replace(/[&<>"']/g, (c) => ({
   "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;",

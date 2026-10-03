@@ -20,11 +20,6 @@
     var raw = String(value == null ? '' : value).trim();
     return raw || fallback;
   };
-  var escapeHtml = function (value) {
-    return String(value == null ? '' : value).replace(/[&<>"']/g, function (c) {
-      return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
-    });
-  };
 
   // The language the page is actually being read in, read off the document
   // rather than assumed.
@@ -39,21 +34,15 @@
   // This file is loaded on pages that do not include i18n.js (the 404 has no
   // language switch at all), so it cannot read the shared dictionary. It reads the
   // <html lang> the server already put there, which is the same answer the
-  // dictionary would give.
+  // dictionary would give. Escaping and money come from public/format.js, loaded
+  // just before this file: this loader used to carry its own copies of both, and
+  // the money one disagreed with the dictionary about grouping.
   var lang = (String((document.documentElement && document.documentElement.lang) || 'vi').toLowerCase().indexOf('en') === 0) ? 'en' : 'vi';
   var locale = lang === 'en' ? 'en-US' : 'vi-VN';
 
-  var money = function (value, currency) {
-    var amount = Number(value) || 0;
-    var options = currency === 'USD'
-      ? { style: 'currency', currency: 'USD' }
-      : { maximumFractionDigits: 0 };
-    try {
-      return new Intl.NumberFormat(locale, options).format(amount);
-    } catch (e) {
-      return amount + ' ' + (currency || '');
-    }
-  };
+  var escapeHtml = function (value) { return window.SVDFormat.esc(value); };
+
+  var money = function (value, currency) { return window.SVDFormat.money(value, currency, locale); };
 
   var empty = {
     vi: 'Đây là sản phẩm duy nhất hiện tại.',

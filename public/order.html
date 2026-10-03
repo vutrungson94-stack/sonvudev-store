@@ -1,21 +1,21 @@
 <!doctype html>
 <html lang="vi">
 <head>
-<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex,nofollow"><title>Đơn hàng — SonVuDev</title><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet"><link rel="stylesheet" href="styles.css">
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex,nofollow"><title>Đơn hàng — {{brandName}}</title><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet"><link rel="stylesheet" href="styles.css">
 </head>
 <body data-support="{{support}}" data-review-min="{{reviewMinLength}}" data-review-max="{{reviewMaxLength}}">
 <!-- This page is where a buyer lands after paying by PayPal and then losing
      their session, so the shell around order.js speaks the same dictionary as
      the storefront. order.js writes the order itself; only the frame is here. -->
-<header class="site-header"><a class="brand" href="/"><span class="brand-mark">S</span><span>SonVu<span>Dev</span></span></a><button class="lang-toggle" type="button" data-lang-toggle>EN</button><a class="header-cta" href="/#products"><span data-i18n="nav.store">Cửa hàng</span> <span>↗</span></a></header>
+<header class="site-header"><a class="brand" href="/">{{brandWordmark}}</a><button class="lang-toggle" type="button" data-lang-toggle>EN</button><a class="header-cta" href="/#products"><span data-i18n="nav.store">Cửa hàng</span> <span>↗</span></a></header>
 <main class="order-shell wrap">
 <p class="eyebrow"><span>✦</span> <span data-i18n="order.eyebrow">Đơn hàng</span></p>
 <h1 class="order-title" id="order-title" data-i18n="order.loading">Đang tải…</h1>
 <p class="order-lead" id="order-lead"></p>
 <div id="order-body" class="order-body"></div>
 </main>
-<footer class="site-footer wrap"><div class="brand"><span class="brand-mark">S</span><span>SonVu<span>Dev</span></span></div><p data-i18n="brand.tagline">Phần mềm tốt cho công việc tốt.</p><div class="footer-links"><a href="/#products" data-i18n="nav.products">Sản phẩm</a><a href="/terms" data-i18n="nav.terms">Điều khoản</a><a href="/privacy" data-i18n="nav.privacy">Bảo mật</a><a href="/refund" data-i18n="nav.refund">Hoàn tiền</a><a href="/lookup" data-i18n="nav.lookup">Tra cứu đơn</a></div><small data-i18n="brand.rights">© {{year}} · Đồng sở hữu</small></footer>
-<script src="i18n.js"></script>
+<footer class="site-footer wrap"><div class="brand">{{brandWordmark}}</div><p data-i18n="brand.tagline">Phần mềm tốt cho công việc tốt.</p><div class="footer-links"><a href="/#products" data-i18n="nav.products">Sản phẩm</a><a href="/terms" data-i18n="nav.terms">Điều khoản</a><a href="/privacy" data-i18n="nav.privacy">Bảo mật</a><a href="/refund" data-i18n="nav.refund">Hoàn tiền</a><a href="/lookup" data-i18n="nav.lookup">Tra cứu đơn</a></div><small data-i18n="brand.rights">© {{year}} · Đồng sở hữu</small></footer>
+<script src="format.js"></script><script src="i18n.js"></script>
 <script src="order-client.js"></script>
 <script src="order.js"></script>
 </body></html>

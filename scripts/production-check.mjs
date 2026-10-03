@@ -1,17 +1,46 @@
 import dns from "node:dns/promises";
+import { readFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import dotenv from "dotenv";
-import { NOT_SET } from "../src/config.js";
+import { looksPlaceholder } from "../src/config.js";
 import { resolvePaypalEnvironment } from "../src/paypal-environment.js";
+import { corsDiff, hostOf } from "./lib/cors.mjs";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 dotenv.config({ path: path.join(root, ".env"), override: true });
 const value = (key) => (process.env[key] || "").trim();
-const placeholder = (item) => !item || /^(your_|replace-with|example)/i.test(item);
 const checks = [];
 const add = (name, ok, detail) => checks.push({ name, ok: Boolean(ok), detail });
 const appUrl = value("APP_URL");
+
+// ---------------------------------------------------------------------------
+// The one setting no other check here can reach, checked before anything that
+// needs the network so a mistake in it costs a minute rather than a deploy.
+//
+// cloudflare/r2-cors.json is applied to the bucket by hand and read by nothing, so
+// a stale origin list is invisible to every other row in this file and to the
+// health endpoint. Its failure mode is also the worst one available: the admin panel
+// asks the server for a presigned URL and then PUTs to R2 from the browser, so a
+// CORS refusal stops the only release-publishing action in the shop, from the only
+// page the owner can open, with no message on the page.
+//
+// The comparison uses the same function as `npm run r2:cors`, so this row and the
+// repair command cannot disagree about what "correct" is. The fix is printed, not
+// just named.
+// ---------------------------------------------------------------------------
+try {
+  const corsFile = JSON.parse(await readFile(path.join(root, "cloudflare", "r2-cors.json"), "utf8"));
+  const diff = corsDiff(corsFile, appUrl);
+  add("R2 CORS khớp APP_URL", !diff.missing.length,
+    diff.missing.length
+      ? `thiếu ${diff.missing.join(", ")} trong cloudflare/r2-cors.json — upload file từ trang quản trị sẽ bị chặn. Sửa: npm run r2:cors:write`
+      : diff.extra.length
+        ? `khớp, nhưng còn ${diff.extra.length} origin thừa (${diff.extra.join(", ")}) không do APP_URL sinh ra`
+        : `khớp, ${diff.required.length} origin cho ${hostOf(appUrl) || "APP_URL"}`);
+} catch (error) {
+  add("R2 CORS khớp APP_URL", false, `không đọc được cloudflare/r2-cors.json: ${error.message}`);
+}
 
 // Production means HTTPS on a real host. It used to be compared against one
 // hardcoded domain, so every staging and preview deploy failed this check and the
@@ -19,10 +48,10 @@ const appUrl = value("APP_URL");
 // shape, and that is what this asserts now.
 const productionUrl = /^https:\/\/(?!localhost|127\.|0\.0\.0\.0)[a-z0-9.-]+\.[a-z]{2,}$/i.test(appUrl);
 add("APP_URL is a production https host", productionUrl, appUrl || "missing");
-add("Admin token", !placeholder(value("ADMIN_API_TOKEN")), value("ADMIN_API_TOKEN") ? "configured" : "missing");
+add("Admin token", !looksPlaceholder(value("ADMIN_API_TOKEN")), value("ADMIN_API_TOKEN") ? "configured" : "missing");
 add("Supabase URL", /^https:\/\/[a-z0-9-]+\.supabase\.co$/i.test(value("SUPABASE_URL")), value("SUPABASE_URL") ? "configured" : "missing");
-add("Supabase secret key", !placeholder(value("SUPABASE_SERVICE_ROLE_KEY")), value("SUPABASE_SERVICE_ROLE_KEY") ? "configured" : "missing");
-add("Cloudflare R2", ["R2_ACCOUNT_ID", "R2_ACCESS_KEY_ID", "R2_SECRET_ACCESS_KEY", "R2_BUCKET_NAME"].every((key) => !placeholder(value(key))), isConfigured(["R2_ACCOUNT_ID", "R2_ACCESS_KEY_ID", "R2_SECRET_ACCESS_KEY", "R2_BUCKET_NAME"]) ? "configured" : "missing");
+add("Supabase secret key", !looksPlaceholder(value("SUPABASE_SERVICE_ROLE_KEY")), value("SUPABASE_SERVICE_ROLE_KEY") ? "configured" : "missing");
+add("Cloudflare R2", ["R2_ACCOUNT_ID", "R2_ACCESS_KEY_ID", "R2_SECRET_ACCESS_KEY", "R2_BUCKET_NAME"].every((key) => !looksPlaceholder(value(key))), isConfigured(["R2_ACCOUNT_ID", "R2_ACCESS_KEY_ID", "R2_SECRET_ACCESS_KEY", "R2_BUCKET_NAME"]) ? "configured" : "missing");
 // Validates the credentials for real. A non-empty string is not proof they work.
 const paypalClientId = value("PAYPAL_CLIENT_ID");
 const paypalClientSecret = value("PAYPAL_CLIENT_SECRET");
@@ -61,18 +90,20 @@ if (!paypalEnv.isSet) {
     add("PayPal", false, `lookup failed: ${error.message}`);
   }
 }
-add("PayPal webhook", !placeholder(value("PAYPAL_WEBHOOK_ID")), value("PAYPAL_WEBHOOK_ID") ? "configured" : "missing");
+add("PayPal webhook", !looksPlaceholder(value("PAYPAL_WEBHOOK_ID")), value("PAYPAL_WEBHOOK_ID") ? "configured" : "missing");
 // The one question "has this been filled in", answered by the same rule the server
-// uses. The sentence that marks an unset value was written out three times — once
-// as the default in config.js, once in the check that decides whether bank
-// transfer is offered, and once here with its own regex. Rewording it in one place
-// left the other two disagreeing, which is a shop that accepts transfers it has no
-// account for while its own health check says it is fine.
-const filledIn = (item) => Boolean(item) && !new RegExp(`^(${NOT_SET}|not configured|example|replace-with|your_)`, "i").test(item);
-add("Bank transfer", ["BANK_NAME", "BANK_ACCOUNT_NAME", "BANK_ACCOUNT_NUMBER"].every((key) => filledIn(value(key))), ["BANK_NAME", "BANK_ACCOUNT_NUMBER"].every((key) => filledIn(value(key))) ? "configured" : "missing");
+// uses. The sentence that marks an unset value was written out four times — twice in
+// config.js and twice here, each with its own regex, and they did not agree:
+// "your_account_number" was real to the shop and missing to this check, "your-secret"
+// was real to the shop and configured to this check. That is a shop that offers a
+// transfer it has no account for while its own pre-deploy check calls it missing, and
+// which one you believe depends on which file you read.
+//
+// It is now one exported rule. Nothing in this file decides what a placeholder is.
+add("Bank transfer", ["BANK_NAME", "BANK_ACCOUNT_NAME", "BANK_ACCOUNT_NUMBER"].every((key) => !looksPlaceholder(value(key))), ["BANK_NAME", "BANK_ACCOUNT_NUMBER"].every((key) => !looksPlaceholder(value(key))) ? "configured" : "missing");
 add("Bank BIN (VietQR)", /^\d{6}$/.test(value("BANK_BIN")), value("BANK_BIN") || "missing");
-add("MoMo wallet", !placeholder(value("MOMO_ACCOUNT_NUMBER")), value("MOMO_ACCOUNT_NUMBER") ? "configured" : "optional, missing");
-add("ZaloPay wallet", !placeholder(value("ZALOPAY_ACCOUNT_NUMBER")), value("ZALOPAY_ACCOUNT_NUMBER") ? "configured" : "optional, missing");
+add("MoMo wallet", !looksPlaceholder(value("MOMO_ACCOUNT_NUMBER")), value("MOMO_ACCOUNT_NUMBER") ? "configured" : "optional, missing");
+add("ZaloPay wallet", !looksPlaceholder(value("ZALOPAY_ACCOUNT_NUMBER")), value("ZALOPAY_ACCOUNT_NUMBER") ? "configured" : "optional, missing");
 
 // Order mail is what tells a buyer their order exists, when it expires and when
 // the money arrived. Unconfigured, all three mails are silently written to
@@ -107,7 +138,7 @@ add("Email sender", /^[^<]+<[^>]+>$/.test(emailFrom), emailFrom || "(chưa đặ
 const windowHours = Number(value("ORDER_PAYMENT_WINDOW_HOURS") || "24");
 add("Order payment window", Number.isFinite(windowHours) && windowHours >= 1, `${windowHours}h before an unpaid order is cancelled`);
 
-function isConfigured(keys) { return keys.every((key) => !placeholder(value(key))); }
+function isConfigured(keys) { return keys.every((key) => !looksPlaceholder(value(key))); }
 if (appUrl) {
   const host = new URL(appUrl).hostname;
   // The address, on its own, proves very little — and the version of this check that

@@ -4,10 +4,17 @@ import { promises as fs } from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { existsSync, readFileSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
 // The shop's test environment, applied before anything imports src/ — config.js
 // reads the environment once at load, so this has to come first and has to be
 // complete. See helpers/env.mjs for what a missing entry used to cost.
 import './helpers/env.mjs';
+
+// Resolved from the file's own location rather than from process.cwd(). These
+// checks read files inside the repository, and an IDE that runs a single test
+// file from its own directory would otherwise report ENOENT for every one of
+// them — on every operating system, and only on that machine.
+const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 
 // Everything that decides whether a crawler, a link-preview bot or an assistant
 // can read this site. Each check here corresponds to a way that used to be
@@ -123,8 +130,8 @@ test('og:image là ảnh raster thật, đúng kích thước khai báo', async 
 });
 
 test('ảnh share nằm trong bản build, không được sinh lúc chạy', () => {
-  assert.ok(existsSync(path.resolve('public', 'og.png')), 'public/og.png phải được commit');
-  const generator = readFileSync(path.resolve('scripts', 'make-og-image.ps1'), 'utf8');
+  assert.ok(existsSync(path.join(root, 'public', 'og.png')), 'public/og.png phải được commit');
+  const generator = readFileSync(path.join(root, 'scripts', 'make-og-image.ps1'), 'utf8');
   assert.match(generator, /public[\\/]og\.png/, 'script sinh ảnh phải ghi ra đúng file mà server trỏ tới');
 });
 
@@ -181,7 +188,13 @@ test('script ngoài phải được phép chạy theo chính CSP đó', async ()
   // product, so it was not a hole an attacker could reach — but it turns one
   // stray ampersand into broken markup, and it would become a hole the moment
   // anyone else could edit the catalogue.
-  assert.match(loader, /replace\(\/\[&<>"'\]/, 'loader phải escape ký tự HTML trước khi chèn vào innerHTML');
+  //
+  // The escaping lives in the shared public/format.js; what is asserted here is
+  // that the loader really calls it on every interpolated value, and that the
+  // shared implementation really escapes.
+  assert.match(loader, /SVDFormat\.esc\(/, 'loader phải escape qua bộ dùng chung trước khi chèn vào innerHTML');
+  const shared = await (await fetch(`${base}/format.js`)).text();
+  assert.match(shared, /replace\(\/\[&<>"'\]\//, 'bộ dùng chung phải escape ký tự HTML');
   assert.ok(!/['"]\s*\+\s*(p|product)\.(name|slug|version|platform)\b/.test(loader), 'không được nối thẳng dữ liệu sản phẩm vào chuỗi HTML');
 });
 
@@ -281,7 +294,7 @@ test('trang chủ và trang sản phẩm mô tả cửa hàng giống hệt nhau
   assert.equal(site(home), site(detail));
 
   // And the homepage must not reintroduce a hand-written copy later.
-  const source = await fs.readFile(path.resolve('public', 'index.html'), 'utf8');
+  const source = await fs.readFile(path.join(root, 'public', 'index.html'), 'utf8');
   assert.ok(source.includes('{{jsonLd}}'), 'index.html phải để server điền dữ liệu có cấu trúc');
   assert.ok(!(await page('/')).body.includes('{{jsonLd}}'), 'placeholder phải được thay thế');
 });
@@ -407,10 +420,15 @@ test('năm bản quyền đọc từ đồng hồ, không phải viết cứng',
 // .env.example with a promise that it appears on the legal pages, and then nothing
 // used it: setting it changed nothing at all.
 test('pháp nhân hiển thị trên trang pháp lý, và biến trống thì không in gì', async () => {
-  const source = await fs.readFile(path.resolve('src', 'app.js'), 'utf8');
-  assert.ok(/\{\{legalEntity\}\}/.test(source), 'renderPage phải điền token pháp nhân');
+  // The token registry lives in src/pages.js now (one list for the renderer, the
+  // audit and the byte-level tests); what is asserted here is that the legal
+  // entity is in it and that renderPage goes through the shared filler.
+  const { PAGE_TOKENS } = await import('../src/pages.js');
+  assert.ok(PAGE_TOKENS.includes('legalEntity'), 'registry token phải có pháp nhân');
+  const source = await fs.readFile(path.join(root, 'src', 'app.js'), 'utf8');
+  assert.ok(/fillPageTokens\s*\(/.test(source), 'renderPage phải điền token qua bộ dùng chung');
   for (const file of ['terms.html', 'privacy.html', 'refund.html']) {
-    const html = await fs.readFile(path.resolve('public', file), 'utf8');
+    const html = await fs.readFile(path.join(root, 'public', file), 'utf8');
     assert.ok(html.includes('{{legalEntity}}'), `public/${file} phải có chỗ hiện pháp nhân`);
   }
   // This run sets nothing, so the token has to come out as nothing rather than as

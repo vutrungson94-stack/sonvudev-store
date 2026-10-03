@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { promises as fs } from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 // The shop's test environment, applied before anything imports src/ — config.js
 // reads the environment once at load, so this has to come first and has to be
 // complete. See helpers/env.mjs for what a missing entry used to cost.
@@ -33,7 +34,7 @@ process.env.ORDER_SWEEP_DISABLED = '1';
 process.env.APP_URL = 'http://127.0.0.1:4180';
 
 const { createApp } = await import('../src/app.js');
-const root = path.resolve(path.dirname(new URL(import.meta.url).pathname.replace(/^\/([A-Za-z]:)/, '$1')), '..');
+const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 
 let server;
 let base;

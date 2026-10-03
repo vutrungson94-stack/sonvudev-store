@@ -79,7 +79,13 @@ test('không trang nào phục vụ nguyên template, ở bất kỳ đường d
   // BRAND_FOUNDER_NAME, and a card on the homepage that skipped that step put the
   // braces in the feature list. Nothing here knows what the placeholders mean; it
   // only insists that a reader is never shown one.
-  const KNOWN = new Set(['site', 'support', 'year', 'jsonLd', 'legalEntity', 'paymentWindowHours', 'reviewMinLength', 'reviewMaxLength', 'brandName', 'brand', 'founder']);
+  //
+  // The known set is imported from src/pages.js — the same list the renderer fills
+  // from and the audit reads — so the three can never disagree about which token
+  // is legitimate again. A hand-written copy here is how {{brandWordmark}} ended
+  // up filled on every page yet "leaked" on the one route the renderer never saw.
+  const { KNOWN_TEMPLATE_TOKENS } = await import('../src/pages.js');
+  const KNOWN = new Set(KNOWN_TEMPLATE_TOKENS);
   const unresolvedIn = (html) => [...html.matchAll(/\{\{\s*([a-zA-Z]+)\s*\}\}/g)].map((m) => m[1]).filter((name) => !KNOWN.has(name));
 
   for (const file of ['index.html', 'terms.html', 'privacy.html', 'refund.html', 'about.html', 'order.html', 'lookup.html', '404.html']) {
@@ -205,11 +211,14 @@ test('danh sách sản phẩm trong trang 404 cũng theo ngôn ngữ của trang
   // sat one line apart and only one was fixed.
   const related = await publicFile('related.js');
   assert.match(related, /var locale = lang === 'en' \? 'en-US' : 'vi-VN'/, 'locale phải theo lang của trang');
-  // The formatter has to read that variable. A second literal anywhere in it means
-  // the language is chosen once and then ignored.
-  const formatter = related.slice(related.indexOf('var money'));
-  assert.ok(!/vi-VN|['"]vi-VN['"]/.test(formatter.slice(formatter.indexOf('Intl.NumberFormat'))), 'money() phải dùng locale đã tính, không gõ lại vi-VN');
-  assert.match(formatter, /Intl\.NumberFormat\(locale/, 'money() phải truyền locale');
+  // The formatter has to read that variable. The implementation now lives in the
+  // shared public/format.js, so what is asserted here is the handoff: the page
+  // locale must travel into the shared call, and the shared call must honour the
+  // locale it is given rather than a literal.
+  assert.match(related, /SVDFormat\.money\(value, currency, locale\)/, 'money() phải truyền locale của trang vào bộ định dạng dùng chung');
+  const shared = await publicFile('format.js');
+  assert.match(shared, /function money\(value, currency, locale\)/, 'bộ định dạng dùng chung phải nhận locale');
+  assert.match(shared, /new Intl\.NumberFormat\(tag/, 'bộ định dạng dùng chung phải dùng locale được truyền, không gõ cứng');
   // And the language is read from the document, because this file loads on pages
   // that may not include i18n.js at all.
   assert.match(related, /documentElement.*lang|lang.*documentElement/s, 'related.js phải đọc lang từ document');

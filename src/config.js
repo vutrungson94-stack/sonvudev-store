@@ -28,13 +28,49 @@ const value = (name, fallback = "") => (process.env[name] || fallback).trim();
  * same question read the same value.
  */
 export const NOT_SET = "Chưa cập nhật";
-const looksUnset = (item) => new RegExp(`^(${NOT_SET}|not configured|replace-with)`, "i").test(String(item).trim());
 
-const configured = (name) => {
-  const v = value(name);
-  const placeholders = ["your_", "your-project", "your-service", "your-account", "your-secret", "your_paypal", "your_bucket"];
-  return v.length > 0 && !placeholders.some((item) => v.toLowerCase().includes(item)) && !v.includes("replace-with");
+/**
+ * Whether a value is a placeholder rather than something somebody filled in.
+ *
+ * This is the one answer to that question in the whole repository, and it used to be
+ * four. src/config.js had two (looksUnset anchored at the start, configured matching
+ * anywhere) and scripts/production-check.mjs had two more (placeholder, filledIn),
+ * and they did not agree on eight of eight representative values:
+ *
+ *   "your_account_number"  config: real, so bank transfer was offered
+ *                         check:  missing, so it failed
+ *   "example"              config: real    check: missing
+ *   "your-secret"          config: real    check: configured
+ *   "x-replace-with-y"     config: real    check: configured
+ *
+ * That is the precise failure the comment on NOT_SET describes, still happening —
+ * the shop offers a payment rail it cannot honour while its own pre-deploy check
+ * reports it as unconfigured, and which one you believe depends on which file you
+ * read. Four implementations also meant four places for the next reword to land in
+ * three.
+ *
+ * Matching is by substring rather than from the start, which is the stricter of the
+ * two old behaviours: a template that has been decorated (x-replace-with-y) is
+ * still a template. Nothing a buyer would genuinely supply contains these tokens.
+ */
+const PLACEHOLDER_TOKENS = [
+  NOT_SET.toLowerCase(),
+  "not configured",
+  "replace-with",
+  "replace_with",
+  "example",
+  "your_",
+  "your-",
+  "yourproject",
+  "your-bucket",
+];
+export const looksPlaceholder = (item) => {
+  const text = String(item ?? "").trim().toLowerCase();
+  if (!text) return true;
+  return PLACEHOLDER_TOKENS.some((token) => text.includes(token));
 };
+
+const configured = (name) => !looksPlaceholder(value(name));
 const numberValue = (name, fallback) => {
   const parsed = Number.parseInt(value(name), 10);
   return Number.isFinite(parsed) ? parsed : fallback;
@@ -58,6 +94,18 @@ export const env = {
   port: numberValue("PORT", 3000),
   appUrl: value("APP_URL", "http://localhost:3000").replace(/\/$/, ""),
   adminToken: value("ADMIN_API_TOKEN"),
+  // How many proxies between the buyer and this process to trust for req.ip.
+  // Behind Caddy (or Render) the client address arrives in X-Forwarded-For, and
+  // the rate limiter counts by it — trusting zero hops makes every visitor share
+  // one address and one budget; trusting hops that do not exist lets a caller
+  // spoof theirs. The deploy template used to carry TRUST_PROXY while the server
+  // ignored it and hardcoded 1, so setting the variable changed nothing.
+  trustProxy: Math.max(0, numberValue("TRUST_PROXY", 1)),
+  // Where the JSON fallback keeps its files. Read here rather than in src/store.js,
+  // which reached for process.env.DATA_DIR directly — the only two places in src/
+  // that bypassed this module, and therefore the only two places no test could hold
+  // to the same contract as everything else. Unset means the project's data/ folder.
+  dataDir: value("DATA_DIR"),
   // Who the shop is to the outside world. The brand used to be typed into the
   // templates, the PayPal call and the order emails separately, so renaming the
   // shop meant editing four files and forgetting one. Everything that speaks to
@@ -108,7 +156,13 @@ export const env = {
     paymentWindowHours: Math.max(1, numberValue("ORDER_PAYMENT_WINDOW_HOURS", 24)),
     // How long before the deadline the "about to expire" notice is sent.
     expiringWarnHours: Math.max(0, numberValue("ORDER_EXPIRY_WARN_HOURS", 1)),
-    sweepIntervalMs: numberValue("ORDER_SWEEP_INTERVAL_MS", 60000),
+    sweepIntervalMs: Math.max(5000, numberValue("ORDER_SWEEP_INTERVAL_MS", 60000)),
+    // Turns the background sweep off for a host where something else does it. Read
+    // here rather than from process.env at the point of use: it used to be read only
+    // by /api/health, which then reported the flag back as if it were the state of
+    // the timer, and by nothing that actually decided whether to start one. Now
+    // startSweeper() honours it and the health endpoint reports the timer itself.
+    sweepDisabled: /^(1|true|yes|on)$/i.test(value("ORDER_SWEEP_DISABLED")),
   },
   email: {
     // Resend is a plain REST API, so no dependency and no SMTP server is needed.
@@ -187,6 +241,5 @@ export const isConfigured = {
   // Without a key the mailer falls back to writing each message to
   // data/outbox, so the flow is testable end to end before an account exists.
   email: configured("RESEND_API_KEY"),
-  bank: Boolean(env.bank.name && env.bank.accountName && env.bank.accountNumber)
-    && !looksUnset(`${env.bank.name} ${env.bank.accountNumber}`.trim()),
+  bank: [env.bank.name, env.bank.accountName, env.bank.accountNumber].every((item) => !looksPlaceholder(item)),
 };

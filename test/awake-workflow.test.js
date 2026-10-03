@@ -79,9 +79,66 @@ test('địa chỉ lấy từ cấu hình repo, không gõ cứng trong workflow
   // A domain change should be one edit. A hardcoded address here means the watch is
   // pointed at last year's host and nobody notices, because it keeps reporting on
   // something perfectly healthy.
-  assert.match(source, /SHOP_URL/, 'phải đọc từ biến SHOP_URL của repo');
+  //
+  // This test used to assert that the string "SHOP_URL" appears in the file, and to
+  // whitelist the hardcoded onrender.com address as the one permitted literal. Both
+  // were satisfiable by a workflow in which the configuration did nothing at all —
+  // and it did nothing at all, because SHOP_URL was a shell variable that GitHub never
+  // put in the step's environment. The test was named "not hardcoded", whitelisted the
+  // hardcoded address, and stayed green on the broken file. A test that passes while the
+  // property in its name is false is worse than no test, because it is trusted.
+  //
+  // So it now asserts the wiring instead of the name: the repository variable has to
+  // be declared into the job's environment, which is the only way `${SHOP_URL:-...}`
+  // in the run step can ever see it.
+  assert.match(source, /SHOP_URL:\s*\$\{\{\s*vars\.SHOP_URL\s*\}\}/,
+    'phải khai báo SHOP_URL từ vars.SSHOP_URL để bước run thấy được — nếu không, đặt biến repo không có tác dụng gì');
+  // And the declaration has to be on the job that runs the step, not merely somewhere
+  // in the file, since a workflow-level or unrelated-job env would not reach it.
+  // Read the job's own env: block rather than pattern-matching through it, so a comment
+  // explaining the declaration does not make the assertion stop matching.
+  const job = source.slice(source.indexOf('\n  check:'));
+  const envBlock = (job.match(/^ {4}env:\n([\s\S]*?)^ {4}\S/m) || [])[1] || '';
+  assert.match(envBlock, /SHOP_URL:\s*\$\{\{\s*vars\.SHOP_URL\s*\}\}/,
+    'khai báo phải nằm trong env của job `check`, không phải ở workflow hay job khác');
+
+  // No fallback address may exist anywhere in this file.
+  //
+  // The test used to permit exactly one — the Render host the shop ran on before
+  // it moved to a VPS — on the reasoning that a default is useful until someone
+  // sets the variable. In practice nobody set the variable, so the watch spent
+  // every scheduled run probing a host that still answered and was no longer the
+  // shop. Green every time, and the monitoring had been disarmed by a domain
+  // change without a single red run.
+  //
+  // A default that outlives the thing it defaults for is not a fallback, it is a
+  // silent opt-out. So: no address is written in this file at all, and the run
+  // step reports that it checked nothing when the variable is absent. Exiting 0
+  // there is deliberate and matches the PayPal warning lower in the same file —
+  // a schedule that goes red for something nobody can fix from the log teaches
+  // people not to read the log.
   assert.ok(
-    !/https:\/\/(?!sonvudev-store\.onrender\.com)[a-z0-9.-]+\.[a-z]{2,}/i.test(source.replace(/sonvudev-store\.onrender\.com/g, '')),
-    'không được gõ một địa chỉ khác vào workflow',
+    !/https?:\/\/[a-z0-9.-]+\.[a-z]{2,}/i.test(source),
+    'workflow không được gõ bất kỳ địa chỉ nào — kể cả địa chỉ dự phòng. Địa chỉ dự phòng tồn tại lâu hơn thứ nó dự phòng cho, và khi đó bộ theo dõi âm thầm trỏ sang máy chủ cũ.',
   );
+  // `${SHOP_URL:-}` with an empty default is the idiom for "read it safely under
+  // `set -u`" and is fine. What must not appear is a default with a value in it,
+  // which is the same as writing the address down.
+  //
+  // Comments are stripped first. The header of this file discusses the very
+  // pattern by name, and a check that reads its own documentation as a violation
+  // is a check that will be "fixed" by deleting the explanation.
+  const runnable = source.replace(/^\s*#.*$/gm, '');
+  for (const match of runnable.matchAll(/\$\{SHOP_URL:-([^}]*)\}/g)) {
+    assert.equal(match[1].trim(), '',
+      `SHOP_URL có giá trị mặc định "${match[1]}" — tức là địa chỉ đã bị gõ cứng, dù nó nằm trong cú pháp \${VAR:-}`);
+  }
+  assert.match(runnable, /url="\$SHOP_URL"/,
+    'sau khi kiểm tra rỗng thì dùng $SHOP_URL trực tiếp, không bọc lại trong \${...:-}');
+
+  // And the absent case has to be handled, not left to `set -u` killing the step.
+  assert.match(source, /if \[ -z "\$\{SHOP_URL:-\}" \]/,
+    'phải xử lý trường hợp SHOP_URL rỗng trước khi dùng, nếu không `set -u` sẽ dừng bước run');
+  assert.match(source, /exit 0\s*\n\s*fi/,
+    'khi chưa cấu hình thì báo rõ và exit 0 — không fail, vì đây là cấu hình còn thiếu chứ không phải shop hỏng');
 });

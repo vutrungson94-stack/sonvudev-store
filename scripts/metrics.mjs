@@ -18,9 +18,10 @@
 // It is not a quality score. It is the minimum instrumentation needed to say
 // whether this week was better than last week, which until now nobody could
 // answer from the repository alone.
-import { readdir, readFile, stat, writeFile } from 'node:fs/promises';
+import { readFile, stat, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { walkProjectFiles } from './lib/files.mjs';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const baselineFile = path.join(root, 'metrics-baseline.json');
@@ -30,15 +31,10 @@ const relative = (file) => path.relative(root, file).split(path.sep).join('/');
 const read = (name) => readFile(path.join(root, name), 'utf8');
 const exists = (file) => stat(file).then(() => true, () => false);
 
-const walk = async (dir, out = []) => {
-  for (const entry of await readdir(dir, { withFileTypes: true })) {
-    if (entry.name === 'node_modules' || entry.name.startsWith('.') || entry.name === 'publish-output') continue;
-    const full = path.join(dir, entry.name);
-    if (entry.isDirectory()) await walk(full, out);
-    else out.push(full);
-  }
+const walk = (dir, out = []) => walkProjectFiles(dir).then((found) => {
+  for (const file of found) out.push(file);
   return out;
-};
+});
 
 const files = await walk(root);
 const inSrc = (f) => f.includes(`${path.sep}src${path.sep}`);
@@ -89,11 +85,10 @@ const rows = [
 // happened to call its local.
 //
 // An escape helper that was written twice and drifted is the exact failure these
-// numbers exist to catch. Four of each are expected, each in a separate runtime:
-// src/format.js (server), public/i18n.js and public/admin.js (browsers — admin
-// deliberately does not load i18n.js), public/related.js (a standalone loader for
-// the 404 page). The server used to have two escapes and two money formatters of
-// its own.
+// numbers exist to catch. Two of each remain, one per runtime: src/format.js
+// (server) and public/format.js (browsers, loaded before every page that needs
+// it). public/i18n.js, public/admin.js and public/related.js all call through
+// window.SVDFormat instead of carrying their own.
 ['escCopies', [...srcText, ...publicText].reduce((n, s) => n + countCopies(s, /&quot;/g), 0), 'down', 'bản sao hàm escape'],
 ['moneyCopies', [...srcText, ...publicText].reduce((n, s) => n + countCopies(s, /style:\s*['"]currency['"]/g), 0), 'down', 'bản sao hàm định dạng tiền'],
   ['i18nKeys', countCopies(i18nText, /^\s{4}'[\w.]+':/gm), 'up', 'khóa i18n'],

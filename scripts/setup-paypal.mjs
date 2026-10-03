@@ -5,13 +5,21 @@
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import dotenv from "dotenv";
+import { resolvePaypalEnvironment } from "../src/paypal-environment.js";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 dotenv.config({ path: path.join(root, ".env"), override: true });
 
 const env = (key) => (process.env[key] || "").trim();
 const detect = process.argv.slice(2).includes("--detect");
-const BASES = { live: "https://api-m.paypal.com", sandbox: "https://api-m.sandbox.paypal.com" };
+// Derived from the same resolver the server uses. This was a third copy of the
+// endpoint list, and the script that verifies the credentials was therefore able
+// to disagree with the module that spends them: a live/sandbox mapping changed in
+// one file would verify against one endpoint and charge against another, which is
+// the failure this script exists to prevent.
+const BASES = Object.fromEntries(
+  ["live", "sandbox"].map((name) => [name, resolvePaypalEnvironment(name).apiBase]),
+);
 const clientId = env("PAYPAL_CLIENT_ID");
 const clientSecret = env("PAYPAL_CLIENT_SECRET");
 
