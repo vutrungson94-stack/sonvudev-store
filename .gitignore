@@ -24,3 +24,8 @@ data/
 Thumbs.db
 .vscode/
 .idea/
+
+# wrangler's scratch directory: a temp copy of the Worker per deploy, plus
+# its source map. Not source, and committing it means the repo contains a second
+# copy of the Worker that can drift from the one that runs.
+.wrangler/
