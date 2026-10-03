@@ -23,7 +23,7 @@ const read = (name) => readFile(path.join(root, name), 'utf8');
 // definition, and nothing notices until someone tries to start it.
 
 const ARTIFACT_DIRECTORIES = ['src', 'public', 'scripts', 'supabase', 'cloudflare', 'deploy'];
-const ARTIFACT_FILES = ['package.json', 'package-lock.json', '.env.example', 'README.md'];
+const ARTIFACT_FILES = ['package.json', 'package-lock.json', '.env.example', 'README.md', 'render.yaml'];
 // npm always ships package.json and package-lock.json, and always ignores dotfiles
 // including .env.example — so those three are named in the build and cannot be
 // named in "files". README.md is the one that genuinely has to be listed.

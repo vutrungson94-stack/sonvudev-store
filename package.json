@@ -39,6 +39,7 @@
     "supabase",
     "cloudflare",
     "deploy",
+    "render.yaml",
     ".env.example",
     "README.md"
   ],

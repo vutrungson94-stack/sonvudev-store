@@ -535,7 +535,17 @@ app.get("/api/health", async (req, res) => {
   // database all work, and it cannot be slow because of the size of the result.
   if (isConfigured.supabase) checks.database = await probe(async () => { await supabaseRequest("products?select=id&limit=1"); return "ok"; }, "supabase");
   else checks.database = `skipped (${persistenceMode})`;
-  checks.storage = await probe(async () => { await fs.mkdir(dataDir, { recursive: true }); await fs.access(dataDir, fs.constants.W_OK); return "ok"; }, `${dataDir} not writable`);
+  // The storage probe only means something when this host is the datastore. With
+  // Supabase configured, a read-only filesystem is the expected state — the
+  // deployment is a bundle, not a checkout — and probing it produced a 503 on
+  // every request from every platform that does not hand out a writable disk.
+  //
+  // It is a worse failure than a false alarm, because a monitor reading ok:false
+  // here concludes the database is unreachable when the database probe above it
+  // says "ok". The two lines sit next to each other in the same JSON object and
+  // disagree.
+  if (isConfigured.supabase) checks.storage = "skipped (supabase)";
+  else checks.storage = await probe(async () => { await fs.mkdir(dataDir, { recursive: true }); await fs.access(dataDir, fs.constants.W_OK); return "ok"; }, `${dataDir} not writable`);
   const rate = await vndPerUsd().catch(() => null);
   const ok = !Object.values(checks).some((value) => typeof value !== "string" || value.startsWith("!"));
   res.status(ok ? 200 : 503).json({

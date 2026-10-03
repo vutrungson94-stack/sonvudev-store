@@ -19,7 +19,7 @@ const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 // discovered by a buyer. public/order-client.js is here for the same reason as
 // the rest: four pages load it, and it holds the access token and the download
 // handshake they all share.
-const required = ['package.json', 'src/server.js', 'src/app.js', 'src/store.js', 'src/r2.js', 'src/paypal.js', 'src/paypal-environment.js', 'src/payments.js', 'src/rates.js', 'src/geo.js', 'src/indexnow.js', 'src/pages.js', 'src/reviews.js', 'src/format.js', 'src/config.js', 'src/notify.js', 'src/supabase-http.js', 'src/refuse.js', 'public/index.html', 'public/i18n.js', 'public/styles.css', 'public/format.js', 'public/order-client.js', 'public/app.js', 'public/admin.html', 'public/admin.js', 'public/paypal-return.html', 'public/paypal-return.js', 'public/lookup.html', 'public/lookup.js', 'public/order.html', 'public/order.js', 'public/terms.html', 'public/privacy.html', 'public/refund.html', 'public/404.html', 'public/about.html', 'public/related.js', 'public/favicon.svg', 'public/og.png', 'scripts/production-check.mjs', 'scripts/audit-web.mjs', 'scripts/seo-check.mjs', 'scripts/r2-cors.mjs', 'scripts/run-tests.mjs', 'scripts/lib/cors.mjs', 'scripts/lib/files.mjs', 'cloudflare/r2-cors.json'];
+const required = ['package.json', 'src/server.js', 'src/app.js', 'src/store.js', 'src/r2.js', 'src/paypal.js', 'src/paypal-environment.js', 'src/payments.js', 'src/rates.js', 'src/geo.js', 'src/indexnow.js', 'src/pages.js', 'src/reviews.js', 'src/format.js', 'src/config.js', 'src/notify.js', 'src/supabase-http.js', 'src/refuse.js', 'public/index.html', 'public/i18n.js', 'public/styles.css', 'public/format.js', 'public/order-client.js', 'public/app.js', 'public/admin.html', 'public/admin.js', 'public/paypal-return.html', 'public/paypal-return.js', 'public/lookup.html', 'public/lookup.js', 'public/order.html', 'public/order.js', 'public/terms.html', 'public/privacy.html', 'public/refund.html', 'public/404.html', 'public/about.html', 'public/related.js', 'public/favicon.svg', 'public/og.png', 'scripts/production-check.mjs', 'scripts/audit-web.mjs', 'scripts/seo-check.mjs', 'scripts/r2-cors.mjs', 'scripts/run-tests.mjs', 'scripts/lib/cors.mjs', 'scripts/lib/files.mjs', 'cloudflare/r2-cors.json', 'render.yaml'];
 // One walk, shared with lint and metrics, so all three measure the same source.
 // This used to keep a private copy of the directory list that did not exclude
 // publish-output, which meant the build re-checked the artifact it had just
@@ -59,7 +59,7 @@ const metricsSummary = (metrics.stdout.match(/\[metrics\].*/g) || []).pop() || '
 // one more than this project needs.
 const publishRoot = path.join(root, 'publish-output', 'node');
 const ARTIFACT_DIRECTORIES = ['src', 'public', 'scripts', 'supabase', 'cloudflare', 'deploy'];
-const ARTIFACT_FILES = ['package.json', 'package-lock.json', '.env.example', 'README.md'];
+const ARTIFACT_FILES = ['package.json', 'package-lock.json', '.env.example', 'README.md', 'render.yaml'];
 
 await rm(publishRoot, { recursive: true, force: true });
 await mkdir(publishRoot, { recursive: true });

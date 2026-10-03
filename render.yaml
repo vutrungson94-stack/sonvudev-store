@@ -1,0 +1,101 @@
+# A zero-cost host for the shop.
+#
+# Why this file exists: the shop needs somewhere to run before it earns anything,
+# and the choices that were available narrowed to one. Vercel's Hobby tier and
+# Netlify's do not permit commercial use, and their own guidelines say so in
+# terms that describe this project exactly — "any method of requesting or
+# processing payment from visitors of the site". Selling software is that. So they
+# are not free for this shop; they are free until the first sale, which is a worse
+# arrangement than paying, because it fails at the moment it starts to work.
+#
+# What is left, and what each costs:
+#
+#   Render Free    no card, ~2 minutes. Spins down after 15 minutes idle and takes
+#                  about a minute to wake, so a visitor arriving at a quiet hour
+#                  waits. 750 instance hours per workspace per month; a service
+#                  kept awake all month costs 744 of them, which leaves 6 hours of
+#                  slack. Do not create a second one — the cap is per workspace,
+#                  not per service, and a second service divides nothing.
+#
+#   Oracle Always  a real VM with no spin-down, 10 TB egress, and the systemd +
+#                  Caddy stack in deploy/ keeps working unchanged. Needs a card on
+#                  file (an authorisation hold, never a charge) and the free
+#                  shapes are often out of capacity in a given region.
+#
+# This file describes the first one because it needs no card and no provisioning.
+# Moving to the second later is a matter of running deploy/deploy.sh on the box;
+# nothing in src/ has to change, which is why the free tier was made to work on a
+# read-only filesystem in the first place.
+#
+#   npm run build && git push
+#   # then: Render dashboard -> New -> Blueprint -> point it at this repository
+#
+# Render reads this file, so the settings below are the ones that matter:
+
+services:
+  - type: web
+    name: sonvudev-store
+    runtime: node
+    plan: free
+
+    # The free tier is a Node default, not a build step. There is nothing to
+    # compile — 4 dependencies, no bundler — and a build that only ran `npm ci`
+    # would spend the account's 500 build minutes to produce the same tree.
+    buildCommand: npm ci --omit=dev
+
+    # `node src/server.js`, and PORT/HOST come from the platform. src/config.js
+    # already defaults HOST to 0.0.0.0 and reads PORT, so no code change is needed
+    # for the service to be reachable.
+    startCommand: npm start
+
+    # The repository keeps development environment variables in .env, and .env is
+    # gitignored, so they are not deployed. They are declared here so a fresh
+    # Render service has the shape of a working one from the first request instead
+    # of booting on defaults and quietly mailing from no-reply@sonvudev.com.
+    #
+    # Every value here is safe to commit: no secret among them. The ones that are
+    # secrets — SUPABASE_SERVICE_ROLE_KEY, PAYPAL_CLIENT_SECRET, RESEND_API_KEY,
+    # ADMIN_API_TOKEN, R2 credentials — must be set in the Render dashboard under
+    # Environment, never here.
+    envVars:
+      - key: NODE_VERSION
+        value: '22'
+      - key: HOST
+        value: '0.0.0.0'
+      - key: NODE_ENV
+        value: production
+      - key: APP_URL
+        sync: false
+      - key: BRAND_NAME
+        value: SonVuDev
+      - key: SUPPORT_EMAIL
+        sync: false
+      - key: SUPABASE_URL
+        sync: false
+      - key: SUPABASE_SERVICE_ROLE_KEY
+        sync: false
+      - key: PAYPAL_ENVIRONMENT
+        sync: false
+      - key: PAYPAL_CLIENT_ID
+        sync: false
+      - key: PAYPAL_CLIENT_SECRET
+        sync: false
+      - key: PAYPAL_WEBHOOK_ID
+        sync: false
+      - key: RESEND_API_KEY
+        sync: false
+      - key: ADMIN_API_TOKEN
+        generateValue: true
+      - key: R2_ACCOUNT_ID
+        sync: false
+      - key: R2_ACCESS_KEY_ID
+        sync: false
+      - key: R2_SECRET_ACCESS_KEY
+        sync: false
+      - key: R2_BUCKET_NAME
+        sync: false
+
+    # A spinning service shows Render's loading page to the first visitor, so a
+    # deploy that never gets a warm request has proved nothing. This asks Render to
+    # make one after a successful build, and fails the deploy if it does not answer.
+    healthCheckPath: /api/health

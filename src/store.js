@@ -51,7 +51,22 @@ const seedProducts = [
   { id: "sonvu-lifetime", slug: "sonvu-lifetime", name: "SonVu Lifetime", shortDescription: "Một lần mua, sử dụng lâu dài.", description: "Sản phẩm mẫu cho gói Lifetime.", category: "Bundle", platform: "Windows", version: "1.0.0", price: 699000, currency: "VND", badge: "Tiết kiệm", features: ["Tất cả gói hiện có", "License cá nhân", "Ưu tiên cập nhật"], requirements: "Windows 10/11, 4 GB RAM", status: "active", fileKey: "", featured: false, createdAt: new Date().toISOString() },
 ];
 
-export async function ensureSeed() { await fs.mkdir(path.join(root, "data"), { recursive: true }); if (local) { if (!(await fs.stat(files.products).catch(() => null))) await writeJson(files.products, seedProducts); if (!(await fs.stat(files.orders).catch(() => null))) await writeJson(files.orders, []); return; } try { const rows = await supabase("products?select=id&limit=1"); if (!rows?.length) await supabase("products", { method: "POST", body: JSON.stringify(seedProducts.map(toProduct)) }); } catch (error) {
+export async function ensureSeed() {
+  // The mkdir is inside the local branch, and it used to be the first statement in
+  // the function — before the `if (local)`. With Supabase configured this host has
+  // no business creating a data directory at all, and on a platform whose
+  // filesystem is read-only (every serverless host: the code is deployed as a
+  // bundle, not a checkout) fs.mkdir throws EROFS and the boot dies before a
+  // single route is registered. The shop looked unshippable for a reason that had
+  // nothing to do with the shop.
+  //
+  // So the directory is created only by the code path that will write into it.
+  if (local) {
+    await fs.mkdir(path.join(root, "data"), { recursive: true });
+    if (!(await fs.stat(files.products).catch(() => null))) await writeJson(files.products, seedProducts);
+    if (!(await fs.stat(files.orders).catch(() => null))) await writeJson(files.orders, []);
+    return;
+  } try { const rows = await supabase("products?select=id&limit=1"); if (!rows?.length) await supabase("products", { method: "POST", body: JSON.stringify(seedProducts.map(toProduct)) }); } catch (error) {
   // Fail closed, never silent: when Supabase is configured but unreachable,
   // falling back to local JSON would write paid orders to this host's ephemeral
   // disk while every other host keeps writing to Postgres — revenue split across

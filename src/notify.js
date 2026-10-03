@@ -204,7 +204,25 @@ async function deliver(to, message, order, key) {
     if (!response.ok) throw new Error(`Resend ${response.status} ${await response.text()}`);
     return { via: "resend" };
   }
-  await fs.mkdir(outboxDir, { recursive: true });
+  // Writing the outbox can fail for a reason that has nothing to do with the order:
+  // on a host with a read-only filesystem — which is every serverless platform,
+  // since the code ships as a bundle and not as a checkout — there is nowhere to
+  // write. It used to throw, and because the order flow awaits this, a missing
+  // Resend key on such a host took down the request that created the order. The
+  // customer was charged and got a 500.
+  //
+  // A store that cannot send mail is already in trouble; it is not in so much
+  // trouble that it should also refuse to take the money. So the failure is
+  // reported and swallowed, loudly, in one place.
+  try {
+    await fs.mkdir(outboxDir, { recursive: true });
+  } catch (error) {
+    console.error(
+      `[notify] Khong ghi duoc outbox (${error.code || error.message}). `
+      + "Dat RESEND_API_KEY de gui email that; neu khong, don hàng se khong co email nao gui cho khach.",
+    );
+    return { via: "outbox-unavailable" };
+  }
   // The order id is in the name so a folder of outbox files can be read as a
   // list of what the store tried to tell buyers.
   const safe = (value) => String(value || "").replace(/[^\w.@-]/g, "_").slice(0, 60);
