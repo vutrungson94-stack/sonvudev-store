@@ -81,6 +81,10 @@ jobs:
       - name: audit
         run: npm run audit
 
+      # Case-sensitive imports: Windows không thấy, Linux (CI/deploy) mới chết.
+      - name: case
+        run: npm run case
+
       - name: metrics
         run: npm run metrics
 

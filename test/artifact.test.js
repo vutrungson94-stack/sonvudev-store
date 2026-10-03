@@ -7,23 +7,21 @@ import { fileURLToPath } from 'node:url';
 // reads the environment once at load, so this has to come first and has to be
 // complete. See helpers/env.mjs for what a missing entry used to cost.
 import './helpers/env.mjs';
+import { ARTIFACT_DIRECTORIES, ARTIFACT_FILES } from '../scripts/lib/artifact.mjs';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const read = (name) => readFile(path.join(root, name), 'utf8');
 
-// What actually gets deployed, and what gets published to npm, are two lists
-// that have to name the same files. They drifted once: the build packaged
-// deploy/ and the deploy script read deploy/sonvudev-store.service from it,
-// while package.json "files" had no deploy at all — so `npm publish` and
-// `npm run build` produced two different artifacts and neither one was checked
-// against the other.
+// What actually gets deployed, and what gets published to npm, must name the
+// same files. They drifted once: the build packaged deploy/ and the deploy
+// script read deploy/sonvudev-store.service from it, while package.json "files"
+// had no deploy at all — so `npm publish` and `npm run build` produced two
+// different artifacts. The lists themselves live in scripts/lib/artifact.mjs,
+// imported by both the build and this test, so there is nowhere left to drift.
 //
 // The failure this guards against is not subtle once it has happened: a systemd
 // unit missing from the published package means a fresh install has no service
 // definition, and nothing notices until someone tries to start it.
-
-const ARTIFACT_DIRECTORIES = ['src', 'public', 'scripts', 'supabase', 'cloudflare', 'deploy'];
-const ARTIFACT_FILES = ['package.json', 'package-lock.json', '.env.example', 'README.md', 'render.yaml'];
 // npm always ships package.json and package-lock.json, and always ignores dotfiles
 // including .env.example — so those three are named in the build and cannot be
 // named in "files". README.md is the one that genuinely has to be listed.
@@ -44,20 +42,14 @@ test('package.json "files" và danh sách đóng gói của build là một', as
       `package.json "files" thiếu ${entry}`);
   }
 
-  // And the build must still be packaging exactly that set, not a second list.
-  const buildList = build.match(/ARTIFACT_DIRECTORIES = \[([^\]]+)\]/);
-  const buildFiles = build.match(/ARTIFACT_FILES = \[([^\]]+)\]/);
-  assert.ok(buildList && buildFiles, 'build-web.mjs phải khai ARTIFACT_DIRECTORIES và ARTIFACT_FILES');
-  assert.equal(
-    buildList[1].replaceAll("'", '').replaceAll(' ', ''),
-    ARTIFACT_DIRECTORIES.join(','),
-    'build-web.mjs đang đóng gói một danh sách khác với danh sách trong test này',
-  );
-  assert.equal(
-    buildFiles[1].replaceAll("'", '').replaceAll(' ', ''),
-    ARTIFACT_FILES.join(','),
-    'build-web.mjs đang đóng gói một danh sách file khác với danh sách trong test này',
-  );
+  // And the build must package that set from the shared module, not a second
+  // list. The literals used to live here too, as a third copy.
+  assert.match(build, /from '\.\/lib\/artifact\.mjs'/,
+    'build-web.mjs phải đọc danh sách đóng gói từ scripts/lib/artifact.mjs');
+  assert.ok(!/ARTIFACT_DIRECTORIES = \[/.test(build),
+    'build-web.mjs không được giữ bản sao ARTIFACT_DIRECTORIES');
+  assert.ok(!/ARTIFACT_FILES = \[/.test(build),
+    'build-web.mjs không được giữ bản sao ARTIFACT_FILES');
 });
 
 test('deploy.sh chỉ deploy thư mục build tạo ra, không deploy cả cây nguồn', async () => {

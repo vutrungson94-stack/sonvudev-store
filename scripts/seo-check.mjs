@@ -311,12 +311,29 @@ try {
   const api = await get(`${base}/api/products`);
   const products = JSON.parse(api.body || "{}").products || [];
   const productPages = locations.filter((loc) => loc.includes("/product/"));
-  // Sitemap liệt kê mỗi sản phẩm 2 URL (vi + en) khi có bản tiếng Anh, còn API
-  // đếm theo sản phẩm. So cả 2 vế theo sản phẩm sẽ đỏ vĩnh viễn từ ngày có
-  // route /en/ — nên vế so sánh chỉ đếm URL tiếng Việt (chuẩn), các URL en
-  // vẫn được kiểm tra từng trang ở vòng lặp bên dưới.
-  const viProductPages = productPages.filter((loc) => !loc.includes("/en/product/"));
-  record("Sitemap khớp danh mục", viProductPages.length === products.length, `sitemap có ${viProductPages.length} trang vi (+${productPages.length - viProductPages.length} trang en), cửa hàng bán ${products.length}`);
+  // Sitemap đa ngôn ngữ: mỗi sản phẩm có 1 URL tiếng Việt, và thêm 1 URL /en/
+  // khi có bản tiếng Anh. Đếm gộp 2 vế theo đầu sản phẩm thì đỏ vĩnh viễn từ
+  // ngày có route /en/ — nên kiểm tra theo 3 ý: đủ trang vi, không trang vi
+  // thừa, không trang en mồ côi. Thiếu bản en của một sản phẩm không phải lỗi
+  // (tiếng Anh là tùy chọn theo từng sản phẩm).
+  const slugOf = (loc) => {
+    try { return decodeURIComponent(new URL(loc).pathname.split("/").filter(Boolean).pop() || ""); }
+    catch { return ""; }
+  };
+  const viPages = productPages.filter((loc) => !loc.includes("/en/product/"));
+  const enPages = productPages.filter((loc) => loc.includes("/en/product/"));
+  const slugs = new Set(products.map((p) => p.slug));
+  const viSlugs = new Set(viPages.map(slugOf));
+  const missingVi = products.filter((p) => !viSlugs.has(p.slug)).map((p) => p.slug);
+  const extraVi = [...viSlugs].filter((s) => s && !slugs.has(s));
+  const orphanEn = enPages.map(slugOf).filter((s) => s && !slugs.has(s));
+  const catalogProblems = [
+    ...missingVi.map((s) => `thiếu trang vi: ${s}`),
+    ...extraVi.map((s) => `thừa trang vi: ${s}`),
+    ...orphanEn.map((s) => `trang en mồ côi: ${s}`),
+  ];
+  record("Sitemap khớp danh mục (đa ngôn ngữ)", catalogProblems.length === 0,
+    catalogProblems.join("; ") || `${viPages.length} trang vi + ${enPages.length} trang en cho ${products.length} sản phẩm`);
   for (const loc of productPages) {
     const { body } = await get(loc);
     const name = loc.replace(`${base}/product/`, "");

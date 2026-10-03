@@ -59,10 +59,10 @@ test('mọi biến mà config.js đọc đều được đẩy lên Render trư�
   assert.deepEqual(missing, [], `sync-render.mjs chưa đẩy: ${missing.join(', ')}`);
 });
 
-test('BRAND_* không bị bỏ sót — đây là năm biến đã từng bị bỏ sót', () => {
+test('BRAND_* không bị bỏ sót — đây là sáu biến đã từng bị bỏ sót', () => {
   // Named on its own so that removing one of them again is a deliberate act rather
   // than an edit to a long list nobody reads.
-  for (const key of ['BRAND_NAME', 'BRAND_LEGAL_ENTITY', 'BRAND_FOUNDER_NAME', 'BRAND_FOUNDER_URL', 'BRAND_SOCIAL_LINKS']) {
+  for (const key of ['BRAND_NAME', 'BRAND_DESCRIPTION', 'BRAND_LEGAL_ENTITY', 'BRAND_FOUNDER_NAME', 'BRAND_FOUNDER_URL', 'BRAND_SOCIAL_LINKS']) {
     assert.ok(readKeys.has(key), `config.js phải đọc ${key}`);
     assert.ok(documentedKeys.has(key), `.env.example phải có ${key}`);
     assert.ok(allowedKeys.has(key), `sync-render.mjs phải đẩy ${key}`);

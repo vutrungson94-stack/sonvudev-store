@@ -101,7 +101,7 @@ export const organization = () => ({
   name: brand(),
   url: `${site()}/`,
   logo: absolute(LOGO_PATH),
-  description: "Công cụ và tiện ích phần mềm cho doanh nghiệp và cá nhân tại Việt Nam.",
+  description: env.brand.description,
   address: { "@type": "PostalAddress", addressCountry: "VN" },
   // The profile accounts for the same shop elsewhere. This is the one thing that
   // links this storefront to the rest of the web in a knowledge graph: with an

@@ -23,6 +23,7 @@
     "render:deploy": "node scripts/sync-render.mjs --deploy",
     "lint": "node scripts/lint-web.mjs",
     "audit": "node scripts/audit-web.mjs",
+    "case": "node scripts/case-check.mjs",
     "metrics": "node scripts/metrics.mjs",
     "metrics:update": "node scripts/metrics.mjs --update",
     "i18n:fill": "node scripts/fill-static-text.mjs",

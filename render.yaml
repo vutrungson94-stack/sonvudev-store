@@ -68,6 +68,8 @@ services:
         sync: false
       - key: BRAND_NAME
         value: SonVuDev
+      - key: BRAND_DESCRIPTION
+        sync: false
       - key: SUPPORT_EMAIL
         sync: false
       - key: SUPABASE_URL

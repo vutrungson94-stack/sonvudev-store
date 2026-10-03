@@ -4,6 +4,7 @@ import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { walkProjectFiles, JS_EXTENSIONS } from './lib/files.mjs';
+import { ARTIFACT_DIRECTORIES, ARTIFACT_FILES } from './lib/artifact.mjs';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 // The build refuses to package without each of these. Every one was added because
@@ -19,7 +20,7 @@ const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 // discovered by a buyer. public/order-client.js is here for the same reason as
 // the rest: four pages load it, and it holds the access token and the download
 // handshake they all share.
-const required = ['package.json', 'src/server.js', 'src/app.js', 'src/store.js', 'src/r2.js', 'src/paypal.js', 'src/paypal-environment.js', 'src/payments.js', 'src/rates.js', 'src/geo.js', 'src/indexnow.js', 'src/pages.js', 'src/reviews.js', 'src/format.js', 'src/config.js', 'src/notify.js', 'src/supabase-http.js', 'src/refuse.js', 'public/index.html', 'public/i18n.js', 'public/styles.css', 'public/format.js', 'public/order-client.js', 'public/app.js', 'public/admin.html', 'public/admin.js', 'public/paypal-return.html', 'public/paypal-return.js', 'public/lookup.html', 'public/lookup.js', 'public/order.html', 'public/order.js', 'public/terms.html', 'public/privacy.html', 'public/refund.html', 'public/404.html', 'public/about.html', 'public/related.js', 'public/favicon.svg', 'public/og.png', 'scripts/production-check.mjs', 'scripts/audit-web.mjs', 'scripts/seo-check.mjs', 'scripts/r2-cors.mjs', 'scripts/run-tests.mjs', 'scripts/lib/cors.mjs', 'scripts/lib/files.mjs', 'cloudflare/r2-cors.json', 'render.yaml'];
+const required = ['package.json', 'src/server.js', 'src/app.js', 'src/store.js', 'src/r2.js', 'src/paypal.js', 'src/paypal-environment.js', 'src/payments.js', 'src/rates.js', 'src/geo.js', 'src/indexnow.js', 'src/pages.js', 'src/reviews.js', 'src/format.js', 'src/config.js', 'src/notify.js', 'src/supabase-http.js', 'src/refuse.js', 'public/index.html', 'public/i18n.js', 'public/styles.css', 'public/format.js', 'public/order-client.js', 'public/app.js', 'public/admin.html', 'public/admin.js', 'public/paypal-return.html', 'public/paypal-return.js', 'public/lookup.html', 'public/lookup.js', 'public/order.html', 'public/order.js', 'public/terms.html', 'public/privacy.html', 'public/refund.html', 'public/404.html', 'public/about.html', 'public/related.js', 'public/favicon.svg', 'public/og.png', 'scripts/production-check.mjs', 'scripts/audit-web.mjs', 'scripts/case-check.mjs', 'scripts/seo-check.mjs', 'scripts/r2-cors.mjs', 'scripts/run-tests.mjs', 'scripts/lib/cors.mjs', 'scripts/lib/files.mjs', 'cloudflare/r2-cors.json', 'render.yaml'];
 // One walk, shared with lint and metrics, so all three measure the same source.
 // This used to keep a private copy of the directory list that did not exclude
 // publish-output, which meant the build re-checked the artifact it had just
@@ -38,6 +39,13 @@ const audit = spawnSync(process.execPath, [path.join(root, 'scripts', 'audit-web
 if (audit.status !== 0) throw new Error(`Audit failed:\n${audit.stdout}${audit.stderr}`);
 const auditSummary = (audit.stdout.match(/\[audit\] .*/g) || []).pop() || '';
 
+// Chữ hoa/thường chỉ chết trên Linux (nơi deploy), Windows không thấy.
+// Chạy ở đây chứ không để CI mới báo, vì import sai mà lọt vào artifact
+// thì bản deploy đó hỏng toàn bộ route liên quan.
+const caseCheck = spawnSync(process.execPath, [path.join(root, 'scripts', 'case-check.mjs')], { encoding: 'utf8' });
+if (caseCheck.status !== 0) throw new Error(`Case check failed:\n${caseCheck.stdout}${caseCheck.stderr}`);
+const caseSummary = (caseCheck.stdout.match(/\[case\].*/g) || []).pop() || '';
+
 // A pass or a fail at a point in time. The metrics step is what answers whether
 // this week was better than last week: it compares test count, route count,
 // dependency count and duplicate-helper count against a committed baseline and
@@ -54,12 +62,9 @@ const metricsSummary = (metrics.stdout.match(/\[metrics\].*/g) || []).pop() || '
 // checked at all — and it carried .env.backup-*, the build tool's secret cache
 // and the full .git history with it.
 //
-// The list below is also what package.json "files" has to agree with, which
-// test/artifact.test.js enforces. Two places that must name the same files is
-// one more than this project needs.
+// What is copied is read from scripts/lib/artifact.mjs, the same module
+// test/artifact.test.js checks package.json "files" against.
 const publishRoot = path.join(root, 'publish-output', 'node');
-const ARTIFACT_DIRECTORIES = ['src', 'public', 'scripts', 'supabase', 'cloudflare', 'deploy'];
-const ARTIFACT_FILES = ['package.json', 'package-lock.json', '.env.example', 'README.md', 'render.yaml'];
 
 await rm(publishRoot, { recursive: true, force: true });
 await mkdir(publishRoot, { recursive: true });
@@ -71,6 +76,6 @@ for (const file of ARTIFACT_FILES) {
 }
 await mkdir(path.join(root, 'build-reports'), { recursive: true });
 const artifactFiles = (await walkProjectFiles(publishRoot)).map((file) => path.relative(root, file).replaceAll('\\', '/'));
-const report = { application: 'SonVuDev Store', mode: 'web-node', generatedAt: new Date().toISOString(), javascriptFilesChecked: jsFiles.length, requiredFilesChecked: required.length, audit: auditSummary, metrics: metricsSummary, artifactFiles: artifactFiles.length, artifactPath: 'publish-output/node', status: 'passed' };
+const report = { application: 'SonVuDev Store', mode: 'web-node', generatedAt: new Date().toISOString(), javascriptFilesChecked: jsFiles.length, requiredFilesChecked: required.length, audit: auditSummary, caseCheck: caseSummary, metrics: metricsSummary, artifactFiles: artifactFiles.length, artifactPath: 'publish-output/node', status: 'passed' };
 await writeFile(path.join(root, 'build-reports', 'web-build.json'), JSON.stringify(report, null, 2));
-console.log(`[build] PASS: ${required.length} required files, ${jsFiles.length} JavaScript files checked, ${auditSummary}, ${metricsSummary}, ${artifactFiles.length} deploy files packaged into publish-output/node.`);
+console.log(`[build] PASS: ${required.length} required files, ${jsFiles.length} JavaScript files checked, ${auditSummary}, ${caseSummary}, ${metricsSummary}, ${artifactFiles.length} deploy files packaged into publish-output/node.`);

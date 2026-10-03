@@ -112,6 +112,11 @@ export const env = {
   // a person or to a crawler now reads it from here.
   brand: {
     name: value("BRAND_NAME", "SonVuDev"),
+    // One line about what the shop is. Read by the Organization schema and
+    // /llms.txt — the two places a crawler or an assistant learns the shop
+    // from — instead of being typed into the markup. A reword in one place
+    // reaches both.
+    description: value("BRAND_DESCRIPTION", "Công cụ và tiện ích phần mềm cho doanh nghiệp và cá nhân tại Việt Nam."),
     // Shown on the legal pages, so a buyer has something to hold the shop to.
     legalEntity: value("BRAND_LEGAL_ENTITY", ""),
     // The person behind the shop. Models weight a named human far more heavily
