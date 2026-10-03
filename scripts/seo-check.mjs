@@ -311,7 +311,12 @@ try {
   const api = await get(`${base}/api/products`);
   const products = JSON.parse(api.body || "{}").products || [];
   const productPages = locations.filter((loc) => loc.includes("/product/"));
-  record("Sitemap khớp danh mục", productPages.length === products.length, `sitemap có ${productPages.length}, cửa hàng bán ${products.length}`);
+  // Sitemap liệt kê mỗi sản phẩm 2 URL (vi + en) khi có bản tiếng Anh, còn API
+  // đếm theo sản phẩm. So cả 2 vế theo sản phẩm sẽ đỏ vĩnh viễn từ ngày có
+  // route /en/ — nên vế so sánh chỉ đếm URL tiếng Việt (chuẩn), các URL en
+  // vẫn được kiểm tra từng trang ở vòng lặp bên dưới.
+  const viProductPages = productPages.filter((loc) => !loc.includes("/en/product/"));
+  record("Sitemap khớp danh mục", viProductPages.length === products.length, `sitemap có ${viProductPages.length} trang vi (+${productPages.length - viProductPages.length} trang en), cửa hàng bán ${products.length}`);
   for (const loc of productPages) {
     const { body } = await get(loc);
     const name = loc.replace(`${base}/product/`, "");

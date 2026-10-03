@@ -331,6 +331,20 @@ test('/feed.json là JSON đúng và lấy từ danh mục sống', async () => 
   assert.match(item.url, /\/product\/discovery-probe$/);
 });
 
+test('/llms.txt và /feed.json trả đúng cả khi cache còn nóng', async () => {
+  // Cache HIT từng trả nguyên object bao {at, value}: request đầu (miss) đúng,
+  // request hai trong 60s nhận JSON bọc khiến /llms.txt thành {"at":...} và
+  // /feed.json thành 2 lớp. Các test trên chỉ gọi mỗi route một lần nên không thấy.
+  const firstLlms = await (await fetch(`${base}/llms.txt`)).text();
+  const secondLlms = await (await fetch(`${base}/llms.txt`)).text();
+  assert.ok(secondLlms.startsWith('# '), `lần hai phải vẫn là markdown, thực tế: ${secondLlms.slice(0, 60)}`);
+  assert.equal(secondLlms, firstLlms, 'nội dung cache phải giống lần đầu');
+  const firstFeed = JSON.parse(await (await fetch(`${base}/feed.json`)).text());
+  const secondFeed = JSON.parse(await (await fetch(`${base}/feed.json`)).text());
+  assert.equal(secondFeed['@type'], 'ItemList', 'lần hai phải vẫn là ItemList, không phải lớp bọc cache');
+  assert.deepEqual(secondFeed, firstFeed, 'feed cache phải giống lần đầu');
+});
+
 test('/llms.txt và /feed.json không báo sản phẩm đã ngừng bán', async () => {
   const headers = { 'content-type': 'application/json', 'x-admin-token': 'test-admin-token' };
   await fetch(`${base}/api/admin/products/${product.id}`, {

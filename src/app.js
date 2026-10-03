@@ -354,7 +354,10 @@ const textCache = new Map();
 const TEXT_TTL_MS = 60000;
 const cachedText = async (key, build) => {
   const hit = textCache.get(key);
-  if (hit && Date.now() - hit.at < TEXT_TTL_MS) return hit;
+  // Cache HIT phải trả về nội dung đã render, không phải cả object bao
+  // {at, value}: lần đầu (miss) trả string/object đúng, lần hai trong 60s
+  // trả nguyên wrapper khiến /llms.txt thành JSON và /feed.json bọc 2 lớp.
+  if (hit && Date.now() - hit.at < TEXT_TTL_MS) return hit.value;
   const value = build(await listProducts());
   textCache.set(key, { at: Date.now(), value });
   return value;
