@@ -32,8 +32,14 @@ const workflow = () => readFile(path.join(root, '.github', 'workflows', 'checks.
 test('job kiểm tra site thật sẽ FAIL khi thiếu secret APP_URL', async () => {
   const yaml = await workflow();
 
-  assert.match(yaml, /if:\s*\$\{\{\s*secrets\.APP_URL\s*==\s*''\s*\}\}/,
-    'phải có một bước điều kiện trên secrets.APP_URL rỗng');
+  // NOTE: `secrets` không dùng được trong `if:` (GitHub báo
+  // "Unrecognized named-value: 'secrets'" và fail cả workflow với 0 job).
+  // Nên secret được truyền qua `env` rồi kiểm tra rỗng trong `run`.
+  // Test này khóa cơ chế đó lại, không khóa cú pháp cũ đã từng làm đỏ main.
+  assert.match(yaml, /CHECK_URL:\s*\$\{\{\s*secrets\.APP_URL\s*\}\}/,
+    'phải truyền secrets.APP_URL qua env cho bước kiểm tra');
+  assert.match(yaml, /if\s*\[\s*-z\s*"\$CHECK_URL"\s*\]/,
+    'phải có bước kiểm tra secret rỗng trong run');
   assert.match(yaml, /exit 1/,
     'bước đó phải exit 1 — không có secret thì bỏ chạy KHÔNG được báo xanh');
 

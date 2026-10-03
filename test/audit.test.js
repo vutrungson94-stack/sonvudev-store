@@ -269,7 +269,7 @@ test('tiếng Việt mất dấu trong scripts và test cũng bị bắt', async
     assert.equal(result.status, 1, 'phải FAIL');
     assert.match(output, /tiếng Việt không dấu.*Khong tim thay/s, output);
     // The file is named, so the person who wrote it knows where to look.
-    assert.match(output, /scripts\\build-web\.mjs/, output);
+    assert.match(output, /scripts[/\\]build-web\.mjs/, output);
     // And the correct spelling is handed to them rather than left to guesswork.
     assert.match(output, /viết đúng là "Không tìm thấy/, output);
   }
@@ -285,7 +285,7 @@ test('tiếng Việt mất dấu trong scripts và test cũng bị bắt', async
     const output = `${result.stdout}${result.stderr}`;
     assert.equal(result.status, 1, 'phải FAIL');
     assert.match(output, /tiếng Việt không dấu.*can tro giup/s, output);
-    assert.match(output, /test\\probe\.test\.js/, output);
+    assert.match(output, /test[/\\]probe\.test\.js/, output);
   }
 
   // The fix must be accepted: accented text in the same places changes nothing.
