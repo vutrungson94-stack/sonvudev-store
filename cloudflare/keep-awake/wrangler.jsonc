@@ -1,0 +1,50 @@
+// The keeper. Deployed separately from the Node app — it does not ship in
+// publish-output/node, because it is not something `npm run build` runs. Render
+// starts the shop; this Worker only makes sure Render is awake when it starts.
+//
+//   cd cloudflare/keep-awake
+//   npx wrangler deploy
+//
+// JSONC rather than TOML. Wrangler supports both, but gbuild's preflight rejects
+// any .toml that does not open with a [section], and a wrangler config cannot
+// have one: `name`, `main`, `compatibility_date` and `triggers` are all top-level
+// keys by design. Adding a section to satisfy the check would break wrangler, so
+// the format is the thing that gave way. This one also keeps the comments, which
+// are the reason to use JSONC in the first place.
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "sonvudev-keep-awake",
+  "main": "worker.js",
+  "compatibility_date": "2024-11-06",
+
+  // Once a minute. Free on the Workers free tier, and one invocation is one
+  // request against the 100,000/day allowance — 1,020 calls on a 19-hour window
+  // is about one percent of it.
+  //
+  // It has to be this frequent: Render sleeps a free service after 15 minutes, so
+  // anything slower than that lets it fall asleep between pings. The alternative —
+  // GitHub Actions on a 10-minute cron — needs 4,320 runs a month against a
+  // 2,000-minute quota and stops around the fourteenth. There is no slower interval
+  // that fits the quota, which is the whole reason this file exists.
+  "triggers": {
+    "crons": ["* * * * *"]
+  }
+
+  // Set in the dashboard, not here, so a fork does not inherit a URL it should not
+  // ping:
+  //
+  //   npx wrangler secret put SHOP_URL     -> https://sonvudev.com
+  //
+  // Optional, defaults shown. These are the hours the shop is kept awake, in
+  // Asia/Ho_Chi_Minh. See the window discussion in worker.js before changing them.
+  //
+  //   npx wrangler secret put AWAKEN_FROM   -> 5
+  //   npx wrangler secret put AWAKEN_TO     -> 24
+  //
+  // The window is a shop-hours question, not an infrastructure one. Widen it for
+  // buyers in another timezone; narrow it if the instance hours get tight. It
+  // exists because an always-awake free service spends 744 of its 750 monthly
+  // hours — six hours of margin — and Render suspends every free service in the
+  // workspace when that allowance is exceeded, which for a shop is a month of
+  // downtime rather than a bill.
+}
