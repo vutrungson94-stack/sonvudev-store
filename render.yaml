@@ -95,6 +95,56 @@ services:
       - key: R2_BUCKET_NAME
         sync: false
 
+      # Bank transfer. These three are not cosmetic and the checkout degrades
+      # silently without them: src/config.js decides a bank transfer is available
+      # only when BANK_NAME, BANK_ACCOUNT_NAME and BANK_ACCOUNT_NUMBER are all
+      # real values rather than the placeholder, and src/payments.js returns null
+      # for the method when they are not. A host missing them does not show an
+      # error — it shows a checkout with one fewer way to pay, and nothing says
+      # which one is missing or why. PayPal alone is not a shop that has decided
+      # to stop taking transfers; it is a shop that forgot three variables.
+      - key: BANK_NAME
+        sync: false
+      - key: BANK_ACCOUNT_NAME
+        sync: false
+      - key: BANK_ACCOUNT_NUMBER
+        sync: false
+
+      # Wallet transfers. MoMo and ZaloPay are the rails a Vietnamese buyer
+      # reaches for, and both hide themselves the same silent way when their
+      # account number is absent. Optional in the sense that the shop still runs
+      # without them — not optional in the sense that most buyers here want them.
+      - key: MOMO_ACCOUNT_NUMBER
+        sync: false
+      - key: MOMO_DEEP_LINK
+        sync: false
+      - key: MOMO_QR_IMAGE
+        sync: false
+      - key: MOMO_QR_AMOUNT_IMAGE
+        sync: false
+      - key: ZALOPAY_ACCOUNT_NUMBER
+        sync: false
+      - key: ZALOPAY_QR_IMAGE
+        sync: false
+
+      # Declared so the value is visible in the dashboard instead of hiding behind
+      # a default in src/config.js. Both currencies a PayPal charge is allowed in
+      # have to match what the account can actually settle, or the order is
+      # created and then refused at capture.
+      - key: PAYPAL_CURRENCY
+        value: USD
+      - key: PAYPAL_ACCOUNT_EMAIL
+        sync: false
+
+      # Render sits in front of this process and adds one X-Forwarded-For hop.
+      # 1 tells Express to trust exactly that one, which makes req.ip the buyer's
+      # address — and req.ip is what the rate limiter counts on (src/app.js:84,
+      # src/app.js:664). Left unset it defaults to 1 and works; setting it to 0
+      # would collapse every customer in the world into one bucket and the tenth
+      # checkout from anywhere would be refused as a rate limit.
+      - key: TRUST_PROXY
+        value: '1'
+
     # A spinning service shows Render's loading page to the first visitor, so a
     # deploy that never gets a warm request has proved nothing. This asks Render to
     # make one after a successful build, and fails the deploy if it does not answer.
