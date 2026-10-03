@@ -84,6 +84,22 @@ const EXPECTED = [
     fix: 'Đặt PAYPAL_WEBHOOK_ID. Thiếu nó thì PayPal báo payment thành công nhưng đơn không bao giờ chuyển sang paid — khách đã trả tiền mà không nhận được link tải.',
   },
   {
+    // The failure mode this one exists for: a variable that is set, is not empty,
+    // passes every presence check, and is wrong. Re-creating a webhook in PayPal
+    // issues a new id, so the copy in the dashboard silently expires while the
+    // variable stays non-empty. Verification then fails for every delivery, the
+    // endpoint answers 400, and a paying customer never gets their download.
+    //
+    // So the id is printed. It is not a secret — it sits next to the webhook URL
+    // in the PayPal developer dashboard — and comparing the two is the only way
+    // to notice before a customer's money is involved.
+    id: 'paypalWebhookId',
+    want: true,
+    read: (b) => typeof b.paypalWebhookId === 'string' && b.paypalWebhookId.trim().length > 0,
+    label: 'Webhook ID hiện tại (đối chiếu với PayPal)',
+    fix: 'Sao chép Webhook ID trong PayPal Developer → app → tab Live → Live Webhooks, dán vào PAYPAL_WEBHOOK_ID trên Render. Tạo lại webhook là sinh ID mới, còn biến cũ vẫn non-empty nên mọi kiểm tra "có cấu hình chưa" đều báo đạt.',
+  },
+  {
     id: 'email',
     want: true,
     read: (b) => b.email === 'resend',

@@ -561,6 +561,17 @@ app.get("/api/health", async (req, res) => {
     // signal says healthy while real payments cannot be captured. Naming it here is
     // what makes the question answerable against the running server.
     paypalEnvironment: paypalEnvironmentIsSet ? env.paypal.environment : "unset (treated as sandbox)",
+    // The configured webhook id, so a mismatch is visible.
+    //
+    // `paypalWebhook` above only says the variable is not empty, and it is true
+    // whether or not the id belongs to a webhook on this account. Verification
+    // passes the id to PayPal, which compares it against the webhook that actually
+    // delivered the event and rejects the delivery when they differ — so a
+    // stale id after a webhook is re-created produces a checkout where the
+    // buyer is charged, every webhook returns 400, and the order never becomes
+    // paid. The id is not a secret: it is printed in the PayPal developer
+    // dashboard next to the webhook URL, to anyone with access to the app.
+    paypalWebhookId: env.paypal.webhookId || null,
     bank: isConfigured.bank, momo: Boolean(env.bank.momo), zalopay: Boolean(env.bank.zalopay), admin: isConfigured.admin,
     // "outbox" means there is no mail provider yet: order mail is being written
     // to data/outbox instead of being delivered.

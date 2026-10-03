@@ -16,6 +16,7 @@ const HEALTHY = {
   r2: true,
   paypal: true,
   paypalWebhook: true,
+  paypalWebhookId: '7CXZV26ZRB62C4Q3',
   paypalEnvironment: 'live',
   bank: true,
   momo: true,
@@ -55,6 +56,10 @@ test('mỗi tích hợp bắt buộc đều có thể phát hiện khi thiếu',
     ['database', { checks: { database: '!supabase', storage: 'skipped (supabase)' } }, /service role key/],
     ['paypal', { paypal: false }, /PAYPAL_CLIENT_ID/],
     ['paypalWebhook', { paypalWebhook: false }, /PAYPAL_WEBHOOK_ID/],
+    // A webhook id that is set but absent from the payload means the host predates
+    // this field. Not a failure of the host — but the report has to say so, or the
+    // mismatch check silently stops covering anyone who has not redeployed yet.
+    ['paypalWebhookId', { paypalWebhookId: null }, /PAYPAL_WEBHOOK_ID/],
     ['email', { email: 'outbox' }, /RESEND_API_KEY/],
     ['bank', { bank: false }, /BANK_ACCOUNT_NUMBER/],
     ['r2', { r2: false }, /R2_ACCOUNT_ID/],
