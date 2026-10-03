@@ -617,10 +617,6 @@ for (const name of ["app.js", "store.js", "orders.js", "payments.js", "r2.js", "
   const file = path.join("src", name);
   if (!existsSync(file)) continue;
   const source = await read(file);
-  if (source.includes('from "./refuse.js"')) {
-    // Strip the module's own error field from the pattern: refuse() is defined
-    // to carry the Vietnamese sentence for logs, and it lives in refuse.js.
-  }
   for (const match of source.matchAll(/res\.status\([^)]*\)\.json\(\{\s*error:\s*"([^"]+)"/g)) {
     if (VIETNAMESE_SENTENCE.test(match[1])) {
       fail("lỗi tiếng Việt cho trình duyệt", "ngôn ngữ khai báo sai", `src/${name}`,
