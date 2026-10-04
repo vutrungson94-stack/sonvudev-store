@@ -20,7 +20,7 @@ const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 // discovered by a buyer. public/order-client.js is here for the same reason as
 // the rest: four pages load it, and it holds the access token and the download
 // handshake they all share.
-const required = ['package.json', 'src/server.js', 'src/app.js', 'src/store.js', 'src/r2.js', 'src/paypal.js', 'src/paypal-environment.js', 'src/payments.js', 'src/rates.js', 'src/geo.js', 'src/indexnow.js', 'src/pages.js', 'src/reviews.js', 'src/format.js', 'src/config.js', 'src/notify.js', 'src/supabase-http.js', 'src/refuse.js', 'public/index.html', 'public/i18n.js', 'public/styles.css', 'public/format.js', 'public/order-client.js', 'public/app.js', 'public/admin.html', 'public/admin.js', 'public/paypal-return.html', 'public/paypal-return.js', 'public/lookup.html', 'public/lookup.js', 'public/order.html', 'public/order.js', 'public/terms.html', 'public/privacy.html', 'public/refund.html', 'public/404.html', 'public/about.html', 'public/related.js', 'public/favicon.svg', 'public/og.png', 'scripts/production-check.mjs', 'scripts/audit-web.mjs', 'scripts/case-check.mjs', 'scripts/seo-check.mjs', 'scripts/r2-cors.mjs', 'scripts/run-tests.mjs', 'scripts/lib/cors.mjs', 'scripts/lib/files.mjs', 'cloudflare/r2-cors.json', 'render.yaml'];
+const required = ['package.json', 'src/server.js', 'src/app.js', 'src/store.js', 'src/r2.js', 'src/paypal.js', 'src/paypal-environment.js', 'src/payments.js', 'src/rates.js', 'src/geo.js', 'src/indexnow.js', 'src/pages.js', 'src/reviews.js', 'src/format.js', 'src/config.js', 'src/notify.js', 'src/supabase-http.js', 'src/refuse.js', 'src/robots.js', 'public/index.html', 'public/i18n.js', 'public/styles.css', 'public/format.js', 'public/order-client.js', 'public/app.js', 'public/admin.html', 'public/admin.js', 'public/paypal-return.html', 'public/paypal-return.js', 'public/lookup.html', 'public/lookup.js', 'public/order.html', 'public/order.js', 'public/terms.html', 'public/privacy.html', 'public/refund.html', 'public/404.html', 'public/about.html', 'public/related.js', 'public/favicon.svg', 'public/favicon.ico', 'public/mask-icon.png', 'public/apple-touch-icon.png', 'public/logo-1024.png', 'public/icon-16.png', 'public/icon-32.png', 'public/icon-64.png', 'public/icon-192.png', 'public/icon-512.png', 'public/img/sonvudev.logo.png', 'public/og.png', 'scripts/production-check.mjs', 'scripts/audit-web.mjs', 'scripts/case-check.mjs', 'scripts/seo-check.mjs', 'scripts/r2-cors.mjs', 'scripts/run-tests.mjs', 'scripts/lib/cors.mjs', 'scripts/lib/files.mjs', 'cloudflare/r2-cors.json', 'render.yaml'];
 // One walk, shared with lint and metrics, so all three measure the same source.
 // This used to keep a private copy of the directory list that did not exclude
 // publish-output, which meant the build re-checked the artifact it had just
@@ -76,6 +76,25 @@ for (const file of ARTIFACT_FILES) {
 }
 await mkdir(path.join(root, 'build-reports'), { recursive: true });
 const artifactFiles = (await walkProjectFiles(publishRoot)).map((file) => path.relative(root, file).replaceAll('\\', '/'));
+
+// Nothing that can hold a secret may leave the machine inside the artifact.
+//
+// The copy above is recursive over whole directories, so a .env, a .env.local or a
+// .env.backup-* sitting in src/ or public/ would be deployed without anything
+// noticing: the existence gate only checks that required files are *present*, never
+// that forbidden ones are absent, and deploy/deploy.sh's refusal runs on the host
+// after the secret has already travelled. This scans what was actually written, so
+// the answer is about the bytes that ship rather than about a list someone maintains.
+//
+// .env.example is the one exception, by name rather than by pattern: it is
+// documentation the deploy needs and it holds no values.
+const shippedEnv = artifactFiles.filter((file) => {
+  const name = file.slice(file.lastIndexOf('/') + 1);
+  return name === '.env' || (name.startsWith('.env.') && name !== '.env.example');
+});
+if (shippedEnv.length) {
+  throw new Error(`Artifact chứa file biến môi trường, không được deploy:\n  ${shippedEnv.join('\n  ')}\n.env.example là file duy nhất được phép.`);
+}
 const report = { application: 'SonVuDev Store', mode: 'web-node', generatedAt: new Date().toISOString(), javascriptFilesChecked: jsFiles.length, requiredFilesChecked: required.length, audit: auditSummary, caseCheck: caseSummary, metrics: metricsSummary, artifactFiles: artifactFiles.length, artifactPath: 'publish-output/node', status: 'passed' };
 await writeFile(path.join(root, 'build-reports', 'web-build.json'), JSON.stringify(report, null, 2));
 console.log(`[build] PASS: ${required.length} required files, ${jsFiles.length} JavaScript files checked, ${auditSummary}, ${caseSummary}, ${metricsSummary}, ${artifactFiles.length} deploy files packaged into publish-output/node.`);

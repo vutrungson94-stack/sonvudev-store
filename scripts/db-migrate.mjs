@@ -51,7 +51,13 @@ const REQUIRED_COLUMNS = {
   orders: ["id", "order_number", "access_token_hash", "customer_email", "customer_name", "status", "payment_provider", "provider_order_id", "amount", "currency", "items", "paid_at", "created_at", "updated_at",
     "expires_at", "cancelled_at", "cancel_reason", "delivered_at", "paid_count", "paid_amount", "paid_provider_amount", "paid_provider_currency", "idempotency_key", "notifications", "reviews",
     "refunded_at", "refund_reason", "refunded_count", "refunded_amount", "refunded_provider_amount"],
-  products: ["id", "slug", "name", "short_description", "description", "category", "platform", "version", "price", "currency", "badge", "features", "requirements", "status", "file_key", "featured", "created_at", "updated_at",
+  // `featured` was in this list and in supabase/schema.sql, and nothing in src/ or
+// public/ ever read or wrote it — the owner could not set it, the storefront could
+// not order by it, and no query selected it. It was a column that looked like a
+// feature and behaved like a lie. Removed from both places so the declared shape
+// and the used shape agree again; an existing database keeps the column, which is
+// harmless, because db-migrate only ever adds what is missing.
+products: ["id", "slug", "name", "short_description", "description", "category", "platform", "version", "price", "currency", "badge", "features", "requirements", "status", "file_key", "created_at", "updated_at",
     "short_description_en", "description_en", "features_en", "seo_title", "seo_description"],
 };
 

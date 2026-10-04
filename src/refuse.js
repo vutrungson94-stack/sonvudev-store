@@ -44,14 +44,10 @@
  */
 export const refuse = (code, error, status) => ({ code, error, status });
 
-/**
- * The same shape with extra fields, for the refusals that carry more than a
- * sentence — a PayPal debug id, an order reference.
- *
- * @param {string} code a full dictionary key
- * @param {string} error the Vietnamese sentence
- * @param {number} status the HTTP status code
- * @param {object} [extra] additional fields to merge into the response
- * @returns {{code: string, error: string, status: number}}
- */
-export const refuseWith = (code, error, status, extra = {}) => ({ code, error, status, ...extra });
+// This module used to also export `refuseWith`, the same shape with extra fields
+// merged in, for the refusals that carry more than a sentence — a PayPal debug id,
+// an order reference. Nothing ever imported it: every one of the ~60 call sites in
+// src/app.js builds its body by hand, because the fields they carry differ per
+// route. Two ways to make the same object, one of which nothing uses, is two places
+// for the shape to drift. If a route ever needs a field in the refusal itself, the
+// shape belongs in the one function rather than beside it.

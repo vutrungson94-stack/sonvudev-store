@@ -277,7 +277,18 @@ test('organization có sameAs và founder khi cấu hình, và bỏ trống khi 
   assert.ok(!('founder' in plain), 'không có BRAND_FOUNDER_NAME thì không được bịa founder');
   // Compared against APP_URL, not the listening port: the markup is built from
   // configuration, so that is what it has to agree with.
-  assert.equal(plain.logo, `${process.env.APP_URL}/favicon.svg`, 'logo phải là file có thật');
+  // Organization.logo is the image Google renders in a knowledge panel, and Google
+// asks for at least 112x112. It pointed at /favicon.svg, a 64x64 SVG built for a
+// browser tab — present in the markup, unusable in practice. It now points at the
+// source mark at full size, and the assertion below reads that path out of the
+// response and checks the file is really there, so naming a logo that does not exist
+// cannot pass again.
+assert.ok(
+  existsSync(new URL(`../public${new URL(plain.logo).pathname}`, import.meta.url)),
+  `logo trong structured data trỏ tới file không tồn tại: ${plain.logo}`,
+);
+assert.ok(Number(new URL(plain.logo).pathname.match(/logo-(\d+)\.png/)?.[1]) >= 112,
+  `logo phải rộng ít nhất 112px cho knowledge panel, đang là ${plain.logo}`);
 });
 
 // The homepage carried a second hand-written copy of the Organization and WebSite

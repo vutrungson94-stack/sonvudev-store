@@ -111,9 +111,20 @@ test('audit chặn được từng loại lỗi nó sinh ra để bắt', async 
     const cwd = await copy('hardcoded-domain');
     const file = path.join(cwd, 'public', 'index.html');
     const source = await fs.readFile(file, 'utf8');
-    // The same origin APP_URL was given above, because the point is that a file
-    // repeating the real domain is what gets caught.
-    await fs.writeFile(file, source.replace('<link rel="icon"', `<link rel="preconnect" href="${AUDIT_DOMAIN}">\n<link rel="icon"`), 'utf8');
+    // The anchor is the page's icon block, and the page's icon block is now a
+    // {{iconLinks}} token rather than a written-out <link rel="icon">. This test
+    // used to replace that literal, and when the literal moved the replace became a
+    // no-op: nothing was injected, the fixture was clean, and the audit correctly
+    // reported no hardcoded domain. The test asserted "phải FAIL" and got a pass,
+    // because a fixture that was never broken cannot fail. So the anchor is asserted
+    // before it is replaced — a silent no-op is now a loud failure instead of a test
+    // that quietly stops testing.
+    const anchor = '{{iconLinks}}';
+    assert.ok(source.includes(anchor),
+      `index.html phải còn "${anchor}" để test này còn chỗ cắm domain — nếu token đổi tên, sửa cả hai`);
+    const injected = source.replace(anchor, `<link rel="preconnect" href="${AUDIT_DOMAIN}">\n${anchor}`);
+    assert.notEqual(injected, source, 'việc chèn domain phải thực sự thay đổi file');
+    await fs.writeFile(file, injected, 'utf8');
     const result = runAudit(cwd);
     const output = `${result.stdout}${result.stderr}`;
     assert.equal(result.status, 1, 'phải FAIL');

@@ -18,7 +18,6 @@ create table if not exists public.products (
   requirements text not null default '',
   status text not null default 'active' check (status in ('draft', 'active', 'archived')),
   file_key text,
-  featured boolean not null default false,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );

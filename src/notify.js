@@ -158,7 +158,10 @@ function body(order, template) {
   ].join("\n");
   const html = `<!doctype html><html lang="vi"><body style="margin:0;padding:24px;background:#f1f6f3;font-family:-apple-system,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;color:#16302a">
 <div style="max-width:560px;margin:0 auto;background:#fff;border:1px solid #dbe7e0;border-radius:14px;padding:28px">
-<p style="margin:0 0 4px;font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:#3f8f68">${escapeHtml(env.brand.name)}</p>
+<table role="presentation" cellpadding="0" cellspacing="0" style="margin:0 0 16px"><tr>
+<td style="padding:0 10px 0 0;vertical-align:middle"><img src="${escapeHtml(env.appUrl)}/icon-64.png" alt="${escapeHtml(env.brand.name)}" width="34" height="34" style="display:block;border:0;border-radius:7px"></td>
+<td style="padding:0;vertical-align:middle;font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:#3f8f68">${escapeHtml(env.brand.name)}</td>
+</tr></table>
 <h1 style="margin:0 0 18px;font-size:22px;line-height:1.3">${escapeHtml(spec.heading)}</h1>
 <h2 style="margin:0 0 18px;font-size:16px;line-height:1.4;color:#4b6159">${escapeHtml(spec.headingEn)}</h2>
 ${spec.lines.map((l) => `<p style="margin:0 0 10px;font-size:14px;line-height:1.6">${escapeHtml(l)}</p>`).join("")}

@@ -69,29 +69,57 @@ $brush = [System.Drawing.Drawing2D.LinearGradientBrush]::new(
 $g.FillEllipse($brush, 760, -130, 620, 620)
 $brush.Dispose()
 
-# The brand mark: the rounded square with an S, same as the site header.
-$markRect = [System.Drawing.RectangleF]::new(90, 74, 74, 74)
-$path = New-RoundedPath $markRect 18
-$brush = [System.Drawing.SolidBrush]::new([System.Drawing.Color]::FromArgb(18, 54, 46))
-$g.FillPath($brush, $path)
-$brush.Dispose()
-$path.Dispose()
-$font = [System.Drawing.Font]::new('Arial Black', 34, [System.Drawing.FontStyle]::Bold, [System.Drawing.GraphicsUnit]::Pixel)
-$brush = [System.Drawing.SolidBrush]::new([System.Drawing.Color]::FromArgb(200, 244, 220))
-$g.DrawString('S', $font, $brush, [System.Drawing.PointF]::new(90, 82), $fmt)
-$brush.Dispose()
-$font.Dispose()
+# The brand mark: the shop's actual logo, drawn from public/img/sonvudev.logo.png.
+#
+# This used to be a rounded square with the letter "S" painted into it, drawn here in
+# code. That made the share card the one surface carrying a hand-drawn second version
+# of the logo — the tab, the iOS icon and the home screen all showed the real mark,
+# and the card that Facebook, Zalo and LinkedIn render showed a different one. The
+# mark is a file now, and this reads it.
+$logoPath = Join-Path $root 'public\img\sonvudev.logo.png'
+if (-not (Test-Path -LiteralPath $logoPath)) {
+  throw "Khong tim thay logo nguon: $logoPath"
+}
+$logo = [System.Drawing.Image]::FromFile($logoPath)
+$g.InterpolationMode = [System.Drawing.Drawing2D.InterpolationMode]::HighQualityBicubic
+$g.PixelOffsetMode = [System.Drawing.Drawing2D.PixelOffsetMode]::HighQuality
+$g.DrawImage($logo, 90, 74, 74, 74)
+$logo.Dispose()
 
-# Wordmark beside the mark, split on the second capital so the halves can be
-# coloured the way the header colours them.
+# The brand name, from the same BRAND_NAME the site reads. It was the literal
+# 'SonVu' and 'Dev' typed here and coloured to match the header, so renaming the shop
+# updated the storefront and left the share card — the one image anybody outside the
+# shop ever sees — announcing the old name.
+$brandName = 'SonVuDev'
+$envFile = Join-Path $root '.env'
+if (Test-Path -LiteralPath $envFile) {
+  $match = Select-String -LiteralPath $envFile -Pattern '^BRAND_NAME=(.*)$' | Select-Object -First 1
+  if ($match) { $brandName = $match.Matches[0].Groups[1].Value.Trim() }
+}
+if (-not $brandName) { $brandName = 'SonVuDev' }
+
+# Split on the last capital that starts a word — the same rule src/pages.js uses for
+# the header wordmark — so the two halves colour identically.
+$head = $brandName
+$tail = ''
+for ($i = $brandName.Length - 1; $i -gt 0; $i--) {
+  if ($brandName[$i] -cmatch '[A-Z]' -and $brandName[$i - 1] -cmatch '[a-z0-9]') {
+    $head = $brandName.Substring(0, $i)
+    $tail = $brandName.Substring($i)
+    break
+  }
+}
+
 $font = [System.Drawing.Font]::new('Arial', 42, [System.Drawing.FontStyle]::Bold, [System.Drawing.GraphicsUnit]::Pixel)
-$width = Measure-Width $g 'SonVu' $font
+$width = Measure-Width $g $head $font
 $brush = [System.Drawing.SolidBrush]::new($WHITE)
-$g.DrawString('SonVu', $font, $brush, [System.Drawing.PointF]::new(180, 86), $fmt)
+$g.DrawString($head, $font, $brush, [System.Drawing.PointF]::new(180, 86), $fmt)
 $brush.Dispose()
-$brush = [System.Drawing.SolidBrush]::new($CORAL)
-$g.DrawString('Dev', $font, $brush, [System.Drawing.PointF]::new((180 + $width), 86), $fmt)
-$brush.Dispose()
+if ($tail) {
+  $brush = [System.Drawing.SolidBrush]::new($CORAL)
+  $g.DrawString($tail, $font, $brush, [System.Drawing.PointF]::new((180 + $width), 86), $fmt)
+  $brush.Dispose()
+}
 $font.Dispose()
 
 $font = [System.Drawing.Font]::new('Arial', 18, [System.Drawing.FontStyle]::Bold, [System.Drawing.GraphicsUnit]::Pixel)

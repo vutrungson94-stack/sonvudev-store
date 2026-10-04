@@ -17,6 +17,7 @@ import dns from "node:dns/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import dotenv from "dotenv";
+import { AI_CRAWLERS, ROBOTS_DISALLOW } from "../src/robots.js";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 dotenv.config({ path: path.join(root, ".env") });
@@ -185,8 +186,21 @@ try { robots = await get(`${base}/robots.txt`); } catch { /* reported below */ }
 record("robots.txt", robots.response.status === 200, `HTTP ${robots.response.status}`);
 const sitemapLine = one(robots.body, /Sitemap:\s*(\S+)/i);
 record("robots.txt khai báo sitemap", sitemapLine === `${base}/sitemap.xml`, sitemapLine || "(thiếu dòng Sitemap)");
-for (const rule of ["/admin", "/api/", "/order/", "/lookup"]) {
+// The rules come from src/robots.js, the same module the server renders the file
+// with. They used to be four literals written here while the server sent five —
+// /paypal-return was already disallowed in the response and missing from this check,
+// so the tool that exists to notice a crawler being pointed somewhere private had
+// stopped being able to see one of them. A rule written twice is enforced once.
+for (const rule of ROBOTS_DISALLOW) {
   record(`robots.txt chặn ${rule}`, new RegExp(`Disallow:\\s*${rule.replace(/\//g, "\\/")}`, "i").test(robots.body), "");
+}
+// And the other half of the same file: the answer engines are allowed by name, so
+// whether the shop is discoverable by ChatGPT or Claude is a checked fact rather
+// than an assumption. Deleting one from src/robots.js without it reaching a deploy
+// now shows up here as a red line instead of a silent loss.
+for (const agent of AI_CRAWLERS) {
+  const block = new RegExp(`User-agent:\\s*${agent}\\s*\\r?\\n\\s*Allow:\\s*/`, "i");
+  record(`robots.txt cho phép ${agent}`, block.test(robots.body), "");
 }
 
 // ---------------------------------------------------------------------------

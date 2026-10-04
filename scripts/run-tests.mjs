@@ -38,5 +38,32 @@ if (!found.length) {
 }
 
 const extra = process.argv.slice(2);
-const result = spawnSync(process.execPath, ['--test', ...extra, ...found], { stdio: 'inherit', cwd: root });
+
+// Node's test runner defaults to one worker per reported CPU, and every file here
+// boots an Express server and shells out to build/audit at least once. On a 16 GB
+// developer machine with a browser open that is enough to exhaust the heap: the run
+// died with "Zone Allocation failed" and then "spawn UNKNOWN" across all 42 files,
+// which reads exactly like 42 broken tests and is not one. A suite that cannot be
+// run on the machine it was written on is a suite people stop running.
+//
+// Four is deliberate rather than a guess at the fastest number: it keeps the wall
+// clock close to the unbounded run on CI while leaving the heap room for the parent
+// runner and the servers the workers start. Override with TEST_CONCURRENCY, or by
+// passing --test-concurrency yourself — extra arguments come after this one, so
+// yours wins.
+const concurrency = process.env.TEST_CONCURRENCY || '4';
+
+// A heap cap per worker, and the reason is reservation rather than real usage.
+//
+// V8 reserves virtual address space for its old generation up front, so every Node
+// process asks the OS for a large slice of memory whether or not it touches it.
+// With one process per test file, that reservation — not the test data — is what
+// exhausts a machine. On a 16 GB box with a browser and an editor open, the suite
+// died with "Zone Allocation failed" and then "spawn UNKNOWN" across all 42 files,
+// which reads exactly like 42 broken tests and is not one. No individual file here
+// needs more than a small fraction of this: the heaviest is the admin panel suite,
+// which parses a 100 KB script in a vm.
+const heap = process.env.TEST_HEAP || '768';
+
+const result = spawnSync(process.execPath, ['--test', `--test-concurrency=${concurrency}`, `--max-old-space-size=${heap}`, ...extra, ...found], { stdio: 'inherit', cwd: root });
 process.exit(result.status === null ? 1 : result.status);

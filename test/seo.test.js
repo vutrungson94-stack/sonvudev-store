@@ -343,7 +343,7 @@ test('mọi trang lập chỉ mục đều chứa dữ liệu có cấu trúc v�
   const html = await text(`/product/${product.slug}`);
   const graph = [...html.matchAll(/<script type="application\/ld\+json">([\s\S]*?)<\/script>/g)].flatMap((m) => JSON.parse(m[1].replace(/\\u003c/g, '<')));
   const organization = graph.find((node) => node['@type'] === 'Organization');
-  assert.equal(organization.logo, 'https://sonvudev.com/favicon.svg', 'logo phải trỏ tới file có thật');
+  assert.equal(organization.logo, 'https://sonvudev.com/logo-1024.png', 'logo phải trỏ tới file có thật');
   // Google removed the sitelinks search box in November 2024, and the only page
   // that took a query string here was /lookup, which robots.txt disallows.
   const website = graph.find((node) => node['@type'] === 'WebSite');

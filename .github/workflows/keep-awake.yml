@@ -132,7 +132,12 @@ jobs:
 
           # Worth noticing, not worth failing over. A warning that fails on something
           # the shop deliberately turned off trains people to ignore warnings.
-          if grep -q '"paypalEnvironment":"unset' /tmp/health.json; then
+          #
+          # Read from the body captured above, not from /tmp/health.json. That path
+          # was hardcoded and the file it named was never written and has since been
+          # removed, so this branch had been reading a file that does not exist and
+          # the warning had never once fired — the one thing it exists for.
+          if grep -q '"paypalEnvironment":"unset' "$body"; then
             echo "!! PAYPAL_ENVIRONMENT chua duoc dat tren host nay — shop dang coi do la sandbox"
           fi
           echo "OK — shop dang thuc va bao khoe"

@@ -724,10 +724,18 @@ for (const name of htmlFiles) {
 //    markup told Google to read a page it had been told to skip. Anything a
 //    crawler is told to read has to be a page it is allowed to read.
 // ---------------------------------------------------------------------------
-// The Disallow lines are written as array entries, so the capture also picks up
-// the closing quote and comma. Left in, every entry reads as "/lookup\"," and
-// matches nothing, which is how this check would pass while broken.
-const blocked = new Set([...serverSource.matchAll(/Disallow:\s*"?([^"\s,]+)"?/g)].map((m) => m[1].replace(/\/$/, "")));
+// The rules are read out of src/robots.js — the module the server renders the file
+// with — rather than scraped from src/app.js. They used to be scraped from app.js
+// as `Disallow: "…"` literals, and moved to their own module made that capture come
+// back empty: this check went from "verifies structured data does not point at a
+// hidden page" to "always passes", with no red line anywhere. Reading the module
+// means adding a private path is one edit that both the response and this check see.
+const robotsSource = await read(path.join("src", "robots.js"));
+const robotsBlock = robotsSource.match(/ROBOTS_DISALLOW\s*=\s*(?:Object\.freeze\()?\s*\[([\s\S]*?)\]/)?.[1] || "";
+const blocked = new Set((robotsBlock.match(/'([^']+)'/g) || []).map((quoted) => quoted.replace(/'/g, "").replace(/\/$/, "")));
+if (!blocked.size) {
+  fail("schema chặn", "src/robots.js", "không đọc được ROBOTS_DISALLOW — audit không thể biết trang nào robots.txt cấm, nên mọi dữ liệu có cấu trúc đều bị coi là hợp lệ");
+}
 for (const match of pagesSource.matchAll(/"(?:urlTemplate|item|url)"\s*:\s*`?\$\{?site\(\)\}?(\/[^"`]*)/g)) {
   // Only the path decides whether a crawler may read it. A target with a query
   // string still describes the page behind it, and that page is what matters.

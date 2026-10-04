@@ -4,11 +4,11 @@ import { promises as fs } from "node:fs";
 import { fileURLToPath } from "node:url";
 import crypto from "node:crypto";
 import { env, isConfigured } from "./config.js";
-import { ORDER_STATUSES, countOrders, dataDir, ensureSeed, findOrderByIdempotencyKey, getOrder, getProduct, getProductBySlug, isOrderOwner, isSellable, latestOrder, listExpiringOrders, listOpenOrders, listOrders, listOrdersForRevenue, listProducts, createOrder, updateOrder, createProduct, updateProduct, persistenceMode } from "./store.js";
+import { ORDER_STATUSES, countOrders, dataDir, ensureSeed, findOrderByIdempotencyKey, getOrder, getProduct, getProductBySlug, isOrderOwner, isSellable, latestOrder, listOpenOrders, listOrders, listOrdersForRevenue, listProducts, createOrder, updateOrder, createProduct, updateProduct, persistenceMode } from "./store.js";
 import { supabaseRequest } from "./supabase-http.js";
 import { paypalEnvironmentIsSet } from "./config.js";
 import { createDownloadUrl, createUploadUrl } from "./r2.js";
-import { captureOrder, createOrder as createPayPalOrder, hashToken, newOrderId, newToken, paypalChargeFor, paypalChargeForProduct, paymentMatchesOrder, readOrder, verifyWebhook } from "./paypal.js";
+import { captureOrder, createOrder as createPayPalOrder, hashToken, newOrderId, newToken, paypalChargeForProduct, paymentMatchesOrder, readOrder, verifyWebhook } from "./paypal.js";
 import { paymentInstructions, paymentOptions } from "./payments.js";
 import { brandMeta, esc, fillCopy, fillPageTokens, pageTokenValues, renderFeed, renderIndexCount, renderIndexFilters, renderIndexGrid, renderLlmsTxt, renderOgImage, renderProductPage, renderStats, verificationFile, verificationMeta } from "./pages.js";
 import { hasPayment, isClosed, isUnpaid, markOrderDelivered, markOrderPaid, paymentDeadline, sweeperRunning, voidPayment } from "./orders.js";
@@ -18,6 +18,7 @@ import { pingIndexNow, isIndexNowConfigured } from "./indexnow.js";
 import { vndPerUsd } from "./rates.js";
 import { createReview, listReviewsForProduct, reviewLimits } from "./reviews.js";
 import { refuse } from "./refuse.js";
+import { renderRobotsTxt } from "./robots.js";
 
 const app = express();
 const publicDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "public");
@@ -99,6 +100,14 @@ const canonicalHost = (() => {
 // localhost and IP hosts have no meaningful www twin, so nothing is redirected.
 const wwwHost = canonicalHost && !/^(localhost|127\.|0\.0\.0\.0|\[?::1|.*\.local)$/i.test(canonicalHost) ? `www.${canonicalHost}` : "";
 
+// The slug that answers the site-wide share card at /og/<slug>.svg.
+//
+// It used to be the literal "sonvudev", written into the route: renaming BRAND_NAME
+// made /og/sonvudev.svg 404 while every other page on the site carried the new name,
+// so the one image a link preview depended on was the only thing still wearing the
+// old brand. Derived from configuration instead, so it follows the name.
+const siteCardSlug = env.brand.name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "") || "shop";
+
 app.use((req, res, next) => {
   res.setHeader("X-Content-Type-Options", "nosniff");
   res.setHeader("Referrer-Policy", "strict-origin-when-cross-origin");
@@ -109,49 +118,39 @@ app.use((req, res, next) => {
   next();
 });
 app.get("/robots.txt", (_req, res) => {
-  res.type("text/plain").send([
-    "User-agent: *",
-    "Allow: /",
-    // Private by design: the admin panel, and the order and lookup pages that
-    // hold a buyer's access token in the URL or the session.
-    "Disallow: /admin",
-    "Disallow: /api/",
-    "Disallow: /order/",
-    "Disallow: /lookup",
-    "Disallow: /paypal-return",
-    "",
-    // Text agents, named one by one rather than left to the default. The default
-    // already allowed them, so nothing changes for the major crawlers; what
-    // changes is that the decision is written down instead of implied, and that a
-    // shop which later wants to opt out of one has the exact block to copy.
-    //
-    // They are allowed on purpose. Answer engines are where people ask this kind
-    // of question now, and a store that hides its catalogue from them is only
-    // hiding it from the people who are looking for it.
-    "User-agent: GPTBot",
-    "Allow: /",
-    "",
-    "User-agent: OAI-SearchBot",
-    "Allow: /",
-    "",
-    "User-agent: ChatGPT-User",
-    "Allow: /",
-    "",
-    "User-agent: ClaudeBot",
-    "Allow: /",
-    "",
-    "User-agent: anthropic-ai",
-    "Allow: /",
-    "",
-    "User-agent: PerplexityBot",
-    "Allow: /",
-    "",
-    "User-agent: Google-Extended",
-    "Allow: /",
-    "",
-    `Sitemap: ${env.appUrl.replace(/\/$/, "")}/sitemap.xml`,
-    "",
-  ].join("\n"));
+  // Built by src/robots.js, which is also what scripts/seo-check.mjs asserts the
+  // live file against. The list used to be written here and there, and /paypal-return
+  // had already been added to one and forgotten in the other.
+  res.type("text/plain").send(renderRobotsTxt(env.appUrl));
+});
+
+app.get("/site.webmanifest", (_req, res) => {
+  // Served rather than committed as a static file, for the same reason the canonical
+  // URL and the verification tags are: the name in here is the brand, and a brand
+  // written into a JSON file is a second place to forget to change it. A manifest is
+  // also what makes the shop installable and what names its icon on an Android home
+  // screen, which is a slot the logo otherwise never reaches.
+  res.set("Cache-Control", "public, max-age=3600").type("application/manifest+json").send(JSON.stringify({
+    name: env.brand.name,
+    short_name: env.brand.name,
+    description: env.brand.description,
+    lang: "vi",
+    start_url: "/",
+    scope: "/",
+    display: "standalone",
+    // The tile background is the brand dark from styles.css, and the mark on it is
+    // the same mark the apple-touch-icon composites onto that same colour.
+    background_color: "#0f2a22",
+    theme_color: "#0f2a22",
+    icons: [
+      { src: "/icon-192.png", sizes: "192x192", type: "image/png", purpose: "any" },
+      { src: "/icon-512.png", sizes: "512x512", type: "image/png", purpose: "any" },
+      // maskable asks the launcher to crop the icon to its own shape, which needs
+      // the mark inside the safe zone rather than edge to edge. The source has the
+      // mark filling the frame, so this points at the padded tile instead.
+      { src: "/apple-touch-icon.png", sizes: "180x180", type: "image/png", purpose: "maskable" },
+    ],
+  }, null, 2));
 });
 
 // Site ownership for the search engines that will actually crawl this thing.
@@ -417,7 +416,7 @@ app.get("/og/:slug.svg", async (req, res) => {
   // and version as literals, so a shop that changed either kept publishing the
   // old numbers. There is no price here at all: a card that invents a number is
   // worse than a card that states none.
-  if (req.params.slug === "sonvudev") {
+  if (req.params.slug === siteCardSlug) {
     return res.set("Cache-Control", "public, max-age=3600").type("image/svg+xml").send(renderOgImage({ name: "Phần mềm Windows cho công việc", platform: "Windows", version: "1.0", price: 0, currency: "VND" }));
   }
   const product = await getProductBySlug(req.params.slug);
