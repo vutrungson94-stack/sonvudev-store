@@ -60,7 +60,7 @@ const isAdmin = (req) => {
   if (!expected || !supplied || supplied.length !== expected.length) return false;
   return crypto.timingSafeEqual(Buffer.from(supplied), Buffer.from(expected));
 };
-const admin = (req, res, next) => { if (!isAdmin(req)) return res.status(401).json(refuse("api.err.unauthorized", "Unauthorized", 401)); next(); };
+const admin = (req, res, next) => { if (!isAdmin(req)) return res.status(401).json(refuse("api.err.unauthorized", "Không có quyền.", 401)); next(); };
 
 // Order ids are short, so a lookup endpoint without a limit would let anyone
 // walk the id space. A per-key window is enough here: the app runs as a single
@@ -829,7 +829,7 @@ app.post("/api/reviews", json, async (req, res) => {
 
 app.post("/api/paypal/webhook", express.raw({ type: "application/json" }), async (req, res) => {
   try {
-    if (!(await verifyWebhook(req.body, req.headers))) return res.status(400).json(refuse("api.err.webhookSignature", "Webhook signature invalid", 400));
+    if (!(await verifyWebhook(req.body, req.headers))) return res.status(400).json(refuse("api.err.webhookSignature", "Chữ ký webhook không hợp lệ", 400));
     const event = JSON.parse(req.body.toString("utf8"));
     if (event.event_type === "PAYMENT.CAPTURE.COMPLETED") {
       const resource = event.resource || {};
@@ -845,7 +845,7 @@ app.post("/api/paypal/webhook", express.raw({ type: "application/json" }), async
       }
     }
     res.json({ received: true });
-  } catch (error) { console.error(error); res.status(400).json(refuse("api.err.webhookRejected", "Webhook rejected", 400)); }
+  } catch (error) { console.error(error); res.status(400).json(refuse("api.err.webhookRejected", "Webhook bị từ chối", 400)); }
 });
 app.post("/api/paypal/capture", json, async (req, res) => {
   try {
@@ -919,11 +919,11 @@ app.post("/api/admin/products", admin, json, async (req, res) => {
     // field was the problem. The index stays the real guarantee; this is the
     // message.
     if (!slug) return res.status(400).json(refuse("api.err.slugRequired", "Tên sản phẩm không tạo được đường dẫn. Hãy nhập slug.", 400));
-    if (await getProductBySlug(slug)) return res.status(409).json(refuse("api.err.slugTaken", `Đường dẫn /product/${slug} đã có sản phẩm khác dùng rồi.`, 409));
+    if (await getProductBySlug(slug)) return res.status(409).json(refuse("api.err.slugTaken", "Đường dẫn này đã có sản phẩm khác dùng rồi.", 409));
     const item = await createProduct({
       slug, name,
       shortDescription: text(req.body.shortDescription, 180), description: text(req.body.description, 2000), category: text(req.body.category, 50) || "Khác", platform: text(req.body.platform, 50) || "Windows", version: text(req.body.version, 30) || "1.0.0", price, currency: text(req.body.currency, 8) || "VND",
-      features: Array.isArray(req.body.features) ? req.body.features.map((v) => text(v, 120)).filter(Boolean) : [], featuresEn: Array.isArray(req.body.featuresEn) ? req.body.featuresEn.map((v) => text(v, 200)).filter(Boolean) : [], shortDescriptionEn: text(req.body.shortDescriptionEn, 180), descriptionEn: text(req.body.descriptionEn, 4000), requirements: text(req.body.requirements, 240), seoTitle: text(req.body.seoTitle, 70), seoDescription: text(req.body.seoDescription, 175), seoTitleEn: text(req.body.seoTitleEn, 70), seoDescriptionEn: text(req.body.seoDescriptionEn, 175), status: text(req.body.fileKey, 500) ? (req.body.status === "draft" ? "draft" : "active") : "draft", fileKey: text(req.body.fileKey, 500), badge: text(req.body.badge, 40) || null, featured: Boolean(req.body.featured),
+      features: Array.isArray(req.body.features) ? req.body.features.map((v) => text(v, 120)).filter(Boolean) : [], featuresEn: Array.isArray(req.body.featuresEn) ? req.body.featuresEn.map((v) => text(v, 200)).filter(Boolean) : [], shortDescriptionEn: text(req.body.shortDescriptionEn, 180), descriptionEn: text(req.body.descriptionEn, 4000), requirements: text(req.body.requirements, 240), seoTitle: text(req.body.seoTitle, 70), seoDescription: text(req.body.seoDescription, 175), seoTitleEn: text(req.body.seoTitleEn, 70), seoDescriptionEn: text(req.body.seoDescriptionEn, 175), status: text(req.body.fileKey, 500) ? (req.body.status === "draft" ? "draft" : "active") : "draft", fileKey: text(req.body.fileKey, 500), badge: text(req.body.badge, 40) || null,
     });
     // Publishing a product is the one event a crawler cannot guess at: the
     // sitemap is only re-read on its own schedule, so without this a new page
@@ -1116,10 +1116,10 @@ app.patch("/api/admin/orders/:id", admin, json, async (req, res) => {
 // the footer carries the year instead of the template token; the handler itself is
 // defined with the other page routes.
 app.use((req, res) => {
-  if (req.path.startsWith("/api/")) return res.status(404).json(refuse("api.err.notFound", "Not found", 404));
+    if (req.path.startsWith("/api/")) return res.status(404).json(refuse("api.err.notFound", "Không tìm thấy", 404));
   return notFound(req, res);
 });
 
-app.use((error, _req, res, _next) => { console.error(error); res.status(500).json(refuse("api.err.internal", "Internal server error", 500)); });
+app.use((error, _req, res, _next) => { console.error(error); res.status(500).json(refuse("api.err.internal", "Lỗi máy chủ", 500)); });
 export async function createApp() { await ensureSeed(); return app; }
 export default app;

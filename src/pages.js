@@ -69,6 +69,42 @@ export function productSummary(product, max = 155) {
 }
 
 /**
+ * The description a search engine and a link preview are shown.
+ *
+ * Distinct from productSummary on purpose. productSummary describes the product for a
+ * reader who is already on the page, so falling back to the Vietnamese copy when the
+ * English copy is missing is the better of two imperfect options. A meta description
+ * is not read on the page — it is read by someone who searched in English and is
+ * deciding whether to click. Serving them a Vietnamese sentence there puts the wrong
+ * text in the result and reads as two pages competing for the same query, which is
+ * what hreflang exists to prevent.
+ *
+ * So: the owner's own SEO copy when it exists, then English prose, then a
+ * language-neutral line built from the product name and platform. A weak description
+ * is recoverable; a description in the wrong language is worse than none.
+ *
+ * @param {object} product already passed through localisedProduct
+ * @param {string} lang "en" or anything else for Vietnamese
+ * @returns {string}
+ */
+export const metaDescriptionFor = (product, lang = "vi", max = 155) => {
+  const own = fillCopy(String(product.seoDescription || "").trim());
+  if (own) return own.length <= max ? own : `${own.slice(0, own.lastIndexOf(" ") || max)}…`;
+  if (lang !== "en") return productSummary(product, max);
+
+  // English requested, no English copy: describe it in words that are the same in
+  // both languages rather than borrowing the Vietnamese sentence.
+  const name = fillCopy(String(product.name || "").trim());
+  const platform = fillCopy(String(product.platform || "Windows").trim());
+  const summary = fillCopy(String(product.short_description || product.shortDescription || "").trim());
+  if (summary && !/[À-ỹ]/.test(summary)) return productSummary(product, max);
+  const derived = platform && platform.toLowerCase() !== "windows"
+    ? `${name} for ${platform} — download from ${env.brand.name}`
+    : `${name} for Windows — download from ${env.brand.name}`;
+  return derived.length <= max ? derived : `${derived.slice(0, derived.lastIndexOf(" ") || max)}…`;
+};
+
+/**
  * The one logo URL the whole site publishes as the brand's logo.
  *
  * It was previously /favicon.svg, which is the right answer for a browser tab and
@@ -178,7 +214,7 @@ export const productSchema = (product, lang = "vi") => ({
   name: `${product.name} ${product.version ? `v${product.version}` : ""}`.trim(),
   // altText and the description both take the search phrasing, so the product
   // is findable by the problem it solves and not only by its product name.
-  description: product.seoDescription || productSummary(product),
+  description: metaDescriptionFor(product, lang),
   alternateName: product.seoTitle || undefined,
   url: absolute(productUrl(product.slug, lang)),
   inLanguage: lang === "en" ? "en" : "vi-VN",
@@ -348,7 +384,12 @@ export const brandWordmark = () => {
   // that survived: the header on all fourteen pages, the admin panel and every email
   // carried a plain S in a rounded square while the favicon, the share card and the
   // home screen icon carried the real mark. One logo, one file, everywhere.
-  const logo = `<span class="brand-mark"><img src="/icon-64.png" alt="" width="26" height="26" loading="eager" decoding="async"></span>`;
+  //
+  // logo-ink rather than the source mark: the source is a flat #3f6a5c, which measures
+  // 2.71:1 against the paper-white header — below the 3:1 WCAG asks of a graphic that
+  // carries meaning. logo-ink is the same silhouette in --green, 3.3:1. The shape is
+  // identical; only the tint differs, because a surface decides how a mark is inked.
+  const logo = `<span class="brand-mark"><img src="/logo-ink-64.png" alt="" width="26" height="26" loading="eager" decoding="async"></span>`;
   if (cut < 1) return `${logo}<span>${esc(name)}</span>`;
   return `${logo}<span>${esc(name.slice(0, cut))}<span>${esc(name.slice(cut))}</span></span>`;
 };
@@ -367,7 +408,7 @@ export const brandWordmark = () => {
  */
 export const PAGE_TOKENS = [
   "site", "brandName", "brandWordmark", "support", "paymentWindowHours",
-  "reviewMinLength", "reviewMaxLength", "year", "legalEntity", "jsonLd", "iconLinks",
+  "reviewMinLength", "reviewMaxLength", "year", "legalEntityLine", "jsonLd", "iconLinks",
 ];
 /** Placeholders inside product copy, filled on the way out rather than in a page. */
 export const COPY_TOKENS = ["founder", "brand"];
@@ -389,6 +430,7 @@ export function pageTokenValues({ products = [], reviewLimits = null } = {}) {
     reviewMaxLength: String(reviewLimits?.maxLength ?? 1200),
     year: String(new Date().getFullYear()),
     legalEntity: env.brand.legalEntity,
+    legalEntityLine: legalEntityLine(),
     jsonLd: jsonLdGraph(products),
     // Rendered, not written into nine <head>s. The icon block is nine lines in ten
     // places otherwise, and the page that misses one is the page with no iOS icon.
@@ -426,6 +468,25 @@ export const verificationFile = (prefix, suffix, token) => {
 
 /** One product's canonical address. Vietnamese is the root; English sits under /en. */
 export const productUrl = (slug, lang = "vi") => (lang === "en" ? `/en/product/${slug}` : `/product/${slug}`);
+
+/**
+ * The legal-entity line, or nothing at all.
+ *
+ * The three legal pages each carried `<p class="legal-entity">{{legalEntity}}</p>`
+ * unconditionally, and BRAND_LEGAL_ENTITY is unset by default — so every one of them
+ * shipped an empty paragraph. It is not invisible: `legal-entity` has its own margin
+ * and colour, so what a buyer saw on /terms was a gap where the shop's name should
+ * be, on the page whose entire job is saying who is responsible for the sale.
+ *
+ * The whole element is the token rather than just its text, because the alternative
+ * is the same empty paragraph with a different failure: an empty <p> is a layout
+ * artefact that only a person looking at the page would ever notice, whereas
+ * omitting it is a decision the markup makes visible in review.
+ */
+export const legalEntityLine = (className = 'legal-entity') => {
+  const name = String(env.brand.legalEntity || '').trim();
+  return name ? `<p class="${className}">${esc(name)}</p>` : '';
+};
 
 /** The other language's address for the same page, or nothing when it has none. */
 const alternateUrl = (path, lang) => {
@@ -596,7 +657,7 @@ const initials = (name) => String(name || "SV").split(/\s+/).map((part) => part[
  * tables side by side make a missing translation a visible gap rather than a
  * silent absence.
  */
-const COPY_VI = {
+export const COPY_VI = {
   home: "Trang chủ",
   products: "Sản phẩm",
   why: "Vì sao",
@@ -604,6 +665,12 @@ const COPY_VI = {
   about: "Về chúng tôi",
   breadcrumbLabel: "Đường dẫn",
   software: "Phần mềm",
+  // Category and badge are free-text columns, so a Vietnamese product carries
+  // Vietnamese words there. Rendering them raw put "Công cụ · Windows · Phát hành 1.4.0"
+  // at the top of the English page. These map the values the shop actually uses; an
+  // unknown one still renders as written rather than disappearing.
+  categories: { "Công cụ": "Công cụ", "Tiện ích": "Tiện ích", "Phần mềm": "Phần mềm", "Khác": "Khác" },
+  badges: { "Mới": "Mới", "Bán chạy": "Bán chạy", "Cập nhật": "Cập nhật", "Phát hành": "Phát hành" },
   buyNow: "Mua ngay",
   buyNote: "Giấy phép vĩnh viễn, không phí thuê bao. Thanh toán chuyển khoản hoặc PayPal.",
   pointDownload: "Tải ngay sau khi thanh toán",
@@ -621,7 +688,7 @@ const COPY_VI = {
   privacy: "Bảo mật",
 };
 
-const COPY_EN = {
+export const COPY_EN = {
   home: "Home",
   products: "Products",
   why: "Why us",
@@ -629,6 +696,10 @@ const COPY_EN = {
   about: "About",
   breadcrumbLabel: "Breadcrumb",
   software: "Software",
+  // The Vietnamese values, translated. See the note on COPY_VI: the category and
+  // badge are free-text columns written in one language and rendered in both.
+  categories: { "Công cụ": "Tools", "Tiện ích": "Utilities", "Phần mềm": "Software", "Khác": "Other" },
+  badges: { "Mới": "New", "Bán chạy": "Best seller", "Cập nhật": "Updated", "Phát hành": "Release" },
   buyNow: "Buy now",
   buyNote: "One-time licence, no subscription. Pay by bank transfer or PayPal.",
   pointDownload: "Download immediately after payment",
@@ -710,6 +781,32 @@ function localizeToEnglish(product) {
 }
 
 /**
+ * Looks a free-text product field up in the dictionary for the current language.
+ *
+ * `category` and `badge` are free-text columns. They are written once, in whichever
+ * language the owner was typing in, and the shop has two languages — so rendering
+ * them raw put a Vietnamese eyebrow at the top of every English product page:
+ * "Công cụ · Windows · Phát hành 1.4.0" on a URL declared as the English alternative
+ * of the Vietnamese one. A dictionary entry cannot fix that on its own, because the
+ * owner can type anything into those columns; the map below covers the values the
+ * shop actually uses and this is what decides what happens to the rest.
+ *
+ * An unknown value is returned unchanged rather than dropped. A new category the owner
+ * invented should appear on both pages, in one language, rather than leave a hole —
+ * the reader can still see what it is, and the alternative is an empty eyebrow.
+ *
+ * @param {unknown} value the raw column value
+ * @param {Record<string, string>|undefined} map dictionary for the current language
+ * @param {string} [fallback] used when the column is empty
+ * @returns {string}
+ */
+export const localised = (value, map, fallback = "") => {
+  const raw = String(value ?? "").trim();
+  if (!raw) return fallback;
+  return map?.[raw] ?? raw;
+};
+
+/**
  * The full product page. It is deliberately standalone HTML: no JavaScript is
  * required to read the whole thing, and the only script on the page opens the
  * existing checkout modal on the storefront rather than duplicating it.
@@ -735,7 +832,7 @@ export function renderProductPage(rawProduct, lang = "vi", reviews = []) {
   // arm on each side — an editor had edited one and not the other, and a page that
   // looked localized was emitting the same title twice.
   const title = product.seoTitle || `${product.name} v${product.version} — ${product.platform || "Windows"} | ${brand()}`;
-  const description = product.seoDescription || productSummary(product);
+  const description = metaDescriptionFor(product, lang);
   const copy = en ? COPY_EN : COPY_VI;
   const faq = faqSchema(product, lang);
 
@@ -759,7 +856,7 @@ ${jsonLd([organization(), websiteSchema(), productSchema(product, lang), breadcr
 <article class="product-detail">
 <header class="product-hero">
 <div>
-<p class="eyebrow">${esc(product.category || copy.software)} · ${esc(product.platform || "Windows")}${product.badge ? ` · ${esc(product.badge)}` : ""}</p>
+<p class="eyebrow">${esc(localised(product.category, copy.categories, copy.software))} · ${esc(product.platform || "Windows")}${product.badge ? ` · ${esc(localised(product.badge, copy.badges))}` : ""}</p>
 <h1>${esc(product.name)} <em>v${esc(product.version)}</em></h1>
 <p class="product-lede">${esc(product.short_description || product.shortDescription || "")}</p>
 </div>

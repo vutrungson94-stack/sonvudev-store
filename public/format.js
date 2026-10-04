@@ -5,21 +5,28 @@
 // related.js grouped prices for the wrong locale on English pages. One order
 // read differently depending on which screen showed it.
 //
-// A plain classic script rather than a module, because these pages run under
+// One plain classic script rather than a module, because these pages run under
 // script-src 'self' with no bundler: every page loads this file first, then
 // calls window.SVDFormat. It declares no top-level let or const of its own, so
 // the audit's shared-global check keeps passing no matter which pages combine
 // it with other scripts.
+//
+// money applies the same rule as src/format.js on the server: the locale
+// follows the currency, never the page language. The two files cannot share
+// code — one runs in Node, the other in the browser — so they are held in
+// step by scripts/metrics.mjs, which counts real implementations, and by the
+// tests that format the same amount on both sides and compare the bytes.
 (function () {
   var ESCAPES = { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' };
   function esc(value) {
     return String(value ?? '').replace(/[&<>"']/g, function (c) { return ESCAPES[c]; });
   }
-  function money(value, currency, locale) {
+  function money(value, currency) {
     var amount = Number(value) || 0;
-    var tag = locale || 'vi-VN';
     // USD is styled on its own rail; anything else is grouped whole, the same
-    // rule the server applies so the receipt and the ledger always agree.
+    // rule the server applies so a price on the page, in the cart and on the
+    // receipt is the same number written the same way.
+    var tag = currency === 'USD' ? 'en-US' : 'vi-VN';
     var options = currency === 'USD'
       ? { style: 'currency', currency: 'USD' }
       : { maximumFractionDigits: 0 };

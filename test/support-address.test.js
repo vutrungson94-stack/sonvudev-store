@@ -206,20 +206,25 @@ test('trang 404 nói được cả hai ngôn ngữ', async () => {
 });
 
 test('danh sách sản phẩm trong trang 404 cũng theo ngôn ngữ của trang', async () => {
-  // The price formatter in the same file grouped digits with a dot, which is right
-  // for a Vietnamese reader and wrong for an English one. Two copies of this mistake
-  // sat one line apart and only one was fixed.
+  // The price formatter in the same file grouped digits by the page
+  // language, and before that by nothing at all: a dot everywhere, which
+  // is right for a Vietnamese reader and wrong for an English one. The
+  // rule is now the one the server applies — the locale follows the
+  // currency, never the page language — so a VND price keeps its dot
+  // grouping on an English page exactly as the receipt writes it, and a
+  // USD price wears its dollar sign on every screen.
   const related = await publicFile('related.js');
-  assert.match(related, /var locale = lang === 'en' \? 'en-US' : 'vi-VN'/, 'locale phải theo lang của trang');
-  // The formatter has to read that variable. The implementation now lives in the
-  // shared public/format.js, so what is asserted here is the handoff: the page
-  // locale must travel into the shared call, and the shared call must honour the
-  // locale it is given rather than a literal.
-  assert.match(related, /SVDFormat\.money\(value, currency, locale\)/, 'money() phải truyền locale của trang vào bộ định dạng dùng chung');
+  assert.match(related, /SVDFormat\.money\(value, currency\)/, 'money() phải truyền currency');
+  assert.ok(!/money\(value, currency, locale\)/.test(related),
+    'related.js không được chọn locale theo trang — giá theo currency, không theo ngôn ngữ');
   const shared = await publicFile('format.js');
-  assert.match(shared, /function money\(value, currency, locale\)/, 'bộ định dạng dùng chung phải nhận locale');
-  assert.match(shared, /new Intl\.NumberFormat\(tag/, 'bộ định dạng dùng chung phải dùng locale được truyền, không gõ cứng');
-  // And the language is read from the document, because this file loads on pages
-  // that may not include i18n.js at all.
+  assert.match(shared, /function money\(value, currency\)/, 'bộ định dạng dùng chung phải nhận currency');
+  assert.match(shared, /currency === 'USD' \? 'en-US' : 'vi-VN'/, 'bộ định dạng dùng chung phải chọn locale theo currency');
+  // And the same rule on the server, so the price on the page and the
+  // price on the receipt are the same number written the same way.
+  const server = await read('src/format.js');
+  assert.match(server, /currency === "USD" \? "en-US" : "vi-VN"/, 'src/format.js phải chọn locale theo currency giống phía trình duyệt');
+  // The language is still read from the document, for the empty message:
+  // this file loads on pages that may not include i18n.js at all.
   assert.match(related, /documentElement.*lang|lang.*documentElement/s, 'related.js phải đọc lang từ document');
 });

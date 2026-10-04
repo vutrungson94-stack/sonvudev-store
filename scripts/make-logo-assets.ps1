@@ -131,23 +131,58 @@ $ico.Dispose()
 Write-Host ("  {0,-32} {1} sizes" -f 'public\favicon.ico', $sizes.Count)
 
 # ------------------------------------------------------------------ favicon.svg
-# Kept as an SVG because it is the sharpest icon a browser tab can show, but built
-# by embedding a 64x64 render of the same source rather than by tracing the mark a
-# second time by hand. Two hand-drawn copies of one logo is how the tab icon and the
-# home screen icon end up being different logos.
-$canvas = New-Canvas 64 ([System.Drawing.Color]::Transparent)
-$canvas[1].DrawImage($logo, 0, 0, 64, 64)
-$canvas[1].Dispose()
-$stream = New-Object System.IO.MemoryStream
-$canvas[0].Save($stream, [System.Drawing.Imaging.ImageFormat]::Png)
-$canvas[0].Dispose()
-$base64 = [Convert]::ToBase64String($stream.ToArray())
-$stream.Dispose()
+# Traced from the source into real vector shapes.
+#
+# This used to embed a base64 PNG inside an <image> element, which reads as clever and
+# is not: Chrome, Firefox and Safari disagree about <image> inside an SVG icon and
+# several ignore it, falling back to /favicon.ico or to nothing at all. That is why
+# the browser tab showed no logo while every file in the project was present and
+# correct. An SVG icon has to be shapes.
+#
+# The mark is rectilinear — drawn from rectangles, like pixel art — so sampling it onto
+# a grid and emitting the occupied cells reproduces it rather than approximating it.
+# Cells are merged into horizontal runs and written as one path: 115 runs, ~2 KB,
+# instead of a 7.7 KB base64 blob that browsers may not even draw.
+$GRID = 64
+$ALPHA_MIN = 110
+$INK_THRESHOLD = 0.42
+$cell = [int][math]::Round($logo.Width / $GRID)
+$runs = New-Object System.Collections.Generic.List[string]
+$row = 0
+while ($row -lt $GRID) {
+  $x = 0
+  while ($x -lt $GRID) {
+    $hits = 0; $total = 0
+    for ($y = $row * $cell; $y -lt ($row * $cell + $cell); $y += 2) {
+      for ($cx = $x * $cell; $cx -lt ($x * $cell + $cell); $cx += 2) {
+        $total++
+        if ($logo.GetPixel($cx, $y).A -ge $ALPHA_MIN) { $hits++ }
+      }
+    }
+    if (($hits / $total) -lt $INK_THRESHOLD) { $x++; continue }
+    $w = 0
+    while (($x + $w) -lt $GRID) {
+      $h2 = 0; $t2 = 0
+      for ($y = $row * $cell; $y -lt ($row * $cell + $cell); $y += 2) {
+        for ($cx = ($x + $w) * $cell; $cx -lt (($x + $w) * $cell + $cell); $cx += 2) {
+          $t2++
+          if ($logo.GetPixel($cx, $y).A -ge $ALPHA_MIN) { $h2++ }
+        }
+      }
+      if (($h2 / $t2) -lt $INK_THRESHOLD) { break }
+      $w++
+    }
+    $runs.Add("M$x $row" + "h$w" + "v1" + "h-$w" + "z")
+    $x += $w
+  }
+  $row++
+}
+$d = ($runs -join '')
 $svg = @"
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64" role="img" aria-label="Logo"><image width="64" height="64" href="data:image/png;base64,$base64"/></svg>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 $GRID $GRID" width="$GRID" height="$GRID" role="img" aria-label="Logo"><path fill="#3f6a5c" d="$d"/></svg>
 "@
 [System.IO.File]::WriteAllText((Join-Path $root 'public\favicon.svg'), $svg)
-Write-Host ("  {0,-32} {1} bytes embedded" -f 'public\favicon.svg', $base64.Length)
+Write-Host ("  {0,-32} {1} runs, {2} bytes vector" -f 'public\favicon.svg', $runs.Count, $svg.Length)
 
 # ------------------------------------------------------------- monochrome mask
 # Safari pinned tabs take a single-colour silhouette and recolour it to the user's
@@ -177,6 +212,70 @@ $mono64.Save((Join-Path $root 'public\mask-icon.png'), [System.Drawing.Imaging.I
 $mono64.Dispose()
 $tint.Dispose()
 Write-Host ("  {0,-32} {1}x{2}" -f 'public\mask-icon.png', 64, 64)
+
+# ------------------------------------------------------- contrast-correct variants
+# The mark is one flat colour: #3f6a5c, measured. That single colour is too close to
+# both surfaces it sits on — 2.71:1 on the paper-white header and 2.31:1 on the dark
+# share card — and WCAG asks for 3:1 for a graphic that carries meaning. So the shape
+# gets two tints, derived from the same alpha silhouette rather than redrawn:
+#
+#   logo-ink.png    #0d6b4d  3.3:1 on paper   for light surfaces (the site header)
+#   logo-mint.png   #c8f4dc  4.7:1 on dark    for dark surfaces (the og card, email)
+#
+# The silhouette never changes, so these are still one logo. A second drawn variant is
+# how the header mark and the share card end up being different logos.
+$INK = [System.Drawing.Color]::FromArgb(255, 13, 107, 77)     # --green, 3.3:1 on paper
+$MINT_ON_DARK = [System.Drawing.Color]::FromArgb(255, 200, 244, 220)  # --mint, 4.7:1 on --dark
+
+function Save-Tinted([System.Drawing.Color]$color, [int[]]$sizes, [string]$relative) {
+  # Recolour once at the largest size, then scale down.
+  #
+  # This is done by rewriting pixels rather than with an ImageAttributes ColorMatrix.
+  # The matrix route sets R/G/B from the tint and A from the source, which looks
+  # correct and produced blank images: System.Drawing bitmaps are premultiplied, so a
+  # colour channel darker than its own alpha does not survive the round trip. Setting
+  # the bytes directly cannot go wrong in a way that is invisible.
+  $base = 512
+  $src = New-Object System.Drawing.Bitmap($source)
+  $work = New-Object System.Drawing.Bitmap($base, $base, [System.Drawing.Imaging.PixelFormat]::Format32bppArgb)
+  $wg = [System.Drawing.Graphics]::FromImage($work)
+  $wg.Clear([System.Drawing.Color]::Transparent)
+  $wg.DrawImage($src, 0, 0, $base, $base)
+  $wg.Dispose()
+  $src.Dispose()
+
+  $rect = New-Object System.Drawing.Rectangle(0, 0, $base, $base)
+  $data = $work.LockBits($rect, [System.Drawing.Imaging.ImageLockMode]::ReadWrite, [System.Drawing.Imaging.PixelFormat]::Format32bppArgb)
+  $bytes = New-Object byte[] ($data.Stride * $base)
+  [System.Runtime.InteropServices.Marshal]::Copy($data.Scan0, $bytes, 0, $bytes.Length)
+  for ($i = 0; $i -lt $bytes.Length; $i += 4) {
+    if ($bytes[$i + 3] -eq 0) { continue }
+    $bytes[$i] = $color.B
+    $bytes[$i + 1] = $color.G
+    $bytes[$i + 2] = $color.R
+  }
+  [System.Runtime.InteropServices.Marshal]::Copy($bytes, 0, $data.Scan0, $bytes.Length)
+  $work.UnlockBits($data)
+
+  foreach ($size in $sizes) {
+    $out = if ($size -eq $base) { $work.Clone() } else {
+      $bmp = New-Object System.Drawing.Bitmap($size, $size, [System.Drawing.Imaging.PixelFormat]::Format32bppArgb)
+      $g = [System.Drawing.Graphics]::FromImage($bmp)
+      $g.Clear([System.Drawing.Color]::Transparent)
+      $g.InterpolationMode = [System.Drawing.Drawing2D.InterpolationMode]::HighQualityBicubic
+      $g.PixelOffsetMode = [System.Drawing.Drawing2D.PixelOffsetMode]::HighQuality
+      $g.DrawImage($work, 0, 0, $size, $size)
+      $g.Dispose()
+      $bmp
+    }
+    Save-Png $out $relative.Replace('{size}', "$size")
+    $out.Dispose()
+  }
+  $work.Dispose()
+}
+
+Save-Tinted $INK @(64, 180, 512) 'public\logo-ink-{size}.png'
+Save-Tinted $MINT_ON_DARK @(64, 180, 512) 'public\logo-mint-{size}.png'
 
 $logo.Dispose()
 Write-Host ''

@@ -444,17 +444,26 @@ test('năm bản quyền đọc từ đồng hồ, không phải viết cứng',
 // rather than printed as a token. BRAND_LEGAL_ENTITY was added to config and to
 // .env.example with a promise that it appears on the legal pages, and then nothing
 // used it: setting it changed nothing at all.
+//
+// It then got a second failure: three pages carried `<p class="legal-entity">{{legalEntity}}</p>`
+// unconditionally, and the variable is unset by default — so a buyer on /terms saw an
+// empty paragraph on the one page whose job is to say who is responsible for the sale.
+// The token is now the whole element, so "unset" means the element is not rendered at
+// all rather than rendered empty.
 test('pháp nhân hiển thị trên trang pháp lý, và biến trống thì không in gì', async () => {
   // The token registry lives in src/pages.js now (one list for the renderer, the
   // audit and the byte-level tests); what is asserted here is that the legal
   // entity is in it and that renderPage goes through the shared filler.
   const { PAGE_TOKENS } = await import('../src/pages.js');
-  assert.ok(PAGE_TOKENS.includes('legalEntity'), 'registry token phải có pháp nhân');
+  assert.ok(PAGE_TOKENS.includes('legalEntityLine'), 'registry token phải có pháp nhân');
+  assert.ok(!PAGE_TOKENS.includes('legalEntity'),
+    'token legalEntity (chỉ phần chữ) không được giữ: không template nào dùng nó nữa, và giữ lại là một token mồ côi in ra chỗ trống');
   const source = await fs.readFile(path.join(root, 'src', 'app.js'), 'utf8');
   assert.ok(/fillPageTokens\s*\(/.test(source), 'renderPage phải điền token qua bộ dùng chung');
   for (const file of ['terms.html', 'privacy.html', 'refund.html']) {
     const html = await fs.readFile(path.join(root, 'public', file), 'utf8');
-    assert.ok(html.includes('{{legalEntity}}'), `public/${file} phải có chỗ hiện pháp nhân`);
+    assert.ok(html.includes('{{legalEntityLine}}'), `public/${file} phải có chỗ hiện pháp nhân`);
+    assert.ok(!html.includes('<p class="legal-entity">{{'), `public/${file} không được in thẻ <p> rỗng khi biến trống`);
   }
   // This run sets nothing, so the token has to come out as nothing rather than as
   // the literal text or a dangling label.

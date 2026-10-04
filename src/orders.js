@@ -1,28 +1,24 @@
 import { env } from "./config.js";
-import { UNPAID_STATUSES, getOrder, listExpiringOrders, updateOrder } from "./store.js";
+import { getOrder, isClosed, isUnpaid, listExpiringOrders, paymentDeadline, updateOrder } from "./store.js";
 import { notifyOrder } from "./notify.js";
 
 // A store has to answer two questions the raw status column cannot: when does an
 // unpaid order stop being payable, and who is allowed to grant the download
-// after the money actually arrives. Both live here so the checkout, the admin
-// panel, the PayPal webhook and the background sweep all agree on one answer.
-// The same list the store's PostgREST filters are built from. Defined here once
-// and derived, because a PayPal order is `pending` until its capture lands and an
-// `isUnpaid` that forgot that would refuse to sweep exactly the orders that needed
-// it most.
-const UNPAID = new Set(UNPAID_STATUSES);
+// after the money actually arrives. Both are answered here so the checkout, the
+// admin panel, the PayPal webhook and the background sweep all agree on one
+// answer. The primitives they are built from — the unpaid status list, the
+// tests for "can it still be paid" and "is it closed", and the deadline rule —
+// live in store.js beside the status list they read, because this module
+// imports that one and the other way round is a cycle. They are re-exported so
+// the routes, the webhook and the tests keep importing them from the module
+// that owns order behavior.
+export { isUnpaid, isClosed, paymentDeadline };
+
 const HOUR = 60 * 60 * 1000;
 
-// Already clamped to at least an hour in config.js, so these two read the one
-// resolved number rather than each re-deriving a fallback. Three modules used to
-// guard the same value with the same literal and nothing kept them agreeing.
-const windowMs = () => env.orders.paymentWindowHours * HOUR;
+// Already clamped to at least an hour in config.js, so this reads the one
+// resolved number rather than re-deriving a fallback.
 const warnMs = () => env.orders.expiringWarnHours * HOUR;
-
-export const isUnpaid = (order) => Boolean(order) && UNPAID.has(order.status);
-
-/** True once the file has been handed over, so the order is closed for good. */
-export const isClosed = (order) => Boolean(order?.deliveredAt);
 
 /**
  * Whether money ever reached the shop for this order.
@@ -44,19 +40,6 @@ export const hasPayment = (order) => Boolean(order) && (
   || Number(order.paidCount || 0) > 0
   || Number(order.paidAmount || 0) > 0
 );
-
-/**
- * When the buyer stops being able to pay. Stored on the order at creation so a
- * later change to the env var never silently moves a deadline under a buyer who
- * is already looking at a countdown; older rows fall back to their creation
- * time plus the current window.
- */
-export function paymentDeadline(order) {
-  const stored = order?.expiresAt ? new Date(order.expiresAt).getTime() : NaN;
-  if (Number.isFinite(stored)) return stored;
-  const created = new Date(order?.createdAt || "").getTime();
-  return Number.isFinite(created) ? created + windowMs() : null;
-}
 
 /**
  * Past the point where the buyer can still pay.

@@ -127,6 +127,42 @@ test('danh sách OPTIONAL không chứa biến có thật trong render.yaml', as
   }
 });
 
+test('giá trị số trong file mẫu khớp mặc định mà src/config.js áp dụng', async () => {
+  // A numeric setting written into an example file is one a person
+  // copying that file will get. Two of them had already drifted from
+  // the defaults the code applies: the deploy example said
+  // R2_DOWNLOAD_URL_TTL_SECONDS was 300 and PAYPAL_RATE_MARGIN_PERCENT
+  // was 3, while src/config.js applies 600 and 0 — so the file that
+  // exists to document the configuration was silently changing the
+  // behavior of whoever trusted it, and no test read both sides.
+  //
+  // An empty value means "leave the default" and is always fine, and
+  // string defaults are left out because the deploy template
+  // deliberately fills placeholders (example.com, your_…) where a
+  // real deployment must write its own values.
+  const config = await read('src/config.js');
+  const defaults = {};
+  for (const m of config.matchAll(/numberValue\("([A-Z][A-Z0-9_]+)",\s*(\d+)\)/g)) {
+    defaults[m[1]] = m[2];
+  }
+  const values = async (file) => {
+    const set = {};
+    for (const line of (await read(file)).split('\n')) {
+      const m = /^([A-Z][A-Z0-9_]+)=(.*)$/.exec(line.trim());
+      if (m) set[m[1]] = m[2];
+    }
+    return set;
+  };
+  for (const [key, fallback] of Object.entries(defaults)) {
+    for (const file of ['.env.example', 'deploy/sonvudev-store.env.example']) {
+      const set = (await values(file))[key];
+      if (set === undefined || set === '') continue;
+      assert.equal(set, fallback,
+        `${file} đặt ${key}=${set} nhưng src/config.js áp dụng mặc định ${fallback} — file mẫu đang đổi hành vi cho người copy nó`);
+    }
+  }
+});
+
 test('không biến nào trong render.yaml chứa secret', async () => {
   const yaml = await read('render.yaml');
   // Every secret must be `sync: false` so Render prompts for it in the dashboard.

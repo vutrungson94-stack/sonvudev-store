@@ -76,7 +76,12 @@ $brush.Dispose()
 # of the logo — the tab, the iOS icon and the home screen all showed the real mark,
 # and the card that Facebook, Zalo and LinkedIn render showed a different one. The
 # mark is a file now, and this reads it.
-$logoPath = Join-Path $root 'public\img\sonvudev.logo.png'
+#
+# logo-mint rather than the source mark. The card background is the brand dark, and the
+# source mark is a flat #3f6a5c — 2.31:1 against it, below the 3:1 WCAG asks of a
+# graphic that carries meaning, which is why the mark looked like it was not there at
+# all. logo-mint is the same silhouette in --mint, 4.7:1 on this background.
+$logoPath = Join-Path $root 'public\logo-mint-512.png'
 if (-not (Test-Path -LiteralPath $logoPath)) {
   throw "Khong tim thay logo nguon: $logoPath"
 }

@@ -262,13 +262,20 @@ test('trang đơn hàng theo ngôn ngữ trình duyệt', async () => {
   assert.ok(html(vi).includes('Thanh toán thành công để mở nút tải'));
 });
 
-test('số tiền và ngày được định dạng theo ngôn ngữ', async () => {
+test('số tiền theo currency, không theo ngôn ngữ của trang', async () => {
   const vi = await boot({ lang: 'vi-VN', respond: json({ order: order({ amount: 249000 }), payment: null }) });
   const en = await boot({ lang: 'en-US', respond: json({ order: order({ amount: 249000 }), payment: null }) });
-  // The separator is part of the language. An English buyer reading 249.000 was
-  // being shown a Vietnamese number, on the one screen that follows a payment.
+  // The amount follows the currency, not the page language. A VND price is
+  // grouped the Vietnamese way on every screen — the same way the server
+  // writes it on the product page and the receipt email writes it — because
+  // an English page showing "249,000" beside a receipt that says "249.000"
+  // is a discrepancy that reads as being overcharged.
   assert.ok(String(vi.nodes.get('order-body').innerHTML).includes('249.000'), 'tieng Viet tach ngan cach bang cham');
-  assert.ok(String(en.nodes.get('order-body').innerHTML).includes('249,000'), 'tieng Anh tach ngan cach bang phay');
+  assert.ok(String(en.nodes.get('order-body').innerHTML).includes('249.000'), 'VND tach ngan cach bang cham tren ca trang tieng Anh — tien theo currency');
+  // And a USD amount wears its dollar sign on every screen, the Vietnamese
+  // page included, because that is the rail it is charged on.
+  const usd = await boot({ lang: 'vi-VN', respond: json({ order: order({ amount: 381, currency: 'USD' }), payment: null }) });
+  assert.ok(String(usd.nodes.get('order-body').innerHTML).includes('$381.00'), 'USD phai co dau dollar tren trang tieng Viet nhu tren hoa don');
 });
 
 test('mọi trang đơn hàng đều dùng chung một bộ nhãn trạng thái', () => {

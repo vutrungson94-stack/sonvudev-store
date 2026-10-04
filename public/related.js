@@ -27,22 +27,23 @@
   // Two copies of this file's mistake used to sit one apart: the empty message
   // had a Vietnamese and an English form and always printed the Vietnamese one,
   // so the English product page and every 404 greeted the reader in a language
-  // they had not chosen. The prices had the same defect independently — they were
-  // always grouped with a dot, which is right for a Vietnamese reader and wrong
-  // for an English one.
+  // they had not chosen.
   //
-  // This file is loaded on pages that do not include i18n.js (the 404 has no
-  // language switch at all), so it cannot read the shared dictionary. It reads the
-  // <html lang> the server already put there, which is the same answer the
-  // dictionary would give. Escaping and money come from public/format.js, loaded
-  // just before this file: this loader used to carry its own copies of both, and
-  // the money one disagreed with the dictionary about grouping.
+  // Prices are not grouped by this language at all: money follows the
+  // currency, the rule public/format.js and the server both apply, so a VND
+  // price keeps its dot grouping on an English page exactly as it does on the
+  // receipt. This file is loaded on pages that do not include i18n.js (the
+  // 404 has no language switch at all), so it cannot read the shared
+  // dictionary. It reads the <html lang> the server already put there, which
+  // is the same answer the dictionary would give. Escaping and money come from
+  // public/format.js, loaded just before this file: this loader used to carry
+  // its own copies of both, and the money one disagreed with the dictionary
+  // about grouping.
   var lang = (String((document.documentElement && document.documentElement.lang) || 'vi').toLowerCase().indexOf('en') === 0) ? 'en' : 'vi';
-  var locale = lang === 'en' ? 'en-US' : 'vi-VN';
 
   var escapeHtml = function (value) { return window.SVDFormat.esc(value); };
 
-  var money = function (value, currency) { return window.SVDFormat.money(value, currency, locale); };
+  var money = function (value, currency) { return window.SVDFormat.money(value, currency); };
 
   var empty = {
     vi: 'Đây là sản phẩm duy nhất hiện tại.',

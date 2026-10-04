@@ -191,6 +191,40 @@ export async function listOrders({ limit = 200, offset = 0 } = {}) {
 export const UNPAID_STATUSES = Object.freeze(["pending", "pending_transfer"]);
 
 /**
+ * Whether this order can still take a payment.
+ *
+ * Defined here, beside the status list it reads, because orders.js imports
+ * this module and importing the other way round is a cycle. The question
+ * used to be answered twice — `isSettled` here, `isUnpaid` there — and the
+ * local-mode filters below were built from the local copy, which measured
+ * deadlines without the payment window: a file-backed shop swept orders as
+ * expiring up to a window early, and fetched every unpaid order every tick
+ * instead of only the ones near their deadline.
+ */
+export const isUnpaid = (order) => Boolean(order) && UNPAID_STATUSES.includes(order.status);
+
+/** True once the file has been handed over, so the order is closed for good. */
+export const isClosed = (order) => Boolean(order?.deliveredAt);
+
+// Already clamped to at least an hour in config.js, so this reads the one
+// resolved number rather than re-deriving a fallback.
+const HOUR = 60 * 60 * 1000;
+const windowMs = () => env.orders.paymentWindowHours * HOUR;
+
+/**
+ * When the buyer stops being able to pay. Stored on the order at creation so a
+ * later change to the env var never silently moves a deadline under a buyer who
+ * is already looking at a countdown; older rows fall back to their creation
+ * time plus the current window.
+ */
+export function paymentDeadline(order) {
+  const stored = order?.expiresAt ? new Date(order.expiresAt).getTime() : NaN;
+  if (Number.isFinite(stored)) return stored;
+  const created = new Date(order?.createdAt || "").getTime();
+  return Number.isFinite(created) ? created + windowMs() : null;
+}
+
+/**
  * Every order status the shop can hold, in lifecycle order. This is the one
  * definition: the admin validation whitelist, the frontend status maps and the
  * unpaid subset above all derive from it, because a seventh status added in one
@@ -206,8 +240,15 @@ const unpaidFilter = () => `status=in.(${UNPAID_STATUSES.join(",")})`;
 export async function listExpiringOrders({ before } = {}) {
   if (local) {
     const cutoff = before ? new Date(before).getTime() : Infinity;
-    return (await readJson(files.orders, [])).filter((order) => !isSettled(order)
-      && (Number.isFinite(cutoff) ? deadlineOf(order) <= cutoff : true));
+    // The same rows the PostgREST query below returns: unpaid, not
+    // delivered, and due. A deadline the clock cannot read counts as due
+    // rather than as never, the way a null expires_at does above, so a
+    // corrupt row is noticed by the sweep instead of sweeping under it.
+    const due = (order) => {
+      const deadline = paymentDeadline(order);
+      return deadline === null || deadline <= cutoff;
+    };
+    return (await readJson(files.orders, [])).filter((order) => isUnpaid(order) && !isClosed(order) && due(order));
   }
   const deadline = before ? new Date(before).toISOString() : new Date(8.64e15).toISOString();
   return (await supabase(`orders?${unpaidFilter()}&delivered_at=is.null&or=(expires_at.lte.${deadline},expires_at.is.null)&select=*&order=expires_at.asc`)).map(fromOrder);
@@ -217,7 +258,7 @@ export async function listExpiringOrders({ before } = {}) {
 export async function listOpenOrders() {
   const columns = { accessTokenHash: 0, access_token_hash: 0, idempotencyKey: 0, idempotency_key: 0, notifications: 0 };
   const strip = (order) => Object.fromEntries(Object.entries(order).filter(([key]) => !(key in columns)));
-  if (local) return (await readJson(files.orders, [])).filter((order) => !isSettled(order)).map(strip);
+  if (local) return (await readJson(files.orders, [])).filter((order) => isUnpaid(order) && !isClosed(order)).map(strip);
   return (await supabase(`orders?${unpaidFilter()}&delivered_at=is.null&select=id,status,amount,currency,created_at,expires_at&order=created_at.desc`)).map(fromOrder);
 }
 
@@ -255,18 +296,6 @@ export async function listOrdersForRevenue() {
   const columns = "id,status,amount,currency,items,delivered_at,created_at,expires_at,paid_count,refunded_count,paid_amount,refunded_amount,paid_provider_amount,refunded_provider_amount";
   return (await supabase(`orders?select=${columns}`)).map(fromOrder);
 }
-
-const isSettled = (order) => Boolean(order?.deliveredAt) || !order || !UNPAID.has(order.status);
-  // The same list the PostgREST filters above are built from. Two definitions of
-  // "unpaid" is how a PayPal order came to never expire: the JSON filter knew
-  // about `pending` and the SQL did not.
-  const UNPAID = new Set(UNPAID_STATUSES);
-const deadlineOf = (order) => {
-  const stored = order?.expiresAt ? new Date(order.expiresAt).getTime() : NaN;
-  if (Number.isFinite(stored)) return stored;
-  const created = new Date(order?.createdAt || "").getTime();
-  return Number.isFinite(created) ? created : Infinity;
-};
 
 export async function getOrder(id) { return local ? (await readJson(files.orders, [])).find((o) => o.id === id) : fromOrder((await supabase(`orders?id=eq.${encodeURIComponent(id)}&limit=1`))[0]); }
 /**

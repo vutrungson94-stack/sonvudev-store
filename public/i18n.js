@@ -661,10 +661,12 @@ const I18N = {
     return window.SVDFormat.esc(value);
   },
   money(value, currency = 'VND') {
-    // A Vietnamese reader wants 249.000 and an English reader wants 249,000. The
-    // separator is part of the language, so it follows the switch rather than
-    // being hard-coded to the seller's own locale.
-    return window.SVDFormat.money(value, currency, I18N.locale);
+    // The separator follows the currency, not the page language: VND keeps
+    // its dot grouping and USD its dollar sign on every screen, which is
+    // what public/format.js and the server both apply. A price on the page
+    // and the price on the receipt have to be the same number written the
+    // same way, or reconciling one against the other means converting by eye.
+    return window.SVDFormat.money(value, currency);
   },
   date(value) {
     const at = value ? new Date(value) : new Date(NaN);

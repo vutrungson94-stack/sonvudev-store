@@ -117,7 +117,7 @@ export async function createReview({ orderId, accessToken, productId, body, auth
   const order = await getOrder(orderId);
   // The same message as a missing order, so a wrong token cannot be used to find
   // out which order ids exist.
-  if (!isOrderOwner(order, accessToken)) return refuse("review.err.notFound", "Không tìm thấy đơn hàng này.", 404);
+  if (!isOrderOwner(order, accessToken)) return refuse("review.err.notFound", "Không tìm thấy đơn này.", 404);
   if (!wasFulfilled(order)) return refuse("review.err.notFulfilled", "Chỉ đơn đã nhận được file mới viết đánh giá được.", 409);
   if (!isVouched(order)) return refuse("review.err.refunded", "Đơn này đã được hoàn tiền nên không viết đánh giá được.", 409);
 
@@ -132,7 +132,7 @@ export async function createReview({ orderId, accessToken, productId, body, auth
   // Already written, so the box is gone entirely (see reviewForm) and this is the
   // race where two tabs both saw it empty. It reuses the existing key rather than
   // introducing a second sentence that says the same thing.
-  if (existing.length) return refuse("review.already", "Bạn đã viết đánh giá cho sản phẩm này rồi.", 409);
+  if (existing.length) return refuse("review.already", "Bạn đã gửi cảm nhận cho sản phẩm này rồi. Cảm ơn bạn!", 409);
 
   const review = {
     id: `rev_${crypto.randomUUID()}`,
