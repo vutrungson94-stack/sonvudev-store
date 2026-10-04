@@ -119,21 +119,73 @@ record("Nội dung không cần JavaScript", /[a-zA-Zà-ỹ]{3,}/.test(h1s[0] ||
 //    look for. The usual choice for a Domain property is a DNS TXT record, which
 //    lives at the registrar and not on the site, so a check that only reads the
 //    homepage would report a verified domain as unverified. Both are checked
-//    here, and a resolver that cannot be reached is reported as "không tra
-//    được" rather than as a failure — a wrong answer is worse than no answer.
+//    here.
 // ---------------------------------------------------------------------------
+//
+// The system resolver is tried first, because it is the answer the machine would
+// actually give. When it refuses — which it does on any Windows box configured for
+// DNS-over-HTTPS, where the Windows client falls back to DoH but Node still sends
+// plain queries to port 53 and gets ECONNREFUSED — public resolvers are asked next,
+// over plain DNS and then over HTTPS.
+//
+// This is not a fallback that makes a wrong answer look right: it reads the same
+// authoritative record, and which path answered is printed, so a reader can see that
+// the system resolver failed rather than being told nothing happened. Before this, a
+// domain verified by DNS for months reported FAIL with "không đọc được DNS (mạng đang
+// chặn tra cứu)" — a red line about the local network sitting where a result
+// belonged, which is the state nobody keeps reading. Only when every path is
+// refused is the result reported as unchecked, never as a failure.
+const PUBLIC_RESOLVERS = ["1.1.1.1", "8.8.8.8"];
+// DoH last, because it is the slowest and the most likely to be intercepted by a
+// middlebox — but on a network with port 53 blocked it is the only one that answers,
+// and a verification check that cannot check is worth less than a slow one.
+const DOH_RESOLVERS = [
+  { name: "DoH Google", url: (host) => `https://dns.google/resolve?name=${host}&type=TXT` },
+  { name: "DoH Cloudflare", url: (host) => `https://cloudflare-dns.com/dns-query?name=${host}&type=TXT`, headers: { accept: "application/dns-json" } },
+];
+
 const txtRecords = async (host) => {
   try {
     const chunks = await dns.resolveTxt(host);
-    return chunks.map((chunk) => chunk.join(""));
+    return { records: chunks.map((chunk) => chunk.join("")), via: "DNS hệ thống" };
   } catch {
-    return null;
+    // System resolver refused. Ask a public one before concluding anything.
   }
+  for (const server of PUBLIC_RESOLVERS) {
+    try {
+      const resolver = new dns.Resolver({ timeout: 4000, tries: 2 });
+      const chunks = await resolver.resolveTxt(host);
+      return { records: chunks.map((chunk) => chunk.join("")), via: server };
+    } catch {
+      // Port 53 is likely blocked entirely. Try the next, then DoH.
+    }
+  }
+  for (const doh of DOH_RESOLVERS) {
+    try {
+      const response = await fetch(doh.url(host), {
+        headers: doh.headers || {},
+        signal: AbortSignal.timeout(8000),
+      });
+      if (!response.ok) continue;
+      const payload = await response.json();
+      const records = (payload.Answer || [])
+        .map((answer) => String(answer.data || ""))
+        // DoH wraps a TXT string in its own quotes; the plain resolvers do not.
+        .map((line) => line.replace(/^"|"$/g, ""));
+      // Status 0 is NOERROR, 3 is NXDOMAIN. Both are answers — a domain that does
+      // not resolve is a fact about the domain, not a resolver that failed.
+      if (records.length || payload.Status === 3) return { records, via: doh.name };
+    } catch {
+      // Try the next endpoint.
+    }
+  }
+  return { records: null, via: null };
 };
+
 const hasTxt = (records, prefix) => Boolean(records) && records.some((line) => line.startsWith(prefix));
 
 const apex = new URL(base).hostname;
-const txt = await txtRecords(apex);
+const { records: txt, via: dnsVia } = await txtRecords(apex);
 const dnsGoogle = hasTxt(txt, "google-site-verification=");
 const dnsBing = hasTxt(txt, "ms=");
 
@@ -146,15 +198,18 @@ const googleMethod = [
   liveGoogle ? "thẻ meta" : null,
   expectedToken && liveGoogle === expectedToken ? "khớp với .env" : null,
   googleFile.response.status === 200 ? "file HTML" : null,
-  dnsGoogle ? "bản ghi DNS" : null,
+  dnsGoogle ? `bản ghi DNS (qua ${dnsVia})` : null,
 ].filter(Boolean);
 record("Xác minh Google", Boolean(googleMethod.length), googleMethod.length
   ? `${googleMethod.join(" + ")}`
   : txt === null
-    ? "không đọc được DNS (mạng đang chặn tra cứu) và site không có thẻ meta — kiểm tra bằng tay"
+    ? "không đọc được DNS (cả hệ thống lẫn 2 resolver công cộng đều bị từ chối) và site không có thẻ meta — kiểm tra bằng tay"
     : "chưa xác minh: không có thẻ meta, không có file, không có bản ghi DNS google-site-verification");
 
-const bingMethod = [liveBing ? "thẻ meta" : null, dnsBing ? "bản ghi DNS" : null].filter(Boolean);
+const bingMethod = [
+  liveBing ? "thẻ meta" : null,
+  dnsBing ? `bản ghi DNS (qua ${dnsVia})` : null,
+].filter(Boolean);
 // Xác minh Bing qua "Import from Google Search Console" không để lại dấu vết
 // nào ra ngoài domain: không có bản ghi `ms=`, không có thẻ meta, và Bing vẫn
 // cấp quyền đọc sitemap. Đó là một trong hai cách xác minh hợp lệ của Bing.
@@ -173,7 +228,7 @@ if (bingMethod.length) {
     + "xác nhận lại trong panel Bing: Sitemaps có sitemap.xml của bạn là đã xác minh");
 } else {
   record("Xác minh Bing", false, txt === null
-    ? "không đọc được DNS (mạng đang chặn tra cứu) và site không có thẻ Bing — kiểm tra bằng tay"
+    ? "không đọc được DNS (cả hệ thống lẫn 2 resolver công cộng đều bị từ chối) và site không có thẻ Bing — kiểm tra bằng tay"
     : "chưa xác minh: không có thẻ meta, không có bản ghi ms=, và domain cũng chưa xác minh với Google");
 }
 
