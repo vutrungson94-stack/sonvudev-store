@@ -68,7 +68,7 @@ Phần này nói về cách sản phẩm được **trích dẫn** khi khách h�
 
 Bốn thứ đã làm, theo thứ tự lợi ích trên chi phí:
 
-**1. `og:image` là PNG.** Đây là thay đổi đáng giá nhất và đã xong. Facebook, Zalo, Telegram, Slack, LinkedIn và phần lớn trợ lý **không render SVG** trong `og:image` và hiện ô trống. Giờ mọi link chia sẻ đều có ảnh. Ảnh nằm ở `public/og.png`, commit sẵn nên build và server không cần thư viện ảnh nào; sinh lại bằng `pwsh -ExecutionPolicy Bypass -File scripts/make-og-image.ps1` khi đổi màu thương hiệu.
+**1. `og:image` là PNG.** Đây là thay đổi đáng giá nhất và đã xong. Facebook, Zalo, Telegram, Slack, LinkedIn và phần lớn trợ lý **không render SVG** trong `og:image` và hiện ô trống. Giờ mọi link chia sẻ đều có ảnh. Ảnh nằm ở `public/og.png`, commit sẵn nên build và server không cần thư viện ảnh nào; sinh lại bằng `npm run assets:og` khi đổi màu thương hiệu.
 
 **2. Hai ngôn ngữ, hai URL.** `descriptionEn`, `shortDescriptionEn` và `featuresEn` đã nằm trong database từ lâu và trình duyệt đã dùng, nhưng server chỉ render tiếng Việt — nên trợ lý hỏi bằng tiếng Anh tìm thấy trang rồi không trích được gì. Giờ có `/en/product/:slug`, hai bản trỏ qua lại bằng `hreflang` và `og:locale:alternate`, và cả hai xuất hiện trong sitemap.
 
@@ -200,7 +200,7 @@ Script chỉ đẩy danh sách biến của ứng dụng (`ALLOWED`), không đ�
   đang dùng chứ không phải tiếng Việt viết cứng.
 - `src/reviews.js`: đánh giá của khách, lưu trên chính dòng đơn vì đó là nơi bằng chứng đã mua tồn tại sẵn.
 - `public/related.js`: loader dùng chung cho trang sản phẩm và trang 404. Nằm ngoài file vì CSP cấm script inline.
-- `public/og.png`: ảnh share raster, sinh một lần bởi `scripts/make-og-image.ps1`.
+- `public/og.png`: ảnh share raster, sinh một lần bởi `scripts/make-og-image.mjs`.
 - `scripts/metrics.mjs`: so số đo với `metrics-baseline.json`.
 - `supabase/schema.sql`: schema PostgreSQL.
 - `cloudflare/r2-cors.json`: CORS cho upload trực tiếp từ trình duyệt.

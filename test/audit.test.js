@@ -176,11 +176,16 @@ test('audit chặn được từng loại lỗi nó sinh ra để bắt', async 
   //     terms page and to config in the same change, and never wired to the
   //     renderer — so the page would have printed "{{legalEntity}}" at a buyer
   //     deciding whether to trust the shop. Nothing threw, nothing was logged.
+  // The replacement is written against the opening <body> tag itself rather than the
+  // literal `<body>`, because terms.html stopped being exactly that when it gained a
+  // data-support attribute for the dictionary. Anchoring on the tag name makes this
+  // survive the next attribute that lands on it — and a check that silently stops
+  // injecting its fault reports nothing at all, which is worse than a missing one.
   {
     const cwd = await copy('unwired-token');
     const file = path.join(cwd, 'public', 'terms.html');
     const source = await fs.readFile(file, 'utf8');
-    await fs.writeFile(file, source.replace('<body>', '<body><p>{{chuaCoAiDien}}</p>'), 'utf8');
+    await fs.writeFile(file, source.replace(/<body[^>]*>/, '<body><p>{{chuaCoAiDien}}</p>'), 'utf8');
     const result = runAudit(cwd);
     const output = `${result.stdout}${result.stderr}`;
     assert.equal(result.status, 1, 'token không được điền phải FAIL');

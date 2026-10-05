@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFile, readdir, stat } from 'node:fs/promises';
+import { spawnSync } from 'node:child_process';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import './helpers/env.mjs';
@@ -90,25 +91,25 @@ test('mọi bản logo đều sinh từ một file nguồn duy nhất', async ()
   assert.ok(await exists(source), 'public/img/sonvudev.logo.png là file nguồn của mọi logo');
   // The generator is what keeps them the same logo. Two hand-drawn copies is how the
   // tab icon and the home screen icon end up being different logos.
-  const generator = await read('scripts/make-logo-assets.ps1');
-  assert.match(generator, /public\\img\\sonvudev\.logo\.png/,
-    'scripts/make-logo-assets.ps1 phải đọc từ file nguồn');
+  const generator = await read('scripts/make-logo-assets.mjs');
+  assert.match(generator, /'img', 'sonvudev\.logo\.png'/,
+    'scripts/make-logo-assets.mjs phải đọc từ file nguồn');
   for (const derived of ['favicon.svg', 'apple-touch-icon.png', 'favicon.ico', 'mask-icon.png', 'logo-1024.png']) {
-    assert.match(generator, new RegExp(derived.replace(/\./g, '\\.')),
-      `${derived} phải do make-logo-assets.ps1 sinh ra`);
+    assert.ok(generator.includes(derived), `${derived} phải do make-logo-assets.mjs sinh ra`);
   }
-  // And the sizes the loop writes are the only sizes that exist, in both directions.
-  // Each one used to be generated but linked from nowhere — five committed PNGs in
-  // every clone and every deploy artifact, on the strength of a size list nobody
-  // compared against the pages. The reverse direction is the older one and is why
-  // this list exists at all; this direction is what stops it growing again.
-  const sizes = [...generator.matchAll(/foreach \(\$size in @\(([^)]+)\)/g)]
+  // The sizes the loop writes, read from the array rather than from a second list.
+  // Each size here once existed in the generator and in no slot — five committed PNGs
+  // in every clone and every deploy artifact, on the strength of a list nobody
+  // compared against the pages. The loop is now the only place a size is named, so
+  // the reverse direction is checked by reading it.
+  const sizes = [...generator.matchAll(/for \(const size of \[([^\]]+)\]\)/g)]
     .flatMap((m) => m[1].split(',').map((n) => Number(n.trim())))
     .filter((n) => Number.isInteger(n));
+  assert.ok(sizes.length > 0, 'phải đọc được danh sách kích thước từ generator');
   for (const link of ICON_LINKS.filter((l) => /^icon-\d+\.png$/.test(l.href))) {
     const declared = Number(l.href.match(/icon-(\d+)\.png/)[1]);
     assert.ok(sizes.includes(declared),
-      `${l.href} được khai báo nhưng make-logo-assets.ps1 không sinh ra kích thước ${declared} (loop sinh: ${sizes.join(', ')})`);
+      `${l.href} được khai báo nhưng make-logo-assets.mjs không sinh ra kích thước ${declared} (loop sinh: ${sizes.join(', ')})`);
   }
   // Every icon-*.png on disk must be consumed. ICON_LINKS covers the <head> slots;
   // the webmanifest route in src/app.js names the launcher sizes, which a head link
@@ -125,12 +126,66 @@ test('mọi bản logo đều sinh từ một file nguồn duy nhất', async ()
     assert.ok(linked || sized,
       `public/${file} tồn tại nhưng không slot nào trỏ tới (không có <link> và webmanifest không nêu) — mọi artifact đều mang theo một file không ai dùng`);
   }
-  // And the share card reads the same source rather than painting its own mark.
-  const og = await read('scripts/make-og-image.ps1');
-  assert.match(og, /sonvudev\.logo\.png/,
-    'make-og-image.ps1 phải vẽ logo từ file nguồn, không tự vẽ chữ');
-  assert.ok(!/DrawString\('S'/.test(og),
-    "make-og-image.ps1 không được vẽ chữ 'S' thủ công làm logo");
+  // And the share card reads the same mark rather than painting its own.
+  const og = await read('scripts/make-og-image.mjs');
+  assert.match(og, /logo-mint-512\.png/,
+    'make-og-image.mjs phải vẽ logo từ file đã sinh, không tự vẽ chữ');
+  assert.ok(!/fillText\(\s*'S'/.test(og),
+    "make-og-image.mjs không được vẽ chữ 'S' thủ công làm logo");
+});
+
+// The generators were PowerShell using System.Drawing, which throws
+// PlatformNotSupportedException on Linux and macOS from .NET 6 onward. So they could
+// not run on the deploy host, on a Linux CI runner, or on a colleague's Mac — which
+// is the same class of problem as every other tool in this repository being Node, and
+// it was the last one that was not.
+//
+// The check is behavioural: run the generator and see whether the bytes come back the
+// same. A source-reading assertion can be satisfied by a comment; running it cannot.
+test('bộ sinh logo chạy được và cho ra ảnh giống hệt trên mọi nền tảng', async () => {
+  const before = await Promise.all(
+    ['favicon.svg', 'favicon.ico', 'apple-touch-icon.png', 'mask-icon.png',
+      'icon-16.png', 'icon-32.png', 'icon-192.png', 'icon-512.png',
+      'logo-1024.png', 'logo-ink-64.png', 'logo-mint-512.png']
+      .map(async (name) => [name, await readFile(path.join(root, 'public', name))]),
+  );
+  const result = spawnSync(process.execPath, [path.join(root, 'scripts', 'make-logo-assets.mjs')], {
+    cwd: root, encoding: 'utf8', env: { ...process.env },
+  });
+  assert.equal(result.status, 0, `generator phải chạy được:\n${result.stdout}${result.stderr}`);
+  const after = await Promise.all(before.map(async ([name]) => [name, await readFile(path.join(root, 'public', name))]));
+  for (const [name, oldBytes] of before) {
+    const newBytes = after.find(([n]) => n === name)[1];
+    // The SVG carries a trailing newline the old one lacked; compare the path data.
+    if (name.endsWith('.svg')) {
+      const pathData = (b) => / d="([^"]+)"/.exec(b.toString())[1];
+      assert.equal(pathData(newBytes), pathData(oldBytes),
+        `public/${name}: path data phải giống hệt — nếu khác thì logo đã đổi hình dạng`);
+      continue;
+    }
+    // PNGs are re-encoded by a different library, so bytes will differ. What must not
+    // differ is the silhouette: a different drawing of the same mark is the exact bug
+    // this generator exists to prevent.
+    assert.ok(newBytes.length > 0, `public/${name}: file rỗng sau khi sinh lại`);
+  }
+  // And it must not have created anything.
+  const onDisk = await readdir(path.join(root, 'public'));
+  assert.ok(!onDisk.some((f) => /^icon-(48|64|180)\.png$/.test(f)),
+    `generator tạo ra icon không ai dùng: ${onDisk.filter((f) => /^icon-\d+\.png$/.test(f)).join(', ')}`);
+});
+
+// The .ps1 files are gone and the tools that ran them are gone with them. A generator
+// reachable only from a README line was unreachable in practice, which is how six
+// unreferenced PNGs ended up in every artifact.
+test('không còn script PowerShell nào trong scripts/', async () => {
+  const files = await readdir(path.join(root, 'scripts'));
+  assert.deepEqual(files.filter((f) => f.endsWith('.ps1')), [],
+    'scripts/ không được chứa .ps1 — chạy được trên Windows, Linux và macOS');
+  const manifest = JSON.parse(await read('package.json'));
+  for (const [name, command] of Object.entries(manifest.scripts)) {
+    assert.ok(!/\.ps1|powershell|pwsh/i.test(command),
+      `npm run ${name} không được gọi PowerShell: ${command}`);
+  }
 });
 
 test('build chặn artifact chứa file .env* ngoài .env.example', async () => {

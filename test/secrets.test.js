@@ -126,6 +126,42 @@ test('danh sách license cho phép phủ hết license thực sự có trong loc
     `license nằm trong danh sách cho phép nhưng không dependency nào dùng: ${unused.join(', ')} — bỏ đi cho danh sách nói đúng hiện trạng`);
 });
 
+// gbuild.config.json is JSON, so it cannot carry the reasoning itself — JSON has no
+// comments, and a config file that breaks on the first `//` is a config file nobody
+// edits. The reasoning lives here instead, which is where a reader will look when the
+// list needs a new entry.
+test('mỗi license được duyệt đều có lý do ghi lại, không phải bấm bừa thêm vào', async () => {
+  const config = JSON.parse(await read('gbuild.config.json'));
+  const allowed = config.license?.allowed || [];
+
+  // MIT, Apache-2.0, BSD and ISC are the standard permissive set every project starts
+  // with; they need no individual argument.
+  const unremarkable = new Set(['MIT', 'Apache-2.0', 'BSD-2-Clause', 'BSD-3-Clause', 'ISC', '0BSD']);
+  // Everything else has to be explained here, by name, or it does not belong.
+  const explained = new Set(['MIT AND OFL-1.1']);
+
+  const unexplained = allowed.filter((lic) => !unremarkable.has(lic) && !explained.has(lic));
+  assert.deepEqual(unexplained, [],
+    `license này được duyệt mà không có lý do: ${unexplained.join(', ')} — ` +
+    'thêm một dòng giải thích vào test này trước khi đưa vào danh sách');
+
+  // And the reverse: an explanation for a licence nobody uses is a comment about
+  // nothing, which is how a list drifts from the lockfile in the first place.
+  const lock = JSON.parse(await read('package-lock.json'));
+  const used = new Set(Object.values(lock.packages || {}).map((meta) => meta && meta.license).filter(Boolean));
+  const stale = [...explained].filter((lic) => !used.has(lic));
+  assert.deepEqual(stale, [],
+    `có lý do cho ${stale.join(', ')} nhưng lockfile không còn dependency nào dùng — gỡ cả license lẫn lý do`);
+
+  // MIT AND OFL-1.1 is one npm value, not two. Listing the halves would pass this
+  // file's own `unapproved` check and still block every build, which is the failure
+  // mode the compound value invites.
+  assert.ok(allowed.includes('MIT AND OFL-1.1'),
+    'Space Grotesk (OFL-1.1) phải được duyệt dưới đúng chuỗi npm ghi, không phải hai entry tách rời');
+  assert.ok(!allowed.includes('OFL-1.1'),
+    'OFL-1.1 riêng lẻ không khớp license field nào trong lockfile — sẽ chặn build mà không báo lý do');
+});
+
 test('gbuild.config.json không tắt bất kỳ kiểm tra bảo mật nào của gbuild', async () => {
   const config = JSON.parse(await read('gbuild.config.json'));
   const security = config.security || {};

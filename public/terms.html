@@ -10,16 +10,17 @@
 <meta property="og:image:height" content="630">
 <meta name="twitter:card" content="summary_large_image">
 <link rel="alternate" hreflang="vi" href="{{site}}/terms">
+<link rel="alternate" hreflang="en" href="{{site}}/terms">
 <link rel="alternate" hreflang="x-default" href="{{site}}/terms"><title>Điều khoản sử dụng — {{brandName}}</title><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet"><link rel="stylesheet" href="styles.css">
 {{iconLinks}}
 </head>
-<body>
-<header class="site-header"><a class="brand" href="/">{{brandWordmark}}</a><nav><a href="/#products">Sản phẩm</a><a href="/#faq">FAQ</a><a href="/terms" aria-current="page">Điều khoản</a></nav><a class="header-cta" href="/#products">Mua ngay <span>↗</span></a></header>
+<body data-support="{{support}}">
+<header class="site-header"><a class="brand" href="/">{{brandWordmark}}</a><nav><a href="/#products" data-i18n="nav.products">Sản phẩm</a><a href="/#faq" data-i18n="nav.faq">FAQ</a><a href="/terms" data-i18n="nav.terms" aria-current="page">Điều khoản</a></nav><button class="lang-toggle" type="button" data-lang-toggle>EN</button><a class="header-cta" href="/#products"><span data-i18n="nav.buy">Mua ngay</span> <span>↗</span></a></header>
 <main>
 <article class="legal">
-<p class="eyebrow"><span>✦</span> Pháp lý</p>
-<h1>Điều khoản sử dụng</h1>
-<p class="legal-updated">Cập nhật: 28/09/2026 · Áp dụng cho mọi giao dịch tại <strong>{{site}}</strong></p>
+<p class="eyebrow"><span>✦</span> <span data-i18n="legal.eyebrow">Pháp lý</span></p>
+<h1><span data-i18n="legal.terms.h1">Điều khoản sử dụng</span></h1>
+<p class="legal-updated"><span data-i18n="legal.updated">Cập nhật: 28/09/2026 · Áp dụng cho mọi giao dịch tại</span> <strong>{{site}}</strong></p>
 <!--
   Who behind the shop a buyer would actually name in a dispute. Left as a token
   because it has to be one value across the terms, the privacy page, the emails and
@@ -47,46 +48,47 @@
 
 <p>Bạn đang đọc các điều khoản áp dụng khi mua và sử dụng phần mềm do <strong>{{brandName}}</strong> phát triển. Mua hàng nghĩa là bạn chấp nhận các điều khoản dưới đây. Nếu không đồng ý, vui lòng không thực hiện giao dịch.</p>
 
-<h2>1. Ai được sử dụng</h2>
-<p>Giấy phép bạn mua là <strong>giấy phép sử dụng cá nhân, không chuyển nhượng</strong>, dành cho một máy tính của một người dùng. Bạn không được bán lại, chia sẻ, cho thuê, quay trội lại hoặc phát tán lại bản quyền, mã nguồn hay tệp phát hành dưới bất kỳ hình thức nào, kể cả khi đã chỉnh sửa mã nguồn.</p>
-<p>Có thể dùng cho mục đích thương mại nội bộ của doanh nghiệp, nhưng phần mềm chỉ chạy trên máy tính của tổ chức đó, không triển khai lại thành dịch vụ. Quyền sử dụng cho cả nhóm nhiều người hoặc nhiều máy cần gói riêng, vui lòng liên hệ trước khi mua.</p>
+<h2 data-i18n="legal.terms.h2">1. Ai được sử dụng</h2>
+<p><span data-i18n="legal.terms.p1a">Giấy phép bạn mua là</span> <strong data-i18n="legal.terms.p1b">giấy phép sử dụng cá nhân, không chuyển nhượng</strong><span data-i18n="legal.terms.p1c">, dành cho một máy tính của một người dùng. Bạn không được bán lại, chia sẻ, cho thuê, quay trội lại hoặc phát tán lại bản quyền, mã nguồn hay tệp phát hành dưới bất kỳ hình thức nào, kể cả khi đã chỉnh sửa mã nguồn.</span></p>
+<p data-i18n="legal.terms.p2">Có thể dùng cho mục đích thương mại nội bộ của doanh nghiệp, nhưng phần mềm chỉ chạy trên máy tính của tổ chức đó, không triển khai lại thành dịch vụ. Quyền sử dụng cho cả nhóm nhiều người hoặc nhiều máy cần gói riêng, vui lòng liên hệ trước khi mua.</p>
 
-<h2>2. Hình thức thanh toán</h2>
-<p>Chúng tôi nhận thanh toán qua PayPal (quy đổi từ VND sang USD theo tỷ giá tại thời điểm tạo đơn) và chuyển khoản ngân hàng, MoMo, ZaloPay. Giá niêm yết là số tiền bạn phải trả; phí đi kèm do bên thứ ba thu không nằm trong giá niêm yết.</p>
-<p>Với PayPal, tỷ giá quy đổi được ghi nhận vào đơn hàng ngay lúc khởi tạo và không thay đổi sau đó. Với chuyển khoản, vui lòng giữ nguyên số tiền và nội dung chuyển khoản đã điền sẵn để chúng tôi đối soát.</p>
-<p>Đơn hàng chuyển khoản được xác nhận trong thời gian làm việc, thông thường dưới 24 giờ. Trong thời gian chờ, trạng thái đơn là <em>đang chờ chuyển khoản</em> và chưa thể tải.</p>
+<h2 data-i18n="legal.terms.h3">2. Hình thức thanh toán</h2>
+<p data-i18n="legal.terms.p3">Chúng tôi nhận thanh toán qua PayPal (quy đổi từ VND sang USD theo tỷ giá tại thời điểm tạo đơn) và chuyển khoản ngân hàng, MoMo, ZaloPay. Giá niêm yết là số tiền bạn phải trả; phí đi kèm do bên thứ ba thu không nằm trong giá niêm yết.</p>
+<p data-i18n="legal.terms.p4">Với PayPal, tỷ giá quy đổi được ghi nhận vào đơn hàng ngay lúc khởi tạo và không thay đổi sau đó. Với chuyển khoản, vui lòng giữ nguyên số tiền và nội dung chuyển khoản đã điền sẵn để chúng tôi đối soát.</p>
+<p><span data-i18n="legal.terms.p5a">Đơn hàng chuyển khoản được xác nhận trong thời gian làm việc, thông thường dưới 24 giờ. Trong thời gian chờ, trạng thái đơn là</span> <em data-i18n="legal.terms.p5b">đang chờ chuyển khoản</em> <span data-i18n="legal.terms.p5c">và chưa thể tải.</span></p>
 
-<h2>3. Thời hạn thanh toán và hủy đơn</h2>
+<h2 data-i18n="legal.terms.h4">3. Thời hạn thanh toán và hủy đơn</h2>
 <p>Đơn hàng chưa được thanh toán sẽ tự động bị hủy sau <strong>{{paymentWindowHours}} giờ</strong> kể từ thời điểm bạn nhấn nút đặt hàng, áp dụng cho mọi phương thức thanh toán. Thời hạn này được hiển thị ngay trên biểu mẫu thanh toán và trên trang đơn hàng của bạn.</p>
-<p>Trước khi hết hạn, chúng tôi gửi email nhắc. Nếu tiền đã vào tài khoản của chúng tôi sau khi đơn bị hủy — chẳng hạn PayPal báo thành công muộn — đơn sẽ được mở lại và bạn vẫn tải được sản phẩm. Nếu bạn đã chuyển khoản ngân hàng nhưng đơn đã hết hạn, hãy gửi ảnh biên lai, chúng tôi sẽ đối soát hoặc hoàn lại.</p>
-<h2>4. Cấp phát và tải phần mềm</h2>
-<p>Sau khi đơn chuyển khoản được xác nhận <em>hoặc</em> PayPal báo thành công, bạn nhận mã tra cứu đơn hàng. Mã này là thông tin truy cập duy nhất vào file phát hành, hãy lưu lại cẩn thận. Chúng tôi cũng gửi mã này qua email kèm thời hạn thanh toán.</p>
-<p>Mỗi lần tải tạo một liên kết có thời hạn ngắn, và bạn có thể tạo liên kết mới bất cứ lúc nào bằng mã tra cứu. Liên kết tải dùng cho một lần và có thể bị thu hồi vì lý do bảo mật.</p>
-<p>Đơn hàng được xem là hoàn tất ngay khi bạn bắt đầu tải sản phẩm, và nút tải sẽ khóa lại. Điều này bảo đảm mỗi đơn chỉ phát hành đúng một lần. Nếu bạn tải lỗi do mạng hoặc file hỏng, hãy liên hệ, chúng tôi sẽ mở lại đơn cho bạn.</p>
-<p>Tên tệp tải xuống được giữ nguyên theo bản phát hành (ví dụ <code>SparkCapacityTester.exe</code>). Một số trình diệt virus hoặc trình duyệt có thể cảnh báo với tệp thực thi chưa ký số; đây là hành vi thông thường của phần mềm tải trực tiếp từ Internet, không phải dấu hiệu phần mềm độc.</p>
+<p data-i18n="legal.terms.p6">Trước khi hết hạn, chúng tôi gửi email nhắc. Nếu tiền đã vào tài khoản của chúng tôi sau khi đơn bị hủy — chẳng hạn PayPal báo thành công muộn — đơn sẽ được mở lại và bạn vẫn tải được sản phẩm. Nếu bạn đã chuyển khoản ngân hàng nhưng đơn đã hết hạn, hãy gửi ảnh biên lai, chúng tôi sẽ đối soát hoặc hoàn lại.</p>
+<h2 data-i18n="legal.terms.h5">4. Cấp phát và tải phần mềm</h2>
+<p><span data-i18n="legal.terms.p7a">Sau khi đơn chuyển khoản được xác nhận</span> <em data-i18n="legal.terms.p7b">hoặc</em> <span data-i18n="legal.terms.p7c">PayPal báo thành công, bạn nhận mã tra cứu đơn hàng. Mã này là thông tin truy cập duy nhất vào file phát hành, hãy lưu lại cẩn thận. Chúng tôi cũng gửi mã này qua email kèm thời hạn thanh toán.</span></p>
+<p data-i18n="legal.terms.p8">Mỗi lần tải tạo một liên kết có thời hạn ngắn, và bạn có thể tạo liên kết mới bất cứ lúc nào bằng mã tra cứu. Liên kết tải dùng cho một lần và có thể bị thu hồi vì lý do bảo mật.</p>
+<p data-i18n="legal.terms.p9">Đơn hàng được xem là hoàn tất ngay khi bạn bắt đầu tải sản phẩm, và nút tải sẽ khóa lại. Điều này bảo đảm mỗi đơn chỉ phát hành đúng một lần. Nếu bạn tải lỗi do mạng hoặc file hỏng, hãy liên hệ, chúng tôi sẽ mở lại đơn cho bạn.</p>
+<p><span data-i18n="legal.terms.p10a">Tên tệp tải xuống được giữ nguyên theo bản phát hành (ví dụ</span> <code>SparkCapacityTester.exe</code><span data-i18n="legal.terms.p10b">). Một số trình diệt virus hoặc trình duyệt có thể cảnh báo với tệp thực thi chưa ký số; đây là hành vi thông thường của phần mềm tải trực tiếp từ Internet, không phải dấu hiệu phần mềm độc.</span></p>
 
-<h2>5. Giấy phép vĩnh viễn, không phí định kỳ</h2>
-<p>Mức giá bạn trả là trọn đời cho phiên bản đã mua. Chúng tôi không thu phí thuê bao, phí duy trì hay phí cấp phép lại. Các bản cập nhật trong tương lai của cùng dòng sản phẩm được phát hành miễn phí khi có.</p>
+<h2 data-i18n="legal.terms.h6">5. Giấy phép vĩnh viễn, không phí định kỳ</h2>
+<p data-i18n="legal.terms.p11">Mức giá bạn trả là trọn đời cho phiên bản đã mua. Chúng tôi không thu phí thuê bao, phí duy trì hay phí cấp phép lại. Các bản cập nhật trong tương lai của cùng dòng sản phẩm được phát hành miễn phí khi có.</p>
 
-<h2>6. Bảo hành và hỗ trợ</h2>
-<p>Chúng tôi bảo đảm phần mềm chạy đúng mô tả trong điều kiện hệ thống đã nêu. Nếu phần mềm lỗi, bạn được hoàn lại tiền hoặc nhận bản sửa lỗi tương đương; bạn chọn phương án nào. Hỗ trợ kỹ thuật qua email trong vòng 2 ngày làm việc.</p>
-<p>Chúng tôi không bảo đảm phần mềm tương thích với mọi cấu hình hệ thống, mọi phiên bản Windows, hoặc với phần mềm diệt virus đang chặn tệp thực thi. Bạn chịu trách nhiệm sao lưu dữ liệu trước khi cài đặt bất kỳ công cụ nào lên máy.</p>
+<h2 data-i18n="legal.terms.h7">6. Bảo hành và hỗ trợ</h2>
+<p data-i18n="legal.terms.p12">Chúng tôi bảo đảm phần mềm chạy đúng mô tả trong điều kiện hệ thống đã nêu. Nếu phần mềm lỗi, bạn được hoàn lại tiền hoặc nhận bản sửa lỗi tương đương; bạn chọn phương án nào. Hỗ trợ kỹ thuật qua email trong vòng 2 ngày làm việc.</p>
+<p data-i18n="legal.terms.p13">Chúng tôi không bảo đảm phần mềm tương thích với mọi cấu hình hệ thống, mọi phiên bản Windows, hoặc với phần mềm diệt virus đang chặn tệp thực thi. Bạn chịu trách nhiệm sao lưu dữ liệu trước khi cài đặt bất kỳ công cụ nào lên máy.</p>
 
-<h2>7. Hoàn tiền</h2>
-<p>Quyền hoàn tiền và điều kiện áp dụng được nêu tại <a href="/refund">chính sách hoàn tiền</a>. Rút gọn: bạn được hoàn tiền nếu phần mềm không chạy được như mô tả, và không được hoàn nếu đã bắt đầu sử dụng bình thường sau khi tải.</p>
+<h2 data-i18n="legal.terms.h8">7. Hoàn tiền</h2>
+<p><span data-i18n="legal.terms.p14a">Quyền hoàn tiền và điều kiện áp dụng được nêu tại</span> <a href="/refund" data-i18n="order.help.refundPolicy">chính sách hoàn tiền</a><span data-i18n="legal.terms.p14b">. Rút gọn: bạn được hoàn tiền nếu phần mềm không chạy được như mô tả, và không được hoàn nếu đã bắt đầu sử dụng bình thường sau khi tải.</span></p>
 
-<h2>8. Giới hạn trách nhiệm</h2>
-<p>Trong phạm vi tối đa được phép luật, trách nhiệm của chúng tôi đối với bất kỳ khiếu nại nào giới hạn ở <strong>tổng số tiền bạn đã trả cho đơn hàng đó</strong>. Chúng tôi không chịu trách nhiệm về thiệt hại gián tiếp, mất dữ liệu hoặc mất lợi nhuận phát sinh gián tiếp từ việc sử dụng hoặc không sử dụng phần mềm.</p>
+<h2 data-i18n="legal.terms.h9">8. Giới hạn trách nhiệm</h2>
+<p><span data-i18n="legal.terms.p15a">Trong phạm vi tối đa được phép luật, trách nhiệm của chúng tôi đối với bất kỳ khiếu nại nào giới hạn ở</span> <strong data-i18n="legal.terms.p15b">tổng số tiền bạn đã trả cho đơn hàng đó</strong><span data-i18n="legal.terms.p15c">. Chúng tôi không chịu trách nhiệm về thiệt hại gián tiếp, mất dữ liệu hoặc mất lợi nhuận phát sinh gián tiếp từ việc sử dụng hoặc không sử dụng phần mềm.</span></p>
 
-<h2>9. Đình chỉ giấy phép</h2>
-<p>Giấy phép sẽ bị vô hiệu nếu bạn vi phạm điều khoản, đặc biệt là chia sẻ, phát tán hoặc bán lại phần mềm. Trong trường hợp này, chúng tôi có thể từ chối cấp lại liên kết tải cho các đơn hàng dưới giấy phép đó. Chúng tôi cũng có quyền ngừng cấp dịch vụ nếu bạn dùng dịch vụ để gây thiệt hại cho người khác hoặc vi phạm pháp luật.</p>
+<h2 data-i18n="legal.terms.h10">9. Đình chỉ giấy phép</h2>
+<p data-i18n="legal.terms.p16">Giấy phép sẽ bị vô hiệu nếu bạn vi phạm điều khoản, đặc biệt là chia sẻ, phát tán hoặc bán lại phần mềm. Trong trường hợp này, chúng tôi có thể từ chối cấp lại liên kết tải cho các đơn hàng dưới giấy phép đó. Chúng tôi cũng có quyền ngừng cấp dịch vụ nếu bạn dùng dịch vụ để gây thiệt hại cho người khác hoặc vi phạm pháp luật.</p>
 
-<h2>10. Thay đổi điều khoản</h2>
-<p>Chúng tôi có thể cập nhật các điều khoản này. Bản cập nhật có hiệu lực từ thời điểm đăng trên trang này và không áp dụng hồi tố cho các đơn hàng đã đặt trước đó, mỗi đơn chịu điều khoản tại thời điểm bạn mua.</p>
+<h2 data-i18n="legal.terms.h11">10. Thay đổi điều khoản</h2>
+<p data-i18n="legal.terms.p17">Chúng tôi có thể cập nhật các điều khoản này. Bản cập nhật có hiệu lực từ thời điểm đăng trên trang này và không áp dụng hồi tố cho các đơn hàng đã đặt trước đó, mỗi đơn chịu điều khoản tại thời điểm bạn mua.</p>
 
-<h2>11. Luật áp dụng và giải quyết tranh chấp</h2>
+<h2 data-i18n="legal.terms.h12">11. Luật áp dụng và giải quyết tranh chấp</h2>
 <p>Các điều khoản này được hiểu và thực hiện theo pháp luật Việt Nam. Tranh chấp sẽ được giải quyết bằng thương lượng thiện chí trước; nếu không thống nhất được, bất kỳ bên nào cũng có quyền yêu cầu tòa án có thẩm quyền tại nơi {{brandName}} đặt trụ sở xử lý.</p>
 </article>
 </main>
-<footer class="site-footer wrap"><div class="brand">{{brandWordmark}}</div><p>Phần mềm tốt cho công việc tốt.</p><div class="footer-links"><a href="/#products">Sản phẩm</a><a href="/terms">Điều khoản</a><a href="/privacy">Bảo mật</a><a href="/refund">Hoàn tiền</a><a href="mailto:{{support}}">Liên hệ</a></div><small>© {{year}} · Đồng sở hữu</small></footer>
+<footer class="site-footer wrap"><div class="brand">{{brandWordmark}}</div><p data-i18n="brand.tagline">Phần mềm tốt cho công việc tốt.</p><div class="footer-links"><a href="/#products" data-i18n="nav.products">Sản phẩm</a><a href="/terms" data-i18n="nav.terms">Điều khoản</a><a href="/privacy" data-i18n="nav.privacy">Bảo mật</a><a href="/refund" data-i18n="nav.refund">Hoàn tiền</a><a href="mailto:{{support}}" data-i18n="nav.contact">Liên hệ</a></div><small>© {{year}} · Đồng sở hữu</small></footer>
+<script src="format.js"></script><script src="i18n.js"></script>
 </body></html>

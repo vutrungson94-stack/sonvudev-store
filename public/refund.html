@@ -10,58 +10,60 @@
 <meta property="og:image:height" content="630">
 <meta name="twitter:card" content="summary_large_image">
 <link rel="alternate" hreflang="vi" href="{{site}}/refund">
+<link rel="alternate" hreflang="en" href="{{site}}/refund">
 <link rel="alternate" hreflang="x-default" href="{{site}}/refund"><title>Chính sách hoàn tiền — {{brandName}}</title><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet"><link rel="stylesheet" href="styles.css">
 {{iconLinks}}
 </head>
-<body>
-<header class="site-header"><a class="brand" href="/">{{brandWordmark}}</a><nav><a href="/#products">Sản phẩm</a><a href="/#faq">FAQ</a><a href="/refund" aria-current="page">Hoàn tiền</a></nav><a class="header-cta" href="/#products">Mua ngay <span>↗</span></a></header>
+<body data-support="{{support}}">
+<header class="site-header"><a class="brand" href="/">{{brandWordmark}}</a><nav><a href="/#products" data-i18n="nav.products">Sản phẩm</a><a href="/#faq" data-i18n="nav.faq">FAQ</a><a href="/refund" data-i18n="nav.refund" aria-current="page">Hoàn tiền</a></nav><button class="lang-toggle" type="button" data-lang-toggle>EN</button><a class="header-cta" href="/#products"><span data-i18n="nav.buy">Mua ngay</span> <span>↗</span></a></header>
 <main>
 <article class="legal">
-<p class="eyebrow"><span>✦</span> Pháp lý</p>
-<h1>Chính sách hoàn tiền</h1>
-<p class="legal-updated">Cập nhật: 28/09/2026 · Áp dụng cho mọi giao dịch tại <strong>{{site}}</strong></p>
+<p class="eyebrow"><span>✦</span> <span data-i18n="legal.eyebrow">Pháp lý</span></p>
+<h1><span data-i18n="legal.refund.h1">Chính sách hoàn tiền</span></h1>
+<p class="legal-updated"><span data-i18n="legal.updated">Cập nhật: 28/09/2026 · Áp dụng cho mọi giao dịch tại</span> <strong>{{site}}</strong></p>
 {{legalEntityLine}}
 
-<p>Chúng tôi muốn bạn mua một cách tự tin. Chính sách này nêu rõ trong trường hợp nào bạn được hoàn tiền, trong trường hợp nào không, và quy trình xử lý cụ thể. Các điều khoản này là một phần của <a href="/terms">điều khoản sử dụng</a>.</p>
+<p><span data-i18n="legal.refund.p1">Chúng tôi muốn bạn mua một cách tự tin. Chính sách này nêu rõ trong trường hợp nào bạn được hoàn tiền, trong trường hợp nào không, và quy trình xử lý cụ thể.</span> <span data-i18n="legal.refund.p2">Các điều khoản này là một phần của</span> <a href="/terms" data-i18n="legal.refund.termsLink">điều khoản sử dụng</a>.</p>
 
-<h2>1. Bạn được hoàn tiền khi nào</h2>
-<p>Chúng tôi hoàn toàn tiền cho các trường hợp sau, kể cả khi bạn đã bắt đầu sử dụng:</p>
+<h2 data-i18n="legal.refund.h2">1. Bạn được hoàn tiền khi nào</h2>
+<p data-i18n="legal.refund.p3">Chúng tôi hoàn toàn tiền cho các trường hợp sau, kể cả khi bạn đã bắt đầu sử dụng:</p>
 <ul>
-<li>Phần mềm <strong>không chạy được</strong> trên hệ thống đã nêu trong mục yêu cầu hệ thống của sản phẩm, và chúng tôi không thể khắc phục trong 7 ngày.</li>
-<li>Sản phẩm bạn nhận <strong>không đúng với mô tả</strong> trên trang sản phẩm, không thể chấp nhận được.</li>
-<li>Bạn bị tính tiền <strong>hai lần</strong> cho cùng một đơn hàng, hoặc số tiền bị trừ sai so với giá niêm yết.</li>
-<li>Bạn đã thanh toán nhưng <strong>không nhận được mã tra cứu</strong> và chúng tôi không thể cấp lại trong 7 ngày.</li>
-<li>Giao dịch bị hoàn tiền tự động, hoặc bạn bị tính nhầm do lỗi hệ thống của chúng tôi.</li>
+<li><span data-i18n="legal.refund.w1a">Phần mềm</span> <strong data-i18n="legal.refund.w1b">không chạy được</strong> <span data-i18n="legal.refund.w1c">trên hệ thống đã nêu trong mục yêu cầu hệ thống của sản phẩm, và chúng tôi không thể khắc phục trong 7 ngày.</span></li>
+<li><span data-i18n="legal.refund.w2a">Sản phẩm bạn nhận</span> <strong data-i18n="legal.refund.w2b">không đúng với mô tả</strong> <span data-i18n="legal.refund.w2c">trên trang sản phẩm, không thể chấp nhận được.</span></li>
+<li><span data-i18n="legal.refund.w3a">Bạn bị tính tiền</span> <strong data-i18n="legal.refund.w3b">hai lần</strong> <span data-i18n="legal.refund.w3c">cho cùng một đơn hàng, hoặc số tiền bị trừ sai so với giá niêm yết.</span></li>
+<li><span data-i18n="legal.refund.w4a">Bạn đã thanh toán nhưng</span> <strong data-i18n="legal.refund.w4b">không nhận được mã tra cứu</strong> <span data-i18n="legal.refund.w4c">và chúng tôi không thể cấp lại trong 7 ngày.</span></li>
+<li data-i18n="legal.refund.w5">Giao dịch bị hoàn tiền tự động, hoặc bạn bị tính nhầm do lỗi hệ thống của chúng tôi.</li>
 </ul>
 
-<h2>2. Thời hạn yêu cầu</h2>
+<h2 data-i18n="legal.refund.h3">2. Thời hạn yêu cầu</h2>
 <p>Bạn có thể gửi yêu cầu hoàn tiền trong <strong>14 ngày</strong> kể từ ngày thanh toán, bằng email tới <a href="mailto:{{support}}">{{support}}</a>. Sau thời điểm này, trường hợp mục 1 và 2 vẫn được xem xét nếu lỗi được phát hiện muộn do hoàn cảnh khách quan, nhưng việc hoàn tiền sẽ do hai bên thỏa thuận.</p>
 
-<h2>3. Quy trình xử lý</h2>
-<p><strong>Bước 1 — Gửi yêu cầu.</strong> Email về địa chỉ trên, kèm mã đơn hàng và mô tả vấn đề. Nên kèm ảnh chụp màn hình lỗi nếu có; điều này giúp xử lý nhanh hơn nhiều.</p>
-<p><strong>Bước 2 — Chúng tôi kiểm tra.</strong> Thời gian phản hồi trong vòng 2 ngày làm việc. Nếu lỗi rõ ràng, chúng tôi chủ động tạo bản sửa và gửi bạn; bạn có thể chọn nhận bản sửa thay vì hoàn tiền.</p>
-<p><strong>Bước 3 — Hoàn tiền.</strong> Sau khi xác nhận, tiền được hoàn về đúng phương thức bạn đã thanh toán, thường mất 1 đến 10 ngày làm việc tùy ngân hàng hoặc nhà cung cấp.</p>
+<h2 data-i18n="legal.refund.h4">3. Quy trình xử lý</h2>
+<p><strong data-i18n="legal.refund.p4a">Bước 1 — Gửi yêu cầu.</strong> <span data-i18n="legal.refund.p4b">Email về địa chỉ trên, kèm mã đơn hàng và mô tả vấn đề. Nên kèm ảnh chụp màn hình lỗi nếu có; điều này giúp xử lý nhanh hơn nhiều.</span></p>
+<p><strong data-i18n="legal.refund.p5a">Bước 2 — Chúng tôi kiểm tra.</strong> <span data-i18n="legal.refund.p5b">Thời gian phản hồi trong vòng 2 ngày làm việc. Nếu lỗi rõ ràng, chúng tôi chủ động tạo bản sửa và gửi bạn; bạn có thể chọn nhận bản sửa thay vì hoàn tiền.</span></p>
+<p><strong data-i18n="legal.refund.p6a">Bước 3 — Hoàn tiền.</strong> <span data-i18n="legal.refund.p6b">Sau khi xác nhận, tiền được hoàn về đúng phương thức bạn đã thanh toán, thường mất 1 đến 10 ngày làm việc tùy ngân hàng hoặc nhà cung cấp.</span></p>
 
-<h2>4. Chúng tôi không hoàn tiền khi nào</h2>
-<p>Để công bằng với những khách hàng khác, chúng tôi không hoàn tiền trong các trường hợp sau:</p>
+<h2 data-i18n="legal.refund.h5">4. Chúng tôi không hoàn tiền khi nào</h2>
+<p data-i18n="legal.refund.p7">Để công bằng với những khách hàng khác, chúng tôi không hoàn tiền trong các trường hợp sau:</p>
 <ul>
-<li>Bạn đã <strong>tải và sử dụng</strong> phần mềm trong luồng công việc bình thường, và yêu cầu chỉ vì không thích giao diện, màu sắc hoặc thay đổi ý định.</li>
-<li>Bạn mua nhầm phiên bản, mua nhầm sản phẩm, hoặc mua số lượng lớn rồi không dùng hết.</li>
-<li>Bạn <strong>vi phạm điều khoản</strong>, ví dụ chia sẻ, bán lại hoặc phát tán phần mềm.</li>
-<li>Phần mềm không chạy vì thiếu yêu cầu hệ thống bạn đã được cảnh báo trước, hoặc vì phần mềm diệt virus của bạn chủ động xoá tệp đã tải.</li>
-<li>Mua nhầm hàng, mua nhiều hơn nhu cầu, hoặc thay đổi ý định sau khi đã tải <strong>quá một lần</strong>.</li>
-<li>Yêu cầu được gửi sau 14 ngày mà không có lý do kỹ thuật hợp lý.</li>
+<li><span data-i18n="legal.refund.n1a">Bạn đã</span> <strong data-i18n="legal.refund.n1b">tải và sử dụng</strong> <span data-i18n="legal.refund.n1c">phần mềm trong luồng công việc bình thường, và yêu cầu chỉ vì không thích giao diện, màu sắc hoặc thay đổi ý định.</span></li>
+<li data-i18n="legal.refund.n2">Bạn mua nhầm phiên bản, mua nhầm sản phẩm, hoặc mua số lượng lớn rồi không dùng hết.</li>
+<li><span data-i18n="legal.refund.n3a">Bạn</span> <strong data-i18n="legal.refund.n3b">vi phạm điều khoản</strong><span data-i18n="legal.refund.n3c">, ví dụ chia sẻ, bán lại hoặc phát tán phần mềm.</span></li>
+<li data-i18n="legal.refund.n4">Phần mềm không chạy vì thiếu yêu cầu hệ thống bạn đã được cảnh báo trước, hoặc vì phần mềm diệt virus của bạn chủ động xoá tệp đã tải.</li>
+<li><span data-i18n="legal.refund.n5a">Mua nhầm hàng, mua nhiều hơn nhu cầu, hoặc thay đổi ý định sau khi đã tải</span> <strong data-i18n="legal.refund.n5b">quá một lần</strong>.</li>
+<li data-i18n="legal.refund.n6">Yêu cầu được gửi sau 14 ngày mà không có lý do kỹ thuật hợp lý.</li>
 </ul>
 
-<h2>5. Hoàn một phần</h2>
-<p>Trong trường hợp đặc biệt, ví dụ bạn đã tải nhưng gặp lỗi kỹ thuật tạm thời không thể dùng ngay, chúng tôi có thể đề xuất hoàn một phần thay vì trọn số tiền. Quyết định này do hai bên thống nhất và không áp dụng bắt buộc.</p>
+<h2 data-i18n="legal.refund.h6">5. Hoàn một phần</h2>
+<p data-i18n="legal.refund.p8">Trong trường hợp đặc biệt, ví dụ bạn đã tải nhưng gặp lỗi kỹ thuật tạm thời không thể dùng ngay, chúng tôi có thể đề xuất hoàn một phần thay vì trọn số tiền. Quyết định này do hai bên thống nhất và không áp dụng bắt buộc.</p>
 
-<h2>6. Hủy đơn chưa thanh toán</h2>
+<h2 data-i18n="legal.refund.h7">6. Hủy đơn chưa thanh toán</h2>
 <p>Đơn hàng chưa thanh toán bị tự động hủy sau {{paymentWindowHours}} giờ kể từ thời điểm đặt hàng. Đơn đã hủy không bị tính phí, vì vậy không có gì để hoàn. Nếu bạn đã chuyển khoản nhưng đơn chưa được xác nhận, hãy gửi ảnh chụp biên lai — chúng tôi sẽ đối soát và hoàn lại nếu có sai sót.</p>
 
-<h2>7. Liên hệ</h2>
+<h2 data-i18n="legal.refund.h8">7. Liên hệ</h2>
 <p>Mọi yêu cầu hoàn tiền gửi tới <a href="mailto:{{support}}">{{support}}</a>. Vui lòng nêu mã đơn hàng để chúng tôi tra cứu nhanh. Chúng tôi không giải quyết khiếu nại qua mạng xã hội, vì không thể xác minh danh tính người gửi trên các kênh đó.</p>
 </article>
 </main>
-<footer class="site-footer wrap"><div class="brand">{{brandWordmark}}</div><p>Phần mềm tốt cho công việc tốt.</p><div class="footer-links"><a href="/#products">Sản phẩm</a><a href="/terms">Điều khoản</a><a href="/privacy">Bảo mật</a><a href="/refund">Hoàn tiền</a><a href="mailto:{{support}}">Liên hệ</a></div><small>© {{year}} · Đồng sở hữu</small></footer>
+<footer class="site-footer wrap"><div class="brand">{{brandWordmark}}</div><p data-i18n="brand.tagline">Phần mềm tốt cho công việc tốt.</p><div class="footer-links"><a href="/#products" data-i18n="nav.products">Sản phẩm</a><a href="/terms" data-i18n="nav.terms">Điều khoản</a><a href="/privacy" data-i18n="nav.privacy">Bảo mật</a><a href="/refund" data-i18n="nav.refund">Hoàn tiền</a><a href="mailto:{{support}}" data-i18n="nav.contact">Liên hệ</a></div><small>© {{year}} · Đồng sở hữu</small></footer>
+<script src="format.js"></script><script src="i18n.js"></script>
 </body></html>

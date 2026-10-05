@@ -98,27 +98,28 @@ const rows = [
   ['productPageLocales', countCopies(appSource, /productPage\("(?:vi|en)"\)/g), 'up', 'ngôn ngữ trang sản phẩm'],
   // How many pages carry the dictionary.
   //
-  // Five do not: about.html and the three legal pages are Vietnamese-only with no
-  // language switch, and admin.html is Vietnamese on purpose — it is the owner's
-  // console, not a shopfront, and it deliberately does not load the dictionary (see
-  // the note at the top of public/i18n.js).
+  // One does not, and it is the right one: admin.html is Vietnamese on purpose. It is
+  // the owner's console rather than a shopfront, it handles money, and the dictionary
+  // deliberately does not load there (see the note at the top of public/i18n.js).
+  // Nine of ten customer-facing pages are translated; the tenth is not a customer.
   //
-  // The comment used to name the 404 as one of the five. The 404 has carried
-  // <script src="i18n.js"> and a working language toggle for some time, and
-  // public/related.js still claimed in a comment that it could not read the shared
-  // dictionary because the 404 has no switch — both facts false, and both about the
-  // page that is the last thing a visitor sees. The count of 5 was right; the page
-  // list was not, which is the worse half — a list someone reads to decide what to
-  // work on next.
+  // The three legal pages and about.html were the ones missing until recently: no
+  // dictionary, no toggle, every sentence a literal. They are the pages a buyer reads
+  // before paying, so an English buyer who mistyped /terms was told in Vietnamese what
+  // they had agreed to. Closing that was the point of counting it.
   //
-  // This is a real gap and it was invisible — nothing counted it, so closing it was
-  // neither possible to notice nor possible to hold. The direction is "up", so a page
-  // that loses its dictionary is a regression the same way a deleted test is.
+  // The count moved from 5 to 9 while a note elsewhere in this file was still naming
+  // the 404 as untranslated. The 404 has carried <script src="i18n.js"> and a working
+  // toggle for some time, and public/related.js still claimed in a comment that it
+  // could not read the shared dictionary because the 404 has no switch — both facts
+  // false, and both about the page a visitor sees last. The number was right; the list
+  // beside it was not, which is the worse half, because a list is what someone reads to
+  // decide what to work on next. It now names admin.html and says why.
   //
-  // What this number is not: a claim that the shop is translated. It says how much of
-  // it is. Reaching the remaining pages means translating their prose, which is
-  // work for someone who can be held to the legal wording — not something a
-  // placeholder or a machine should decide.
+  // The direction is "up", so a page that loses its dictionary is a regression the same
+  // way a deleted test is. Nothing stops the count reaching 10 — that would mean the
+  // admin console had been translated too, which is a decision for the owner and not
+  // for a metric.
   ['localizedPages', publicHtmlText.filter((body) => /<script src="i18n\.js">/.test(body)).length, 'up', 'trang có từ điển'],
   // One route serving two languages. It was one, then two pages with a renderer
   // between them that only ever spoke Vietnamese, and the English copy sat unused

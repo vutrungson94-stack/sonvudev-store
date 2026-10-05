@@ -131,8 +131,8 @@ test('og:image là ảnh raster thật, đúng kích thước khai báo', async 
 
 test('ảnh share nằm trong bản build, không được sinh lúc chạy', () => {
   assert.ok(existsSync(path.join(root, 'public', 'og.png')), 'public/og.png phải được commit');
-  const generator = readFileSync(path.join(root, 'scripts', 'make-og-image.ps1'), 'utf8');
-  assert.match(generator, /public[\\/]og\.png/, 'script sinh ảnh phải ghi ra đúng file mà server trỏ tới');
+  const generator = readFileSync(path.join(root, 'scripts', 'make-og-image.mjs'), 'utf8');
+  assert.match(generator, /'og\.png'/, 'script sinh ảnh phải ghi ra đúng file mà server trỏ tới');
 });
 
 test('mọi trang index được trỏ tới cùng một ảnh raster', async () => {

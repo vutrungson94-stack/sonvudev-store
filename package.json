@@ -29,6 +29,8 @@
     "i18n:fill": "node scripts/fill-static-text.mjs",
     "test:flow": "node scripts/payment-flow-test.mjs",
     "seo:check": "node scripts/seo-check.mjs",
+    "assets:logo": "node scripts/make-logo-assets.mjs",
+    "assets:og": "node scripts/make-og-image.mjs",
     "start": "node src/server.js",
     "dev": "node --watch src/server.js",
     "test": "node scripts/run-tests.mjs",
@@ -54,5 +56,9 @@
     "@aws-sdk/s3-request-presigner": "^3.600.0",
     "dotenv": "^16.4.5",
     "express": "^4.19.2"
+  },
+  "devDependencies": {
+    "@expo-google-fonts/space-grotesk": "^0.4.1",
+    "pureimage": "^0.4.20"
   }
 }
