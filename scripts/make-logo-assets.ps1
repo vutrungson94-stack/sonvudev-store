@@ -55,9 +55,17 @@ Write-Host "Nguon: public\img\sonvudev.logo.png ($($logo.Width)x$($logo.Height))
 
 # ---------------------------------------------------------------- transparent set
 # Kept transparent so the mark sits on whatever background the platform gives it.
-# 180 is deliberately absent: apple-touch-icon is that size, and a second 180px file
-# that no <link> points at is a file nothing loads.
-foreach ($size in @(16, 32, 48, 64, 192, 512)) {
+#
+# Every size here is one a slot actually consumes — a <link rel="icon"> with that
+# exact sizes attribute, or an entry in the webmanifest. 180 is absent because
+# apple-touch-icon is that size and a second 180px file no slot points at is a file
+# nothing loads. 48 is absent because favicon.ico embeds 48 internally. 64 is absent
+# because favicon.svg is a 64-unit vector and a raster twin of it served nothing.
+#
+# All three were generated, committed, listed in the build's required files and
+# shipped in every artifact. test/logo.test.js now holds this loop to the sizes a
+# consumer names, so a size added here without one fails rather than travelling.
+foreach ($size in @(16, 32, 192, 512)) {
   $canvas = New-Canvas $size ([System.Drawing.Color]::Transparent)
   $graphics = $canvas[1]
   $graphics.DrawImage($logo, 0, 0, $size, $size)
@@ -274,8 +282,19 @@ function Save-Tinted([System.Drawing.Color]$color, [int[]]$sizes, [string]$relat
   $work.Dispose()
 }
 
-Save-Tinted $INK @(64, 180, 512) 'public\logo-ink-{size}.png'
-Save-Tinted $MINT_ON_DARK @(64, 180, 512) 'public\logo-mint-{size}.png'
+# One size each, because one size each is what is consumed.
+#
+#   logo-ink-64.png    the site header mark (src/pages.js) and the email header
+#   logo-mint-512.png  the input to make-og-image.ps1, the only mint file anything
+#                      reads
+#
+# The other five used to be generated at 180 and 512 and referenced by nothing: a
+# committed file in every artifact and in every clone, on the strength of a size
+# list nobody cross-checked against the pages. test/logo.test.js now holds the list
+# to what the site references, so a size added here without a consumer fails rather
+# than shipping.
+Save-Tinted $INK @(64) 'public\logo-ink-{size}.png'
+Save-Tinted $MINT_ON_DARK @(512) 'public\logo-mint-{size}.png'
 
 $logo.Dispose()
 Write-Host ''

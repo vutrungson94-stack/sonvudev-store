@@ -9,7 +9,7 @@ import './helpers/env.mjs';
 // it, and a store that quietly phones a third party on every product save when
 // nobody asked for that is the problem this guards against.
 process.env.NODE_ENV = 'test';
-process.env.APP_URL = 'https://sonvudev.com';
+process.env.APP_URL = 'https://indexnow-off-fixture.example';
 // Set to an empty string rather than deleted. src/config.js loads .env without
 // overriding what the test already set, and dotenv skips a key that is already
 // present on process.env. Deleting it therefore let the developer's real

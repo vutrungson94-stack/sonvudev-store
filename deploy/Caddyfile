@@ -6,9 +6,16 @@
 #
 #   SITE_DOMAIN=example.com caddy run --config /etc/caddy/Caddyfile
 #
-# and deploy.sh passes it through from /etc/sonvudev-store.env. Two domains are
-# served because the app 308s www to the bare host; that redirect is the app's
-# job, not the proxy's.
+# and deploy.sh loads this file into place and reloads the service with SITE_DOMAIN
+# and PORT taken from /etc/sonvudev-store.env — the same file every other value comes
+# from. Until it did, this configuration shipped in every artifact and reached no host
+# at all: deploy.sh copied the systemd unit and nothing else, so Caddy kept serving
+# whatever it was configured with on the day it was first set up, and an edit here was
+# invisible until someone reconfigured Caddy by hand. Two domains are served because
+# the app 308s www to the bare host; that redirect is the app's job, not the proxy's.
+#
+# A missing SITE_DOMAIN is a load error rather than a default, deliberately: a proxy
+# that came up answering for no host looks healthy and serves nothing.
 {$SITE_DOMAIN}, www.{$SITE_DOMAIN} {
   encode zstd gzip
   # The port comes from the environment for the same reason the domain does. It

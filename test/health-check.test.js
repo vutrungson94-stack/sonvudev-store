@@ -22,7 +22,11 @@ const HEALTHY = {
   momo: true,
   zalopay: true,
   admin: true,
-  appUrl: 'https://sonvudev.com',
+  // A fixture, not the shop's real origin. This is a hand-written sample of what
+  // /api/health answers, and it was carrying the production address — which meant
+  // the file had to be excluded by name from the audit's hardcoded-domain check,
+  // and a sample payload is the last place a real address belongs.
+  appUrl: 'https://health-fixture.example',
   email: 'resend',
 };
 

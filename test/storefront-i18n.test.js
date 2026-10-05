@@ -422,6 +422,63 @@ test('#modal-content phai la flex column, va la noi app.js ghi vao', () => {
   }
 });
 
+// The PayPal return screen showed "{support}" and "{id}" as literal braces.
+//
+// Four page scripts each wrapped I18N.t in a local `T`, and three of the four
+// forwarded all three arguments. paypal-return.js's took one, so a call written
+// `T('paypal.errHint', {id, support})` put its object in the *fallback* slot, left
+// `vars` undefined, and the placeholder pass left every brace alone. The failure
+// screen therefore read "…contact {support} with order {id}" — on the one page a
+// buyer reaches after PayPal has already taken their money, where the address and
+// the order id are the only two things that get them the file or the refund.
+//
+// Driven against the real i18n.js rather than read as source text, because the
+// bug is an argument *position*, and no regex over the wrapper distinguishes a
+// wrapper that forwards vars from one that swallows them.
+test('mọi bọc T() phải chuyển tiếp đủ 3 đối số, và placeholder phải được điền', async () => {
+  const { document, nodes } = createDom(['title', 'message', 'actions', 'loader', 'eyebrow']);
+  const i18n = await runScript(read('i18n.js'), { document, window: {}, localStorage: { getItem: () => null, setItem() {}, removeItem() {} } });
+  const dict = i18n.window.I18N;
+
+  // A key that exists in both languages and carries two placeholders. Resolving it
+  // through each page's own wrapper is what the page does.
+  const expectResolved = (key, vars) => {
+    const text = dict.t(key, undefined, vars);
+    assert.ok(!/\{[a-zA-Z]+\}/.test(text), `${key} phải điền hết placeholder, nhận: ${text}`);
+    assert.ok(text.includes(vars.id), `${key} phải chứa mã đơn`);
+    assert.ok(text.includes(vars.support), `${key} phải chứa địa chỉ hỗ trợ`);
+    return text;
+  };
+  const vars = { id: 'SVD-TEST-0001', support: 'support@shop.example' };
+  expectResolved('paypal.errHint', vars);
+
+  // And the wrappers themselves, driven by their own parameter lists rather than
+  // by a shape a regex guesses. Each page names its parameters differently —
+  // (key, fallback, vars) or (key, vars) — so the thing to assert is where each
+  // one lands in the call: the third slot is vars, always, and a wrapper with two
+  // parameters has to fill the second slot with undefined rather than pass vars
+  // there. That is the mistake this test exists for.
+  for (const name of ['app.js', 'order.js', 'lookup.js', 'paypal-return.js']) {
+    const source = read(name);
+    const wrapper = source.match(/const T\s*=\s*\(([^)]*)\)\s*=>\s*window\.I18N\.t\(([^)]*)\)/);
+    assert.ok(wrapper, `${name} phai co bọc T() chuyển tiếp sang window.I18N.t`);
+    const [, params, forwarded] = wrapper;
+    const names = params.split(',').map((p) => p.trim()).filter(Boolean);
+    const slots = forwarded.split(',').map((a) => a.trim());
+    assert.equal(slots.length, 3, `${name}: phải chuyển đủ 3 đối số vào I18N.t`);
+    const varsParam = names.find((p) => /vars$/i.test(p)) || names[1];
+    assert.ok(varsParam, `${name}: phải có tham số chứa vars`);
+    assert.equal(slots[2], varsParam,
+      `${name}: "${varsParam}" phải vào ô thứ ba của I18N.t — ô thứ hai là fallback, và đặt vars vào đó là lỗi đã xảy ra`);
+    assert.notEqual(slots[1], varsParam,
+      `${name}: không được truyền vars vào ô fallback`);
+    if (names.length === 2) {
+      assert.equal(slots[1], 'undefined',
+        `${name}: bọc 2 tham số phải điền undefined vào ô fallback`);
+    }
+  }
+});
+
 test('vùng cuộn phải có overflow và min-height:0 ngay ở rule cơ bản', () => {
   const css = read('styles.css');
   // These have to hold on a desktop too, where the 700px query never applies.

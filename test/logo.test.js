@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { readFile, stat } from 'node:fs/promises';
+import { readFile, readdir, stat } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import './helpers/env.mjs';
@@ -97,8 +97,11 @@ test('mọi bản logo đều sinh từ một file nguồn duy nhất', async ()
     assert.match(generator, new RegExp(derived.replace(/\./g, '\\.')),
       `${derived} phải do make-logo-assets.ps1 sinh ra`);
   }
-  // The icon sizes come from a loop rather than one line each, so the sizes that
-  // ICON_LINKS publishes have to be the sizes that loop actually writes.
+  // And the sizes the loop writes are the only sizes that exist, in both directions.
+  // Each one used to be generated but linked from nowhere — five committed PNGs in
+  // every clone and every deploy artifact, on the strength of a size list nobody
+  // compared against the pages. The reverse direction is the older one and is why
+  // this list exists at all; this direction is what stops it growing again.
   const sizes = [...generator.matchAll(/foreach \(\$size in @\(([^)]+)\)/g)]
     .flatMap((m) => m[1].split(',').map((n) => Number(n.trim())))
     .filter((n) => Number.isInteger(n));
@@ -106,6 +109,21 @@ test('mọi bản logo đều sinh từ một file nguồn duy nhất', async ()
     const declared = Number(l.href.match(/icon-(\d+)\.png/)[1]);
     assert.ok(sizes.includes(declared),
       `${l.href} được khai báo nhưng make-logo-assets.ps1 không sinh ra kích thước ${declared} (loop sinh: ${sizes.join(', ')})`);
+  }
+  // Every icon-*.png on disk must be consumed. ICON_LINKS covers the <head> slots;
+  // the webmanifest route in src/app.js names the launcher sizes, which a head link
+  // cannot serve — so both are read, and a file neither reaches fails here rather
+  // than travelling in every artifact for the life of the repository.
+  const manifest = await read(path.join('src', 'app.js'));
+  for (const file of await readdir(path.join(root, 'public'))) {
+    const match = /^icon-(\d+)\.png$/.exec(file);
+    if (!match) continue;
+    const href = `/${file}`;
+    const linked = ICON_LINKS.some((l) => l.href === href);
+    // Sizes the manifest names, with the numbers allowed to be written either way.
+    const sized = new RegExp(`icon-${match[1]}\\.png["'][^}]*?sizes["']?\\s*:?\\s*["']?${match[1]}x${match[1]}`).test(manifest);
+    assert.ok(linked || sized,
+      `public/${file} tồn tại nhưng không slot nào trỏ tới (không có <link> và webmanifest không nêu) — mọi artifact đều mang theo một file không ai dùng`);
   }
   // And the share card reads the same source rather than painting its own mark.
   const og = await read('scripts/make-og-image.ps1');

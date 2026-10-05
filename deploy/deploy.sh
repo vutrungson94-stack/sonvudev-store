@@ -60,15 +60,44 @@ install -d -o sonvudev -g sonvudev -m 0755 "$RELEASE_DIR"
 cp -a "$SOURCE_DIR"/. "$RELEASE_DIR"/
 
 cd "$RELEASE_DIR"
-sudo -u sonvudev npm ci --omit=dev --ignore-scripts
+# No sudo. This script installs into /opt and /etc/systemd/system, so it must run as
+# root already — deploy/bootstrap-ubuntu.sh refuses to start unless EUID is 0 — and
+# it uses plain `install` and `su` throughout for exactly that reason. The sudo calls
+# here were not merely redundant: on a minimal Ubuntu image sudo is not installed
+# unless someone installed it, and bootstrap-ubuntu.sh does not install it, so
+# `npm ci` died on line 63 of an otherwise successful deploy.
+run_as_shop() { su -s /bin/bash sonvudev -c "$1"; }
+run_as_shop "cd '$RELEASE_DIR' && npm ci --omit=dev --ignore-scripts"
+
 ln -sfn "$RELEASE_DIR" "$CURRENT_LINK"
 chown -h sonvudev:sonvudev "$CURRENT_LINK"
 chown -R sonvudev:sonvudev "$RELEASE_DIR" "$APP_ROOT/shared"
 
-sudo cp "$SOURCE_DIR/deploy/sonvudev-store.service" /etc/systemd/system/sonvudev-store.service
-sudo systemctl daemon-reload
-sudo systemctl enable --now sonvudev-store
-sudo systemctl restart sonvudev-store
+# Caddy is installed because the artifact ships deploy/Caddyfile and nothing has
+# used it. The file was in every artifact and in no release: this copied the unit
+# file only, so the reverse proxy kept serving whatever configuration it had on the
+# day it was set up, and a change to Caddyfile could never reach the host.
+# TLS renewal is refused until the file is in place — a missing site block means no
+# certificate for the domain, which is worse than a failed deploy.
+install -m 0644 "$SOURCE_DIR/deploy/Caddyfile" /etc/caddy/Caddyfile
+if ! command -v caddy >/dev/null 2>&1; then
+  echo "ERROR: caddy is not installed but deploy/Caddyfile was copied." >&2
+  echo "       Install caddy, or remove deploy/Caddyfile from scripts/lib/artifact.mjs." >&2
+  exit 1
+fi
+systemctl daemon-reload
+systemctl enable --now sonvudev-store
+systemctl restart sonvudev-store
+# Reload rather than restart: a restart drops every in-flight request, a reload
+# leaves the proxy up while it re-reads the file. Validate first — caddy refuses to
+# start on a bad config, and taking the proxy down to find that out is the failure
+# this avoids.
+if ! caddy validate --config /etc/caddy/Caddyfile >/dev/null 2>&1; then
+  echo "ERROR: /etc/caddy/Caddyfile is not valid — Caddyfile left in place, proxy not reloaded." >&2
+  echo "       Fix the file or run: caddy fmt /etc/caddy/Caddyfile" >&2
+  exit 1
+fi
+systemctl reload caddy
 
 # Fail the deploy here rather than in the uptime monitor ten minutes later. The
 # health endpoint answers 503 whenever a probe fails, and one of its probes is

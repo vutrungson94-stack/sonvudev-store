@@ -2,7 +2,9 @@ const form=document.getElementById('lookup-form'),status=document.getElementById
 // Every string is read from the same dictionary the storefront uses. This page
 // used to carry its own hardcoded copy, which is why an English buyer who lost
 // their order code after paying by PayPal was told what to do in Vietnamese.
-const T=(key,fallback)=>window.I18N.t(key,fallback);
+// (key, fallback, vars) — the dictionary's signature, on every page script. See
+// the note in public/app.js.
+const T=(key,fallback,vars)=>window.I18N.t(key,fallback,vars);
 // The order screen links here with the id already attached. Retyping a code from
 // a receipt onto a phone keyboard is exactly the step that stops people
 // recovering, so the one value we already know arrives filled in.

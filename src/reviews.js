@@ -1,5 +1,6 @@
 import crypto from "node:crypto";
 import { hasPayment } from "./orders.js";
+import { refuse } from "./refuse.js";
 import { getOrder, isOrderOwner, listFulfilledOrderReviews, updateOrder } from "./store.js";
 
 // Customer reviews, deliberately without a star rating.
@@ -69,7 +70,12 @@ const publicReview = (review) => ({
  * `error` stays for anything reading the API as a human — curl, a log line, the
  * audit. The browser uses `code`.
  */
-const refuse = (key, error, status) => ({ code: key, error, status });
+// The shape lives in src/refuse.js — see the note on the import at the top of this
+// file. The reasoning about why the key is spelled out in full is repeated nowhere
+// else: `refuse("review.err.notFound", …)` and a client assembling
+// `review.err.${code}` both work, but the second leaves no key name in any file, so
+// the audit reports eleven working translations as dead and the cheapest way to
+// satisfy it is to delete the translations.
 
 /**
  * The reviews a product page prints.

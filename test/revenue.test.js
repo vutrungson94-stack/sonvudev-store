@@ -193,3 +193,48 @@ test('thanh toán trùng không làm doanh thu nhân đôi', async () => {
   const data = await revenue();
   assert.equal(data.paidOrders, 5, 'một lần thu tiền phải tính đúng một lần');
 });
+
+// ---------------------------------------------------------------------------
+// The Postgres projection is a contract, and nothing else in this file can check
+// it.
+//
+// Every test here runs against the local JSON backend, which returns whole rows.
+// So the assertion at line 119 — the one that proves USD is bucketed separately —
+// passes on local and would have passed with `paid_provider_currency` missing from
+// the projection too, because local never uses the projection at all. The column
+// was absent from `listOrdersForRevenue` for as long as this test existed, and on a
+// deployed Postgres every PayPal sale was booked at its VND shelf price under
+// gross.VND. Nothing went red: the suite, the audit, the case check and the build
+// all passed on a shop whose revenue report was wrong in the currency the owner
+// reconciles against a PayPal statement with.
+//
+// So the contract is asserted directly: every order field the revenue handler reads
+// has to be either a projected column or an alias fromOrder knows how to fill. A
+// column dropped from the projection reads as null, which is how a missing value
+// becomes a wrong number instead of a visible failure.
+// ---------------------------------------------------------------------------
+test('mọi trường đơn mà báo cáo đọc đều phải có trong projection của Postgres', async () => {
+  const readSource = (relative) => fs.readFile(path.join(path.dirname(new URL(import.meta.url).pathname.replace(/^\//, '')), '..', relative), 'utf8');
+  const store = await readSource('src/store.js');
+  const app = await readSource('src/app.js');
+
+  const projection = store.match(/const columns = "([^"]*)"/)[1].split(',').map((c) => c.trim());
+  const fromOrder = store.match(/const fromOrder = \(row\) => row \? \{[\s\S]*?\} : null;/)[0];
+  // Fields fromOrder knows how to fill in, whichever spelling the row uses.
+  const aliased = new Set([...fromOrder.matchAll(/([a-zA-Z][\w]*): row\./g)].map((m) => m[1]));
+
+  const handler = app.slice(app.indexOf('/api/admin/revenue'), app.indexOf('/api/admin/orders/:id'));
+  const read_ = [...new Set([...handler.matchAll(/order\.([a-zA-Z][\w]*)/g)].map((m) => m[1]))];
+
+  // `items` arrives as a JSON column and is spread field by field, so its own
+  // fields are not order columns and must not be required of the projection.
+  const itemFields = new Set(['items']);
+  const missing = read_.filter((field) => !itemFields.has(field)
+    && !projection.includes(field)
+    && !aliased.has(field));
+
+  assert.deepEqual(missing, [],
+    `báo cáo đọc ${read_.join(', ')} nhưng projection thiếu: ${missing.join(', ')}`);
+  assert.ok(projection.includes('paid_provider_currency'),
+    'paid_provider_currency phải được chọn: báo cáo nhóm gross theo nó, thiếu thì mọi đơn PayPal rơi vào bucket VND');
+});

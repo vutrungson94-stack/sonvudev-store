@@ -51,7 +51,13 @@ add("APP_URL is a production https host", productionUrl, appUrl || "missing");
 add("Admin token", !looksPlaceholder(value("ADMIN_API_TOKEN")), value("ADMIN_API_TOKEN") ? "configured" : "missing");
 add("Supabase URL", /^https:\/\/[a-z0-9-]+\.supabase\.co$/i.test(value("SUPABASE_URL")), value("SUPABASE_URL") ? "configured" : "missing");
 add("Supabase secret key", !looksPlaceholder(value("SUPABASE_SERVICE_ROLE_KEY")), value("SUPABASE_SERVICE_ROLE_KEY") ? "configured" : "missing");
-add("Cloudflare R2", ["R2_ACCOUNT_ID", "R2_ACCESS_KEY_ID", "R2_SECRET_ACCESS_KEY", "R2_BUCKET_NAME"].every((key) => !looksPlaceholder(value(key))), isConfigured(["R2_ACCOUNT_ID", "R2_ACCESS_KEY_ID", "R2_SECRET_ACCESS_KEY", "R2_BUCKET_NAME"]) ? "configured" : "missing");
+// One list, one answer. The condition was written out inline and the same four keys
+// were passed to a helper one line later — the helper's result decided what the
+// detail column said while the inline copy decided the pass/fail, so the two could
+// disagree and the row would read "configured" with a failing tick beside it.
+const r2Keys = ["R2_ACCOUNT_ID", "R2_ACCESS_KEY_ID", "R2_SECRET_ACCESS_KEY", "R2_BUCKET_NAME"];
+const r2Filled = allSet(r2Keys);
+add("Cloudflare R2", r2Filled, r2Filled ? "configured" : "missing");
 // Validates the credentials for real. A non-empty string is not proof they work.
 const paypalClientId = value("PAYPAL_CLIENT_ID");
 const paypalClientSecret = value("PAYPAL_CLIENT_SECRET");
@@ -65,7 +71,7 @@ const paypalClientSecret = value("PAYPAL_CLIENT_SECRET");
 const paypalEnv = resolvePaypalEnvironment(value("PAYPAL_ENVIRONMENT"));
 const paypalEnvironment = paypalEnv.environment;
 const paypalBase = paypalEnv.apiBase;
-const paypalFilled = isConfigured(["PAYPAL_CLIENT_ID", "PAYPAL_CLIENT_SECRET"]);
+const paypalFilled = allSet(["PAYPAL_CLIENT_ID", "PAYPAL_CLIENT_SECRET"]);
 
 if (!paypalEnv.isSet) {
   add("PayPal", false, `${paypalEnv.reason} — mặc định là sandbox, và sandbox không nhận tiền thật`);
@@ -138,7 +144,12 @@ add("Email sender", /^[^<]+<[^>]+>$/.test(emailFrom), emailFrom || "(chưa đặ
 const windowHours = Number(value("ORDER_PAYMENT_WINDOW_HOURS") || "24");
 add("Order payment window", Number.isFinite(windowHours) && windowHours >= 1, `${windowHours}h before an unpaid order is cancelled`);
 
-function isConfigured(keys) { return keys.every((key) => !looksPlaceholder(value(key))); }
+// Not `isConfigured`, which is the name of the object imported from src/config.js
+// and means the opposite thing: that one knows whether the server will act on a
+// value, this one asks whether a list of names all carry a real value. Two
+// different questions under one name in one file, and the imported one is used
+// nowhere else here — so nothing would have complained.
+function allSet(keys) { return keys.every((key) => !looksPlaceholder(value(key))); }
 if (appUrl) {
   const host = new URL(appUrl).hostname;
   // The address, on its own, proves very little — and the version of this check that

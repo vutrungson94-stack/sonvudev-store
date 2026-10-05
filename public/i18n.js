@@ -133,6 +133,12 @@ const DICT = {
     'products.searchLabel': 'Tìm sản phẩm',
     'products.searchPlaceholder': 'Tìm theo tên hoặc tính năng…',
     'products.count': 'sản phẩm',
+    // Chỉ còn một sản phẩm trong danh mục: dải "sản phẩm khác" ở cuối trang sản phẩm
+    // và danh sách ở trang 404 rỗng. Trước đây câu này nằm trong một bảng hai
+    // ngôn ngữ riêng trong public/related.js, bên cạnh chính từ điển đã có mặt
+    // trên đúng những trang đó — nên thêm một ngôn ngữ thứ ba cũng không tới được
+    // nó, và mọi bản dịch phải sửa ở hai chỗ.
+    'products.onlyOne': 'Đây là sản phẩm duy nhất hiện tại.',
     // Một trạng thái rỗng cho cả hai nguyên nhân: catalogue rỗng, và từ khoá tìm
     // không khớp. Trước đây có hai cặp khoá — "Chưa có sản phẩm" cho catalogue rỗng
     // và một câu khác khi lọc — nhưng render() chỉ có một chỗ gọi ra, nên câu dành
@@ -184,6 +190,7 @@ const DICT = {
     'order.keepCode': 'Lưu lại mã này. Nếu đóng tab, mất mạng hoặc máy tắt, bạn vẫn lấy lại được đơn bằng mã tra cứu cùng email đã dùng.',
     'order.openLookup': 'Mở trang tra cứu',
     'order.copied': 'Đã sao chép mã tra cứu.',
+    'order.copyFailed': 'Không sao chép được — hãy chép mã tra cứu ở phía trên bằng tay.',
     'order.paid': 'Đã thanh toán',
     'order.download': 'Tải sản phẩm',
     'order.notFound': 'Không tìm thấy đơn hàng.',
@@ -414,6 +421,7 @@ const DICT = {
     'products.searchLabel': 'Search products',
     'products.searchPlaceholder': 'Search by name or feature…',
     'products.count': 'products',
+    'products.onlyOne': 'This is the only product right now.',
     'products.emptyTitle': 'No product matches',
     'products.emptyText': 'Try a different word, or clear the filter you picked.',
     'products.loadError': 'Could not load products',
@@ -460,6 +468,7 @@ const DICT = {
     'order.keepCode': 'Save this code. If you close the tab, lose your connection or your device powers off, you can still get the order back with this code and the email you paid with.',
     'order.openLookup': 'Open the lookup page',
     'order.copied': 'Lookup code copied.',
+    'order.copyFailed': 'Could not copy — please copy the lookup code above by hand.',
     'order.paid': 'Paid',
     'order.download': 'Download product',
     'order.notFound': 'Order not found.',

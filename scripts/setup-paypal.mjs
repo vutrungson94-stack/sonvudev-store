@@ -67,15 +67,23 @@ if (detect) {
   process.exit(found ? 0 : 1);
 }
 
-const environment = env("PAYPAL_ENVIRONMENT") || "sandbox";
-const apiBase = BASES[environment];
+const resolved = resolvePaypalEnvironment(env("PAYPAL_ENVIRONMENT"));
+const environment = resolved.isSet ? resolved.environment : "";
+const apiBase = resolved.isSet ? resolved.apiBase : null;
 const webhookUrl = `${env("APP_URL").replace(/\/$/, "")}/api/paypal/webhook`;
 const eventTypes = ["PAYMENT.CAPTURE.COMPLETED"];
+
+if (!resolved.isSet) {
+  console.error(`${resolved.reason}. Khong tao webhook o moi truong nao.`);
+  console.error("Chay `npm run paypal:detect` de PayPal tu tra loi credential thuoc moi truong nao,");
+  console.error("roi dat PAYPAL_ENVIRONMENT vao .env truoc khi tao webhook.");
+  process.exitCode = 1;
+}
 
 if (!clientId || !clientSecret) {
   console.error("Thiếu PAYPAL_CLIENT_ID / PAYPAL_CLIENT_SECRET trong .env.");
   process.exitCode = 1;
-} else {
+} else if (apiBase) {
   await main();
 }
 
@@ -91,26 +99,25 @@ async function main() {
     return;
   }
 
-  const tokenResponse = await fetch(`${apiBase}/v1/oauth2/token`, {
-    method: "POST",
-    headers: {
-      Authorization: `Basic ${Buffer.from(`${clientId}:${clientSecret}`).toString("base64")}`,
-      "Content-Type": "application/x-www-form-urlencoded",
-    },
-    body: "grant_type=client_credentials",
-  });
-  const tokenBody = await tokenResponse.json();
-  if (!tokenResponse.ok) {
-    console.error(`Xac thuc that bai (${tokenResponse.status}): ${tokenBody.error_description || tokenBody.error || "unknown"}`);
+  // The same call authenticate() makes, one implementation rather than two. The
+  // second copy that used to sit here had no timeout on it at all, so a PayPal
+  // endpoint that accepted the connection and then stalled hung this script until
+  // the operating system's TCP timeout, with nothing on screen.
+  const tokenResult = await authenticate(apiBase);
+  if (!tokenResult.ok) {
+    console.error(`Xac thuc that bai (${tokenResult.status}): ${tokenResult.body.error_description || tokenResult.body.error || "unknown"}`);
     console.error("Kiem tra lai Client ID / Secret co dung app khong.");
     process.exitCode = 1;
     return;
   }
+  const auth = { Authorization: `Bearer ${tokenResult.body.access_token}`, "Content-Type": "application/json" };
   console.log("Credential hợp lệ. Đã lấy access token.");
 
-  const auth = { Authorization: `Bearer ${tokenBody.access_token}`, "Content-Type": "application/json" };
-  const listResponse = await fetch(`${apiBase}/v1/notifications/webhooks`, { headers: auth });
-  const listBody = await listResponse.json();
+  // One read, one parse, one failure branch for each response that is not JSON —
+  // a proxy's HTML error page used to reject out of main() as a raw stack trace,
+  // which is not an answer to "are my credentials valid".
+  const listResponse = await fetch(`${apiBase}/v1/notifications/webhooks`, { headers: auth, signal: AbortSignal.timeout(15000) });
+  const listBody = await listResponse.json().catch(() => ({}));
   const existing = Array.isArray(listBody.webhooks) ? listBody.webhooks : [];
   console.log(`Webhook hien co: ${existing.length}`);
 
@@ -124,8 +131,9 @@ async function main() {
       method: "POST",
       headers: auth,
       body: JSON.stringify({ url: webhookUrl, event_types: eventTypes }),
+      signal: AbortSignal.timeout(15000),
     });
-    const createBody = await createResponse.json();
+    const createBody = await createResponse.json().catch(() => ({}));
     if (!createResponse.ok) {
       const detail = (createBody.details || []).map((d) => `${d.field} ${d.issue}`).join("; ");
       console.error(`Tao webhook that bai (${createResponse.status}): ${createBody.message || "unknown"}`);

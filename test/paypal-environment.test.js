@@ -79,6 +79,29 @@ test('config và production-check dùng chung một quy tắc', async () => {
   assert.ok(!/PAYPAL_ENVIRONMENT"\) \|\| "sandbox"/.test(check), 'production-check không được tự đặt mặc định');
 });
 
+// setup-paypal.mjs was the third copy, and the worst-placed one: it is the script
+// that verifies a credential set and registers the webhook. Defaulting to sandbox
+// there meant it authenticated against sandbox and printed "Credential hợp lệ"
+// while the shop was configured for live — so the tool whose whole job is to catch
+// that disagreement was the one making it.
+test('setup-paypal cũng dùng chung quy tắc, không tự mặc định sandbox', async () => {
+  const setup = await read('scripts/setup-paypal.mjs');
+  assert.match(setup, /resolvePaypalEnvironment\(env\("PAYPAL_ENVIRONMENT"\)\)/,
+    'setup-paypal phải hỏi đúng hàm chung');
+  assert.ok(!/PAYPAL_ENVIRONMENT"\)\s*\|\|\s*"sandbox"/.test(setup),
+    'setup-paypal không được tự mặc định sandbox');
+  assert.match(setup, /if \(!resolved\.isSet\)/,
+    'khi chưa quyết được thì phải báo và không tạo webhook ở môi trường nào');
+  // And no fetch in it without a timeout: a stalled endpoint used to hang the script
+  // to the OS TCP timeout with nothing on screen.
+  const fetches = [...setup.matchAll(/fetch\(([\s\S]*?)\n\s*\}\);/g)];
+  assert.ok(fetches.length > 0, 'phải còn fetch trong script');
+  for (const [, body] of fetches) {
+    assert.match(body, /signal:\s*AbortSignal\.timeout\(/,
+      'mọi fetch trong setup-paypal phải có timeout');
+  }
+});
+
 test('môi trường không rõ thì PayPal bị coi là chưa cấu hình, nên không mở lựa chọn đó', async () => {
   // The shop keeps running — bank transfer still works — but the checkout form must
   // not offer a rail that cannot take money. Offering it is the failure; hiding it is

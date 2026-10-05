@@ -48,7 +48,7 @@
   // Set in the dashboard, not here, so a fork does not inherit a URL it should not
   // ping:
   //
-  //   npx wrangler secret put SHOP_URL     -> https://sonvudev.com
+  //   npx wrangler secret put SHOP_URL     -> https://<ten-mien-cua-ban>/api/health
   //
   // Optional, defaults shown. These are the hours the shop is kept awake, in
   // Asia/Ho_Chi_Minh. See the window discussion in worker.js before changing them.

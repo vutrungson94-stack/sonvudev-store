@@ -42,7 +42,7 @@
 import path from 'node:path';
 import { readFile, readdir } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
-import { walkProjectFiles } from './lib/files.mjs';
+import { walkProjectFiles, isExcludedDir } from './lib/files.mjs';
 
 // Như audit-web.mjs: mặc định quét chính repo này, `--root <dir>` để quét
 // một bản sao fixture trong test mà không cần copy cả script sang.
@@ -109,14 +109,28 @@ export async function findCaseProblems(scanRoot = root) {
   // The real names, grouped by lower-cased directory so a lookup can find the
   // exact spelling without walking the tree again per reference.
   const realNames = new Map();
-  for (const dir of ["public", "src", "scripts", "test"]) {
+  // Every directory that can hold a reference. It was four — public, src, scripts,
+  // test — which meant supabase/, cloudflare/ and deploy/ were never indexed and a
+  // case-mismatched path in any of them passed. Those three ship: schema.sql is run
+  // by hand against a live database, wrangler.jsonc is read by a Cloudflare
+  // deployment, and deploy/ is what a VPS install executes. A check that stops at
+  // the edge of src/ does not check the thing that reaches production.
+  //
+  // Recursion goes through isExcludedDir for the same reason walkProjectFiles does.
+  // Its own walk had no exclusion at all, so every run built an index of
+  // node_modules — tens of thousands of directories — before the first assertion,
+  // and the cost of the check grew with the machine rather than with the source.
+  for (const dir of ["public", "src", "scripts", "test", "supabase", "cloudflare", "deploy"]) {
     const stack = [path.join(scanRoot, dir)];
     while (stack.length) {
       const current = stack.pop();
       let entries;
       try { entries = await readdir(current, { withFileTypes: true }); } catch { continue; }
       for (const entry of entries) {
-        if (entry.isDirectory()) { stack.push(path.join(current, entry.name)); continue; }
+        if (entry.isDirectory()) {
+          if (!isExcludedDir(entry.name)) stack.push(path.join(current, entry.name));
+          continue;
+        }
         const key = current.toLowerCase();
         if (!realNames.has(key)) realNames.set(key, new Map());
         realNames.get(key).set(entry.name.toLowerCase(), entry.name);

@@ -20,7 +20,11 @@ let deadlineState = { expiresAt: null, offset: 0, serverTime: null };
 let countdownTimer = null;
 let watchTimer = null;
 
-const T = (key, fallback) => window.I18N.t(key, fallback);
+// I18N.t is (key, fallback, vars). Three slots, always in that order, so a page
+// that fills placeholders passes vars and a page that does not simply omits them.
+// One signature across all four page scripts: a wrapper that took only (key, vars)
+// is what put `{support}` on the PayPal failure screen as a literal brace.
+const T = (key, fallback, vars) => window.I18N.t(key, fallback, vars);
 // esc and money now live in i18n.js, which every page already loads. They were typed out
 // here and again in order.js, and had already drifted: this copy formatted every amount in
 // Vietnamese even for a buyer who had switched the site to English, which showed 249.000
@@ -75,8 +79,11 @@ function geoNote() {
   const d = payOptions;
   if (!d || !d.country) return '';
   const outside = d.country !== 'VN';
+  // Filled through vars rather than by hand. The dictionary's own substitution
+  // pass is the only place placeholders are resolved, so a string that gains a
+  // second {token} later works here without anyone remembering this line.
   const text = outside
-    ? T('geo.outside').replace('{country}', d.country)
+    ? T('geo.outside', undefined, { country: d.country })
     : T('geo.domestic');
   return `<p class="geo-note">${esc(text)}</p>`;
 }
@@ -93,7 +100,7 @@ function geoNote() {
 function expiryNote() {
   const hours = Number(payOptions && payOptions.paymentWindowHours);
   if (!Number.isFinite(hours) || hours <= 0) return '';
-  return `<p class="expiry-note">${esc(T('cart.expiry').replace('{hours}', String(hours)))}</p>`;
+  return `<p class="expiry-note">${esc(T('cart.expiry', undefined, { hours: String(hours) }))}</p>`;
 }
 
 async function loadProducts() {
@@ -134,7 +141,16 @@ let searchTerm = '';
 // keyboard is easier with accents switched on, a Latin one is not, and a customer
 // who cannot type the word they are looking for will not report that the search box
 // is broken.
-const foldDiacritics = (value) => String(value).normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/đ/g, 'd').toLowerCase().trim();
+//
+// Order matters, and it was wrong. The replacement for đ ran before toLowerCase(),
+// and the pattern was lowercase-only — so "Đ" (U+0110) was missed by NFD, missed
+// by the regex, and only became lowercase *after* the substitution it should have
+// taken part in. Vietnamese product names very often start with Đ, so a search for
+// "Đồ gỗ" folded to "đo gỗ" while the catalogue folded to "do go" from a name typed
+// in lowercase: no match, no error, an empty result for a word that was right there.
+// Lowercasing first makes the two sides of the comparison identical regardless of
+// the case either was typed in.
+const foldDiacritics = (value) => String(value).toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/đ/g, 'd').trim();
 
 function matchesSearch(p) {
   if (!searchTerm) return true;
@@ -411,9 +427,21 @@ function showOrder(order, token, payment, meta) {
       document.querySelectorAll('.pay-channel').forEach((s) => s.classList.toggle('is-active', s.dataset.channel === tab.dataset.tab));
     };
   });
+  // navigator.clipboard does not exist outside a secure context, and the optional
+  // chain turned that into a silent no-op: the await resolved, the toast said
+  // "copied", and nothing had been copied. A buyer who then read the code back
+  // from somewhere else, typed it wrong and could not recover their download,
+  // would have no way to know the button lied. So the success is only reported when
+  // something was actually written, and the failure points at the code itself —
+  // which is on screen, in a <code> element, precisely so it can be read by hand.
   document.getElementById('copy-token').onclick = async () => {
-    await navigator.clipboard?.writeText(token);
-    toastMsg(T('order.copied'));
+    try {
+      if (!navigator.clipboard) throw new Error('clipboard unavailable');
+      await navigator.clipboard.writeText(token);
+      toastMsg(T('order.copied'));
+    } catch {
+      toastMsg(T('order.copyFailed'), true);
+    }
   };
   document.getElementById('check-order').onclick = () => checkOrder(order.id, token);
   // Always rendered and only ever disabled, so the buyer can see exactly what

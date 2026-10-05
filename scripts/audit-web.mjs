@@ -12,11 +12,12 @@
 //
 // Exit code is non-zero when anything is wrong, so it can gate a deploy.
 import { readFile, readdir } from "node:fs/promises";
-import { existsSync } from "node:fs";
+import { readFileSync, existsSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import dotenv from "dotenv";
 import { corsDiff, isFixtureHost } from "./lib/cors.mjs";
+import { walkProjectFiles } from "./lib/files.mjs";
 
 const rootFlag = process.argv.indexOf("--root");
 const root = rootFlag > -1
@@ -336,6 +337,23 @@ const thirdParty = new Set(["www.w3.org", "schema.org", "www.sitemaps.org", "loc
 // loopback address and a fixture mailbox, and flagging those would only teach
 // people to ignore the audit.
 const emailBearing = [...htmlFiles, ...scriptFiles].map((n) => path.join("public", n)).concat([path.join("src", "pages.js"), path.join("public", "i18n.js")]);
+// One pattern for "the shop's own host is written out in this text", shared by all
+// three scans below so they cannot disagree about what counts.
+//
+// The lookbehind excludes word characters and a hyphen, and nothing else. It used
+// to exclude `/` as well, on the reasoning that a URL is caught by the scheme scan
+// above — which is true of public/ and false of everything else: that scan reads
+// only the HTML, the page scripts and src/pages.js. So in deploy/, cloudflare/,
+// supabase/ and .github/ a bare `sonvudev.com` was flagged and `https://sonvudev.com`
+// was not, because the character before the host in a URL is a slash. The one form
+// those files are actually written in passed every time, and cloudflare/r2-cors.json
+// is a file made of exactly that form.
+//
+// A subdomain still matches, which is correct: `www.<host>` in a config file is the
+// same hardcode with one more label.
+const hostPattern = (host) => new RegExp(`(?<![\\w-])${host.replace(/\./g, "\\.")}(?![\\w-])`, "gi");
+const domainHits = (source, host) => [...source.matchAll(hostPattern(host))];
+
 const testDir = path.join(root, "test");
 const testFiles = existsSync(testDir) ? (await readdir(testDir)).filter((name) => name.endsWith(".js")) : [];
 for (const name of testFiles) {
@@ -352,7 +370,7 @@ for (const name of testFiles) {
   if (!appHost) continue;
   const relative = path.join("test", name);
   const source = await read(relative);
-  for (const match of source.matchAll(new RegExp(`(?<![/.\\w-])${appHost.replace(/\./g, "\\.")}(?![\\w-])`, "gi"))) {
+  for (const match of domainHits(source, appHost)) {
     const line = source.slice(0, match.index).split("\n").length;
     fail("domain gõ tay", `${relative}:${line}`, `${match[0]} — APP_URL là ${appUrl}. Test phải đọc từ process.env.APP_URL, không ghi cứng domain.`);
   }
@@ -379,7 +397,7 @@ for (const relative of emailBearing) {
   // straight through — and that is exactly the string a legal page shows a buyer
   // deciding whether the terms they are reading are the ones that apply.
   if (appHost) {
-    for (const match of source.matchAll(new RegExp(`(?<![/.\\w-])${appHost.replace(/\./g, "\\.")}(?![\\w-])`, "gi"))) {
+    for (const match of domainHits(source, appHost)) {
       const line = source.slice(0, match.index).split("\n").length;
       fail("domain gõ tay", `${relative}:${line}`, `${match[0]} — APP_URL là ${appUrl}`);
     }
@@ -407,23 +425,59 @@ for (const relative of emailBearing) {
 //     would only teach people to ignore the audit. What must never be written down
 //     is the value APP_URL already holds.
 // ---------------------------------------------------------------------------
+// Recursive, and over every directory that holds shipped configuration.
+//
+// It used to be `readdir` — non-recursive, two directories. So `scripts/lib/*.mjs`
+// was never read: the only module in the repository that several tools import for
+// their shared behaviour, in the one gate whose job is to notice a value written
+// into two places. `cloudflare/` and `supabase/` were not in the list at all, which
+// is why cloudflare/r2-cors.json could carry the production domain and schema.sql
+// could carry a Vietnamese UI default, with every gate green.
+//
+// walkProjectFiles is the shared walker, so the excluded-directory rules cannot
+// drift from the ones lint, build and metrics use. .github is not under it (it is a
+// dot-directory) and has to be walked explicitly, because a domain typed into a
+// workflow's env block reaches production exactly as surely as one in deploy/.
 const infraFiles = [];
-for (const [dir, filter] of [["deploy", () => true], ["scripts", (name) => /\.(mjs|js|sh|ps1)$/.test(name)]]) {
+const INFRA_EXTENSIONS = /\.(mjs|js|sh|ps1|json|jsonc|yaml|yml|sql|example|service)$/;
+for (const dir of ["deploy", "scripts", "cloudflare", "supabase", ".github"]) {
   const full = path.join(root, dir);
   if (!existsSync(full)) continue;
-  for (const name of await readdir(full)) {
-    if (filter(name)) infraFiles.push(path.join(dir, name));
+  if (dir === ".github") {
+    // The one directory the shared walker excludes on purpose, because for most
+    // tools .git and tool caches are noise. Here they are the subject.
+    for (const name of await readdir(full, { recursive: true, withFileTypes: true })) {
+      if (!name.isFile() || !INFRA_EXTENSIONS.test(name.name)) continue;
+      infraFiles.push(path.join(".github", name.parentPath.slice(full.length + 1) || "", name.name).replaceAll("\\", "/"));
+    }
+    continue;
+  }
+  for (const absolute of await walkProjectFiles(full)) {
+    const relative = path.relative(root, absolute).replaceAll("\\", "/");
+    if (INFRA_EXTENSIONS.test(relative) || path.basename(relative) === "Caddyfile") infraFiles.push(relative);
   }
 }
+// Files whose entire purpose is to carry the address, so the scan must skip them —
+// and each exemption says who holds them to account instead. A blanket skip would
+// be the same hole as before; a named one is a decision.
+const DOMAIN_EXEMPT = new Map([
+  // Written by `npm run r2:cors:write` from APP_URL, and held to it by the R2 CORS
+  // check below — which fails the build when this file and APP_URL disagree. So the
+  // address is correct here by construction, and the gate for it already exists.
+  ["cloudflare/r2-cors.json", "sinh ra từ APP_URL, kiểm bằng nhóm kiểm tra R2 CORS"],
+  // This file, and the Caddyfile it also skips: both exist to name the mistake.
+  ["scripts/audit-web.mjs", "chính file chứa lỗi cần tìm"],
+  ["deploy/Caddyfile", "biến {$SITE_DOMAIN} do deploy/sonvudev-store.env.example cung cấp"],
+]);
+
 for (const relative of infraFiles) {
-  // This file exists to name the mistake, so it necessarily quotes the address
-  // that mistake takes. Same reasoning as skipping audit.test.js above. Compared
-  // on the file name: path.join uses a backslash on Windows, and "audit-web.mjs"
-  // never equals "scripts\audit-web.mjs".
+  if (DOMAIN_EXEMPT.has(relative)) continue;
+  // Skipped by name rather than by shape, because a shape recogniser eventually
+  // matches a real hardcode written the same way.
   if (path.basename(relative) === "audit-web.mjs") continue;
   const source = await read(relative);
   if (!appHost) continue;
-  for (const match of source.matchAll(new RegExp(`(?<![/.\\w-])${appHost.replace(/\./g, "\\.")}(?![\\w-])`, "gi"))) {
+  for (const match of domainHits(source, appHost)) {
     const line = source.slice(0, match.index).split("\n").length;
     fail("domain gõ tay", `${relative}:${line}`, `${match[0]} — APP_URL là ${appUrl}. Dùng biến môi trường thay vì ghi tên miền.`);
   }
@@ -558,6 +612,37 @@ for (const name of htmlFiles) {
   // control over it. It was dead code written to catch that.
   if (hasDictionary && !hasToggle) {
     fail("thừa nhiệu", `public/${name}`, `nạp từ điển mà không có nút đổi ngôn ngữ — trang dịch theo sở thích đã lưu mà không có cách đổi`);
+  }
+}
+
+// ---------------------------------------------------------------------------
+// 4g-bis. A CSS variable that is read and never declared.
+//
+// The silent one. `font-family: var(--display)` with no --display in :root is not
+// a parse error and not a rendering error: the declaration is dropped, the property
+// falls back to its initial value, and the page still draws. public/styles.css had
+// three rules doing this — the review heading's typeface and the review form's and
+// the review list's backgrounds — so the review block was rendering in the body
+// font on transparent, indistinguishable from an intentional choice.
+//
+// Nothing about "the page renders" is evidence that the CSS did what it said.
+// Every var() is compared against the :root block, which is the only place a
+// custom property can come from here.
+// ---------------------------------------------------------------------------
+{
+  const css = await read(path.join("public", "styles.css"));
+  const rootBlock = css.slice(0, css.search(/:root\s*\{/) === -1 ? css.length : css.indexOf("}") + 1);
+  const declared = new Set([...rootBlock.matchAll(/(--[a-z0-9-]+)\s*:/gi)].map((m) => m[1]));
+  const used = new Map();
+  for (const match of css.matchAll(/var\(\s*(--[a-z0-9-]+)/gi)) {
+    if (!used.has(match[1])) used.set(match[1], []);
+    const line = css.slice(0, match.index).split("\n").length;
+    if (!used.get(match[1]).includes(line)) used.get(match[1]).push(line);
+  }
+  for (const [name, lines] of used) {
+    if (declared.has(name)) continue;
+    fail("biến CSS chưa khai báo", "public/styles.css",
+      `var(${name}) ở dòng ${lines.join(", ")} nhưng :root không khai báo — khai báo bị bỏ qua, thuộc tính rơi về giá trị mặc định`);
   }
 }
 
@@ -817,12 +902,17 @@ for (const relative of customerFacing) {
 //
 // Strings and test titles are not ambiguous: if three or more accented words appear
 // bare together, they are a sentence in this language.
+// Recursive for the same reason as the scan above: `readdir` skipped
+// `scripts/lib/` and `test/helpers/`, which is where shared code lives. A misspell
+// in a shared helper reaches every tool that imports it, and a check that only
+// reads the top level of two directories would never have seen it.
 const operatorFacing = [];
 for (const dir of ["scripts", "test", "deploy"]) {
   const full = path.join(root, dir);
   if (!existsSync(full)) continue;
-  for (const name of await readdir(full)) {
-    if (/\.(mjs|js|sh|service|example)$/.test(name) || name === "Caddyfile") operatorFacing.push(path.join(dir, name));
+  for (const absolute of await walkProjectFiles(full)) {
+    const relative = path.relative(root, absolute).replaceAll("\\", "/");
+    if (/\.(mjs|js|sh|service|example)$/.test(relative) || path.basename(relative) === "Caddyfile") operatorFacing.push(relative);
   }
 }
 if (existsSync(path.join(root, ".env.example"))) operatorFacing.push(".env.example");
@@ -1074,13 +1164,31 @@ const REGISTERED = new Set(findings.map((item) => item.check));
 const DECLARED = [
   "link gãy", "route trùng", "thiếu bản dịch", "khoá i18n mồ côi", "khoá i18n chưa định nghĩa",
   "khoá i18n trùng", "nút đổi ngữ không có từ điển", "thừa nhiệu",
-  "domain gõ tay", "email gõ tay", "R2 CORS lệch", "R2 CORS thừa origin",
-  "ngôn ngữ thiếu", "thương hiệu khai báo hai lần", "thừa ngôn ngữ", "placeholder lạ",
+  "domain gõ tay", "email gõ tay", "R2 CORS lệch", "R2 CORS thừa origin", "biến CSS chưa khai báo",
+  "thương hiệu khai báo hai lần", "placeholder lạ",
   "schema chặn", "tiếng Việt không dấu", "tiếng Việt ở phía máy chủ", "token chưa nối",
   "trang chưa render", "hreflang chết", "thương hiệu gõ cứng", "trang mồ côi",
   "trùng tên toàn cục", "chữ rỗng", "thiếu font thương hiệu",
   "lỗi tiếng Việt cho trình duyệt", "ngôn ngữ khai báo sai",
 ];
+// The reverse direction, which is the one that actually rots.
+//
+// A label with no call site is a check that was deleted from the code and left in
+// the list. It counts towards the total this script reports, so `[audit] 29 nhom
+// kiem tra` was claiming two families of checking that no longer exist — and a
+// number that overstates coverage is worse than no number, because it is what a
+// reader trusts. Two were here: "ngôn ngữ thiếu" and "thừa ngôn ngữ", both left
+// behind when the language comparison was rewritten.
+//
+// Read from the source rather than from REGISTERED, because REGISTERED is built
+// from `findings` and a clean run produces none — checking it against that would
+// report every label as unused on every green run, which is a check nobody keeps.
+const callSiteLabels = new Set([...readFileSync(new URL(import.meta.url), "utf8").matchAll(/fail\(\s*"([^"]+)"/g)].map((m) => m[1]));
+const unusedLabels = DECLARED.filter((label) => !callSiteLabels.has(label));
+if (unusedLabels.length) {
+  console.error(`[audit] Nhom kiem tra khai bao nhung khong co call site nao: ${unusedLabels.join(", ")}`);
+  process.exitCode = 1;
+}
 const unknown = [...REGISTERED].filter((label) => !DECLARED.includes(label));
 if (unknown.length) {
   console.error(`[audit] Nhom kiem tra chua khai bao trong danh sach cuoi file: ${unknown.join(", ")}`);

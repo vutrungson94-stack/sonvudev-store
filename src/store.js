@@ -290,10 +290,22 @@ export async function latestOrder() {
  * A full row carries the access-token hash, the per-order notification log and
  * the line items. The report needs none of them, and skipping them turns a
  * multi-megabyte response into a few kilobytes once the shop has history.
+ *
+ * paid_provider_currency is in this list and was not. The report buckets gross and
+ * net by `order.paidProviderCurrency` — the currency PayPal actually captured in,
+ * which is USD for every foreign order — so on Postgres the column came back absent,
+ * `fromOrder` aliased it to null, and the condition guarding the provider bucket was
+ * never true. Every PayPal sale was then booked at its VND shelf price under
+ * `gross.VND`: the report silently overstated revenue in dong and reported no
+ * dollar total at all, on the one panel the owner reconciles against a PayPal
+ * statement. The local JSON backend returned whole rows and so never showed it, and
+ * every test in the suite runs against local JSON. A projection is a contract with
+ * the reader: a column omitted is a field that reads as null, which is how a
+ * missing value becomes a wrong answer rather than a visible failure.
  */
 export async function listOrdersForRevenue() {
   if (local) return (await readJson(files.orders, [])).map(({ accessTokenHash, idempotencyKey, notifications, ...rest }) => rest);
-  const columns = "id,status,amount,currency,items,delivered_at,created_at,expires_at,paid_count,refunded_count,paid_amount,refunded_amount,paid_provider_amount,refunded_provider_amount";
+  const columns = "id,status,amount,currency,items,delivered_at,created_at,expires_at,paid_count,refunded_count,paid_amount,refunded_amount,paid_provider_amount,paid_provider_currency,refunded_provider_amount";
   return (await supabase(`orders?select=${columns}`)).map(fromOrder);
 }
 

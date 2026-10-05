@@ -1,6 +1,10 @@
 [Unit]
 Description=SonVuDev Store Node.js application
-After=network-online.target
+# caddy is named so the application does not start before the proxy that terminates
+# TLS in front of it, nor restart ahead of it. After, not Requires: whether anything
+# sits in front of the shop is the host's decision, and a unit that hard-fails
+# because caddy is absent would take down a shop serving perfectly well without it.
+After=network-online.target caddy.service
 Wants=network-online.target
 
 [Service]

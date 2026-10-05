@@ -22,17 +22,79 @@ if (!projectRef || !/^[a-z0-9-]+$/i.test(projectRef)) {
 
 /**
  * Splits a .sql file into statements. Supabase's query endpoint rejects multiple
- * statements in one call, so each has to go on its own. Dollar-quoted bodies are
- * kept whole; this schema has none, but a future function would break on a naive
- * split and fail in a way that is tedious to read.
+ * statements in one call, so each has to go on its own.
+ *
+ * Dollar-quoted bodies are kept whole. `$$ … $$` is Postgres's own quoting for a
+ * function body, and it contains semicolons and apostrophes that both of the simple
+ * rules below get wrong: a naive semicolon split cuts a function in half and the
+ * second half fails with a syntax error pointing at the wrong line, and toggling
+ * `quoted` on every apostrophe loses track inside a body full of them. A function is
+ * one statement no matter what it contains.
+ *
+ * Single quotes are handled with the doubled-escape rule ('' is one literal quote,
+ * not the end of one), which is the difference between a schema with `'draft'`
+ * working and one with `'O''Brien'` silently running to the next apostrophe.
  */
 function statements(sql) {
   const out = [];
   let buffer = "";
   let quoted = false;
+  let dollarTag = null;
+  let lineComment = false;
+  let blockComment = false;
   for (let i = 0; i < sql.length; i += 1) {
     const char = sql[i];
-    if (char === "'") quoted = !quoted;
+    const next = sql[i + 1];
+    // Comments are read, not interpreted.
+    //
+    // One apostrophe in a comment is enough to desynchronise the whole file. The
+    // splitter counts quotes to find the end of a literal, and an odd number of them
+    // in prose — "the provider's currency" — leaves it believing a string is still
+    // open, so every semicolon after that point stops being a statement boundary.
+    // supabase/schema.sql:109 has exactly that, and it made the last statement 5311
+    // characters long: one request carrying twenty DDL statements, which PostgREST
+    // rejects, so the migration failed at the very end with the first twenty applied
+    // and no transaction to roll it back. The comment it choked on is a sentence
+    // explaining a column.
+    if (lineComment) {
+      if (char === "\n") { lineComment = false; buffer += char; }
+      else buffer += char;
+      continue;
+    }
+    if (blockComment) {
+      if (char === "*" && next === "/") { blockComment = false; buffer += "*/"; i += 1; continue; }
+      buffer += char;
+      continue;
+    }
+    if (!quoted && !dollarTag && char === "-" && next === "-") { lineComment = true; buffer += "--"; i += 1; continue; }
+    if (!quoted && !dollarTag && char === "/" && next === "*") { blockComment = true; buffer += "/*"; i += 1; continue; }
+    if (dollarTag) {
+      // Inside $$ … $$. Only the closing tag ends it.
+      if (char === "$" && sql.startsWith(dollarTag, i)) {
+        buffer += dollarTag;
+        i += dollarTag.length - 1;
+        dollarTag = null;
+        continue;
+      }
+      buffer += char;
+      continue;
+    }
+    if (!quoted && char === "$" && /^\$[A-Za-z_]*\$/.test(sql.slice(i))) {
+      const match = /^\$[A-Za-z_]*\$/.exec(sql.slice(i))[0];
+      dollarTag = match;
+      buffer += match;
+      i += match.length - 1;
+      continue;
+    }
+    if (char === "'") {
+      // '' inside a literal is an escaped quote, not a close followed by an open.
+      if (quoted && sql[i + 1] === "'") {
+        buffer += "''";
+        i += 1;
+        continue;
+      }
+      quoted = !quoted;
+    }
     if (char === ";" && !quoted) {
       const statement = buffer.trim();
       // A comment-only chunk is not a statement, and sending one is an error.
@@ -72,7 +134,15 @@ products: ["id", "slug", "name", "short_description", "description", "category",
 const REQUIRED_INDEXES = {
   orders: {
     unique: ["orders_idempotency_key_uniq"],
-    plain: ["orders_customer_email_idx", "orders_provider_order_id_idx", "orders_open_idx", "orders_created_at_idx", "orders_delivered_idx"],
+    // orders_idempotency_key_idx was missing from this list, and schema.sql creates
+    // it — which is the point. The check answers "does the live database have the
+    // indexes the schema declares", so an index absent from this list is an index
+    // whose absence nobody would notice: the sweep that cancels expired orders and
+    // the lookup that resolves a repeated checkout both read idempotency_key, and a
+    // database without it answers both with a sequential scan. `npm run db:check`
+    // printed PASS for a database that would have told a buyer their checkout had
+    // not been received.
+    plain: ["orders_customer_email_idx", "orders_provider_order_id_idx", "orders_open_idx", "orders_created_at_idx", "orders_delivered_idx", "orders_idempotency_key_idx"],
   },
   products: { unique: [], plain: ["products_status_idx", "products_active_idx"] },
 };

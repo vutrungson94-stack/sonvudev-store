@@ -98,11 +98,22 @@ const rows = [
   ['productPageLocales', countCopies(appSource, /productPage\("(?:vi|en)"\)/g), 'up', 'ngôn ngữ trang sản phẩm'],
   // How many pages carry the dictionary.
   //
-  // Five do not: the four legal pages and the 404 are Vietnamese-only, with no
-  // language switch and no English route behind one. That is a real gap and it was
-  // invisible — nothing counted it, so closing it was neither possible to notice nor
-  // possible to hold. The direction is "up", so a page that loses its dictionary is
-  // a regression the same way a deleted test is.
+  // Five do not: about.html and the three legal pages are Vietnamese-only with no
+  // language switch, and admin.html is Vietnamese on purpose — it is the owner's
+  // console, not a shopfront, and it deliberately does not load the dictionary (see
+  // the note at the top of public/i18n.js).
+  //
+  // The comment used to name the 404 as one of the five. The 404 has carried
+  // <script src="i18n.js"> and a working language toggle for some time, and
+  // public/related.js still claimed in a comment that it could not read the shared
+  // dictionary because the 404 has no switch — both facts false, and both about the
+  // page that is the last thing a visitor sees. The count of 5 was right; the page
+  // list was not, which is the worse half — a list someone reads to decide what to
+  // work on next.
+  //
+  // This is a real gap and it was invisible — nothing counted it, so closing it was
+  // neither possible to notice nor possible to hold. The direction is "up", so a page
+  // that loses its dictionary is a regression the same way a deleted test is.
   //
   // What this number is not: a claim that the shop is translated. It says how much of
   // it is. Reaching the remaining pages means translating their prose, which is
@@ -118,13 +129,29 @@ const rows = [
 const measurements = Object.fromEntries(rows.map(([key, value, direction]) => [key, { value, direction }]));
 const label = Object.fromEntries(rows.map(([key, , , note]) => [key, note]));
 
-if (update || !(await exists(baselineFile))) {
+// No baseline is a failure, not a free pass.
+//
+// This used to write one and exit 0 — so the very first build on any machine created
+// the baseline and reported "no metric moved backwards", having compared nothing. A
+// check that cannot fail on its first run is a check that has not run yet, and the
+// report it produced was the most reassuring line in the build: eleven numbers, all
+// green, no comparison. A metric gate earns its place by being able to say no.
+//
+// `npm run metrics:update` is the deliberate act of recording a new starting point,
+// and the build has no way to perform it.
+if (update) {
   await writeFile(baselineFile, `${JSON.stringify({ generatedAt: new Date().toISOString(), measurements }, null, 2)}\n`);
-  console.log(update ? '[metrics] baseline updated' : '[metrics] chua co baseline, da ghi mot ban');
+  console.log('[metrics] baseline updated');
   for (const [key, entry] of Object.entries(measurements)) {
     console.log(`  ${key.padEnd(19)} ${String(entry.value).padStart(4)}   ${label[key]}`);
   }
   process.exit(0);
+}
+if (!(await exists(baselineFile))) {
+  console.error(`[metrics] FAIL — khong co ${path.relative(root, baselineFile)} de so sanh.`);
+  console.error('Không có gì để so sánh thì một dòng "PASS" không có nghĩa gì.');
+  console.error('Ghi baseline mot lan co chu dich: npm run metrics:update');
+  process.exit(1);
 }
 
 const baseline = JSON.parse(await readFile(baselineFile, 'utf8'));

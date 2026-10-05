@@ -150,6 +150,31 @@ test('tìm không dấu vẫn ra kết quả có dấu', async () => {
   assert.deepEqual(shown(nodes), ['p1'], 'không phân biệt hoa thường');
 });
 
+// "Đ" is not a decomposed letter and cannot be reached by stripping the combining
+// marks, so it needs its own substitution — and that substitution has to run after
+// the lowercasing, or it misses the capital entirely. It did run before, so a
+// search for "Đồ gỗ" folded to "đo gỗ" while the catalogue folded to "do go": no
+// match, no error, an empty grid for a product sitting right there. Names starting
+// with Đ are ordinary in Vietnamese, which is what made this reachable.
+test('tìm được cả chữ Đ hoa, ở cả hai phía', async () => {
+  const capitalised = [{ ...products[0], name: 'Đồ Gỗ Kiểm Tra Dung Lượng' }];
+  const { document, nodes } = createDom(['product-grid', 'product-count', 'product-search', 'product-modal', 'modal-content', 'toast', 'lang-toggle', 'announce', 'why', 'faq']);
+  filterRow(nodes);
+  const fetch = async (url) => (String(url).includes('/api/products')
+    ? { ok: true, json: async () => ({ products: capitalised }) }
+    : { ok: true, json: async () => ({ country: 'VN', options: [] }) });
+  const ctx = { document, window: { I18N: undefined }, fetch, localStorage: { _v: {}, getItem() { return null; }, setItem() {}, removeItem() {} } };
+  const i18n = await runScript(read('i18n.js'), ctx);
+  await runScript(`${read('order-client.js')}\n${read('app.js')}`, { ...ctx, window: { ...ctx.window, I18N: i18n.window.I18N } });
+
+  type(nodes.get('product-search'), 'đồ gỗ');
+  assert.deepEqual(shown(nodes), ['p1'], 'gõ "Đồ gỗ" phải ra "Đồ Gỗ"');
+  type(nodes.get('product-search'), 'ĐỒ GỖ');
+  assert.deepEqual(shown(nodes), ['p1'], 'hoa thường không được làm mất kết quả');
+  type(nodes.get('product-search'), 'do go');
+  assert.deepEqual(shown(nodes), ['p1'], 'không dấu vẫn phải ra');
+});
+
 test('đang đọc tiếng Anh thì tìm trên bản tiếng Anh', async () => {
   // A reader who was handed the English name searches for the English name. Searching
   // only the Vietnamese copy finds nothing for exactly the visitor most likely to be

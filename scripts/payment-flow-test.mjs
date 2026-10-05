@@ -62,20 +62,49 @@ const { getOrder } = await load("store.js");
 const { markOrderDelivered, markOrderPaid, voidPayment } = await load("orders.js");
 const { outboxPath } = await load("notify.js");
 
-const app = await createApp();
-const server = app.listen(0);
-const base = live ? target.replace(/\/$/, "") : `http://127.0.0.1:${server.address().port}`;
+// The boot is inside a try like the rest.
+//
+// Loading the modules, building the app and opening the socket all sat *above* the
+// try block, so a failure in any of them — a port already in use, a config file that
+// will not parse, a missing dependency — rejected out of the module as a raw stack
+// trace with none of the step reporting this script is built on. Every failure the
+// script does handle produces a line like `FAIL <step> — <reason>`; this produced
+// none.
+let app = null;
+let server = null;
+let base = target.replace(/\/$/, "");
 const token = live ? adminToken : "flow-test-admin-token";
 const stamp = Date.now();
 const admin = (extra = {}) => ({ "content-type": "application/json", "x-admin-token": token, ...extra });
 const email = `flow-${stamp}@example.com`;
 
+// Every request gets the same deadline.
+//
+// None of them had one. Against a live host eight requests with no `signal` means
+// the script hangs until the operating system gives up on the TCP connection — which
+// on Windows is a couple of minutes per socket, with no output, so a deploy host
+// that stopped responding produced a silent terminal rather than a failed check.
+// Generous, because the sleep after a payment is real: a waking instance can take a
+// minute to answer. Bounded, because a check that can hang forever is not a check.
+const REQUEST_TIMEOUT_MS = 90_000;
+const call = (url, options = {}) =>
+  fetch(url, { ...options, signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS) });
+
 try {
   if (!live && !adminToken) console.log("Chạy bỏ qua máy chủ, không dùng tiền thật.\n");
 
+  // Boot, inside the try, so its failures are reported like every other one.
+  const { createApp } = await load("app.js");
+  const { getOrder } = await load("store.js");
+  const { markOrderDelivered, markOrderPaid, voidPayment } = await load("orders.js");
+  const { outboxPath } = await load("notify.js");
+  app = await createApp();
+  server = app.listen(0);
+  if (!live) base = `http://127.0.0.1:${server.address().port}`;
+
   // 1. A product that a buyer can actually see and buy.
   const slug = `flow-test-${stamp}`;
-  const created = await fetch(`${base}/api/admin/products`, {
+  const created = await call(`${base}/api/admin/products`, {
     method: "POST",
     headers: admin(),
     body: JSON.stringify({ name: "Flow Test Tool", slug, price: 49000, version: "1.0", platform: "Windows", fileKey: `products/${slug}/1.0/x.exe`, status: "active", description: "Cong cu kiem tra luong don hanh va vong doi thu muc tin cay." }),
@@ -85,11 +114,11 @@ try {
 
   // 2. The storefront actually lists it. Without R2 connected the storefront hides
   //    every product, so this is where a missing bucket shows up.
-  const catalogue = await (await fetch(`${base}/api/products`)).json();
+  const catalogue = await (await call(`${base}/api/products`)).json();
   step("sản phẩm xuất hiện trên cửa hàng", (catalogue.products || []).some((p) => p.id === product.id));
 
   // 3. Checkout, and the order it created.
-  const checkout = await fetch(`${base}/api/checkout`, {
+  const checkout = await call(`${base}/api/checkout`, {
     method: "POST",
     headers: { "content-type": "application/json" },
     body: JSON.stringify({ productId: product.id, email, customerName: "Flow Tester", paymentMethod: "bank_transfer" }),
@@ -103,7 +132,7 @@ try {
   //    The checkout response carries the deadline; the options endpoint carries the
   //    hours the storefront prints. They are built from different places, which is
   //    why this compares them rather than trusting either.
-  const options = await (await fetch(`${base}/api/checkout/options`)).json();
+  const options = await (await call(`${base}/api/checkout/options`)).json();
   const window = Number(options.paymentWindowHours);
   const deadline = new Date(placed.expiresAt).getTime() - new Date(placed.order.createdAt).getTime();
   step("cửa sổ thanh toán đúng số giờ cấu hình",
@@ -112,7 +141,7 @@ try {
   step("đơn có hạn chót và đồng hồ máy chủ", Boolean(placed.expiresAt && placed.serverTime), `hạn ${new Date(placed.expiresAt).toISOString()}`);
 
   // 5. An unpaid order cannot download.
-  const early = await fetch(`${base}/api/orders/${orderId}/download?token=${accessToken}`, { headers: { "x-order-token": accessToken } });
+  const early = await call(`${base}/api/orders/${orderId}/download?token=${accessToken}`, { headers: { "x-order-token": accessToken } });
   step("đơn chưa thanh toán không tải được", early.status !== 200, `HTTP ${early.status}`);
 
   // 6. The mail. Written to the outbox rather than sent, so the whole step is free
@@ -130,8 +159,8 @@ try {
 
   // 7. A wrong token is refused, with the same wording as a missing order, so the
   //    endpoint cannot be used to discover which ids exist.
-  const wrong = await fetch(`${base}/api/orders/${orderId}/download?token=sai`, { headers: { "x-order-token": "sai" } });
-  const missing = await fetch(`${base}/api/orders/SVD-KHONG-CO-XXXX/download?token=sai`, { headers: { "x-order-token": "sai" } });
+  const wrong = await call(`${base}/api/orders/${orderId}/download?token=sai`, { headers: { "x-order-token": "sai" } });
+  const missing = await call(`${base}/api/orders/SVD-KHONG-CO-XXXX/download?token=sai`, { headers: { "x-order-token": "sai" } });
   step("token sai bị từ chối", wrong.status === 404, `HTTP ${wrong.status}`);
   step("không lộ không tồn tại qua lỗi", wrong.status === missing.status, `${wrong.status} vs ${missing.status}`);
 
@@ -146,7 +175,7 @@ try {
   step("đơn đã giao vẫn hoàn tiền được", refunded?.status === "refunded", `status=${refunded?.status}`);
 
   // 10. The review gate. Prose only, and only from a fulfilled, unrefunded order.
-  const review = await fetch(`${base}/api/reviews`, {
+  const review = await call(`${base}/api/reviews`, {
     method: "POST",
     headers: { "content-type": "application/json" },
     body: JSON.stringify({ orderId, accessToken, productId: product.id, body: "Dung de kiem tra luong don, chay tot va cac buoc sau hon." }),
@@ -155,8 +184,11 @@ try {
 } catch (error) {
   step("chạy xong không lỗi", false, error.message);
 } finally {
-  server.close();
-  if (!live) await fs.rm(process.env.DATA_DIR, { recursive: true, force: true }).catch(() => {});
+  // Awaited. close() is asynchronous: without this the summary below could be printed
+  // and then truncated by the process exiting, which turns a failure report into a
+  // partial one. Null when the boot failed before a socket existed.
+  if (server) await new Promise((resolve) => server.close(resolve));
+  if (!live && process.env.DATA_DIR) await fs.rm(process.env.DATA_DIR, { recursive: true, force: true }).catch(() => {});
 }
 
 const failed = steps.filter((s) => !s.ok);

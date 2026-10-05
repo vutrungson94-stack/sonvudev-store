@@ -393,7 +393,7 @@ const productPage = (lang) => async (req, res) => {
     // the literal {{brandWordmark}} and {{year}} while every other 404 was
     // substituted — a leak no file-based check could see, because the file on
     // disk is meant to carry those tokens.
-    if (!product || product.status !== "active" || !product.fileKey || !isConfigured.r2) {
+    if (!isSellable(product)) {
       return notFound(req, res);
     }
     const reviews = await listReviewsForProduct(product.id);
@@ -420,7 +420,13 @@ app.get("/og/:slug.svg", async (req, res) => {
     return res.set("Cache-Control", "public, max-age=3600").type("image/svg+xml").send(renderOgImage({ name: "Phần mềm Windows cho công việc", platform: "Windows", version: "1.0", price: 0, currency: "VND" }));
   }
   const product = await getProductBySlug(req.params.slug);
-  if (!product || product.status !== "active" || !product.fileKey || !isConfigured.r2) return res.status(404).type("text/plain").send("Not found");
+  // isSellable rather than a second copy of its rule. The rule — active, has a
+  // file, storage configured — was written out inline here and once more in
+  // renderProductPage's caller, and a third time with a different order of the
+  // same three conditions further down. Three spellings of one rule means a change
+  // to it has to find all three, and the one nobody found is a product page that
+  // renders for something with no file behind it.
+  if (!isSellable(product)) return res.status(404).type("text/plain").send("Not found");
   res.set("Cache-Control", "public, max-age=3600");
   res.type("image/svg+xml").send(renderOgImage(product));
 });

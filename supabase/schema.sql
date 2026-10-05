@@ -48,8 +48,34 @@ create index if not exists products_status_idx on public.products(status);
 -- 'refunded' means the money went back to the buyer. It is kept separate from
 -- 'cancelled' because cancelling an unpaid order and giving back a paid one are
 -- different events, and the revenue report has to tell them apart.
-alter table public.orders drop constraint if exists orders_status_check;
-alter table public.orders add constraint orders_status_check check (status in ('pending', 'pending_transfer', 'paid', 'payment_failed', 'cancelled', 'refunded'));
+-- Added only when the definition actually differs.
+--
+-- It used to be a bare `drop` then `add`, which is correct once and expensive
+-- forever after: adding a check constraint re-validates every existing row, so a
+-- second run of an unchanged schema re-read the entire order table to confirm
+-- something it had confirmed last time. And PostgREST runs these statements one at a
+-- time with no transaction around them — src/../scripts/db-migrate.mjs posts them
+-- individually — so a re-validation that failed on one historical row would abort
+-- after everything above it had already been applied, leaving a half-migrated
+-- database with no record of where it stopped.
+--
+-- Reading the current definition first means an unchanged schema costs one catalog
+-- lookup, and a genuinely changed one still replaces the constraint.
+do $$
+declare
+  current_definition text;
+begin
+  select pg_get_constraintdef(oid) into current_definition
+    from pg_constraint
+   where conrelid = 'public.orders'::regclass and conname = 'orders_status_check';
+
+  if current_definition is distinct from
+     'CHECK ((status = ANY (ARRAY[''pending''::text, ''pending_transfer''::text, ''paid''::text, ''payment_failed''::text, ''cancelled''::text, ''refunded''::text])))' then
+    alter table public.orders drop constraint if exists orders_status_check;
+    alter table public.orders add constraint orders_status_check check (status in ('pending', 'pending_transfer', 'paid', 'payment_failed', 'cancelled', 'refunded'));
+  end if;
+end
+$$;
 
 -- English copy for the storefront language switch. Kept optional: a product with
 -- no *_en value simply falls back to the Vietnamese text, so existing rows and
@@ -132,7 +158,6 @@ alter table public.orders add column if not exists notifications jsonb not null 
 -- buyer who had the same problem, so the sentence is the record.
 alter table public.orders add column if not exists reviews jsonb not null default '[]'::jsonb;
 
-create index if not exists orders_idempotency_key_idx on public.orders(idempotency_key);
 -- The sweep only ever asks for rows it could act on.
 create index if not exists orders_open_idx on public.orders(status, expires_at);
 -- Reviews are read by the product page, which asks for orders whose file was

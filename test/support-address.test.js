@@ -192,17 +192,23 @@ test('trang 404 nói được cả hai ngôn ngữ', async () => {
   // The static text is Vietnamese, which is the correct fallback for a reader whose
   // browser says nothing — but it is a fallback, and the dictionary has to hold the
   // other side or the button would show the same words twice.
-  const i18n = await publicFile('i18n.js');
+  const publicI18n = await publicFile('i18n.js');
   for (const key of ['notfound.eyebrow', 'notfound.title', 'notfound.text', 'notfound.loading']) {
-    assert.ok(new RegExp(`'${key.replace(/\./g, '\\.')}':`).test(i18n), `từ điển thiếu ${key}`);
+    assert.ok(new RegExp(`'${key.replace(/\./g, '\\.')}':`).test(publicI18n), `từ điển thiếu ${key}`);
   }
-  // related.js is the only piece of the page not covered by the dictionary: it is a
-  // standalone loader for pages that may not include i18n.js. It now reads the
-  // document's language, which is why the empty message is no longer always
-  // Vietnamese.
+  // related.js, the one piece of the page that is a standalone loader rather than a
+  // data-i18n node. It used to carry a private {vi, en} table for one sentence, on the
+  // stated reasoning that this page has no dictionary — which was false, and is the
+  // reason the 404 was named as "the page with no switch" in that very comment while
+  // it sat three lines above a working toggle. The sentence now comes from the shared
+  // dictionary, so adding a locale reaches it.
   const related = await publicFile('related.js');
-  assert.ok(!/empty\.vi/.test(related.replace(/empty\.vi:/, 'empty.$1:')), 'related.js không được in thẳng empty.vi');
-  assert.match(related, /empty\[lang\]/, 'related.js phải chọn theo ngôn ngữ của trang');
+  assert.match(related, /dictionary\.t\(EMPTY\)/, 'related.js phải đọc câu từ từ điển chung');
+  assert.match(related, /window\.I18N/, 'related.js phải dùng từ điển khi trang có nó');
+  assert.ok(!/^\s*vi:\s*'/m.test(related.replace(/emptyFallback[\s\S]*?\};/, '')),
+    'related.js không được mang bảng hai ngôn ngữ riêng cho câu này');
+  assert.ok(publicI18n.includes("'products.onlyOne'"),
+    'từ điển phải có products.onlyOne — đó là nơi câu duy nhất này sống bây giờ');
 });
 
 test('danh sách sản phẩm trong trang 404 cũng theo ngôn ngữ của trang', async () => {

@@ -57,10 +57,16 @@ name: shop is awake
 
 on:
   schedule:
-    # Once a day, at 5am. The Cloudflare Worker does the waking; this is the net
-    # under it and the alarm when it stops. Every thirty minutes spent 1,440 of the
-    # 2,000 free minutes on a private repository duplicating a worker Cloudflare
-    # runs for free — see the note above for why that cadence never worked anyway.
+    # Once a day. GitHub cron is UTC and this is 05:00 UTC — 12:00 in the shop's own
+    # timezone (ICT, UTC+7, which is what cloudflare/keep-awake/worker.js reasons
+    # about with its own ICT_OFFSET_HOURS). The two run on different clocks and the
+    # comment used to imply they agreed; they do not, and the daily probe is a
+    # fire alarm rather than a morning checkup, so the hour it lands on does not
+    # matter. If it ever does matter, the fix is to say which timezone is meant here.
+    #
+    # Every thirty minutes spent 1,440 of the 2,000 free minutes on a private
+    # repository duplicating a worker Cloudflare runs for free — see the note above for
+    # why that cadence never worked anyway.
     - cron: "0 5 * * *"
   workflow_dispatch:
 

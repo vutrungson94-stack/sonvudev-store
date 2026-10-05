@@ -22,9 +22,9 @@
 // variable. No output ever contains a secret — this reads /api/health, which is
 // public by design, and never reads the dashboard's values.
 
-import { readFile } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
+import dotenv from 'dotenv';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 
@@ -138,7 +138,11 @@ const EXPECTED = [
     // Canonical link, hreflang, sitemap, robots.txt và URL quay lại sau PayPal
     // đều lấy từ đây. Sai giao thức thì Google bị bảo trang sống ở một nơi
     // và được phục vụ ở nơi khác.
-    fix: 'Đặt APP_URL=https://sonvudev.com (kể cả khi đang test trên onrender.com, cũng để tên miền thật nếu tên miền đã trỏ về).',
+    // The address is not written here. It is read out of the payload the server
+    // itself reports, so the advice names the value the host is actually using
+    // rather than one typed into this sentence — which is what a rename, a new
+    // domain or a second shop would leave behind.
+    fix: (b) => `Đặt APP_URL=${String(b.appUrl || '').replace(/^http:/, 'https:')} (kể cả khi đang test trên onrender.com, cũng để tên miền thật nếu tên miền đã trỏ về).`,
   },
   { id: 'momo', want: false, read: (b) => b.momo === true, label: 'MoMo (tuỳ chọn)', fix: 'Đặt MOMO_ACCOUNT_NUMBER để có. Không có thì cửa hàng vẫn chạy.' },
   { id: 'zalopay', want: false, read: (b) => b.zalopay === true, label: 'ZaloPay (tuỳ chọn)', fix: 'Đặt ZALOPAY_ACCOUNT_NUMBER để có.' },
@@ -161,7 +165,10 @@ export function report(body) {
     }
     if (check.want) {
       failures += 1;
-      lines.push({ state: 'fail', text: `${check.label} — ${check.fix}` });
+      // `fix` may be a function: some advice is only correct for the value this host
+      // actually reports, and printing a literal instead would be a second copy of
+      // the answer to re-word.
+      lines.push({ state: 'fail', text: `${check.label} — ${typeof check.fix === 'function' ? check.fix(body) : check.fix}` });
     } else {
       lines.push({ state: 'skip', text: `${check.label} — chưa cấu hình, không ảnh hưởng gì` });
     }
@@ -178,13 +185,20 @@ export function report(body) {
  * @returns {Promise<string>} a base URL, without a trailing slash
  */
 const defaultBase = async () => {
-  let raw = '';
+  // Read through the shared configuration rather than by regex over the file. The
+  // hand-rolled `^APP_URL=(.*)$` could not see a quoted value, and — worse for a
+  // check — it fell back to http://localhost:3000 when .env was absent, so a
+  // misconfigured developer machine got a green report about a server that was
+  // never running. It is the exact "no fallback" rule audit-web.mjs:292 enforces
+  // on public/: guessing what to audit is worse than declining to.
+  dotenv.config({ path: path.join(root, '.env') });
+  const configured = (process.env.APP_URL || '').trim().replace(/\/$/, '');
+  if (configured) return configured;
   try {
-    raw = await readFile(path.join(root, '.env'), 'utf8');
+    return await import('../src/config.js').then((m) => m.env.appUrl);
   } catch {
-    raw = '';
+    return '';
   }
-  return raw.match(/^APP_URL=(.*)$/m)?.[1]?.trim().replace(/\/$/, '') || 'http://localhost:3000';
 };
 
 /**

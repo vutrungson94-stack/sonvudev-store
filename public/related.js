@@ -32,22 +32,44 @@
   // Prices are not grouped by this language at all: money follows the
   // currency, the rule public/format.js and the server both apply, so a VND
   // price keeps its dot grouping on an English page exactly as it does on the
-  // receipt. This file is loaded on pages that do not include i18n.js (the
-  // 404 has no language switch at all), so it cannot read the shared
-  // dictionary. It reads the <html lang> the server already put there, which
-  // is the same answer the dictionary would give. Escaping and money come from
-  // public/format.js, loaded just before this file: this loader used to carry
-  // its own copies of both, and the money one disagreed with the dictionary
-  // about grouping.
-  var lang = (String((document.documentElement && document.documentElement.lang) || 'vi').toLowerCase().indexOf('en') === 0) ? 'en' : 'vi';
+  // receipt.
+  //
+  // The dictionary is used when the page has it. It used to be reasoned that this
+  // file could not: the comment here claimed the 404 has no language switch and no
+  // i18n.js, and both were false — public/404.html has loaded the dictionary and
+  // shown a working toggle for some time. So this file carried a private
+  // two-language table for one sentence and re-derived the current language by
+  // sniffing <html lang>, which is a second answer to a question
+  // window.I18N.lang already answers, and one that cannot see a locale added
+  // later. Where the dictionary is present it is now asked; the fallback stays for
+  // a page that genuinely has not got it, so the loader still cannot fail.
+  //
+  // Escaping and money come from public/format.js, loaded just before this file:
+  // this loader used to carry its own copies of both, and the money one disagreed
+  // with the dictionary about grouping.
+  var dictionary = window.I18N || null;
+  var lang = dictionary && dictionary.lang
+    ? String(dictionary.lang).toLowerCase().indexOf('en') === 0 ? 'en' : 'vi'
+    : (String((document.documentElement && document.documentElement.lang) || 'vi').toLowerCase().indexOf('en') === 0 ? 'en' : 'vi');
 
   var escapeHtml = function (value) { return window.SVDFormat.esc(value); };
 
   var money = function (value, currency) { return window.SVDFormat.money(value, currency); };
 
-  var empty = {
-    vi: 'Đây là sản phẩm duy nhất hiện tại.',
-    en: 'This is the only product right now.',
+  var EMPTY = 'products.onlyOne';
+  var emptyText = function () {
+    if (dictionary && dictionary.t) {
+      // The shared sentence, resolved in the reader's language rather than chosen
+      // from a table beside the page it appears on.
+      var text = dictionary.t(EMPTY);
+      // An unresolved key comes back with its braces; falling back then keeps the
+      // sentence readable rather than printing the key name at a visitor.
+      return /\{[\w]+\}/.test(text) ? emptyFallback() : text;
+    }
+    return emptyFallback();
+  };
+  var emptyFallback = function () {
+    return lang === 'en' ? 'This is the only product right now.' : 'Đây là sản phẩm duy nhất hiện tại.';
   };
 
   fetch('/api/products')
@@ -55,7 +77,7 @@
     .then(function (data) {
       var others = (data.products || []).filter(function (p) { return p.id !== selfId; });
       if (!others.length) {
-        box.innerHTML = '<p class="related-empty">' + escapeHtml(empty[lang]) + '</p>';
+        box.innerHTML = '<p class="related-empty">' + escapeHtml(emptyText()) + '</p>';
         return;
       }
       box.innerHTML = others.slice(0, 6).map(function (p) {

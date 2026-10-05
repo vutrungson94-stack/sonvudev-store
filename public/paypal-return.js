@@ -2,7 +2,17 @@ const state = window.OrderClient.read();
 const title=document.getElementById('title'),message=document.getElementById('message'),actions=document.getElementById('actions'),loader=document.getElementById('loader'),eyebrow=document.getElementById('eyebrow');
 // PayPal buyers are the overseas half of the shop, so this page follows the same
 // dictionary as the storefront instead of carrying its own fixed copy.
-const T=key=>window.I18N.t(key);
+//
+// The third argument is `vars`, and dropping it is what put "{support}" and "{id}"
+// on this screen as literal braces. I18N.t is (key, fallback, vars); a wrapper of
+// `key => t(key)` puts a caller's object into the *fallback* slot, vars arrives
+// undefined, and the placeholder pass at i18n.js:626 leaves any brace it does not
+// know alone. The sentence rendered as "…or contact {support} with order {id}" —
+// on the one page a buyer reaches after PayPal has already taken their money, where
+// the address and the order id are the only two things that get either the file or
+// the refund. The other three wrappers (app.js, order.js, lookup.js) all forward
+// vars, which is why only this one screen was affected.
+const T=(key,fallback,vars)=>window.I18N.t(key,fallback,vars);
 // Injected into the page from SUPPORT_EMAIL on the server, so the address here
 // cannot drift from the one the emails go to. The dictionary holds the
 // configured default for the case where the page was served without it.
@@ -47,7 +57,7 @@ async function start(){
   // The order id and the support address are the only two things that let a
   // buyer who was actually charged get their money or their file, so they stay
   // in the sentence even though the sentence now comes from the dictionary.
-  message.textContent=T('paypal.errHint',{id:state.id,support:SUPPORT()});
+  message.textContent=T('paypal.errHint',undefined,{id:state.id,support:SUPPORT()});
   actions.innerHTML='';
   const retry=document.createElement('button');retry.className='button button-primary';retry.textContent=T('order.check')+' ↻';retry.onclick=()=>{retry.disabled=true;start()};
   const order=document.createElement('a');order.className='button button-secondary';order.href='/order/'+encodeURIComponent(state.id);order.textContent=T('paypal.myOrders');

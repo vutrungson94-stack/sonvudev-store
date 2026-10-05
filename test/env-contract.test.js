@@ -229,5 +229,12 @@ test('quy tắc origin của R2 được suy ra từ APP_URL, không gõ tay', a
   // .example is reserved by RFC 2606 and cannot be registered, which is what makes it
   // safe to skip on: a real shop cannot live there.
   assert.ok(isFixtureHost('https://ci-fixture.example'), 'APP_URL giả của CI phải nhận ra được');
-  assert.ok(!isFixtureHost('https://sonvudev.com'), 'một domain thật không được nhận là giả');
+  // A registrable host, built rather than typed. The literal used to be the shop's
+  // real domain, which made this the one test file that had to be excluded by name
+  // from the audit's hardcoded-domain check — a hole punched for a test, and a test
+  // that could only be written by naming the thing it was checking against. A host
+  // that is not a fixture and not reserved needs no name: two labels plus a TLD is
+  // enough for isFixtureHost to answer the question it is being asked.
+  assert.ok(!isFixtureHost('https://shop.example-domain.test'), 'một domain thật không được nhận là giả');
+  assert.ok(!isFixtureHost('https://live-store.co'), 'một domain thật không được nhận là giả');
 });

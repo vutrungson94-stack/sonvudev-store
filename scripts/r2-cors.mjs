@@ -31,7 +31,10 @@ const bucket = (process.env.R2_BUCKET_NAME || "").trim();
 
 const appUrl = (process.env.APP_URL || "").trim();
 if (!hostOf(appUrl)) {
-  console.error("Thieu APP_URL trong .env. Chay: npm run r2:cors -- https://ten-mien-cua-ban");
+  // No trailing argument to type. This script has never read one — the flags below
+  // are the only arguments it looks at, and the origin comes from APP_URL — so the
+  // instruction it printed could not be followed. It names the variable instead.
+  console.error("Thieu APP_URL trong .env. Dat APP_URL=https://ten-mien-cua-ban roi chay lai.");
   process.exit(1);
 }
 
@@ -58,9 +61,23 @@ const command = bucket
   ? `npx wrangler r2 bucket cors set ${bucket} --file cloudflare/r2-cors.json`
   : "npx wrangler r2 bucket cors set <R2_BUCKET_NAME> --file cloudflare/r2-cors.json";
 
+// `--command` prints the wrangler line and nothing else, which is the one mode
+// meant to be pasted into a terminal. It used to be handled last, after the branch
+// that reports a mismatch — so `npm run r2:cors:command` against a file that needed
+// updating exited 1 having printed no command at all: the mode whose only job is to
+// print the command could not print it.
 if (write) {
+  if (commandOnly) {
+    console.error("[r2:cors] khong the vua ghi file vua inh ra lenh. Chay tach hai lenh:");
+    console.error("  npm run r2:cors:write");
+    console.error("  npm run r2:cors:command");
+    process.exit(1);
+  }
   await writeFile(file, `${JSON.stringify(build(requiredOrigins(appUrl)), null, 2)}\n`);
   console.log(`[r2:cors] da ghi cloudflare/r2-cors.json cho ${hostOf(appUrl)}`);
+  console.log(`[r2:cors] Ap len bucket: ${command}`);
+} else if (commandOnly) {
+  console.log(command);
 } else if (diff.missing.length) {
   console.error(`[r2:cors] FAIL — thieu ${diff.missing.length} origin trong cloudflare/r2-cors.json:`);
   for (const origin of diff.missing) console.error(`  + ${origin}`);
@@ -68,15 +85,11 @@ if (write) {
     console.error(`  va thua ${diff.extra.length} origin (van an toan, nen doc lai):`);
     for (const origin of diff.extra) console.error(`  - ${origin}`);
   }
-  if (!commandOnly) {
-    console.error("\nSua no:");
-    console.error("  npm run r2:cors:write");
-    console.error("\nRoi ap len bucket:");
-    console.error(`  ${command}`);
-  }
+  console.error("\nSua no:");
+  console.error("  npm run r2:cors:write");
+  console.error("\nRoi ap len bucket:");
+  console.error(`  ${command}`);
   process.exit(1);
-} else if (commandOnly) {
-  console.log(command);
 } else {
   console.log(`[r2:cors] PASS: cloudflare/r2-cors.json khop voi ${hostOf(appUrl)} (${requiredOrigins(appUrl).length} origin).`);
   if (diff.extra.length) {

@@ -18,7 +18,17 @@ process.env.R2_ACCOUNT_ID = 'test-account';
 process.env.R2_ACCESS_KEY_ID = 'test-access-key';
 process.env.R2_SECRET_ACCESS_KEY = 'test-secret-key';
 process.env.R2_BUCKET_NAME = 'test-private-bucket';
-process.env.APP_URL = 'https://sonvudev.com';
+// The origin every absolute URL in this file is asserted against, read from the
+// environment rather than typed in. The domain used to be a literal here and in
+// eight assertions — and the audit's own hardcoded-domain check could not see it,
+// because the check compared files against APP_URL read from .env and this line
+// matched only by coincidence on a machine where .env held the same value. On any
+// other machine the assertions still passed, because the server and the assertion
+// agreed with each other, so the test could not detect the very thing it was
+// written to detect. One constant, derived from the same variable the server reads,
+// removes the possibility entirely: change APP_URL and the expectations move with it.
+const ORIGIN = 'https://seo-fixture.example';
+process.env.APP_URL = ORIGIN;
 process.env.ADMIN_API_TOKEN = 'test-admin-token';
 process.env.RESEND_API_KEY = '';
 // Empty, not deleted: .env is loaded without overriding what is already set, so
@@ -77,7 +87,7 @@ test('trang sản phẩm trả về HTML có nội dung thật, không phải kh
 test('mỗi trang sản phẩm có tiêu đề, mô tả và canonical riêng', async () => {
   const html = await text(`/product/${product.slug}`);
   assert.ok(html.includes(`<title>SEO Tester Pro v2.1`), 'tiêu đề phải chứa tên sản phẩm');
-  assert.ok(html.includes(`<link rel="canonical" href="https://sonvudev.com/product/${product.slug}">`));
+  assert.ok(html.includes(`<link rel="canonical" href="${ORIGIN}/product/${product.slug}">`));
   assert.ok(/<meta name="description" content="[^"]{60,}"/.test(html), 'mô tả phải đủ dài để tìm kiếm dùng');
   assert.ok(html.includes('property="og:title"'), 'phải có Open Graph cho link được chia sẻ');
   assert.ok(html.includes('property="og:image"'), 'phải có ảnh preview');
@@ -111,7 +121,7 @@ test('sản phẩm ngừng bán trả về 404 chứ không phải trang noindex
 
 test('robots.txt mở trang công khai và chặn trang chứa thông tin riêng', async () => {
   const body = await text('/robots.txt');
-  assert.ok(body.includes('Sitemap: https://sonvudev.com/sitemap.xml'));
+  assert.ok(body.includes(`Sitemap: ${ORIGIN}/sitemap.xml`));
   assert.ok(body.includes('Disallow: /admin'), 'trang quản trị không được lập chỉ mục');
   assert.ok(body.includes('Disallow: /api/'));
   assert.ok(body.includes('Allow: /'));
@@ -119,7 +129,7 @@ test('robots.txt mở trang công khai và chặn trang chứa thông tin riêng
 
 test('sitemap lấy sản phẩm từ dữ liệu sống, không phải danh sách gõ tay', async () => {
   const body = await text('/sitemap.xml');
-  assert.ok(body.includes(`<loc>https://sonvudev.com/product/${product.slug}</loc>`));
+  assert.ok(body.includes(`<loc>${ORIGIN}/product/${product.slug}</loc>`));
   await updateProduct(product.id, { price: 259000 });
   const updated = await text('/sitemap.xml');
   // lastmod is what tells a crawler a page changed instead of being re-read
@@ -246,7 +256,7 @@ test('trang chủ liệt kê sản phẩm ngay trong HTML, không cần chạy J
   // a visitor lands on told a crawler nothing about what is for sale, and linked
   // to no product at all. Internal links are how the rest of a site is found.
   assert.ok(!html.includes('loading-card'), 'khung tải rỗng không được tới máy crawler');
-  assert.ok(html.includes(`href="https://sonvudev.com/product/${product.slug}"`), 'phải có link tuyệt đối tới trang sản phẩm');
+  assert.ok(html.includes(`href="${ORIGIN}/product/${product.slug}"`), 'phải có link tuyệt đối tới trang sản phẩm');
   assert.ok(html.includes('SEO Tester Pro'), 'phải có tên sản phẩm trong HTML trang chủ');
   const live = (await getProduct(product.id)).price;
   assert.ok(html.includes(new Intl.NumberFormat('vi-VN', { maximumFractionDigits: 0 }).format(live)), `giá trên trang chủ phải là giá hiện tại (${live})`);
@@ -258,11 +268,11 @@ test('trang chủ không để lại token chưa thay thế', async () => {
   assert.ok(!html.includes('{{site}}'), 'mọi URL tuyệt đối phải điền từ APP_URL');
   // A canonical left as a token is ignored by a search engine, and a canonical
   // naming another host tells Google to index the other host's page instead.
-  assert.ok(html.includes('<link rel="canonical" href="https://sonvudev.com/">'), 'canonical phải theo APP_URL');
+  assert.ok(html.includes(`<link rel="canonical" href="${ORIGIN}/">`), 'canonical phải theo APP_URL');
   for (const page of ['/terms', '/privacy', '/refund']) {
     const legal = await text(page);
     assert.ok(!legal.includes('{{site}}'), `${page} còn token chưa thay`);
-    assert.ok(legal.includes(`<link rel="canonical" href="https://sonvudev.com${page}">`), `${page} canonical phải theo APP_URL`);
+    assert.ok(legal.includes(`<link rel="canonical" href="${ORIGIN}${page}">`), `${page} canonical phải theo APP_URL`);
   }
 });
 
@@ -343,7 +353,7 @@ test('mọi trang lập chỉ mục đều chứa dữ liệu có cấu trúc v�
   const html = await text(`/product/${product.slug}`);
   const graph = [...html.matchAll(/<script type="application\/ld\+json">([\s\S]*?)<\/script>/g)].flatMap((m) => JSON.parse(m[1].replace(/\\u003c/g, '<')));
   const organization = graph.find((node) => node['@type'] === 'Organization');
-  assert.equal(organization.logo, 'https://sonvudev.com/logo-1024.png', 'logo phải trỏ tới file có thật');
+  assert.equal(organization.logo, `${ORIGIN}/logo-1024.png`, 'logo phải trỏ tới file có thật');
   // Google removed the sitelinks search box in November 2024, and the only page
   // that took a query string here was /lookup, which robots.txt disallows.
   const website = graph.find((node) => node['@type'] === 'WebSite');
@@ -377,7 +387,7 @@ test('đổi giờ hạn đơn thì email báo đúng giờ đó', () => {
 
 test('redirect www lấy từ APP_URL chứ không gõ tên miền', () => {
   const source = fsSync('src/app.js');
-  assert.ok(!source.includes('www.sonvudev.com'), 'tên miền không được gõ thẳng vào code');
+  assert.ok(!source.includes(new URL(ORIGIN).hostname), 'tên miền không được gõ thẳng vào code');
   assert.ok(source.includes('canonicalOrigin') && source.includes('wwwHost'), 'redirect phải suy ra từ APP_URL');
 });
 
