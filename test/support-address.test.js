@@ -186,9 +186,10 @@ test('trang 404 nói được cả hai ngôn ngữ', async () => {
   for (const key of ['notfound.eyebrow', 'notfound.title', 'notfound.text', 'notfound.loading']) {
     assert.match(html, new RegExp(`data-i18n="${key}"`), `thiếu data-i18n="${key}"`);
   }
-  // And the switch itself, because a page that translates only on first load is not
-  // a page that translates.
-  assert.match(html, /data-lang-toggle/, 'trang 404 phải có nút đổi ngôn ngữ');
+  // No switch of its own: it is chosen on the homepage and stored, and the dictionary
+  // reads that before the first paint. A second control on the 404 would be the ninth
+  // button for one decision.
+  assert.ok(!/data-lang-switch|data-lang-toggle/.test(html), 'trang 404 không có nút đổi ngôn ngữ riêng');
   // The static text is Vietnamese, which is the correct fallback for a reader whose
   // browser says nothing — but it is a fallback, and the dictionary has to hold the
   // other side or the button would show the same words twice.

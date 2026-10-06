@@ -168,33 +168,66 @@ test('doi ngon ngu thi <html lang> va nut doi cung doi theo', async () => {
   });
   const I18N = res.window.I18N;
   assert.equal(document.documentElement.lang, 'vi');
+  // aria-pressed is what paints the active half of the "VI | EN" switch and what a
+  // screen reader announces. It is read from the current language rather than set
+  // once, so a switch that survived a change made anywhere else is still correct.
+  const pressed = () => [...document.querySelectorAll('[data-lang-set]')]
+    .filter((b) => b.getAttribute('aria-pressed') === 'true')
+    .map((b) => b.dataset.langSet);
+  assert.deepEqual(pressed(), ['vi'], 'VI phải là nửa đang bật khi trang mở');
   I18N.set('en');
   assert.equal(document.documentElement.lang, 'en', 'lang tren <html> phai doi theo');
-  assert.equal(nodes.get('lang-toggle').textContent, 'VI', 'nut phai hien chuoi doi sang VI');
+  assert.deepEqual(pressed(), ['en'], 'nut phai chuyen sang EN khi doi sang tieng anh');
   I18N.set('vi');
   assert.equal(document.documentElement.lang, 'vi');
+  assert.deepEqual(pressed(), ['vi'], 'nut phai quay lai VI');
 });
 
 test('nút chuyển ngôn ngữ không làm vỡ layout trên màn hình nhỏ', () => {
   const css = read('styles.css');
-  // The switch is a 4th flex child of .site-header. Without flex:0 0 auto the
-  // button stretches and pushes the row past the viewport, which is what broke
-  // the header on phones when the language feature was added.
-  const rule = css.match(/^\.lang-toggle\{[^}]*\}/m);
-  assert.ok(rule, 'phải có rule .lang-toggle');
-  assert.ok(rule[0].includes('flex:0 0 auto'), 'nut phai co flex:0 0 auto de khong bi keo gian');
-  // Below 800px the nav is hidden and the CTA is pushed right, so the switch
-  // needs its own margin and the CTA must stop using margin-left:auto.
-  assert.ok(/@media\(max-width:800px\)\{[^}]*\.lang-toggle\{[^}]*margin-left:auto/.test(css), 'can margin-left:auto cho nut o man hinh nho');
+  // The switch is a flex child of .site-header. Without flex:0 0 auto it stretches
+  // and pushes the row past the viewport, which is what broke the header on phones
+  // when the language feature was added.
+  const rule = css.match(/^\.lang-switch\{[^}]*\}/m);
+  assert.ok(rule, 'phải có rule .lang-switch');
+  assert.ok(rule[0].includes('flex:0 0 auto'), 'switch phai co flex:0 0 auto de khong bi keo gian');
+  // Below 800px the nav is hidden and the CTA is pushed right, so the switch needs
+  // its own margin and the CTA must stop using margin-left:auto.
+  assert.ok(/@media\(max-width:800px\)\{[^}]*\.lang-switch\{[^}]*margin-left:auto/.test(css), 'can margin-left:auto cho switch o man hinh nho');
   assert.ok(/\.site-header \.header-cta\{margin-left:0\}/.test(css), 'nut mua phai bo margin-left:auto o man hinh nho');
-  assert.ok(/@media\(max-width:420px\)\{[^}]*\.lang-toggle\{/.test(css), 'can rule rieng cho man hinh 420px');
+  assert.ok(/@media\(max-width:420px\)\{[^}]*\.lang-switch button\{/.test(css), 'can rule rieng cho man hinh 420px');
+  // The active half is painted from aria-pressed, so the state a screen reader reads
+  // and the state the eye sees are one attribute rather than two that can disagree.
+  assert.ok(/\.lang-switch button\[aria-pressed="true"\]\{/.test(css),
+    'nửa đang bật phải được tô bằng cùng thuộc tính mà trình đọc màn hình đọc');
 });
 
 test('nut chuyen ngon ngu nam trong header cua index.html', () => {
   const html = read('index.html');
-  assert.ok(/<button[^>]*data-lang-toggle/.test(html), 'phai co nut co thuoc tinh data-lang-toggle');
+  assert.ok(/<button[^>]*data-lang-set="vi"/.test(html), 'phai co nua VI');
+  assert.ok(/<button[^>]*data-lang-set="en"/.test(html), 'phai co nua EN');
   const header = html.slice(html.indexOf('<header'), html.indexOf('</header>'));
-  assert.ok(header.includes('data-lang-toggle'), 'nút phải nằm trong header');
+  assert.ok(header.includes('data-lang-switch'), 'switch phải nằm trong header');
+});
+
+// The switch lives on the homepage only. Nine pages each carrying a control for one
+// decision meant nine places to look for it, and two of them needed CSS rules that
+// existed only to place a button on a page with no header to put it in.
+test('chỉ trang chủ mới có nút đổi ngôn ngữ', () => {
+  const pages = ['index.html', 'about.html', 'terms.html', 'privacy.html', 'refund.html',
+    'lookup.html', 'order.html', '404.html', 'paypal-return.html'];
+  const withSwitch = pages.filter((name) => /data-lang-switch|data-lang-toggle/.test(read(name)));
+  assert.deepEqual(withSwitch, ['index.html'],
+    `nút đổi ngôn ngữ phải chỉ ở trang chủ, các trang khác đọc lựa chọn đã lưu. Đang có ở: ${withSwitch.join(', ')}`);
+  // Every one of them still renders in the language the reader chose on the
+  // homepage — which is the whole point of moving the button rather than dropping it.
+  for (const name of pages) {
+    assert.match(read(name), /src="i18n\.js"/, `${name} phải vẫn nạp từ điển`);
+  }
+  // The classes that placed the removed buttons are gone with them.
+  const css = read('styles.css');
+  assert.ok(!/\.lookup-lang|\.paypal-lang|\.lang-toggle\b/.test(css),
+    'CSS của nút đã bỏ phải bị gỡ — còn lại thì là quy tắc chết');
 });
 
 

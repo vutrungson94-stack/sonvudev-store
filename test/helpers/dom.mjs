@@ -73,13 +73,21 @@ export class El {
 export function createDom(ids) {
   const nodes = new Map();
   for (const id of ids) nodes.set(id, new El('div', id));
-  // The storefront finds its language button with querySelector, so the stub
-  // has to resolve data-i18n and data-lang-toggle attributes rather than always
-  // returning null.
+  // The storefront finds its language control with querySelector, so the stub has to
+  // resolve data-i18n and data-lang-set rather than always returning null. The switch is
+  // two buttons, so they are created here rather than passed in as ids: a test that
+  // has to remember to build the control it is testing is a test that passes for the
+  // wrong reason when the control is missing.
   const findAttr = (attr) => {
     for (const el of nodes.values()) if (el.attrs?.[attr] !== undefined) return el;
     return null;
   };
+  for (const lang of ['vi', 'en']) {
+    const button = new El('button');
+    button.attrs['data-lang-set'] = lang;
+    button.dataset.langSet = lang;
+    nodes.set(`lang-set-${lang}`, button);
+  }
   const document = {
     readyState: 'complete',
     documentElement: new El('html'),
@@ -87,6 +95,7 @@ export function createDom(ids) {
     title: '',
     querySelector: (sel) => {
       if (typeof sel === 'string' && sel.includes('data-lang-toggle')) return nodes.get('lang-toggle');
+      if (typeof sel === 'string' && sel.includes('data-lang-set')) return nodes.get('lang-set-vi');
       if (typeof sel === 'string' && sel.includes('data-i18n')) return findAttr('data-i18n');
       return null;
     },
@@ -98,6 +107,9 @@ export function createDom(ids) {
       if (typeof sel === 'string' && sel.startsWith('.')) {
         const cls = sel.slice(1);
         return [...nodes.values()].filter((el) => el.classList.contains(cls));
+      }
+      if (typeof sel === 'string' && sel.includes('data-lang-set')) {
+        return [nodes.get('lang-set-vi'), nodes.get('lang-set-en')];
       }
       if (typeof sel === 'string' && sel.startsWith('[')) {
         const attr = sel.slice(1, sel.indexOf(']'));

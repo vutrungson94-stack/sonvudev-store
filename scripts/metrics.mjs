@@ -14,6 +14,7 @@
 //
 //   npm run metrics              compare against the baseline
 //   npm run metrics:update      accept the current numbers as the new baseline
+//   npm run metrics:auto        update baseline ONLY if all metrics improved or stayed same (no regressions)
 //
 // It is not a quality score. It is the minimum instrumentation needed to say
 // whether this week was better than last week, which until now nobody could
@@ -25,7 +26,10 @@ import { walkProjectFiles } from './lib/files.mjs';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const baselineFile = path.join(root, 'metrics-baseline.json');
+const trendsFile = path.join(root, 'metrics-trends.json');
 const update = process.argv.includes('--update');
+const autoUpdate = process.argv.includes('--auto-update');
+const showTrends = process.argv.includes('--trends');
 
 const relative = (file) => path.relative(root, file).split(path.sep).join('/');
 const read = (name) => readFile(path.join(root, name), 'utf8');
@@ -140,9 +144,16 @@ const label = Object.fromEntries(rows.map(([key, , , note]) => [key, note]));
 //
 // `npm run metrics:update` is the deliberate act of recording a new starting point,
 // and the build has no way to perform it.
-if (update) {
+// `npm run metrics:auto` updates baseline only when all metrics improved or held —
+// enabling continuous optimization without manual intervention.
+if (update || autoUpdate) {
+  const hasRegressions = autoUpdate && await hasRegressionsAgainstBaseline(measurements);
+  if (hasRegressions) {
+    console.error('[metrics:auto] FAIL — có hồi quy, từ chối cập nhật baseline tự động');
+    process.exit(1);
+  }
   await writeFile(baselineFile, `${JSON.stringify({ generatedAt: new Date().toISOString(), measurements }, null, 2)}\n`);
-  console.log('[metrics] baseline updated');
+  console.log(autoUpdate ? '[metrics:auto] baseline updated (all metrics improved or stable)' : '[metrics] baseline updated');
   for (const [key, entry] of Object.entries(measurements)) {
     console.log(`  ${key.padEnd(19)} ${String(entry.value).padStart(4)}   ${label[key]}`);
   }
@@ -178,3 +189,98 @@ if (regressions.length) {
   process.exit(1);
 }
 console.log('\n[metrics] PASS — không có chỉ số nào lùi về.');
+
+  // Predictive causal analysis: trend tracking for CMMI Level 5
+  if (showTrends) {
+    await analyzeTrends(measurements);
+  }
+
+async function hasRegressionsAgainstBaseline(measurements) {
+  if (!(await exists(baselineFile))) return true;
+  const baseline = JSON.parse(await readFile(baselineFile, 'utf8'));
+  for (const [key, entry] of Object.entries(measurements)) {
+    const before = baseline.measurements[key];
+    if (!before) continue;
+    const delta = entry.value - before.value;
+    const worse = entry.direction === 'up' ? delta < 0 : delta > 0;
+    if (worse) return true;
+  }
+  return false;
+}
+
+async function analyzeTrends(measurements) {
+  const MAX_HISTORY = 50;
+  let trends = { history: [] };
+  if (await exists(trendsFile)) {
+    try {
+      trends = JSON.parse(await readFile(trendsFile, 'utf8'));
+    } catch {
+      // ignore corrupt file
+    }
+  }
+
+  const snapshot = {
+    timestamp: new Date().toISOString(),
+    measurements: Object.fromEntries(
+      Object.entries(measurements).map(([key, entry]) => [key, entry.value])
+    ),
+  };
+
+  trends.history.push(snapshot);
+  if (trends.history.length > MAX_HISTORY) {
+    trends.history = trends.history.slice(-MAX_HISTORY);
+  }
+
+  await writeFile(trendsFile, `${JSON.stringify(trends, null, 2)}\n`);
+
+  console.log('\n[trends] Analyzing ' + trends.history.length + ' snapshots...');
+
+  const alerts = [];
+  for (const [key, entry] of Object.entries(measurements)) {
+    const direction = entry.direction;
+    const values = trends.history.map((h) => h.measurements[key]).filter((v) => v !== undefined);
+    if (values.length < 3) continue;
+
+    // Linear regression slope
+    const n = values.length;
+    const xSum = (n * (n - 1)) / 2;
+    const ySum = values.reduce((a, b) => a + b, 0);
+    const xySum = values.reduce((sum, y, i) => sum + i * y, 0);
+    const x2Sum = values.reduce((sum, _, i) => sum + i * i, 0);
+    const slope = (n * xySum - xSum * ySum) / (n * x2Sum - xSum * xSum);
+
+    const recent = values.slice(-3);
+    const recentAvg = recent.reduce((a, b) => a + b, 0) / recent.length;
+    const overallAvg = ySum / n;
+
+    // Acceleration: slope is increasing in wrong direction
+    const wrongDirection = direction === 'up' ? slope < -0.1 : slope > 0.1;
+    const accelerating = direction === 'up'
+      ? recentAvg < overallAvg * 0.95
+      : recentAvg > overallAvg * 1.05;
+
+    if (wrongDirection || accelerating) {
+      alerts.push({
+        key,
+        label: label[key],
+        current: entry.value,
+        slope: slope.toFixed(3),
+        recentAvg: recentAvg.toFixed(1),
+        overallAvg: overallAvg.toFixed(1),
+        warning: wrongDirection ? 'xu hướng ngược chiều' : 'tăng tốc sai chiều',
+      });
+    }
+  }
+
+  if (alerts.length) {
+    console.error('\n[trends] CẢNH BÁO DỰ BÁO — các chỉ số có xu hướng xấu:');
+    for (const a of alerts) {
+      console.error(
+        `  ${a.key.padEnd(19)} ${String(a.current).padStart(4)} | slope=${a.slope.padStart(6)} | recent=${String(a.recentAvg).padStart(6)} | overall=${String(a.overallAvg).padStart(6)} | ${a.warning}`
+      );
+    }
+    console.error('\nHành động: xem xét nguyên nhân gốc rễ (root cause) trước khi chỉ số thực sự lùi.');
+  } else {
+    console.log('[trends] Tốt — không có xu hướng tiêu cực rõ rệt trong ' + trends.history.length + ' lần đo.');
+  }
+}

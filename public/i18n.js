@@ -115,6 +115,11 @@ const DICT = {
     'hero.trust1': 'Bảo mật',
     'hero.trust2': 'Hỗ trợ tận tâm',
     'hero.trust3': 'Cập nhật dài hạn',
+    'art.window': 'sonvudev / workspace',
+    'art.verified': 'Đã xác nhận',
+    'art.safe': 'Giao dịch an toàn',
+    'art.new': 'v1.0.0 · mới',
+    'art.caption': 'Made for better work.',
     // Each label says what the number next to it counts. They used to describe a
     // promise ("a quality standard of ours", "built and controlled 100%") while
     // the numbers beside them were not measurements of anything.
@@ -207,6 +212,8 @@ const DICT = {
     'paypal.errHint': 'PayPal chưa báo thành công. Nếu bạn đã bị trừ tiền, hãy thử lại sau ít phút hoặc liên hệ {support} kèm mã đơn {id}.',
     'paypal.noSession': 'Mã đơn hàng không có trong phiên trình duyệt này. Nếu bạn mở trang này ở thiết bị khác, hãy tra cứu lại bằng mã đơn và email.',
     'cart.email': 'Email nhận sản phẩm',
+    'cart.namePlaceholder': 'Nguyễn Văn A',
+    'cart.emailPlaceholder': 'ban@example.com',
     'cart.name': 'Họ tên',
     'cart.paying': 'Đang xử lý…',
     'cart.note': 'Bạn chỉ bị tính phí khi thanh toán thành công.',
@@ -580,6 +587,11 @@ const DICT = {
     'hero.trust1': 'Secure',
     'hero.trust2': 'Real support',
     'hero.trust3': 'Long-term updates',
+    'art.window': 'sonvudev / workspace',
+    'art.verified': 'Verified',
+    'art.safe': 'Secure checkout',
+    'art.new': 'v1.0.0 · new',
+    'art.caption': 'Made for better work.',
     'stats.1': 'Products on sale',
     'stats.2': 'Platforms supported',
     'stats.3': 'Releases published',
@@ -657,6 +669,8 @@ const DICT = {
     'paypal.errHint': 'PayPal has not reported success. If you were charged, try again in a few minutes or contact {support} with order {id}.',
     'paypal.noSession': 'This order is not in this browser session. If you opened the page on a different device, look it up again with your order id and email.',
     'cart.email': 'Email to receive the product',
+    'cart.namePlaceholder': 'Jane Doe',
+    'cart.emailPlaceholder': 'you@example.com',
     'cart.name': 'Full name',
     'cart.paying': 'Processing…',
     'cart.note': 'You are only charged when the payment succeeds.',
@@ -970,11 +984,7 @@ const I18N = {
     current = lang;
     try { localStorage.setItem(STORAGE_KEY, lang); } catch (_) { /* ignore */ }
     apply();
-    const button = document.querySelector('[data-lang-toggle]');
-    if (button) {
-      button.textContent = I18N.t('lang.switch');
-      button.setAttribute('aria-label', I18N.t('lang.switchAria'));
-    }
+    markActiveLanguage();
     listeners.forEach((fn) => { try { fn(lang); } catch (e) { console.error(e); } });
   },
   toggle() { I18N.set(current === 'vi' ? 'en' : 'vi'); },
@@ -1128,14 +1138,43 @@ function apply(root = document) {
   document.documentElement.lang = current;
 }
 
+// Marks which of the two buttons is the language being read.
+//
+// A segmented control showing "VI | EN" has to say which half is active, or it is two
+// labels and no control. aria-pressed is the accessible half of that — a screen
+// reader announces the pressed state, and the CSS reads the same attribute to paint
+// the filled pill — so one attribute answers both and the two cannot disagree.
+//
+// It is read from `current` rather than set once at boot, because the switch has to
+// survive a language change made anywhere: the storefront's own toggle, a
+// programmatically-set language, or the browser's stored choice being restored.
+function markActiveLanguage() {
+  document.querySelectorAll('[data-lang-switch] [data-lang-set]').forEach((button) => {
+    const active = button.dataset.langSet === current;
+    button.setAttribute('aria-pressed', active ? 'true' : 'false');
+  });
+}
+
 function boot() {
   apply();
+  // The switch is two buttons, so both get a handler rather than one button whose
+  // label changes. `data-lang-set` names the target language instead of "the other
+  // one", which is what makes the control a control rather than a toggle: clicking
+  // the half that is already active is a no-op rather than a flip.
+  document.querySelectorAll('[data-lang-switch] [data-lang-set]').forEach((button) => {
+    button.addEventListener('click', () => I18N.set(button.dataset.langSet));
+  });
+  // The single-button form, kept for any page that wants one. Nothing in the project
+  // uses it any more — the switch lives on the homepage only — but the mechanism is
+  // two lines and removing it would mean a page could not have a switch again without
+  // editing the dictionary.
   const button = document.querySelector('[data-lang-toggle]');
   if (button) {
     button.textContent = I18N.t('lang.switch');
     button.setAttribute('aria-label', I18N.t('lang.switchAria'));
     button.addEventListener('click', () => I18N.toggle());
   }
+  markActiveLanguage();
   document.dispatchEvent(new CustomEvent('i18n:ready', { detail: { lang: current } }));
 }
 

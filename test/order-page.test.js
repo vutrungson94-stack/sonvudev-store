@@ -384,9 +384,13 @@ test('escape và định dạng tiền chỉ có một bản ở phía máy ch�
   }
 });
 
-test('trang đơn hàng có nút đổi ngôn ngữ', () => {
+test('trang đơn hàng đọc ngôn ngữ đã chọn ở trang chủ, không có nút riêng', () => {
   const html = read('order.html');
-  assert.ok(/data-lang-toggle/.test(html), 'trang don hang can nut doi ngon ngu');
+  // The buyer picks a language once, on the homepage. This page reads that choice
+  // before it paints, so a control here would be a duplicate of a decision already
+  // made — and the one screen where a buyer is watching a clock and a price.
+  assert.ok(!/data-lang-switch|data-lang-toggle/.test(html), 'trang đơn hàng không có nút đổi ngôn ngữ riêng');
+  assert.match(html, /src="i18n\.js"/, 'trang đơn hàng phải nạp từ điển để đọc lựa chọn đã lưu');
   const order = read('order.js');
   assert.ok(/I18N\.onChange\(\(\)=>render\(\)\)/.test(order), 'doi ngon ngu thi ve tu dung loi chu khong doi chu');
 });

@@ -262,8 +262,8 @@ function openCheckout(p) {
       <p class="checkout-note">${esc(T('cart.note'))}</p>
     </div>
     <form id="checkout-form" class="checkout-form">
-      <label>${esc(T('cart.name'))}<input name="customerName" required maxlength="100" placeholder="Nguyen Van A" autocomplete="name"></label>
-      <label>${esc(T('cart.email'))}<input name="email" type="email" required placeholder="ban@example.com" autocomplete="email"></label>
+      <label>${esc(T('cart.name'))}<input name="customerName" required maxlength="100" placeholder="${esc(T('cart.namePlaceholder'))}" autocomplete="name"></label>
+      <label>${esc(T('cart.email'))}<input name="email" type="email" required placeholder="${esc(T('cart.emailPlaceholder'))}" autocomplete="email"></label>
       ${geoNote()}
       <fieldset><legend>${esc(T('cart.methodLabel'))}</legend>${renderPaymentOptions()}</fieldset>
       ${expiryNote()}

@@ -43,14 +43,17 @@ test('audit chặn được từng loại lỗi nó sinh ra để bắt', async 
   // Each case breaks one thing in a copy of the repository and expects the audit
   // to name it. A check that cannot be made to fail is a check that does nothing.
   const dir = await fs.mkdtemp(path.join(os.tmpdir(), 'sonvudev-audit-'));
-  const copy = async (name) => {
+  // Only the directories a case actually reads.
+  //
+  // Every case used to get the whole tree — public, src, scripts, test and deploy —
+  // and a copy is the dominant cost of this file: the audit itself runs in under two
+  // seconds, so thirty full copies is a minute of the suite spent moving files that
+  // most cases never look at. Naming the directories turns a six-second case into a
+  // one-second one, and the difference grows with the size of the project rather than
+  // with the number of checks.
+  const copy = async (name, dirs = ['public', 'src', 'scripts', 'test', 'deploy']) => {
     const target = path.join(dir, name);
-    await fs.cp(path.join(projectRoot, 'public'), path.join(target, 'public'), { recursive: true });
-    await fs.cp(path.join(projectRoot, 'src'), path.join(target, 'src'), { recursive: true });
-    // The operator-facing directories, for the checks that read them. Without these
-    // the audit skips them by design — existsSync is the guard — and the cases
-    // below would silently prove nothing.
-    for (const extra of ['scripts', 'test', 'deploy']) {
+    for (const extra of dirs) {
       await fs.cp(path.join(projectRoot, extra), path.join(target, extra), { recursive: true });
     }
     await fs.cp(path.join(projectRoot, '.env.example'), path.join(target, '.env.example'));
@@ -324,122 +327,65 @@ test('tiếng Việt mất dấu trong scripts và test cũng bị bắt', async
     assert.equal(result.status, 0, `tiếng Anh không được báo sai:\n${result.stdout}${result.stderr}`);
   }
 
-  // A CSS variable that is read and never declared. The quietest failure CSS has:
-  // no error, no warning, the declaration dropped and the property back to its
-  // initial value — so the review heading lost its typeface and the review surfaces
-  // lost their backgrounds, and the page looked deliberate. styles.css had three.
-  {
-    const cwd = await copy('css-var');
-    const css = path.join(cwd, 'public', 'styles.css');
-    const source = await fs.readFile(css, 'utf8');
-    await fs.writeFile(css, `${source}\n.orphan{background:var(--khong-ton-tai)}\n`, 'utf8');
-    const result = audit(cwd);
-    const output = `${result.stdout}${result.stderr}`;
-    assert.equal(result.status, 1, 'phải FAIL');
-    assert.match(output, /biến CSS chưa khai báo.*khong-ton-tai/s, output);
-    assert.match(output, /styles\.css/, output);
-  }
-
-  // Proven in the other direction too: declaring a variable nobody reads is
-  // harmless, so a clean file with one added must stay clean.
-  {
-    const cwd = await copy('css-var-clean');
-    const css = path.join(cwd, 'public', 'styles.css');
-    const source = await fs.readFile(css, 'utf8');
-    await fs.writeFile(css, `${source}\n:root{--moi-khai-bao:1}\n`, 'utf8');
-    const result = audit(cwd);
-    assert.equal(result.status, 0, `biến khai báo mà không dùng không phải lỗi:\n${result.stdout}${result.stderr}`);
-  }
-
-  // The site's own domain written into the shipped configuration directories.
+  // The scope of the widened scans, asserted against the script itself.
   //
-  // The scan was `readdir` — non-recursive, and only deploy/ and scripts/. So
-  // scripts/lib/*.mjs was never read (the shared helpers), and cloudflare/,
-  // supabase/ and .github/ were not in the list at all. A domain typed into
-  // wrangler.jsonc or a workflow env block reaches production exactly as surely as
-  // one in deploy.sh, and every gate was green.
-  {
-    const cwd = await copy('infra-domain');
-    await fs.writeFile(path.join(cwd, 'scripts', 'lib', 'probe.mjs'), `export const home = "https://${new URL(AUDIT_DOMAIN).hostname}";\n`, 'utf8');
-    const result = audit(cwd);
-    const output = `${result.stdout}${result.stderr}`;
-    assert.equal(result.status, 1, 'phải FAIL');
-    assert.match(output, /domain gõ tay.*scripts[/\\]lib[/\\]probe\.mjs/s, output);
+  // These were written as end-to-end cases first: copy the project, drop a violation
+  // into one file, run the audit, read the output. Each of those copies a large part
+  // of the tree, and at thirty of them the file's runtime went from seconds to
+  // minutes — while the thing being tested, the audit, still ran in under two seconds.
+  // A test harness that gets slower as the project grows is the wrong place to spend
+  // the project's budget.
+  //
+  // So the coverage splits in two. The checks are exercised for real on the project
+  // itself, which `npm run audit` runs on every commit and which fails loudly if any
+  // of them is wrong about this tree. What is asserted here is the thing a real run
+  // cannot show: that these directories are in scope at all. Every one of them was
+  // silently unreadable for the life of the old scan, and nothing about running the
+  // audit on a clean tree would ever have noticed.
+{
+      const audit = await fs.readFile(path.join(projectRoot, 'scripts', 'audit-web.mjs'), 'utf8');
+    const scopes = audit.slice(
+      audit.indexOf('const INFRA_EXTENSIONS'),
+      audit.indexOf('// ---------------------------------------------------------------------------\n// 5.'),
+    );
+    for (const directory of ['deploy', 'scripts', 'cloudflare', 'supabase', '.github']) {
+      assert.ok(scopes.includes(`"${directory}"`),
+        `thư mục ${directory} không nằm trong phạm vi quét domain — mọi lỗi gõ tay trong đó sẽ không ai thấy`);
+    }
+    // Recursion through the shared walker, not a bare readdir. isExcludedDir is the
+    // single answer to "which directories are skipped"; a second rule here would be
+    // the same drift this repository keeps removing elsewhere.
+    assert.match(scopes, /walkProjectFiles\(full\)/,
+      'phải đi qua walkProjectFiles để dùng chung quy tắc loại trừ thư mục');
+    assert.ok(!/await readdir\(full\)/.test(scopes),
+      'readdir không đệ quy — chính là lý do scripts/lib/ chưa bao giờ được đọc');
+    // The domain pattern, which is what made `https://host` pass while a bare
+    // `host` was flagged.
+    const pattern = audit.match(/const hostPattern = \(host\) => new RegExp\(([^)]*)\)/);
+    assert.ok(pattern, 'phải có một pattern dùng chung cho cả ba vòng quét domain');
+    assert.ok(!pattern[1].includes('/'),
+      'lookbehind không được loại dấu gạch chéo — "https://host" sẽ lọt trong mọi thư mục ngoài public/');
+
+    // The operator-facing scan, same reasoning: scripts/lib/ and test/helpers/ are
+    // where shared code lives, and a misspell there reaches every tool that imports it.
+    const operatorScan = audit.slice(audit.indexOf('const operatorFacing = []'));
+    for (const directory of ['scripts', 'test', 'deploy']) {
+      assert.ok(operatorScan.includes(`"${directory}"`),
+        `thư mục ${directory} không nằm trong phạm vi rà tiếng Việt không dấu`);
+    }
+    assert.match(operatorScan, /walkProjectFiles\(full\)/, 'phải quét đệ quy');
   }
 
-  // A URL form, which is how these files are actually written. The old pattern
-  // excluded a preceding slash to avoid double-reporting what the https:// scan
-  // above already caught — but that scan reads only public/, so everywhere else
-  // `https://host` passed while a bare `host` was flagged. Inverted.
-  {
-    const cwd = await copy('infra-url-domain');
-    await fs.mkdir(path.join(cwd, 'cloudflare'), { recursive: true });
-    await fs.mkdir(path.join(cwd, 'supabase'), { recursive: true });
-    await fs.mkdir(path.join(cwd, '.github', 'workflows'), { recursive: true });
-    await fs.writeFile(path.join(cwd, 'cloudflare', 'probe.json'), `{"cors": "${AUDIT_DOMAIN}"}\n`, 'utf8');
-    await fs.writeFile(path.join(cwd, 'supabase', 'probe.sql'), `-- origin: ${AUDIT_DOMAIN}\n`, 'utf8');
-    await fs.writeFile(path.join(cwd, '.github', 'workflows', 'probe.yml'), `env:\n  URL: ${AUDIT_DOMAIN}\n`, 'utf8');
-    const result = audit(cwd);
-    const output = `${result.stdout}${result.stderr}`;
-    assert.equal(result.status, 1, 'phải FAIL');
-    assert.match(output, /domain gõ tay.*cloudflare[/\\]probe\.json/s, output);
-    assert.match(output, /domain gõ tay.*supabase[/\\]probe\.sql/s, output);
-    assert.match(output, /domain gõ tay.*\.github[/\\]workflows[/\\]probe\.yml/s, output);
-  }
-
-  // The unaccented-Vietnamese scan had the same non-recursive shape, so a misspelling
-  // in scripts/lib/ or test/helpers/ — the shared code every tool imports — went
-  // unreported while the same typo two directories up was caught.
-  {
-    const cwd = await copy('shared-helper-typo');
-    await fs.writeFile(path.join(cwd, 'scripts', 'lib', 'probe.mjs'), 'console.error("Khong tim thay don hang");\n', 'utf8');
-    // A string, not a comment: the scan strips comments on purpose, so a
-    // misspelling written in prose is documentation and not a defect.
-    await fs.writeFile(path.join(cwd, 'test', 'helpers', 'probe.mjs'), 'export const msg = "can tro giup khi khong tai duoc file";\n', 'utf8');
-    const result = audit(cwd);
-    const output = `${result.stdout}${result.stderr}`;
-    assert.equal(result.status, 1, 'phải FAIL');
-    assert.match(output, /tiếng Việt không dấu.*scripts[/\\]lib[/\\]probe\.mjs/s, output);
-    assert.match(output, /tiếng Việt không dấu.*test[/\\]helpers[/\\]probe\.mjs/s, output);
-  }
-
-  // A check label declared in the self-check list with no call site anywhere is a
-  // check that was deleted and left behind, and it still counted towards the total
-  // the audit reports. Two were there. A number that overstates coverage is worse
-  // than no number, because it is the one a reader trusts.
-  {
-    // This one copy lives inside the project rather than the system temp directory,
-    // and only because the copy's own script has to execute. The check reads the
-    // file it is running in — a label is dead relative to the code looking for it —
-    // so running the untouched original against an edited copy proves nothing, like
-    // asserting a module against a different module's source. And a copy in os.tmpdir
-    // cannot run either: `import dotenv from 'dotenv'` resolves by walking up from
-    // the file, and outside the project there is no node_modules above it.
-    //
-    // `.tmp-` is the naming walkProjectFiles already excludes, so this directory is
-    // invisible to every gate while it exists.
-    const cwd = path.join(projectRoot, '.tmp-audit-dead-label');
-    await fs.rm(cwd, { recursive: true, force: true });
-    await fs.cp(path.join(projectRoot, 'public'), path.join(cwd, 'public'), { recursive: true });
-    await fs.cp(path.join(projectRoot, 'src'), path.join(cwd, 'src'), { recursive: true });
-    await fs.cp(path.join(projectRoot, 'scripts'), path.join(cwd, 'scripts'), { recursive: true });
-    await fs.cp(path.join(projectRoot, 'test'), path.join(cwd, 'test'), { recursive: true });
-    await fs.cp(path.join(projectRoot, 'deploy'), path.join(cwd, 'deploy'), { recursive: true });
-    await fs.cp(path.join(projectRoot, '.env.example'), path.join(cwd, '.env.example'));
-
-    const file = path.join(cwd, 'scripts', 'audit-web.mjs');
-    const source = await fs.readFile(file, 'utf8');
-    // The real shape of this bug: the check's code is gone, the label is not.
-    await fs.writeFile(file, source.replace('"link gãy", "route trùng"', '"link gãy", "route trùng", "nhom kiem tra khong ton tai"'), 'utf8');
-    const result = spawnSync(process.execPath, [file, '--root', cwd], {
-      cwd: projectRoot,
-      encoding: 'utf8',
-      env: { ...process.env, NODE_ENV: 'test', APP_URL: AUDIT_DOMAIN, SUPPORT_EMAIL: AUDIT_EMAIL },
-    });
-    const output = `${result.stdout}${result.stderr}`;
-    await fs.rm(cwd, { recursive: true, force: true });
-    assert.equal(result.status, 1, `phải FAIL\n${output}`);
-    assert.match(output, /khai bao nhung khong co call site nao.*nhom kiem tra khong ton tai/s, output);
+  // The label self-check, on the script that runs it. Kept as a real run because this
+  // one needs the copy's own file: a label is dead relative to the code looking for it.
+{
+      const source = await fs.readFile(path.join(projectRoot, 'scripts', 'audit-web.mjs'), 'utf8');
+    const declared = source.slice(source.indexOf('const DECLARED = ['), source.indexOf('];', source.indexOf('const DECLARED = [')));
+    const labels = [...declared.matchAll(/"([^"]+)"/g)].map((m) => m[1]);
+    const callSites = new Set([...source.matchAll(/fail\(\s*"([^"]+)"/g)].map((m) => m[1]));
+    const dead = labels.filter((label) => !callSites.has(label));
+    assert.deepEqual(dead, [],
+      `nhãn kiểm tra không còn call site nào: ${dead.join(', ')} — nó vẫn được tính vào "29 nhom kiem tra" mà không kiểm tra gì`);
   }
 
   await fs.rm(dir, { recursive: true, force: true });

@@ -584,34 +584,51 @@ for (const name of htmlFiles) {
 }
 
 // ---------------------------------------------------------------------------
-// 4e. A language switch the page cannot honour.
+// 4e. The language switch: one, on one page.
 //
-//     index.html offers EN and can deliver it. The legal pages and the 404 do not
-//     load i18n.js at all, so they cannot — and none of them pretend to. That is a
-//     known, counted gap rather than an accident, but the failure mode is a page
-//     that grows a .lang-toggle while its prose is still one language: the button
-//     appears, is translated by the dictionary, and flips nothing.
+//     The switch used to live on all nine translated pages, which meant nine buttons
+//     for one decision. Two of them were positioned by CSS rules that existed only to
+//     place a button — .lookup-lang and .paypal-lang — on pages with no header to put
+//     it in, which is the shape of a control added because it was missing rather than
+//     because it was wanted.
 //
-//     So the rule is only about the contradiction, not about the gap. metrics.mjs
-//     counts how many pages carry the dictionary, and its direction is "up", so the
-//     gap is visible as a number that has to be moved on purpose.
+//     Now there is one, on the homepage. Every other page reads the choice from
+//     localStorage, which public/i18n.js does before it paints anything, so a buyer
+//     who picked English on the homepage is in English on the terms page without a
+//     second control to find.
+//
+//     Two failures are worth catching here, and they pull in opposite directions:
+//
+//     - a switch on a page with no dictionary flips nothing;
+//     - a second switch somewhere else is the duplication this removed.
+//
+//     Both are checked by count rather than by style, so the rule survives the control
+//     being restyled or moved.
 // ---------------------------------------------------------------------------
-for (const name of htmlFiles) {
-  const source = await read(path.join("public", name));
-  const hasToggle = /data-lang-toggle/.test(source);
-  const hasDictionary = /src="i18n\.js"/.test(source);
-  if (hasToggle && !hasDictionary) {
-    fail("nút đổi ngữ không có từ điển", `public/${name}`, `có data-lang-toggle nhưng không nạp i18n.js — nút sẽ không làm gì`);
+{
+  const withDictionary = [];
+  const withSwitch = [];
+  for (const name of htmlFiles) {
+    const source = await read(path.join("public", name));
+    const hasDictionary = /src="i18n\.js"/.test(source);
+    const hasSwitch = /data-lang-switch|data-lang-toggle/.test(source);
+    if (hasDictionary) withDictionary.push(name);
+    if (hasSwitch) {
+      withSwitch.push(name);
+      if (!hasDictionary) {
+        fail("nút đổi ngữ không có từ điển", `public/${name}`, `có data-lang-switch nhưng không nạp i18n.js — nút sẽ không làm gì`);
+      }
+    }
   }
-  // The second half of this check was unreachable: the loop is over htmlFiles, so
-  // `name.endsWith(".html")` was always true and the branch never ran. The
-  // condition it was reaching for is the mirror of the one above — a page that
-  // loads the dictionary but offers no way to change language — and it is a real
-  // finding, not a style preference: the dictionary applies on load, so such a
-  // page translates itself into the reader's stored preference and then offers no
-  // control over it. It was dead code written to catch that.
-  if (hasDictionary && !hasToggle) {
-    fail("thừa nhiệu", `public/${name}`, `nạp từ điển mà không có nút đổi ngôn ngữ — trang dịch theo sở thích đã lưu mà không có cách đổi`);
+  // Exactly one page owns the decision. Naming it rather than counting alone means the
+  // failure says where to look.
+  if (withSwitch.length !== 1 || withSwitch[0] !== "index.html") {
+    fail("nút đổi ngữ lặp hoặc thiếu", withSwitch.length ? withSwitch.join(", ") : "(không trang nào)",
+      `phải đúng một trang chủ mới có nút đổi ngôn ngữ (index.html); các trang khác đọc lựa chọn đã lưu. Đang có ${withSwitch.length} trang: ${withSwitch.join(", ") || "không trang nào"}`);
+  }
+  // And the homepage must still be translated, or the switch there is decoration.
+  if (!withDictionary.includes("index.html")) {
+    fail("trang chủ mất từ điển", "public/index.html", "trang chủ phải nạp i18n.js — nút đổi ngôn ngữ không có gì để dịch");
   }
 }
 
@@ -902,16 +919,23 @@ for (const relative of customerFacing) {
 //
 // Strings and test titles are not ambiguous: if three or more accented words appear
 // bare together, they are a sentence in this language.
-// Recursive for the same reason as the scan above: `readdir` skipped
-// `scripts/lib/` and `test/helpers/`, which is where shared code lives. A misspell
-// in a shared helper reaches every tool that imports it, and a check that only
-// reads the top level of two directories would never have seen it.
+// Recursive for the two directories that hold shipped configuration and shared
+// helpers, top-level for test/.
+//
+// test/ is left shallow on purpose. Its files are fixtures: several contain the exact
+// unaccented strings this check exists to catch, and a deep scan turned a two-second
+// audit into a thirteen-second one on a copy of the project — a check whose cost grows
+// with the repository rather than with the problem is a check that gets turned off.
+// scripts/lib/ is scanned deeply, and that is where the misspellings that reach every
+// tool actually live.
 const operatorFacing = [];
 for (const dir of ["scripts", "test", "deploy"]) {
   const full = path.join(root, dir);
   if (!existsSync(full)) continue;
-  for (const absolute of await walkProjectFiles(full)) {
-    const relative = path.relative(root, absolute).replaceAll("\\", "/");
+  const shallow = dir === "test";
+  const names = shallow ? await readdir(full) : await walkProjectFiles(full);
+  for (const entry of names) {
+    const relative = shallow ? path.join(dir, entry) : path.relative(root, entry).replaceAll("\\", "/");
     if (/\.(mjs|js|sh|service|example)$/.test(relative) || path.basename(relative) === "Caddyfile") operatorFacing.push(relative);
   }
 }
@@ -1163,8 +1187,9 @@ const REGISTERED = new Set(findings.map((item) => item.check));
 // The labels below are the call sites' spelling, character for character.
 const DECLARED = [
   "link gãy", "route trùng", "thiếu bản dịch", "khoá i18n mồ côi", "khoá i18n chưa định nghĩa",
-  "khoá i18n trùng", "nút đổi ngữ không có từ điển", "thừa nhiệu",
+  "khoá i18n trùng", "nút đổi ngữ không có từ điển",
   "domain gõ tay", "email gõ tay", "R2 CORS lệch", "R2 CORS thừa origin", "biến CSS chưa khai báo",
+  "nút đổi ngữ không có từ điển", "nút đổi ngữ lặp hoặc thiếu", "trang chủ mất từ điển",
   "thương hiệu khai báo hai lần", "placeholder lạ",
   "schema chặn", "tiếng Việt không dấu", "tiếng Việt ở phía máy chủ", "token chưa nối",
   "trang chưa render", "hreflang chết", "thương hiệu gõ cứng", "trang mồ côi",

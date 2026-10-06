@@ -34,7 +34,12 @@ const LEGAL_PAGES = ['about.html', 'terms.html', 'privacy.html', 'refund.html'];
 // Each element starts holding the Vietnamese text that is actually on the page — which is
 // the fallback for a reader whose browser says nothing, and therefore the sentence that
 // has to survive being wrong about.
-const render = async (name) => {
+//
+// The stored language is part of the test, not decoration: these pages have no switch of
+// their own, so the only reason an English reader sees English here is that the choice
+// made on the homepage is sitting in localStorage. A page that ignored it would render
+// Vietnamese while every other check in the repository passed.
+const render = async (name, stored = null) => {
   const html = await page(name);
   const keys = [...html.matchAll(/data-i18n="([\w.]+)"/g)].map((m) => m[1]);
   const { document, nodes } = createDom([]);
@@ -58,18 +63,16 @@ const render = async (name) => {
   });
   document.querySelectorAll = (selector) => (selector === '[data-i18n]' ? elements : []);
 
-  const toggle = document.createElement('button');
-  toggle.addEventListener = () => {};
-  document.querySelector = (selector) => (selector === '[data-lang-toggle]' ? toggle : null);
-
   const store = { v: {}, getItem: (k) => store.v[k] ?? null, setItem: (k, v) => { store.v[k] = String(v); } };
+  if (stored) store.v.sonvudev_lang = stored;
   const i18n = await runScript(vi, { document, window: {}, localStorage: store });
 
+  const atBoot = elements.map((el) => el.textContent.trim());
   i18n.window.I18N.set('vi');
   const before = elements.map((el) => el.textContent.trim());
   i18n.window.I18N.set('en');
   const after = elements.map((el) => el.textContent.trim());
-  return { html, keys, before, after, enTable, nodes };
+  return { html, keys, before, after, atBoot, enTable, nodes };
 };
 
 // Reads one locale out of the dictionary as a Map, from the source rather than from a
@@ -93,8 +96,11 @@ for (const name of LEGAL_PAGES) {
       `${name} phải nạp format.js — i18n.js gọi window.SVDFormat.esc`);
     assert.match(html, /src="i18n\.js"/,
       `${name} phải nạp từ điển`);
-    assert.match(html, /data-lang-toggle/,
-      `${name} phải có nút đổi ngôn ngữ — từ điển mà không nút thì không ai tới được`);
+    // No switch of its own: the language is chosen on the homepage and every page
+    // reads it from localStorage before it paints. What matters here is that the page
+    // still honours a stored choice, which is the behaviour below.
+    assert.ok(!/data-lang-switch|data-lang-toggle/.test(html),
+      `${name} không được có nút đổi ngôn ngữ riêng — chọn ở trang chủ, các trang này đọc lựa chọn đó`);
 
     const { keys, before, after } = await render(name);
     assert.ok(keys.length > 0, `${name} không có data-i18n nào — nạp từ điển mà không dùng thì vẫn chỉ tiếng Việt`);
@@ -109,6 +115,15 @@ for (const name of LEGAL_PAGES) {
     const unresolved = after.filter((text) => /^[a-z]+\.[a-zA-Z0-9]+$/.test(text));
     assert.deepEqual(unresolved, [],
       `${name}: có câu ra đúng tên khoá, tức khoá không tồn tại: ${unresolved.join(', ')}`);
+
+    // A reader who chose English on the homepage lands here with no switch to find, so
+    // the stored choice has to be read before the first paint. If it is not, this page
+    // greets them in the language they switched away from — with nothing on screen to
+    // correct it.
+    const { atBoot } = await render(name, 'en');
+    const stillVietnamese = atBoot.filter((text) => /[À-ỹ]/.test(text));
+    assert.deepEqual(stillVietnamese, [],
+      `${name}: lựa chọn 'en' đã lưu vẫn ra tiếng Việt khi mở trang (${stillVietnamese.length}/${atBoot.length} câu) — trang này không có nút để sửa lại`);
   });
 }
 

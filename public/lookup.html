@@ -16,7 +16,7 @@
 <p data-i18n="lookup.lead">Nhập mã đơn và email bạn đã dùng khi thanh toán. Chúng tôi sẽ đưa bạn thẳng tới trang tải sản phẩm.</p>
 <form id="lookup-form">
 <label><span data-i18n="lookup.orderLabel">Mã đơn hàng</span><input name="orderId" required autocomplete="off" placeholder="SVD-XXXXXX-XXXXXX"></label>
-<label><span data-i18n="lookup.emailLabel">Email đã thanh toán</span><input name="email" type="email" required autocomplete="email" placeholder="ban@example.com"></label>
+<label><span data-i18n="lookup.emailLabel">Email đã thanh toán</span><input name="email" type="email" required autocomplete="email" placeholder="ban@example.com" data-i18n-attr="placeholder:cart.emailPlaceholder"></label>
 <button class="button button-primary" type="submit" id="lookup-submit"><span data-i18n="lookup.submit">Tra cứu đơn hàng</span> <span>→</span></button>
 <p class="form-message" id="lookup-status"></p>
 </form>
@@ -26,7 +26,6 @@
      previous visit, or navigator.language on a first visit, and a buyer who got
      the wrong one has no way to correct it — on the one page they reach after a
      payment they may already be worried about. -->
-<button class="lang-toggle lookup-lang" type="button" data-lang-toggle>EN</button>
 </main>
 <script src="format.js"></script><script src="i18n.js"></script>
 <script src="order-client.js"></script>
