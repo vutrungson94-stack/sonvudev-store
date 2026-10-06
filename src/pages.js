@@ -555,9 +555,11 @@ export function renderIndexGrid(products) {
     // looked at.
     const features = (product.features || []).slice(0, 2)
       .map((item) => `<li>✓ ${esc(fillCopy(item))}</li>`).join("");
+    const badge = esc(fillCopy(product.badge) || "Mới");
+    const buyAria = `Mua ${esc(product.name)}`;
     return `<article class="product-card" data-id="${esc(product.id)}">
     <div class="product-art art-${art}">
-      <span class="product-badge">${esc(fillCopy(product.badge) || "Mới")}</span>
+      <span class="product-badge" data-i18n="products.new">${badge}</span>
       <div class="product-logo">${esc(initials(product.name))}</div>
       <div class="art-grid"></div>
       <span class="art-spark">✦</span>
@@ -569,7 +571,7 @@ export function renderIndexGrid(products) {
       <ul>${features}</ul>
       <div class="product-buy">
         <strong>${esc(money(product.price, product.currency))}</strong>
-        <a class="round-arrow" href="${esc(url)}" aria-label="Mua ${esc(product.name)}">↗</a>
+        <a class="round-arrow" href="${esc(url)}" data-i18n-attr="aria-label:products.buyAria" aria-label="${buyAria}">↗</a>
       </div>
     </div>
   </article>`;
@@ -578,7 +580,7 @@ export function renderIndexGrid(products) {
   // leaving three grey placeholder rectangles in the markup.
   return cards.length
     ? cards.join("\n")
-    : `<div class="empty-state"><b>Chưa có sản phẩm</b><p>Hãy thử bộ lọc khác.</p></div>`;
+    : `<div class="empty-state"><b data-i18n="products.emptyTitle">Chưa có sản phẩm</b><p data-i18n="products.emptyText">Hãy thử bộ lọc khác.</p></div>`;
 }
 
 /** The "02 sản phẩm" counter above the grid, in the same shape the client writes. */
