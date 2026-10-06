@@ -38,12 +38,16 @@ fi
 # named files, but the check is kept because the cost of it being wrong is every
 # production secret in a directory served by a live process, and the cost of the
 # check is one line.
-for forbidden in .env .git data logs publish-output; do
+for forbidden in .env .git data logs publish-output .wrangler .gbuildcache; do
   if [[ -e "$SOURCE_DIR/$forbidden" ]]; then
     echo "ERROR: artifact contains $forbidden — refusing to deploy." >&2
     exit 1
   fi
 done
+if find "$SOURCE_DIR" -type d \( -name .wrangler -o -name .gbuildcache \) -print -quit | grep -q .; then
+  echo "ERROR: artifact contains tool scratch (.wrangler/.gbuildcache) — refusing to deploy." >&2
+  exit 1
+fi
 if compgen -G "$SOURCE_DIR/.env.*" >/dev/null; then
   echo "ERROR: artifact contains a .env.* backup — refusing to deploy." >&2
   exit 1

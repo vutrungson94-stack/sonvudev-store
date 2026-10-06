@@ -94,6 +94,10 @@ export const env = {
   port: numberValue("PORT", 3000),
   appUrl: value("APP_URL", "http://localhost:3000").replace(/\/$/, ""),
   adminToken: value("ADMIN_API_TOKEN"),
+  // Token phụ cho RBAC tối thiểu: "name:token:role, token2@2027-01-01".
+  // Không bắt buộc; để trống thì chỉ có ADMIN_API_TOKEN (admin, không expiry)
+  // như trước đây. Chi tiết format xem src/admin-auth.js.
+  adminTokens: value("ADMIN_API_TOKENS"),
   // How many proxies between the buyer and this process to trust for req.ip.
   // Behind Caddy (or Render) the client address arrives in X-Forwarded-For, and
   // the rate limiter counts by it — trusting zero hops makes every visitor share

@@ -17,6 +17,7 @@ publish-output/
 # Local runtime scratch
 logs/
 data/
+backup/
 .tmp-*
 
 # OS/editor

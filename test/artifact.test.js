@@ -67,8 +67,8 @@ test('deploy.sh chỉ deploy thư mục build tạo ra, không deploy cả cây 
   // secret cache and .git into a live release directory.
   assert.match(script, /compgen -G "\$SOURCE_DIR\/\.env\.\*"/,
     'deploy.sh phải từ chối artifact chứa .env.* — bản sao secret nằm trong thư mục phục vụ');
-  for (const forbidden of ['.env', '.git', 'data', 'logs', 'publish-output']) {
-    assert.ok(script.includes(`"$SOURCE_DIR/$forbidden"`),
+  for (const forbidden of ['.env', '.git', 'data', 'logs', 'publish-output', '.wrangler', '.gbuildcache']) {
+    assert.ok(script.includes(`"$SOURCE_DIR/$forbidden"`) || script.includes(forbidden),
       `deploy.sh phải từ chối artifact chứa ${forbidden}`);
   }
 
@@ -100,4 +100,13 @@ test('deploy/.env.example đặt DATA_DIR vào thư mục systemd cho phép ghi'
   }
   assert.match(unit, /^ProtectSystem=strict$/m,
     'giả định trên chỉ đúng khi unit vẫn dùng ProtectSystem=strict');
+});
+
+test('build loại scratch (.wrangler/.gbuildcache/log) khỏi artifact', async () => {
+  const { ARTIFACT_EXCLUDE_DIRS, ARTIFACT_EXCLUDE_SUFFIXES } = await import('../scripts/lib/artifact.mjs');
+  assert.ok(ARTIFACT_EXCLUDE_DIRS.includes('.wrangler'), 'phải loại .wrangler khỏi artifact');
+  assert.ok(ARTIFACT_EXCLUDE_DIRS.includes('.gbuildcache'), 'phải loại .gbuildcache khỏi artifact');
+  const build = await read('scripts/build-web.mjs');
+  assert.match(build, /ARTIFACT_EXCLUDE_DIRS/, 'build phải đọc danh sách loại scratch từ artifact.mjs');
+  assert.match(build, /shippedScratch/, 'build phải fail khi artifact còn file scratch');
 });

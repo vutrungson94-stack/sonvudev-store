@@ -19,6 +19,8 @@ import { vndPerUsd } from "./rates.js";
 import { createReview, listReviewsForProduct, reviewLimits } from "./reviews.js";
 import { refuse } from "./refuse.js";
 import { renderRobotsTxt } from "./robots.js";
+import { tooMany, tooManyAttempts, checkoutThrottled } from "./rate-limit.js";
+import { parseAdminTokens, matchAdminToken } from "./admin-auth.js";
 
 const app = express();
 const publicDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "public");
@@ -54,17 +56,28 @@ const deadlinePayload = (order) => {
 };
 const text = (value, max = 180) => String(value || "").trim().slice(0, max);
 const isEmail = (value) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
-const isAdmin = (req) => {
+const adminEntries = () => parseAdminTokens({ primary: env.adminToken, extra: env.adminTokens });
+const adminEntryFor = (req) => {
   const supplied = req.get("x-admin-token") || (req.get("authorization") || "").replace(/^Bearer\s+/i, "");
-  const expected = env.adminToken;
-  if (!expected || !supplied || supplied.length !== expected.length) return false;
-  return crypto.timingSafeEqual(Buffer.from(supplied), Buffer.from(expected));
+  return matchAdminToken(supplied, adminEntries());
 };
-const admin = (req, res, next) => { if (!isAdmin(req)) return res.status(401).json(refuse("api.err.unauthorized", "Không có quyền.", 401)); next(); };
+const isAdmin = (req) => Boolean(adminEntryFor(req));
+// GET cho phép viewer + admin, ghi (POST/PATCH/PUT/DELETE) chỉ admin.
+// Token cũ không role mặc định admin nên mọi test/caller hiện tại giữ nguyên.
+const admin = (req, res, next) => {
+  const entry = adminEntryFor(req);
+  if (!entry) return res.status(401).json(refuse("api.err.unauthorized", "Không có quyền.", 401));
+  req.admin = { name: entry.name, role: entry.role };
+  if (req.method !== "GET" && req.method !== "HEAD" && req.method !== "OPTIONS" && entry.role !== "admin") {
+    return res.status(403).json(refuse("api.err.forbidden", "Vai trò viewer chỉ được đọc.", 403));
+  }
+  next();
+};
 
 // Order ids are short, so a lookup endpoint without a limit would let anyone
-// walk the id space. A per-key window is enough here: the app runs as a single
-// process and this only needs to make guessing impractical, not bulletproof.
+// walk the id space. Limit logic lives in src/rate-limit.js so every route
+// shares one window and tests can reset it; the comment about CGNAT/email split
+// below explains the policy this wiring implements.
 //
 // Keyed rather than counted by IP alone, on purpose. Vietnamese mobile carriers
 // put a lot of unrelated buyers behind one public address, so a limit read only
@@ -73,16 +86,6 @@ const admin = (req, res, next) => { if (!isAdmin(req)) return res.status(401).js
 // script on one machine walks many emails, and many machines behind one address
 // hammer the same one. Each has its own budget, so blocking one does not starve
 // the other.
-const attempts = new Map();
-const tooMany = (key, limit) => {
-  const now = Date.now();
-  const recent = (attempts.get(key) || []).filter((time) => now - time < 15 * 60 * 1000);
-  recent.push(now);
-  attempts.set(key, recent);
-  if (attempts.size > 20000) attempts.clear();
-  return recent.length > limit;
-};
-const tooManyAttempts = (req) => tooMany(`ip:${req.ip || "unknown"}`, 10);
 
 app.set("trust proxy", env.trustProxy);
 app.disable("x-powered-by");
@@ -691,9 +694,7 @@ async function resumeOrder(order) {
 // never near a limit. Charging them for the retry would lose the sale and fix
 // nothing. The IP budget stays generous for the same CGNAT reason as the lookup
 // form: one public address can legitimately be many different buyers.
-function checkoutThrottled(req, email) {
-  return tooMany(`checkout-ip:${req.ip || "unknown"}`, 30) || Boolean(email) && tooMany(`checkout-email:${email}`, 12);
-}
+// Implemented in src/rate-limit.js; kept here only as documentation of position.
 
 app.post("/api/checkout", json, async (req, res) => {
   try {

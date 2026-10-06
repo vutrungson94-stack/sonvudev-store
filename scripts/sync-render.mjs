@@ -39,7 +39,7 @@ const api = "https://api.render.com/v1";
 // place these names are written down and the only one with no caller to complain
 // when it falls behind.
 const ALLOWED = [
-  "HOST", "APP_URL", "ADMIN_API_TOKEN", "NODE_ENV", "TRUST_PROXY",
+  "HOST", "APP_URL", "ADMIN_API_TOKEN", "ADMIN_API_TOKENS", "NODE_ENV", "TRUST_PROXY",
   "R2_ACCOUNT_ID", "R2_ACCESS_KEY_ID", "R2_SECRET_ACCESS_KEY", "R2_BUCKET_NAME",
   "R2_UPLOAD_URL_TTL_SECONDS", "R2_DOWNLOAD_URL_TTL_SECONDS",
   "SUPABASE_URL", "SUPABASE_SERVICE_ROLE_KEY",

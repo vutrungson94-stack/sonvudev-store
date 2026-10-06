@@ -1,0 +1,14 @@
+.env
+.env.*
+!.env.example
+logs/
+data/
+backup/
+publish-output/
+build-reports/
+.gbuildcache/
+.wrangler/
+.git/
+node_modules/
+--help/
+.tmp-*

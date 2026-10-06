@@ -36,7 +36,10 @@
     "start": "node src/server.js",
     "dev": "node --watch src/server.js",
     "test": "node scripts/run-tests.mjs",
-    "health:check": "node scripts/health-check.mjs"
+    "health:check": "node scripts/health-check.mjs",
+    "logs:prune": "node scripts/prune-logs.mjs",
+    "backup": "node scripts/backup.mjs",
+    "provenance": "node scripts/provenance.mjs"
   },
   "files": [
     "src",
@@ -46,6 +49,7 @@
     "cloudflare",
     "deploy",
     "render.yaml",
+    "Dockerfile",
     ".env.example",
     "README.md"
   ],

@@ -41,10 +41,11 @@ const DICT = {
     // Every refusal the API makes. The server sends the key and the Vietnamese
     // sentence together (src/refuse.js); the browser uses the key, so a visitor who
     // switched the shop to English is told what went wrong in English.
-    // 45 keys, one per refusal — before this they were Vietnamese sentences chosen by
+    // 46 keys, one per refusal — before this they were Vietnamese sentences chosen by
     // whichever route happened to fail, and the browser preferred them over its own
     // dictionary, so a failed checkout explained itself in the wrong language.
     'api.err.unauthorized': 'Không có quyền.',
+    'api.err.forbidden': 'Vai trò viewer chỉ được đọc.',
     'api.err.catalogLoad': 'Không thể tải danh mục',
     'api.err.productNotFound': 'Không tìm thấy sản phẩm',
     'api.err.productLoad': 'Không thể tải sản phẩm',
@@ -522,6 +523,7 @@ const DICT = {
     'nav.home': 'Back to home',
 
     'api.err.unauthorized': 'Not authorised.',
+    'api.err.forbidden': 'The viewer role is read-only.',
     'api.err.catalogLoad': 'Could not load the catalogue',
     'api.err.productNotFound': 'Product not found',
     'api.err.productLoad': 'Could not load the product',

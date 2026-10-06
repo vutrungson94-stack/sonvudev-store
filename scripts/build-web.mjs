@@ -4,7 +4,7 @@ import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { walkProjectFiles, JS_EXTENSIONS } from './lib/files.mjs';
-import { ARTIFACT_DIRECTORIES, ARTIFACT_FILES } from './lib/artifact.mjs';
+import { ARTIFACT_DIRECTORIES, ARTIFACT_FILES, ARTIFACT_EXCLUDE_DIRS, ARTIFACT_EXCLUDE_SUFFIXES } from './lib/artifact.mjs';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 // The build refuses to package without each of these. Every one was added because
@@ -20,7 +20,7 @@ const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 // discovered by a buyer. public/order-client.js is here for the same reason as
 // the rest: four pages load it, and it holds the access token and the download
 // handshake they all share.
-const required = ['package.json', 'src/server.js', 'src/app.js', 'src/store.js', 'src/r2.js', 'src/paypal.js', 'src/paypal-environment.js', 'src/payments.js', 'src/rates.js', 'src/geo.js', 'src/indexnow.js', 'src/pages.js', 'src/reviews.js', 'src/format.js', 'src/config.js', 'src/notify.js', 'src/supabase-http.js', 'src/refuse.js', 'src/robots.js', 'public/index.html', 'public/i18n.js', 'public/styles.css', 'public/format.js', 'public/order-client.js', 'public/app.js', 'public/admin.html', 'public/admin.js', 'public/paypal-return.html', 'public/paypal-return.js', 'public/lookup.html', 'public/lookup.js', 'public/order.html', 'public/order.js', 'public/terms.html', 'public/privacy.html', 'public/refund.html', 'public/404.html', 'public/about.html', 'public/related.js', 'public/favicon.svg', 'public/favicon.ico', 'public/mask-icon.png', 'public/apple-touch-icon.png', 'public/logo-1024.png', 'public/logo-ink-64.png', 'public/logo-mint-512.png', 'public/icon-16.png', 'public/icon-32.png', 'public/icon-192.png', 'public/icon-512.png', 'public/img/sonvudev.logo.png', 'public/og.png', 'scripts/production-check.mjs', 'scripts/audit-web.mjs', 'scripts/case-check.mjs', 'scripts/seo-check.mjs', 'scripts/r2-cors.mjs', 'scripts/run-tests.mjs', 'scripts/lib/artifact.mjs', 'scripts/lib/cors.mjs', 'scripts/lib/files.mjs', 'cloudflare/r2-cors.json', 'render.yaml'];
+const required = ['package.json', 'src/server.js', 'src/app.js', 'src/store.js', 'src/r2.js', 'src/paypal.js', 'src/paypal-environment.js', 'src/payments.js', 'src/rates.js', 'src/geo.js', 'src/indexnow.js', 'src/pages.js', 'src/reviews.js', 'src/format.js', 'src/config.js', 'src/notify.js', 'src/supabase-http.js', 'src/refuse.js', 'src/robots.js', 'src/rate-limit.js', 'src/admin-auth.js', 'public/index.html', 'public/i18n.js', 'public/styles.css', 'public/format.js', 'public/order-client.js', 'public/app.js', 'public/admin.html', 'public/admin.js', 'public/paypal-return.html', 'public/paypal-return.js', 'public/lookup.html', 'public/lookup.js', 'public/order.html', 'public/order.js', 'public/terms.html', 'public/privacy.html', 'public/refund.html', 'public/404.html', 'public/about.html', 'public/related.js', 'public/favicon.svg', 'public/favicon.ico', 'public/mask-icon.png', 'public/apple-touch-icon.png', 'public/logo-1024.png', 'public/logo-ink-64.png', 'public/logo-mint-512.png', 'public/icon-16.png', 'public/icon-32.png', 'public/icon-192.png', 'public/icon-512.png', 'public/img/sonvudev.logo.png', 'public/og.png', 'scripts/production-check.mjs', 'scripts/audit-web.mjs', 'scripts/case-check.mjs', 'scripts/seo-check.mjs', 'scripts/r2-cors.mjs', 'scripts/run-tests.mjs', 'scripts/provenance.mjs', 'scripts/prune-logs.mjs', 'scripts/backup.mjs', 'scripts/lib/artifact.mjs', 'scripts/lib/cors.mjs', 'scripts/lib/files.mjs', 'cloudflare/r2-cors.json', 'Dockerfile', 'render.yaml'];
 // One walk, shared with lint and metrics, so all three measure the same source.
 // This used to keep a private copy of the directory list that did not exclude
 // publish-output, which meant the build re-checked the artifact it had just
@@ -54,6 +54,11 @@ const caseSummary = (caseCheck.stdout.match(/\[case\].*/g) || []).pop() || '';
 const metrics = spawnSync(process.execPath, [path.join(root, 'scripts', 'metrics.mjs')], { encoding: 'utf8' });
 if (metrics.status !== 0) throw new Error(`Metrics regressed:\n${metrics.stdout}${metrics.stderr}`);
 const metricsSummary = (metrics.stdout.match(/\[metrics\].*/g) || []).pop() || '';
+// Provenance + SBOM nội bộ: ai build cái gì bằng gì. Chạy trước khi đóng gói để
+// build-reports/provenance.json nói về đúng cây nguồn vừa pass audit/metrics.
+const provenance = spawnSync(process.execPath, [path.join(root, 'scripts', 'provenance.mjs')], { encoding: 'utf8' });
+if (provenance.status !== 0) throw new Error(`Provenance failed:\n${provenance.stdout}${provenance.stderr}`);
+const provenanceSummary = (provenance.stdout.match(/\[provenance\].*/g) || []).pop() || '';
 // The artifact is the single definition of what ships, and deploy/deploy.sh
 // deploys this directory and nothing else. It used to be written here and then
 // ignored: the deploy script copied the entire working tree instead, so the
@@ -74,8 +79,25 @@ for (const directory of ARTIFACT_DIRECTORIES) {
 for (const file of ARTIFACT_FILES) {
   await cp(path.join(root, file), path.join(publishRoot, file), { force: true });
 }
+// Prune tool scratch that lives inside artifact directories (notably
+// cloudflare/keep-awake/.wrangler). cp is recursive over whole directories,
+// so without this a local `wrangler deploy` or gbuild run ships its cache.
+for (const dir of ARTIFACT_EXCLUDE_DIRS) {
+  await rm(path.join(publishRoot, 'cloudflare', 'keep-awake', dir), { recursive: true, force: true });
+  for (const top of ARTIFACT_DIRECTORIES) {
+    await rm(path.join(publishRoot, top, dir), { recursive: true, force: true });
+  }
+}
 await mkdir(path.join(root, 'build-reports'), { recursive: true });
 const artifactFiles = (await walkProjectFiles(publishRoot)).map((file) => path.relative(root, file).replaceAll('\\', '/'));
+const shippedScratch = artifactFiles.filter((file) => {
+  const base = file.slice(file.lastIndexOf('/') + 1);
+  return ARTIFACT_EXCLUDE_DIRS.some((d) => file.includes(`/${d}/`) || base === d)
+    || ARTIFACT_EXCLUDE_SUFFIXES.some((s) => base.endsWith(s));
+});
+if (shippedScratch.length) {
+  throw new Error(`Artifact chứa file scratch của tool, không được deploy:\n  ${shippedScratch.join('\n  ')}`);
+}
 
 // Nothing that can hold a secret may leave the machine inside the artifact.
 //
@@ -95,6 +117,6 @@ const shippedEnv = artifactFiles.filter((file) => {
 if (shippedEnv.length) {
   throw new Error(`Artifact chứa file biến môi trường, không được deploy:\n  ${shippedEnv.join('\n  ')}\n.env.example là file duy nhất được phép.`);
 }
-const report = { application: 'SonVuDev Store', mode: 'web-node', generatedAt: new Date().toISOString(), javascriptFilesChecked: jsFiles.length, requiredFilesChecked: required.length, audit: auditSummary, caseCheck: caseSummary, metrics: metricsSummary, artifactFiles: artifactFiles.length, artifactPath: 'publish-output/node', status: 'passed' };
+const report = { application: 'SonVuDev Store', mode: 'web-node', generatedAt: new Date().toISOString(), javascriptFilesChecked: jsFiles.length, requiredFilesChecked: required.length, audit: auditSummary, caseCheck: caseSummary, metrics: metricsSummary, provenance: provenanceSummary, artifactFiles: artifactFiles.length, artifactPath: 'publish-output/node', status: 'passed' };
 await writeFile(path.join(root, 'build-reports', 'web-build.json'), JSON.stringify(report, null, 2));
-console.log(`[build] PASS: ${required.length} required files, ${jsFiles.length} JavaScript files checked, ${auditSummary}, ${caseSummary}, ${metricsSummary}, ${artifactFiles.length} deploy files packaged into publish-output/node.`);
+console.log(`[build] PASS: ${required.length} required files, ${jsFiles.length} JavaScript files checked, ${auditSummary}, ${caseSummary}, ${metricsSummary}, ${provenanceSummary}, ${artifactFiles.length} deploy files packaged into publish-output/node.`);

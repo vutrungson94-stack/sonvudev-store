@@ -11,6 +11,10 @@
     ]
   },
   "security": {
+    "sast": {
+      "enabled": true,
+      "failOnFindings": true
+    },
     "excludeDirs": [
       ".env"
     ],
@@ -33,7 +37,7 @@
       }
     },
     "provenance": {
-      "enabled": false
+      "enabled": true
     },
     "artifactSign": {
       "enabled": false
