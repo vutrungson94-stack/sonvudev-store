@@ -13,7 +13,7 @@ import { env } from "./config.js";
 // the site root and compares the body with the key it was issued, so the file
 // has to be reachable over plain HTTPS on the same host as the URLs submitted.
 
-const ENDPOINT = "https://api.indexnow.org/indexnow";
+const ENDPOINT = env.indexNow.endpoint;
 const TIMEOUT_MS = 8000;
 const KEY_PATTERN = /^[a-z0-9-]{8,128}$/i;
 

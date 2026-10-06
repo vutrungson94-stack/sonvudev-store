@@ -1,9 +1,6 @@
 import { env } from "./config.js";
 
-const SOURCES = [
-  "https://open.er-api.com/v6/latest/USD",
-  "https://api.exchangerate-api.com/v4/latest/USD",
-];
+const SOURCES = env.rates.sourceUrls;
 
 const cache = { rate: 0, fetchedAt: 0, inflight: null };
 const isFresh = (ttlMs) => cache.rate > 0 && Date.now() - cache.fetchedAt < ttlMs;

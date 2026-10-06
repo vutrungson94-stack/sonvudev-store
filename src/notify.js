@@ -179,7 +179,7 @@ ${spec.blocks.map((b) => `<p style="margin:0 0 10px;font-size:13px;line-height:1
 
 async function deliver(to, message, order, key) {
   if (isConfigured.email) {
-    const response = await fetch("https://api.resend.com/emails", {
+    const response = await fetch(env.notify.resendApiUrl, {
       method: "POST",
       headers: {
         Authorization: `Bearer ${env.email.resendKey}`,

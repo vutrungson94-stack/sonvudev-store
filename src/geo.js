@@ -33,8 +33,8 @@ const validCode = (value) => (/^[A-Za-z]{2}$/.test(String(value || "").trim()) ?
 // ipapi.co answers with a bare country code, which is one less thing to go
 // wrong than parsing a geo-IP JSON payload. The second is the fallback.
 const providers = (ip) => [
-  { url: `https://ipapi.co/${ip}/country/`, read: (text) => validCode(text) },
-  { url: `https://ipwho.is/${ip}`, read: (text) => { const data = JSON.parse(text); return data?.success ? validCode(data.country_code) : ""; } },
+  { url: env.geo.provider1UrlTemplate.replace("{ip}", encodeURIComponent(ip)), read: (text) => validCode(text) },
+  { url: env.geo.provider2UrlTemplate.replace("{ip}", encodeURIComponent(ip)), read: (text) => { const data = JSON.parse(text); return data?.success ? validCode(data.country_code) : ""; } },
 ];
 
 export function createGeoResolver({ fetchImpl = fetch, timeoutMs = 1500 } = {}) {

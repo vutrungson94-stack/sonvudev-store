@@ -148,6 +148,20 @@ export const env = {
     // to listing every payment method without a recommendation.
     lookup: /^off$/i.test(value("GEO_LOOKUP", "auto")) ? "off" : "auto",
     cacheHours: numberValue("GEO_CACHE_HOURS", 24),
+    provider1UrlTemplate: value("GEO_PROVIDER_1_URL", "https://ipapi.co/{ip}/country/"),
+    provider2UrlTemplate: value("GEO_PROVIDER_2_URL", "https://ipwho.is/{ip}"),
+  },
+  rates: {
+    sourceUrls: value("RATES_SOURCE_URLS", "https://open.er-api.com/v6/latest/USD,https://api.exchangerate-api.com/v4/latest/USD")
+      .split(",")
+      .map((s) => s.trim())
+      .filter(Boolean),
+  },
+  indexNow: {
+    endpoint: value("INDEXNOW_ENDPOINT", "https://api.indexnow.org/indexnow"),
+  },
+  notify: {
+    resendApiUrl: value("RESEND_API_URL", "https://api.resend.com/emails"),
   },
   orders: {
     // Unpaid orders are cancelled once this many hours have passed. The window
