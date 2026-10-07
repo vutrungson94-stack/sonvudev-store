@@ -962,22 +962,12 @@ const I18N = {
   get lang() { return current; },
   t(key, fallback, vars) {
     const table = DICT[current] || DICT.vi;
-    // Placeholders are filled here rather than by every caller. A sentence that
-    // mentions an order id or a countdown reads as broken the moment one of them
-    // is left as a literal brace.
-    //
-    // {brand} always resolves to the shop name from configuration, so copy never
-    // hardcodes it: a rebrand edits BRAND_NAME, not eleven dictionary entries in
-    // two languages. Explicit vars win over the default, and braces nobody knows
-    // are left alone rather than blanked.
     const fill = (text) => String(text).replace(/\{(\w+)\}/g, (match, name) => {
       if (vars && vars[name] !== undefined) return vars[name];
       if (name === "brand") return host();
       return match;
     });
     if (table[key] !== undefined) return fill(table[key]);
-    // Never render an empty box for a missing key: fall back to Vietnamese,
-    // then to whatever the caller passed, so the gap stays visible.
     if (DICT.vi[key] !== undefined) return fill(DICT.vi[key]);
     return fill(fallback !== undefined ? fallback : key);
   },
@@ -991,24 +981,11 @@ const I18N = {
   },
   toggle() { I18N.set(current === 'vi' ? 'en' : 'vi'); },
   onChange(fn) { listeners.add(fn); return () => listeners.delete(fn); },
-  // Everything below is shared rather than retyped per page. The storefront, the
-  // recovery form and the order page each had their own escape, money and status
-  // helpers; two of those copies had already drifted apart, so one order showed a
-  // different status word depending on which screen the buyer was looking at.
-  //
-  // The implementations live in public/format.js, loaded before this file on
-  // every page: one escape and one money formatter for the whole browser side,
-  // counted by scripts/metrics.mjs so a new copy fails the build.
   get locale() { return current === 'en' ? 'en-US' : 'vi-VN'; },
   esc(value) {
     return window.SVDFormat.esc(value);
   },
   money(value, currency = 'VND') {
-    // The separator follows the currency, not the page language: VND keeps
-    // its dot grouping and USD its dollar sign on every screen, which is
-    // what public/format.js and the server both apply. A price on the page
-    // and the price on the receipt have to be the same number written the
-    // same way, or reconciling one against the other means converting by eye.
     return window.SVDFormat.money(value, currency);
   },
   date(value) {
@@ -1017,46 +994,11 @@ const I18N = {
   },
   statusKey(status) { return STATUS_KEYS[status] || 'order.status.pending'; },
   status(status) { return I18N.t(I18N.statusKey(status), status); },
-  /**
-   * Turns a failed API response into a sentence in the reader's language.
-   *
-   * Every refusal the server makes carries two fields: `code`, a key in this
-   * dictionary, and `error`, a Vietnamese sentence for curl and for log lines
-   * (src/refuse.js). The browser must use `code`.
-   *
-   * It did not, and the order of the two decided the language. Every call site
-   * was `payload.error || T('some.fallback')` — the server's sentence won, because
-   * it was first — so a visitor who had switched the shop to English and then got
-   * a refusal was told, in Vietnamese, why. On the checkout form, at the moment
-   * of paying, which is where a buyer is least able to tell a real problem from
-   * one they caused.
-   *
-   * So the key is consulted first and the sentence is only reached for when there
-   * is no code — an older server, a proxy in between, or a response that never
-   * came from this one. `fallbackKey` is for the case where even that fails.
-   *
-   * @param {object|null} payload the parsed JSON body of a failed response
-   * @param {string} fallbackKey a key to use when the body carries nothing usable
-   * @returns {string} a sentence ready to put on screen
-   */
   apiError(payload, fallbackKey) {
     const code = payload && payload.code;
     if (code) return I18N.t(code, payload.error || I18N.t(fallbackKey, ''));
     return payload && payload.error ? payload.error : I18N.t(fallbackKey, '');
   },
-  /**
-   * The countdown clock.
-   *
-   * The checkout modal and the order page each carried their own copy: the same
-   * remaining-ms calculation, the same zero padding, the same HH:MM:SS formatting,
-   * the same "is this order closed" test. Two copies of a clock is two chances to
-   * show a buyer a different amount of time to pay on two screens, and a
-   * discrepancy there reads as being charged by the shop.
-   *
-   * It is measured against the server's clock rather than the device's, so a phone
-   * with the wrong time cannot invent extra hours. `deadline` is an ISO string and
-   * `serverTime` is the server's own clock from the same response.
-   */
   clock(deadline, serverTime) {
     const at = deadline ? new Date(deadline).getTime() : null;
     const skew = serverTime ? new Date(serverTime).getTime() - Date.now() : 0;
@@ -1076,27 +1018,11 @@ const I18N = {
       },
     };
   },
-  /**
-   * The one sentence that explains what state an order is in.
-   *
-   * The checkout modal and the order page each used to have their own. They were
-   * not two wordings of one rule: the modal knew five states and the page knew
-   * ten, so a refunded order, a failed payment or an unconfirmed PayPal capture
-   * read as a bland "đang chờ thanh toán" in one and as the truth in the other.
-   * Two screens describing the same order differently is the single worst thing
-   * a shop can do to a buyer who is worried about their money.
-   *
-   * The order here is the page's, because it is the complete one: what the buyer
-   * needs to know is which world they are in, and that is decided by refund first,
-   * then payment, then delivery, then the clock.
-   */
   orderHint(order, options) {
     const deadlineAt = options && options.expiresAt ? new Date(options.expiresAt).getTime() : null;
     const serverSkew = options && options.serverTime ? new Date(options.serverTime).getTime() - Date.now() : 0;
     const left = deadlineAt === null ? null : deadlineAt - (Date.now() + serverSkew);
     const paid = order.status === 'paid' || Number(order.paidCount || 0) > 0 || Boolean(order.paidAt);
-    // The order is closed once the file has been handed over, and closed means
-    // "reopen it if it broke", which is a different sentence from "paid".
     const delivered = Boolean(order.deliveredAt) && order.status !== 'paid';
     const provider = order.paymentProvider || 'bank_transfer';
 
@@ -1137,6 +1063,16 @@ function apply(root = document) {
       if (attr && key) el.setAttribute(attr, I18N.t(key, el.getAttribute(attr)));
     });
   });
+  root.querySelectorAll('[data-vi],[data-en]').forEach((el) => {
+    const vi = el.dataset.vi;
+    const en = el.dataset.en;
+    if (!vi && !en) return;
+    if (current === 'vi') {
+      if (vi && el.textContent !== vi) el.textContent = vi;
+    } else {
+      if (en && el.textContent !== en) el.textContent = en;
+    }
+  });
   document.documentElement.lang = current;
 }
 
@@ -1159,23 +1095,14 @@ function markActiveLanguage() {
 
 function boot() {
   apply();
-  // The switch is two buttons, so both get a handler rather than one button whose
-  // label changes. `data-lang-set` names the target language instead of "the other
-  // one", which is what makes the control a control rather than a toggle: clicking
-  // the half that is already active is a no-op rather than a flip.
+  // Language switch buttons - client-side toggle only (no navigation)
   document.querySelectorAll('[data-lang-switch] [data-lang-set]').forEach((button) => {
     button.addEventListener('click', () => {
       const target = button.dataset.langSet;
-      const url = target === 'en' ? '/en' : '/';
-      if (window.location.pathname === url) return;
-      try { localStorage.setItem('svd-lang', target); } catch (_) {}
-      window.location.href = url;
+      I18N.set(target);
     });
   });
-  // The single-button form, kept for any page that wants one. Nothing in the project
-  // uses it any more — the switch lives on the homepage only — but the mechanism is
-  // two lines and removing it would mean a page could not have a switch again without
-  // editing the dictionary.
+  // The single-button form - kept for compatibility but does client-side toggle
   const button = document.querySelector('[data-lang-toggle]');
   if (button) {
     button.textContent = I18N.t('lang.switch');

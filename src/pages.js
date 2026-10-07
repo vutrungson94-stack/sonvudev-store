@@ -558,69 +558,68 @@ const meta = ({ title, description, url, image = absolute(OG_IMAGE_PATH), type =
  * and the arrow are real links, which is what makes the page usable with
  * JavaScript turned off.
 */
-export function renderIndexGrid(products, lang = "vi") {
-  const copy = getCopy(lang);
+/**
+ * The homepage product grid, rendered in Vietnamese with data attributes
+ * for client-side translation. Categories and badges include both VI and EN
+ * so the browser can switch languages without a server round-trip.
+ */
+export function renderIndexGrid(products) {
   const cards = (products || []).filter(isSellable).map((product) => {
     const art = esc(String(product.category || "khac").toLowerCase().replace(/\s+/g, "-"));
     const url = absolute(`/product/${encodeURIComponent(product.slug)}`);
-    const features = (product.features || []).slice(0, 2)
-      .map((item) => `<li>✓ ${esc(fillCopy(item))}</li>`).join("");
     const badgeRaw = String(product.badge || "").trim();
     const badgeFilled = fillCopy(badgeRaw);
-    const badgeLabel = badgeFilled ? localised(badgeFilled, copy.badges, badgeFilled) : (lang === "en" ? "New" : "Mới");
-    const categoryLabel = localised(String(product.category || "").trim(), copy.categories, copy.software);
-    const buyAria = lang === "en" ? `Buy ${esc(product.name)}` : `Mua ${esc(product.name)}`;
+    const badgeVi = badgeFilled || "Mới";
+    const badgeEn = COPY_EN.badges[badgeVi] || badgeVi;
+    const categoryRaw = String(product.category || "").trim();
+    const categoryVi = categoryRaw || COPY_VI.software;
+    const categoryEn = COPY_EN.categories[categoryVi] || categoryVi;
+    const nameVi = esc(fillCopy(product.name));
+    const nameEn = product.nameEn ? esc(fillCopy(product.nameEn)) : nameVi;
+    const descVi = esc(fillCopy(product.shortDescription || product.short_description || product.description || ""));
+    const descEn = product.shortDescriptionEn ? esc(fillCopy(product.shortDescriptionEn)) : descVi;
+    
+    const featuresVi = (product.features || []).slice(0, 2).map((item) => esc(fillCopy(item)));
+    const featuresEn = (product.featuresEn && product.featuresEn.length)
+      ? (product.featuresEn || []).slice(0, 2).map((item) => esc(fillCopy(item)))
+      : featuresVi;
+    
+    const features = featuresVi.map((item, index) => 
+      `<li data-vi="✓ ${item}" data-en="✓ ${(featuresEn[index] || item)}">✓ ${item}</li>`).join("");
     return `<article class="product-card" data-id="${esc(product.id)}">
     <div class="product-art art-${art}">
-      <span class="product-badge" data-i18n="products.new">${esc(badgeLabel)}</span>
+      <span class="product-badge" data-i18n="products.new" data-vi="${esc(badgeVi)}" data-en="${esc(badgeEn)}">${esc(badgeVi)}</span>
       <div class="product-logo">${esc(initials(product.name))}</div>
       <div class="art-grid"></div>
       <span class="art-spark">✦</span>
     </div>
     <div class="product-info">
-      <div class="product-meta"><span>${esc(product.platform || "Windows")} · v${esc(product.version || "1.0")}</span><span>${esc(categoryLabel)}</span></div>
-      <h3><a href="${esc(url)}">${esc(fillCopy(product.name))}</a></h3>
-      <p>${esc(fillCopy(product.shortDescription || product.short_description || product.description || ""))}</p>
+      <div class="product-meta"><span>${esc(product.platform || "Windows")} · v${esc(product.version || "1.0")}</span><span data-vi="${esc(categoryVi)}" data-en="${esc(categoryEn)}">${esc(categoryVi)}</span></div>
+      <h3><a href="${esc(url)}" data-vi="${nameVi}" data-en="${nameEn}">${nameVi}</a></h3>
+      <p data-vi="${descVi}" data-en="${descEn}">${descVi}</p>
       <ul>${features}</ul>
       <div class="product-buy">
         <strong>${esc(money(product.price, product.currency))}</strong>
-        <a class="round-arrow" href="${esc(url)}" data-i18n-attr="aria-label:products.buyAria" aria-label="${buyAria}">↗</a>
+        <a class="round-arrow" href="${esc(url)}" data-i18n-attr="aria-label:products.buyAria" aria-label="Mua ${nameVi}">↗</a>
       </div>
     </div>
   </article>`;
   });
-  const emptyTitle = lang === "en" ? "No products" : "Chưa có sản phẩm";
-  const emptyText = lang === "en" ? "Try a different filter." : "Hãy thử bộ lọc khác.";
   return cards.length
     ? cards.join("\n")
-    : `<div class="empty-state"><b data-i18n="products.emptyTitle">${esc(emptyTitle)}</b><p data-i18n="products.emptyText">${esc(emptyText)}</p></div>`;
+    : `<div class="empty-state"><b data-i18n="products.emptyTitle" data-vi="Không có sản phẩm nào khớp" data-en="No products match">Không có sản phẩm nào khớp</b><p data-i18n="products.emptyText" data-vi="Hãy thử từ khoá khác, hoặc bỏ bộ lọc đang chọn." data-en="Try a different word, or clear the filter you picked.">Hãy thử từ khoá khác, hoặc bỏ bộ lọc đang chọn.</p></div>`;
 };
-/** The product count above the grid, translated by language. */
-export const renderIndexCount = (products, lang = "vi") => {
+/** The product count above the grid, in Vietnamese. The template's span already has data-vi/data-en attributes. */
+export const renderIndexCount = (products) => {
   const total = (products || []).filter(isSellable).length;
-  return lang === "en"
-    ? `${String(total).padStart(2, "0")} products`
-    : `${String(total).padStart(2, "0")} sản phẩm`;
+  return `${String(total).padStart(2, "0")} sản phẩm`;
 };
 
 /**
  * The homepage's category filter row, built from what is actually for sale.
- *
- * It used to be three literals in index.html — two categories and a platform —
- * sitting beside a grid that was loaded live. Nothing connected the two, so a
- * product published in a fourth category appeared in the grid with no button that
- * reached it, while the three buttons offered a subset nobody had chosen. One of
- * them was not filtering on the same thing as the other two.
- *
- * The buttons come from the same products the grid renders, so one exists exactly
- * when there is something behind it, and stops existing when there is not.
- *
- * "All" keeps its data-i18n key because it is a word in the interface.
- * Categories are translated based on the page language so English visitors see
- * English filter buttons.
+ * Rendered in Vietnamese with data-vi/data-en attributes for client-side translation.
  */
-export const renderIndexFilters = (products, lang = "vi") => {
-  const copy = getCopy(lang);
+export const renderIndexFilters = (products) => {
   const counts = new Map();
   for (const product of products || []) {
     const category = String(product.category || "").trim();
@@ -630,12 +629,12 @@ export const renderIndexFilters = (products, lang = "vi") => {
   const buttons = [...counts.entries()]
     .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0], "vi"))
     .map(([category, count]) => {
-      const label = localised(category, copy.categories, category);
-      return `<button class="filter" data-filter="${esc(category)}" data-count="${count}">${esc(label)}</button>`;
+      const categoryVi = category;
+      const categoryEn = COPY_EN.categories[categoryVi] || categoryVi;
+      return `<button class="filter" data-filter="${esc(category)}" data-count="${count}" data-vi="${esc(categoryVi)}" data-en="${esc(categoryEn)}">${esc(categoryVi)}</button>`;
     })
     .join("");
-  const allLabel = lang === "en" ? "All" : "Tất cả";
-  return `<button class="filter active" data-filter="all" data-i18n="products.all">${esc(allLabel)}</button>${buttons}`;
+  return `<button class="filter active" data-filter="all" data-i18n="products.all" data-vi="Tất cả" data-en="All">Tất cả</button>${buttons}`;
 };
 
 /**
