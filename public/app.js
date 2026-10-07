@@ -167,9 +167,16 @@ function visibleProducts() {
 // we prefer those fields but always fall back to the Vietnamese text, so a
 // product that has not been translated yet never shows an empty description.
 const CATEGORIES = { "Công cụ": "Tools", "Tiện ích": "Utilities", "Phần mềm": "Software", "Khác": "Other" };
+const CATEGORIES_VI = Object.fromEntries(Object.entries(CATEGORIES).map(([k, v]) => [v, k]));
 const BADGES = { "Mới": "New", "Bán chạy": "Best seller", "Cập nhật": "Updated", "Phát hành": "Release" };
+const BADGES_VI = Object.fromEntries(Object.entries(BADGES).map(([k, v]) => [v, k]));
 function localized(p) {
-  if (window.I18N.lang !== 'en') return p;
+  if (window.I18N.lang !== 'en') {
+    const cat = CATEGORIES_VI[p.category] || p.category;
+    const badge = BADGES_VI[p.badge] || p.badge;
+    if (cat === p.category && badge === p.badge) return p;
+    return { ...p, category: cat, badge };
+  }
   const hasEn = typeof p.descriptionEn === 'string' && p.descriptionEn.trim();
   if (!hasEn) return p;
   return {

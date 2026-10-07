@@ -49,7 +49,7 @@ export const money = (amount, currency) => {
   try {
     return new Intl.NumberFormat(
       currency === "USD" ? "en-US" : "vi-VN",
-      currency === "USD" ? { style: "currency", currency } : { maximumFractionDigits: 0 },
+      currency === "USD" ? { style: "currency", currency } : { style: "currency", currency, maximumFractionDigits: 0 },
     ).format(value);
   } catch {
     return `${value} ${currency || ""}`.trim();

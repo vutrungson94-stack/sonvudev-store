@@ -270,8 +270,8 @@ test('số tiền theo currency, không theo ngôn ngữ của trang', async () 
   // writes it on the product page and the receipt email writes it — because
   // an English page showing "249,000" beside a receipt that says "249.000"
   // is a discrepancy that reads as being overcharged.
-  assert.ok(String(vi.nodes.get('order-body').innerHTML).includes('249.000'), 'tieng Viet tach ngan cach bang cham');
-  assert.ok(String(en.nodes.get('order-body').innerHTML).includes('249.000'), 'VND tach ngan cach bang cham tren ca trang tieng Anh — tien theo currency');
+  assert.ok(/249\.000[\s\u00A0]₫/.test(String(vi.nodes.get('order-body').innerHTML)), 'tieng Viet tach ngan cach bang cham');
+  assert.ok(/249\.000[\s\u00A0]₫/.test(String(en.nodes.get('order-body').innerHTML)), 'VND tach ngan cach bang cham tren ca trang tieng Anh — tien theo currency');
   // And a USD amount wears its dollar sign on every screen, the Vietnamese
   // page included, because that is the rail it is charged on.
   const usd = await boot({ lang: 'vi-VN', respond: json({ order: order({ amount: 381, currency: 'USD' }), payment: null }) });

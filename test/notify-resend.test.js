@@ -111,7 +111,7 @@ test('Resend từ chối thì ghi nhận lỗi và không làm hỏng đơn hàn
 test('xem trước thư không gửi đi', () => {
   const message = previewMessage(order(), 'created');
   assert.ok(message.html.includes('SVD-MAIL01'));
-  assert.ok(message.html.includes('199.000'), 'phải điền số tiền thật để soi lỗi bố cục');
+  assert.ok(/199\.000[\s\u00A0]₫/.test(message.html), 'phải điền số tiền thật để soi lỗi bố cục');
   assert.ok(!message.html.includes('undefined'), 'không được lộ undefined trong thư gửi khách');
   assert.ok(!message.html.includes('[object Object]'));
   // Both the code and the lookup route, because losing a device is the case the

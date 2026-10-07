@@ -29,7 +29,7 @@
     var tag = currency === 'USD' ? 'en-US' : 'vi-VN';
     var options = currency === 'USD'
       ? { style: 'currency', currency: 'USD' }
-      : { maximumFractionDigits: 0 };
+      : { style: 'currency', currency: currency, maximumFractionDigits: 0 };
     try {
       return new Intl.NumberFormat(tag, options).format(amount);
     } catch (e) {

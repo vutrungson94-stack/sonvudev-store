@@ -77,7 +77,7 @@ test('trang sản phẩm trả về HTML có nội dung thật, không phải kh
   // The whole point: a crawler that never runs JavaScript still sees the product.
   assert.ok(html.includes('SEO Tester Pro'), 'phải có tên sản phẩm trong HTML');
   assert.ok(html.includes('2.1'), 'phải có phiên bản');
-  assert.ok(html.includes('249.000'), 'phải có giá định dạng tiếng Việt');
+  assert.ok(/249\.000[\s\u00A0]₫/.test(html), 'phải có giá định dạng tiếng Việt');
   assert.ok(html.includes('Đo tải liên tục'), 'phải có mô tả dài');
   assert.ok(html.includes('Windows 10 trở lên'), 'phải có yêu cầu hệ thống');
   assert.ok(html.includes('TÍNH NĂNG CHÍNH'), 'phải tách phần theo tiêu đề ===');
