@@ -170,6 +170,16 @@ const CATEGORIES = { "Công cụ": "Tools", "Tiện ích": "Utilities", "Phần 
 const CATEGORIES_VI = Object.fromEntries(Object.entries(CATEGORIES).map(([k, v]) => [v, k]));
 const BADGES = { "Mới": "New", "Bán chạy": "Best seller", "Cập nhật": "Updated", "Phát hành": "Release" };
 const BADGES_VI = Object.fromEntries(Object.entries(BADGES).map(([k, v]) => [v, k]));
+// A diacritic-tolerant map so a "con co" or "CON CO" in the catalogue still
+// maps to Tools instead of leaking raw Vietnamese text on the English page.
+const CATEGORIES_NORM = Object.fromEntries(
+  Object.entries(CATEGORIES).map(([k, v]) => [foldDiacritics(k), v])
+);
+// Same treatment for badges, including badges that carry a trailing version
+// such as "Phat hanh 1.4.0" so the map key is the badge alone.
+const BADGES_NORM = Object.fromEntries(
+  Object.entries(BADGES).map(([k, v]) => [foldDiacritics(k), v])
+);
 function localized(p) {
   if (window.I18N.lang !== 'en') {
     const cat = CATEGORIES_VI[p.category] || p.category;
