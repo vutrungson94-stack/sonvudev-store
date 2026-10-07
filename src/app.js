@@ -262,8 +262,9 @@ const invalidatePages = () => {
   textCache.clear();
 };
 
-async function renderPage(file) {
-  const cached = pageCache.get(file);
+async function renderPage(file, lang = "vi") {
+  const cacheKey = `${file}:${lang}`;
+  const cached = pageCache.get(cacheKey);
   if (cached && Date.now() - cached.at < PAGE_TTL_MS) return cached.html;
   const template = await fs.readFile(path.join(publicDir, file), "utf8");
   // Optional rather than assumed: a file missing from the table is rendered with
@@ -276,8 +277,8 @@ async function renderPage(file) {
   // product list the tokens describe.
   const html = fillPageTokens(template, pageTokenValues({ products, reviewLimits }))
     .replace("</head>", `${verificationMeta()}\n${brandMeta()}\n</head>`)
-    .replace(/(<span class="product-count" id="product-count">)[\s\S]*?(<\/span>)/, `$1${esc(renderIndexCount(products))}$2`)
-    .replace(/<!--filters:start-->[\s\S]*?<!--filters:end-->/, `<!--filters:start-->${renderIndexFilters(products)}<!--filters:end-->`)
+    .replace(/(<span class="product-count" id="product-count">)[\s\S]*?(<\/span>)/, `$1${esc(renderIndexCount(products, lang))}$2`)
+    .replace(/<!--filters:start-->[\s\S]*?<!--filters:end-->/, `<!--filters:start-->${renderIndexFilters(products, lang)}<!--filters:end-->`)
     .replace(/(<section class="stats wrap" id="stats">)([\s\S]*?)(<\/section>)/, (_all, open, _body, close) => {
       // The three counts come from the catalogue, so they are never stale. With
       // nothing on sale the strip is removed rather than zeroed — see renderStats.
@@ -285,14 +286,14 @@ async function renderPage(file) {
       if (!stats) return "";
       return `${open}<div data-stat="products"><strong><span id="stat-products">${stats.products}</span></strong><small data-i18n="stats.1">Sản phẩm đang bán</small></div><div data-stat="platforms"><strong><span id="stat-platforms">${stats.platforms}</span></strong><small data-i18n="stats.2">Nền tảng được hỗ trợ</small></div><div data-stat="releases"><strong><span id="stat-releases">${stats.releases}</span></strong><small data-i18n="stats.3">Bản phát hành đã xuất bản</small></div><div class="stats-note"><span class="spark">✦</span><p data-i18n="stats.note">Mỗi sản phẩm đều được làm ra để giải quyết một vấn đề thật.</p></div>${close}`;
     })
-    .replace(/<!--catalog:start-->[\s\S]*?<!--catalog:end-->/, `<!--catalog:start-->${renderIndexGrid(products)}<!--catalog:end-->`);
-  pageCache.set(file, { at: Date.now(), html });
+    .replace(/<!--catalog:start-->[\s\S]*?<!--catalog:end-->/, `<!--catalog:start-->${renderIndexGrid(products, lang)}<!--catalog:end-->`);
+  pageCache.set(cacheKey, { at: Date.now(), html });
   return html;
 }
 
-const sendPage = (file) => async (_req, res) => {
+const sendPage = (file, lang = "vi") => async (_req, res) => {
   try {
-    res.set("Cache-Control", "public, max-age=300").type("html").send(await renderPage(file));
+    res.set("Cache-Control", "public, max-age=300").type("html").send(await renderPage(file, lang));
   } catch (error) {
     console.error(error);
     // A broken template must not take the storefront down with it.
@@ -324,7 +325,10 @@ for (const file of Object.keys(served)) {
   // where a person could paste the address bar they were given and get a different
   // page from the one they were looking at.
   if (file === "index.html") {
-    app.get(["/", "/index.html"], sendPage(file));
+    // Vietnamese homepage
+    app.get(["/", "/index.html"], sendPage(file, "vi"));
+    // English homepage
+    app.get(["/en", "/en/index.html"], sendPage(file, "en"));
     continue;
   }
   app.get(`/${file}`, sendPage(file));

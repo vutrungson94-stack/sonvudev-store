@@ -557,29 +557,28 @@ const meta = ({ title, description, url, image = absolute(OG_IMAGE_PATH), type =
  * the page's own script runs is a repaint rather than a layout change. The name
  * and the arrow are real links, which is what makes the page usable with
  * JavaScript turned off.
- */
-export function renderIndexGrid(products) {
+*/
+export function renderIndexGrid(products, lang = "vi") {
+  const copy = getCopy(lang);
   const cards = (products || []).filter(isSellable).map((product) => {
     const art = esc(String(product.category || "khac").toLowerCase().replace(/\s+/g, "-"));
     const url = absolute(`/product/${encodeURIComponent(product.slug)}`);
-    // Filled here as well as on the product page. The card and the detail page are
-    // both places a buyer reads the feature list, and a placeholder resolved on one
-    // and not the other puts the braces in front of them on whichever they load
-    // first — the homepage, in fact, which is the one the product page test never
-    // looked at.
     const features = (product.features || []).slice(0, 2)
       .map((item) => `<li>✓ ${esc(fillCopy(item))}</li>`).join("");
-    const badge = esc(fillCopy(product.badge) || "Mới");
-    const buyAria = `Mua ${esc(product.name)}`;
+    const badgeRaw = String(product.badge || "").trim();
+    const badgeFilled = fillCopy(badgeRaw);
+    const badgeLabel = badgeFilled ? localised(badgeFilled, copy.badges, badgeFilled) : (lang === "en" ? "New" : "Mới");
+    const categoryLabel = localised(String(product.category || "").trim(), copy.categories, copy.software);
+    const buyAria = lang === "en" ? `Buy ${esc(product.name)}` : `Mua ${esc(product.name)}`;
     return `<article class="product-card" data-id="${esc(product.id)}">
     <div class="product-art art-${art}">
-      <span class="product-badge" data-i18n="products.new">${badge}</span>
+      <span class="product-badge" data-i18n="products.new">${esc(badgeLabel)}</span>
       <div class="product-logo">${esc(initials(product.name))}</div>
       <div class="art-grid"></div>
       <span class="art-spark">✦</span>
     </div>
     <div class="product-info">
-      <div class="product-meta"><span>${esc(product.platform || "Windows")} · v${esc(product.version || "1.0")}</span><span>${esc(product.category || "")}</span></div>
+      <div class="product-meta"><span>${esc(product.platform || "Windows")} · v${esc(product.version || "1.0")}</span><span>${esc(categoryLabel)}</span></div>
       <h3><a href="${esc(url)}">${esc(fillCopy(product.name))}</a></h3>
       <p>${esc(fillCopy(product.shortDescription || product.short_description || product.description || ""))}</p>
       <ul>${features}</ul>
@@ -590,17 +589,18 @@ export function renderIndexGrid(products) {
     </div>
   </article>`;
   });
-  // An empty catalogue still has to say so in words a crawler reads, rather than
-  // leaving three grey placeholder rectangles in the markup.
+  const emptyTitle = lang === "en" ? "No products" : "Chưa có sản phẩm";
+  const emptyText = lang === "en" ? "Try a different filter." : "Hãy thử bộ lọc khác.";
   return cards.length
     ? cards.join("\n")
-    : `<div class="empty-state"><b data-i18n="products.emptyTitle">Chưa có sản phẩm</b><p data-i18n="products.emptyText">Hãy thử bộ lọc khác.</p></div>`;
-}
-
-/** The "02 sản phẩm" counter above the grid, in the same shape the client writes. */
-export const renderIndexCount = (products) => {
+    : `<div class="empty-state"><b data-i18n="products.emptyTitle">${esc(emptyTitle)}</b><p data-i18n="products.emptyText">${esc(emptyText)}</p></div>`;
+};
+/** The product count above the grid, translated by language. */
+export const renderIndexCount = (products, lang = "vi") => {
   const total = (products || []).filter(isSellable).length;
-  return `${String(total).padStart(2, "0")} sản phẩm`;
+  return lang === "en"
+    ? `${String(total).padStart(2, "0")} products`
+    : `${String(total).padStart(2, "0")} sản phẩm`;
 };
 
 /**
@@ -615,11 +615,12 @@ export const renderIndexCount = (products) => {
  * The buttons come from the same products the grid renders, so one exists exactly
  * when there is something behind it, and stops existing when there is not.
  *
- * "All" keeps its data-i18n key because it is a word in the interface. The
- * categories are not translated, because they are data — the same call the product
- * names make, and the reason a category can be in any language at all.
+ * "All" keeps its data-i18n key because it is a word in the interface.
+ * Categories are translated based on the page language so English visitors see
+ * English filter buttons.
  */
-export const renderIndexFilters = (products) => {
+export const renderIndexFilters = (products, lang = "vi") => {
+  const copy = getCopy(lang);
   const counts = new Map();
   for (const product of products || []) {
     const category = String(product.category || "").trim();
@@ -628,9 +629,13 @@ export const renderIndexFilters = (products) => {
   }
   const buttons = [...counts.entries()]
     .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0], "vi"))
-    .map(([category, count]) => `<button class="filter" data-filter="${esc(category)}" data-count="${count}">${esc(category)}</button>`)
+    .map(([category, count]) => {
+      const label = localised(category, copy.categories, category);
+      return `<button class="filter" data-filter="${esc(category)}" data-count="${count}">${esc(label)}</button>`;
+    })
     .join("");
-  return `<button class="filter active" data-filter="all" data-i18n="products.all">Tất cả</button>${buttons}`;
+  const allLabel = lang === "en" ? "All" : "Tất cả";
+  return `<button class="filter active" data-filter="all" data-i18n="products.all">${esc(allLabel)}</button>${buttons}`;
 };
 
 /**
@@ -732,6 +737,11 @@ export const COPY_EN = {
   refund: "Refunds",
   privacy: "Privacy",
 };
+
+/** Returns the copy table for the given language. */
+function getCopy(lang) {
+  return lang === "en" ? COPY_EN : COPY_VI;
+}
 
 /** Splits the long form description on the === heading === markers. */function sections(description) {
   const parts = String(description || "").split(/\n={3,}\n?/);
@@ -849,7 +859,7 @@ export function renderProductPage(rawProduct, lang = "vi", reviews = []) {
   // looked localized was emitting the same title twice.
   const title = product.seoTitle || `${product.name} v${product.version} — ${product.platform || "Windows"} | ${brand()}`;
   const description = metaDescriptionFor(product, lang);
-  const copy = en ? COPY_EN : COPY_VI;
+  const copy = getCopy(lang);
   const faq = faqSchema(product, lang);
 
   return `<!doctype html>
