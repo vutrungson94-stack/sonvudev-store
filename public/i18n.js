@@ -1164,7 +1164,12 @@ function boot() {
   // one", which is what makes the control a control rather than a toggle: clicking
   // the half that is already active is a no-op rather than a flip.
   document.querySelectorAll('[data-lang-switch] [data-lang-set]').forEach((button) => {
-    button.addEventListener('click', () => I18N.set(button.dataset.langSet));
+    button.addEventListener('click', () => {
+      const target = button.dataset.langSet;
+      const url = target === 'en' ? '/en' : '/';
+      if (window.location.pathname === url) return;
+      window.location.href = url;
+    });
   });
   // The single-button form, kept for any page that wants one. Nothing in the project
   // uses it any more — the switch lives on the homepage only — but the mechanism is
