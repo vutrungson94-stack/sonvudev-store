@@ -398,9 +398,11 @@ export const brandWordmark = () => {
   // carried a plain S in a rounded square while the favicon, the share card and the
   // home screen icon carried the real mark. One logo, one file, everywhere.
   //
-  // logo-mint is the light silhouette (--brand-mist) for use on dark surfaces like the
-  // header brand mark. The ink version (--green) is for light backgrounds only.
-  const logo = `<span class="brand-mark"><img src="/logo-mint-512.png" alt="" width="26" height="26" loading="eager" decoding="async"></span>`;
+  // logo-ink rather than the source mark: the source is a flat #3f6a5c, which measures
+  // 2.71:1 against the paper-white header — below the 3:1 WCAG asks of a graphic that
+  // carries meaning. logo-ink is the same silhouette in --green, 3.3:1. The shape is
+  // identical; only the tint differs, because a surface decides how a mark is inked.
+  const logo = `<span class="brand-mark"><img src="/logo-ink-64.png" alt="" width="26" height="26" loading="eager" decoding="async"></span>`;
   if (cut < 1) return `${logo}<span>${esc(name)}</span>`;
   return `${logo}<span>${esc(name.slice(0, cut))}<span>${esc(name.slice(cut))}</span></span>`;
 };
