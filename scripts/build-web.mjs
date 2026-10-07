@@ -7,6 +7,13 @@ import { walkProjectFiles, JS_EXTENSIONS } from './lib/files.mjs';
 import { ARTIFACT_DIRECTORIES, ARTIFACT_FILES, ARTIFACT_EXCLUDE_DIRS, ARTIFACT_EXCLUDE_SUFFIXES } from './lib/artifact.mjs';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
+const gitCommit = () => {
+  try {
+    const r = spawnSync('git', ['rev-parse', '--short', 'HEAD'], { cwd: root, encoding: 'utf8' });
+    return r.status === 0 ? (r.stdout || '').trim() : '';
+  } catch { return ''; }
+};
+const commitHash = gitCommit() || Date.now().toString(36);
 // The build refuses to package without each of these. Every one was added because
 // the site worked but something on it was quietly broken: og.png because every
 // platform that renders a link preview refuses SVG, related.js because the strict
@@ -86,10 +93,22 @@ for (const dir of ARTIFACT_EXCLUDE_DIRS) {
   await rm(path.join(publishRoot, 'cloudflare', 'keep-awake', dir), { recursive: true, force: true });
   for (const top of ARTIFACT_DIRECTORIES) {
     await rm(path.join(publishRoot, top, dir), { recursive: true, force: true });
-  }
 }
+  }
+
 await mkdir(path.join(root, 'build-reports'), { recursive: true });
 const artifactFiles = (await walkProjectFiles(publishRoot)).map((file) => path.relative(root, file).replaceAll('\\', '/'));
+
+// Inject cache-busting version into CSS links in all HTML files
+const cssVersion = commitHash.slice(0, 8);
+for (const htmlFile of artifactFiles.filter((f) => f.endsWith('.html'))) {
+  const abs = path.join(root, htmlFile);
+  let content = await readFile(abs, 'utf8');
+  content = content.replace(/(href=["'])\/styles\.css(["'])/g, `$1/styles.css?v=${cssVersion}$2`);
+  content = content.replace(/(href=["'])styles\.css(["'])/g, `$1styles.css?v=${cssVersion}$2`);
+  await writeFile(abs, content, 'utf8');
+}
+
 const shippedScratch = artifactFiles.filter((file) => {
   const base = file.slice(file.lastIndexOf('/') + 1);
   return ARTIFACT_EXCLUDE_DIRS.some((d) => file.includes(`/${d}/`) || base === d)

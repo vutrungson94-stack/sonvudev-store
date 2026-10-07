@@ -1,6 +1,19 @@
 import { env } from "./config.js";
 import { isSellable } from "./store.js";
 import { esc, money } from "./format.js";
+import { spawnSync } from "node:child_process";
+import { fileURLToPath } from "node:url";
+import path from "node:path";
+
+const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
+const gitCommit = () => {
+  try {
+    const r = spawnSync('git', ['rev-parse', '--short', 'HEAD'], { cwd: root, encoding: 'utf8' });
+    return r.status === 0 ? (r.stdout || '').trim() : '';
+  } catch { return ''; }
+};
+const commitHash = gitCommit() || Date.now().toString(36);
+const cssVersion = commitHash.slice(0, 8);
 
 // Product pages are rendered here, on the server, rather than in the browser.
 // The storefront ships an empty skeleton and fills it in with JavaScript, which
@@ -385,11 +398,9 @@ export const brandWordmark = () => {
   // carried a plain S in a rounded square while the favicon, the share card and the
   // home screen icon carried the real mark. One logo, one file, everywhere.
   //
-  // logo-ink rather than the source mark: the source is a flat #3f6a5c, which measures
-  // 2.71:1 against the paper-white header — below the 3:1 WCAG asks of a graphic that
-  // carries meaning. logo-ink is the same silhouette in --green, 3.3:1. The shape is
-  // identical; only the tint differs, because a surface decides how a mark is inked.
-  const logo = `<span class="brand-mark"><img src="/logo-ink-64.png" alt="" width="26" height="26" loading="eager" decoding="async"></span>`;
+  // logo-mint is the light silhouette (--brand-mist) for use on dark surfaces like the
+  // header brand mark. The ink version (--green) is for light backgrounds only.
+  const logo = `<span class="brand-mark"><img src="/logo-mint-512.png" alt="" width="26" height="26" loading="eager" decoding="async"></span>`;
   if (cut < 1) return `${logo}<span>${esc(name)}</span>`;
   return `${logo}<span>${esc(name.slice(0, cut))}<span>${esc(name.slice(cut))}</span></span>`;
 };
@@ -408,7 +419,7 @@ export const brandWordmark = () => {
  */
 export const PAGE_TOKENS = [
   "site", "brandName", "brandWordmark", "support", "paymentWindowHours",
-  "reviewMinLength", "reviewMaxLength", "year", "legalEntityLine", "jsonLd", "iconLinks",
+  "reviewMinLength", "reviewMaxLength", "year", "legalEntityLine", "jsonLd", "iconLinks", "cssVersion",
 ];
 /** Placeholders inside product copy, filled on the way out rather than in a page. */
 export const COPY_TOKENS = ["founder", "brand"];
@@ -435,6 +446,7 @@ export function pageTokenValues({ products = [], reviewLimits = null } = {}) {
     // Rendered, not written into nine <head>s. The icon block is nine lines in ten
     // places otherwise, and the page that misses one is the page with no iOS icon.
     iconLinks: iconLinkMarkup().join("\n"),
+    cssVersion,
   };
 }
 
@@ -847,7 +859,7 @@ ${meta({ title, description, url, type: "product", lang, alternates: { vi: absol
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="/styles.css">
+<link rel="stylesheet" href="/styles.css?v=${cssVersion}">
 ${brandMeta()}
 ${jsonLd([organization(), websiteSchema(), productSchema(product, lang), breadcrumbSchema(product, lang), faq])}
 </head>
