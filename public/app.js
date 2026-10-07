@@ -166,12 +166,16 @@ function visibleProducts() {
 // Products carry an optional English copy. When the visitor switches to English
 // we prefer those fields but always fall back to the Vietnamese text, so a
 // product that has not been translated yet never shows an empty description.
+const CATEGORIES = { "Công cụ": "Tools", "Tiện ích": "Utilities", "Phần mềm": "Software", "Khác": "Other" };
+const BADGES = { "Mới": "New", "Bán chạy": "Best seller", "Cập nhật": "Updated", "Phát hành": "Release" };
 function localized(p) {
   if (window.I18N.lang !== 'en') return p;
   const hasEn = typeof p.descriptionEn === 'string' && p.descriptionEn.trim();
   if (!hasEn) return p;
   return {
     ...p,
+    category: CATEGORIES[p.category] || p.category,
+    badge: BADGES[p.badge] || p.badge || undefined,
     shortDescription: p.shortDescriptionEn || p.shortDescription,
     description: p.descriptionEn,
     features: (p.featuresEn && p.featuresEn.length ? p.featuresEn : p.features) || [],
@@ -536,6 +540,7 @@ window.addEventListener('i18n:ready', () => { render(); });
 window.I18N.onChange(() => {
   if (lastOrder && lastToken) showOrder(lastOrder, lastToken, null, { serverTime: new Date(Date.now() + deadlineState.offset).toISOString(), expiresAt: deadlineState.expiresAt });
   else if (!modal.hidden && lastOrder) showOrder(lastOrder, lastToken, null);
+  else render();
 });
 // A connection that comes back should immediately re-check whatever order is
 // open, instead of leaving the buyer on a stale screen until the next poll.
