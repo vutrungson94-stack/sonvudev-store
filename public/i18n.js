@@ -1168,6 +1168,7 @@ function boot() {
       const target = button.dataset.langSet;
       const url = target === 'en' ? '/en' : '/';
       if (window.location.pathname === url) return;
+      try { localStorage.setItem('svd-lang', target); } catch (_) {}
       window.location.href = url;
     });
   });
