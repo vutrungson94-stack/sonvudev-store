@@ -88,10 +88,10 @@ const rows = [
 // aliasing one function under two names and does not depend on what each file
 // happened to call its local.
 //
-// An escape helper that was written twice and drifted is the exact failure these
-// numbers exist to catch. Two of each remain, one per runtime: src/format.js
-// (server) and public/format.js (browsers, loaded before every page that needs
-// it). public/i18n.js, public/admin.js and public/related.js all call through
+// An escape helper that was written twice and drifted is the exact failure this
+// number exists to catch. One remains, one per runtime: src/format.js (server)
+// and public/format.js (browsers, loaded before every page that needs it).
+// public/i18n.js, public/admin.js and public/related.js all call through
 // window.SVDFormat instead of carrying their own.
 ['escCopies', [...srcText, ...publicText].reduce((n, s) => n + countCopies(s, /&quot;/g), 0), 'down', 'bản sao hàm escape'],
 ['moneyCopies', [...srcText, ...publicText].reduce((n, s) => n + countCopies(s, /style:\s*['"]currency['"]/g), 0), 'down', 'bản sao hàm định dạng tiền'],

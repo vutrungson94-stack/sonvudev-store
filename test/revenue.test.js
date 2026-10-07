@@ -214,7 +214,7 @@ test('thanh toán trùng không làm doanh thu nhân đôi', async () => {
 // becomes a wrong number instead of a visible failure.
 // ---------------------------------------------------------------------------
 test('mọi trường đơn mà báo cáo đọc đều phải có trong projection của Postgres', async () => {
-  const readSource = (relative) => fs.readFile(path.join(path.dirname(new URL(import.meta.url).pathname.replace(/^\//, '')), '..', relative), 'utf8');
+  const readSource = (relative) => fs.readFile(path.join(path.dirname(decodeURIComponent(new URL(import.meta.url).pathname.replace(/^\//, ''))), '..', relative), 'utf8');
   const store = await readSource('src/store.js');
   const app = await readSource('src/app.js');
 
