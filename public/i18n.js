@@ -421,6 +421,9 @@ const DICT = {
     'legal.terms.h11': '10. Thay đổi điều khoản',
     'legal.terms.p17': 'Chúng tôi có thể cập nhật các điều khoản này. Bản cập nhật có hiệu lực từ thời điểm đăng trên trang này và không áp dụng hồi tố cho các đơn hàng đã đặt trước đó, mỗi đơn chịu điều khoản tại thời điểm bạn mua.',
     'legal.terms.h12': '11. Luật áp dụng và giải quyết tranh chấp',
+    'legal.terms.intro': 'Bạn đang đọc các điều khoản áp dụng khi mua và sử dụng phần mềm do <strong>{{brandName}}</strong> phát triển. Mua hàng nghĩa là bạn chấp nhận các điều khoản dưới đây. Nếu không đồng ý, vui lòng không thực hiện giao dịch.',
+    'legal.terms.p5d': 'Đơn hàng chưa được thanh toán sẽ tự động bị hủy sau <strong>{{paymentWindowHours}} giờ</strong> kể từ thời điểm bạn nhấn nút đặt hàng, áp dụng cho mọi phương thức thanh toán. Thời hạn này được hiển thị ngay trên biểu mẫu thanh toán và trên trang đơn hàng của bạn.',
+    'legal.terms.p18': 'Các điều khoản này được hiểu và thực hiện theo pháp luật Việt Nam. Tranh chấp sẽ được giải quyết bằng thương lượng thiện chí trước; nếu không thống nhất được, bất kỳ bên nào cũng có quyền yêu cầu tòa án có thẩm quyền tại nơi {{brandName}} đặt trụ sở xử lý.',
 
     // ---- privacy ----
     'legal.privacy.h1': 'Chính sách bảo mật',
@@ -461,6 +464,8 @@ const DICT = {
     'legal.privacy.p13': 'Phần mềm bạn mua không thu thập, gửi hay tải lên bất kỳ máy chủ nào của chúng tôi. Phần mềm chạy hoàn toàn cục bộ trên máy tính của bạn và không cần kết nối Internet sau khi cài đặt. Nếu bạn phát hiện phần mềm gửi dữ liệu đi, vui lòng báo cho chúng tôi, vì đó sẽ là hành vi không đúng cam kết.',
     'legal.privacy.h11': '10. Thay đổi chính sách',
     'legal.privacy.p14': 'Chúng tôi có thể cập nhật chính sách này. Bản cập nhật có hiệu lực khi đăng tại trang này; các giao dịch đã hoàn tất chịu chính sách tại thời điểm phát sinh.',
+    'legal.privacy.p5': 'Chúng tôi không yêu cầu và không lưu số thẻ tín dụng, mã PIN, mật khẩu ngân hàng, hay ảnh chụp màn hình. Việc thanh toán được xử lý hoàn toàn trên hệ thống của PayPal, ngân hàng, MoMo hoặc ZaloPay, nên thông tin bí mật đó không đi qua máy chủ của {{brandName}}.',
+    'legal.privacy.p15': 'Bạn có quyền xem, chỉnh sửa hoặc yêu cầu xoá thông tin cá nhân của mình. Với dữ liệu giao dịch, chúng tôi có thể ẩn danh thông tin nhận diện trong khi vẫn giữ nghĩa vụ kế toán, hoặc xoá hẳn nếu pháp luật cho phép. Gửi yêu cầu tới <a href="mailto:{{support}}">{{support}}</a> và chúng tôi sẽ phản hồi trong 5 ngày làm việc.',
 
     // ---- refund ----
     'legal.refund.h1': 'Chính sách hoàn tiền',
@@ -844,6 +849,9 @@ const DICT = {
     'legal.terms.h11': '10. Changes to these terms',
     'legal.terms.p17': 'We may update these terms. An update takes effect from the moment it is published on this page and does not apply retroactively to orders already placed: each order is governed by the terms in force at the moment you bought.',
     'legal.terms.h12': '11. Governing law and disputes',
+    'legal.terms.intro': 'You are reading the terms that apply when you buy and use software developed by <strong>{{brandName}}</strong>. Placing an order means you accept the terms below. If you do not agree, please do not proceed with the transaction.',
+    'legal.terms.p5d': 'Unpaid orders are automatically cancelled after <strong>{{paymentWindowHours}} hours</strong> from the moment you place the order, applying to all payment methods. This deadline is shown on the checkout form and on your order page.',
+    'legal.terms.p18': 'These terms are governed by and construed in accordance with the laws of Vietnam. Disputes will be resolved through good-faith negotiation first; if no agreement is reached, either party may refer the matter to the competent court where {{brandName}} is based.',
 
     // ---- privacy ----
     'legal.privacy.h1': 'Privacy Policy',
@@ -882,6 +890,8 @@ const DICT = {
     'legal.privacy.p13': 'The software you buy does not collect, send or upload anything to any server of ours. It runs entirely locally on your computer and needs no internet connection once it is installed. If you ever find that it does send data out, please tell us, because that would break the promise made here.',
     'legal.privacy.h11': '10. Changes to this policy',
     'legal.privacy.p14': 'We may update this policy. An update takes effect as soon as it is published here; completed transactions stay governed by the policy in force when they happened.',
+    'legal.privacy.p5': 'We do not ask for and do not store credit card numbers, PINs, bank passwords, or screenshots. Payment is processed entirely on the systems of PayPal, banks, MoMo or ZaloPay, so that sensitive information never passes through {{brandName}}\'s servers.',
+    'legal.privacy.p15': 'You have the right to view, edit or request deletion of your personal information. For transaction data, we may anonymise identifying information while retaining accounting obligations, or delete it entirely if the law permits. Send requests to <a href="mailto:{{support}}">{{support}}</a> and we will respond within 5 business days.',
 
     // ---- refund ----
     'legal.refund.h1': 'Refund Policy',

@@ -183,7 +183,7 @@ test('bỏ tên thì hiển thị ẩn danh, không lộ tên trống', async ()
   // And the page really does substitute — in both languages, from its own table.
   const page = await fs.readFile(path.join(root, 'src', 'pages.js'), 'utf8');
   assert.match(page, /review\.authorName \|\| copy\.anonymous/, 'trang sản phẩm phải thay nhãn chung khi không có tên');
-  const vi = page.slice(page.indexOf('COPY_VI'), page.indexOf('COPY_EN'));
+  const vi = page.slice(page.indexOf('export const COPY_VI'), page.indexOf('export const COPY_EN', page.indexOf('export const COPY_VI')));
   const en = page.slice(page.indexOf('COPY_EN'));
   assert.match(vi, /anonymous: "Khách hàng"/, 'bản tiếng Việt phải có nhãn chung');
   assert.match(en, /anonymous: "Customer"/, 'bản tiếng Anh phải có nhãn chung riêng');
