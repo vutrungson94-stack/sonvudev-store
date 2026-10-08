@@ -362,6 +362,10 @@ for (const name of testFiles) {
   // honest option: a pattern meant to recognise "this is a fixture" would eventually
   // match a real hardcode written in the same shape.
   if (name === "audit.test.js") continue;
+  // checks-workflow.test.js and env-contract.test.js validate that only
+  // RFC 2606 reserved domains (.example, .test, .invalid, .localhost) appear
+  // in the workflow/env config. They necessarily mention the fixture URL.
+  if (name === "checks-workflow.test.js" || name === "env-contract.test.js") continue;
   // With no APP_URL there is no host to look for, and an empty pattern matches at
   // every position in every file. The missing-configuration failure is already
   // reported above; adding one finding per character on top of it buried the report
@@ -468,6 +472,10 @@ const DOMAIN_EXEMPT = new Map([
   // This file, and the Caddyfile it also skips: both exist to name the mistake.
   ["scripts/audit-web.mjs", "chính file chứa lỗi cần tìm"],
   ["deploy/Caddyfile", "biến {$SITE_DOMAIN} do deploy/sonvudev-store.env.example cung cấp"],
+  // CI workflow uses a fixture APP_URL (ci-fixture.example) to run the audit
+  // without a real domain. The fixture is necessarily hardcoded here and is the
+  // value the audit itself runs against.
+  [".github/workflows/checks.yml", "fixture APP_URL cho CI, audit chạy chính với giá trị này"],
 ]);
 
 for (const relative of infraFiles) {
