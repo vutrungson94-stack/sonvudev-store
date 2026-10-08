@@ -158,7 +158,9 @@ test('không có khoá pháp lý nào mồ côi, và không câu tiếng Việt 
   const source = await readFile(path.join(root, 'public', 'i18n.js'), 'utf8');
   const vi = tableOf(source, 'vi');
   const allHtml = (await Promise.all(LEGAL_PAGES.map(page))).join('\n');
-  const used = new Set([...allHtml.matchAll(/data-i18n="([\w.]+)"/g)].map((m) => m[1]));
+  const keysFromI18n = [...allHtml.matchAll(/data-i18n="([\w.]+)"/g)].map((m) => m[1]);
+  const keysFromHtml = [...allHtml.matchAll(new RegExp('data-i18n-html="([\\w.]+)"', 'g'))].map((m) => m[1]);
+  const used = new Set([...keysFromI18n, ...keysFromHtml]);
 
   const legalKeys = [...vi.keys()].filter((k) => /^(legal|about)\./.test(k));
   assert.ok(legalKeys.length > 50, `chỉ tìm thấy ${legalKeys.length} khoá pháp lý — có lẽ đọc sai bảng từ điển`);
@@ -179,7 +181,7 @@ test('không có khoá pháp lý nào mồ côi, và không câu tiếng Việt 
     .map((m) => ({ markup: m[0], inner: m[1] }))
     .filter(({ inner }) => /[a-zà-ỹ]{3,}/i.test(inner.replace(/<[^>]+>/g, '')));
   const unkeyed = paragraphs
-    .filter(({ markup }) => !/data-i18n/.test(markup))
+    .filter(({ markup }) => !/data-i18n(-html)?/.test(markup))
     .map(({ inner }) => inner.replace(/<[^>]+>/g, '').replace(/\s+/g, ' ').trim())
     // Sentences the renderer fills server-side stay Vietnamese by design: a {{token}}
     // inside one is the reason there is no dictionary entry for it.

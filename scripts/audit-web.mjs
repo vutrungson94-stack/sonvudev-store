@@ -125,9 +125,11 @@ const htmlSources = await Promise.all(htmlFiles.map((name) => read(path.join("pu
 const allHtml = htmlSources.join("\n");
 const usedKeys = new Set([
   // data-i18n holds the key itself; data-i18n-attr holds "attribute:key" pairs.
+  // data-i18n-html is for elements that need innerHTML (contain <strong>, <a>, etc.)
   // Every page is scanned, not just the homepage: the recovery and PayPal pages
   // carry their own keys, and reading only index.html reported them all as dead.
   ...[...allHtml.matchAll(/\bdata-i18n="([^"]+)"/g)].map((m) => m[1]),
+  ...[...allHtml.matchAll(/\bdata-i18n-html="([^"]+)"/g)].map((m) => m[1]),
   ...[...allHtml.matchAll(/\bdata-i18n-attr="([^"]+)"/g)].flatMap((m) => m[1].split(",").map((pair) => pair.split(":")[1]?.trim()).filter(Boolean)),
   ...pageScriptSources.flatMap((source) => [...source.matchAll(/'([a-z][\w]*(?:\.[\w]+)+)'/g)].map((m) => m[1])),
   // What i18n.js itself reads: the status map, the switch button labels, the

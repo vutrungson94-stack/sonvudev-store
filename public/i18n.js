@@ -1074,6 +1074,9 @@ function apply(root = document) {
   root.querySelectorAll('[data-i18n]').forEach((el) => {
     el.textContent = I18N.t(el.dataset.i18n, el.textContent);
   });
+  root.querySelectorAll('[data-i18n-html]').forEach((el) => {
+    el.innerHTML = I18N.t(el.dataset.i18nHtml, el.innerHTML);
+  });
   root.querySelectorAll('[data-i18n-attr]').forEach((el) => {
     // Format: "placeholder:lookup.order,aria-label:nav.buy"
     el.dataset.i18nAttr.split(',').forEach((pair) => {
