@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { promises as fs } from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 // The shop's test environment, applied before anything imports src/ — config.js
 // reads the environment once at load, so this has to come first and has to be
 // complete. See helpers/env.mjs for what a missing entry used to cost.
@@ -214,7 +215,8 @@ test('thanh toán trùng không làm doanh thu nhân đôi', async () => {
 // becomes a wrong number instead of a visible failure.
 // ---------------------------------------------------------------------------
 test('mọi trường đơn mà báo cáo đọc đều phải có trong projection của Postgres', async () => {
-  const readSource = (relative) => fs.readFile(path.join(path.dirname(decodeURIComponent(new URL(import.meta.url).pathname.replace(/^\//, ''))), '..', relative), 'utf8');
+  const __dirname = path.dirname(fileURLToPath(import.meta.url));
+  const readSource = (relative) => fs.readFile(path.join(__dirname, '..', relative), 'utf8');
   const store = await readSource('src/store.js');
   const app = await readSource('src/app.js');
 
