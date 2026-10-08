@@ -451,7 +451,8 @@ const DICT = {
     // translating it would put a name nobody can search for into the sentence.
     'legal.privacy.v1': '— lưu trữ tệp phát hành và phân phối liên kết tải. Tệp của bạn nằm trong bucket riêng tư, không công khai.',
     'legal.privacy.v2': '— cơ sở dữ liệu lưu đơn hàng và danh mục sản phẩm.',
-    'legal.privacy.v3': '— xử lý thanh toán theo đúng lịch trình của từng nhà cung cấp.',
+    'legal.privacy.v3a': 'PayPal, ngân hàng, MoMo, ZaloPay',
+    'legal.privacy.v3b': '— xử lý thanh toán theo đúng lịch trình của từng nhà cung cấp.',
     'legal.privacy.v4': '— gửi email giao dịch về đơn hàng của bạn. Nó chỉ nhận địa chỉ email, tên và nội dung thư; chúng tôi không gửi danh sách khách hàng cho bên khác.',
     'legal.privacy.v5': '— nền tảng vận hành máy chủ.',
     'legal.privacy.p10': 'Chúng tôi cũng có thể phải cung cấp thông tin khi có yêu cầu hợp pháp từ cơ quan nhà nước có thẩm quyền.',
@@ -512,8 +513,11 @@ const DICT = {
     'legal.refund.n6': 'Yêu cầu được gửi sau 14 ngày mà không có lý do kỹ thuật hợp lý.',
     'legal.refund.h6': '5. Hoàn một phần',
     'legal.refund.p8': 'Trong trường hợp đặc biệt, ví dụ bạn đã tải nhưng gặp lỗi kỹ thuật tạm thời không thể dùng ngay, chúng tôi có thể đề xuất hoàn một phần thay vì trọn số tiền. Quyết định này do hai bên thống nhất và không áp dụng bắt buộc.',
+    'legal.refund.p2b': 'Bạn có thể gửi yêu cầu hoàn tiền trong <strong>14 ngày</strong> kể từ ngày thanh toán, bằng email tới <a href="mailto:{{support}}">{{support}}</a>. Sau thời điểm này, trường hợp mục 1 và 2 vẫn được xem xét nếu lỗi được phát hiện muộn do hoàn cảnh khách quan, nhưng việc hoàn tiền sẽ do hai bên thỏa thuận.',
     'legal.refund.h7': '6. Hủy đơn chưa thanh toán',
+    'legal.refund.p9': 'Đơn hàng chưa thanh toán bị tự động hủy sau {{paymentWindowHours}} giờ kể từ thời điểm đặt hàng. Đơn đã hủy không bị tính phí, vì vậy không có gì để hoàn. Nếu bạn đã chuyển khoản nhưng đơn chưa được xác nhận, hãy gửi ảnh chụp biên lai — chúng tôi sẽ đối soát và hoàn lại nếu có sai sót.',
     'legal.refund.h8': '7. Liên hệ',
+    'legal.refund.p10': 'Mọi yêu cầu hoàn tiền gửi tới <a href="mailto:{{support}}">{{support}}</a>. Vui lòng nêu mã đơn hàng để chúng tôi tra cứu nhanh. Chúng tôi không giải quyết khiếu nại qua mạng xã hội, vì không thể xác minh danh tính người gửi trên các kênh đó.',
   },
   en: {
     'lang.switch': 'VI',
@@ -877,7 +881,8 @@ const DICT = {
     'legal.privacy.p9': 'We share only the minimum data needed with the partners below, each of them for its own part of the job. This list may change; the current version always lives on this page.',
     'legal.privacy.v1': '— hosts the release files and hands out the download links. Your files sit in a private bucket, not a public one.',
     'legal.privacy.v2': '— the database that stores orders and the product catalogue.',
-    'legal.privacy.v3': '— takes the payment on their own schedules.',
+    'legal.privacy.v3a': 'PayPal, banks, MoMo, ZaloPay',
+    'legal.privacy.v3b': '— takes the payment on their own schedules.',
     'legal.privacy.v4': '— sends the transactional email about your order. It only receives the email address, the name and the content of the message; we never hand it a customer list.',
     'legal.privacy.v5': '— the platform the server runs on.',
     'legal.privacy.p10': 'We may also have to disclose information when a competent authority makes a lawful request.',
@@ -936,8 +941,11 @@ const DICT = {
     'legal.refund.n6': 'The request arrives after 14 days with no valid technical reason behind it.',
     'legal.refund.h6': '5. Partial refunds',
     'legal.refund.p8': 'In special cases, for example when you have downloaded the product but hit a temporary technical fault that made it unusable right away, we may offer a partial refund instead of the full amount. That decision is agreed between the two of us and is never binding on either side.',
+    'legal.refund.p2b': 'You can request a refund within <strong>14 days</strong> of payment by emailing <a href="mailto:{{support}}">{{support}}</a>. After that, cases under section 1 and 2 will still be considered if the issue was discovered late due to circumstances beyond your control, but the refund will be by mutual agreement.',
     'legal.refund.h7': '6. Cancelling an unpaid order',
+    'legal.refund.p9': 'Unpaid orders are automatically cancelled after {{paymentWindowHours}} hours from when they were placed. A cancelled order incurs no fee, so there is nothing to refund. If you have transferred money but the order has not been confirmed, send a screenshot of the receipt — we will reconcile and refund if there was an error.',
     'legal.refund.h8': '7. Contact',
+    'legal.refund.p10': 'Send all refund requests to <a href="mailto:{{support}}">{{support}}</a>. Please include the order id so we can look it up quickly. We do not handle complaints via social media, because we cannot verify the identity of the sender on those channels.',
   },
 };
 
