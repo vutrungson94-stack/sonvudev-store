@@ -48,6 +48,30 @@ const publicProduct = (product) => {
   return filled;
 };
 const publicOrder = (order) => { if (!order) return null; const { accessTokenHash, access_token_hash, idempotencyKey, idempotency_key, notifications, ...safe } = order; return { ...safe, items: (safe.items || []).map(({ fileKey, file_key, ...item }) => item) }; };
+
+// The USD figure a buyer is actually charged, attached in front of the public
+// copy of a product so a storefront read in English quotes the same number
+// PayPal takes.
+//
+// It is resolved through paypalChargeForProduct — the same function checkout
+// uses — rather than by dividing the shelf price by the raw rate. The raw
+// division is a number nobody pays: checkout adds the rate margin first, so a
+// page showing the raw conversion quotes low and the buyer discovers the real
+// amount at the payment step.
+//
+// When there is no rate and no fallback the product is returned untouched. A
+// missing priceUsd makes every caller render the VND shelf price, which is
+// wrong for the language but is never a sum the buyer is not charged.
+async function withUsdPrice(product) {
+  if (!product) return product;
+  if (String(product.currency || "VND").toUpperCase() !== "VND") return product;
+  try {
+    const { charge } = await paypalChargeForProduct(product);
+    return { ...product, priceUsd: charge.amount, priceUsdCurrency: charge.currency };
+  } catch {
+    return product;
+  }
+}
 // A countdown is only correct if it is measured against the server's clock, so
 // the deadline and the server's own time always travel together.
 const deadlinePayload = (order) => {
@@ -401,7 +425,23 @@ const productPage = (lang) => async (req, res) => {
       return notFound(req, res);
     }
     const reviews = await listReviewsForProduct(product.id);
-    res.set("Cache-Control", "public, max-age=600").type("html").send(renderProductPage(product, lang, reviews));
+    // Only the English page needs a dollar figure: the Vietnamese shelf price is
+    // the price a Vietnamese buyer is charged, and converting it for a reader who
+    // is about to pay in dong adds nothing but a rounded number. The figure is
+    // resolved with the same function checkout uses, so what the page states and
+    // what PayPal takes cannot drift apart.
+    let usd = null;
+    if (lang === "en") {
+      try {
+        const { charge } = await paypalChargeForProduct(product);
+        usd = charge.amount;
+      } catch {
+        // Rate unavailable: the page falls back to the shelf price rather than
+        // inventing a dollar amount. Charging still works — checkout resolves
+        // the rate again at order time.
+      }
+    }
+    res.set("Cache-Control", "public, max-age=600").type("html").send(renderProductPage(product, lang, reviews, usd));
   } catch (error) {
     console.error(error);
     try {
@@ -624,8 +664,10 @@ async function probe(check, label) {
   }
 }
 app.get("/api/products", async (_req, res) => {
-  try { res.json({ products: (await listProducts()).filter(isSellable).map(publicProduct) }); }
-  catch (error) { console.error(error); res.status(500).json(refuse("api.err.catalogLoad", "Không thể tải danh mục", 500)); }
+  try {
+    const products = (await listProducts()).filter(isSellable).map(publicProduct);
+    res.json({ products: await Promise.all(products.map(withUsdPrice)) });
+  } catch (error) { console.error(error); res.status(500).json(refuse("api.err.catalogLoad", "Không thể tải danh mục", 500)); }
 });
 app.get("/api/products/:id", async (req, res) => {
   try {
@@ -633,7 +675,7 @@ app.get("/api/products/:id", async (req, res) => {
     // Same rule as the storefront and the sitemap, so a product cannot be
     // readable through the API while being invisible on the page.
     if (!isSellable(product)) return res.status(404).json(refuse("api.err.productNotFound", "Không tìm thấy sản phẩm", 404));
-    res.json({ product: publicProduct(product) });
+    res.json({ product: await withUsdPrice(publicProduct(product)) });
   } catch (error) { console.error(error); res.status(500).json(refuse("api.err.productLoad", "Không thể tải sản phẩm", 500)); }
 });
 

@@ -29,10 +29,13 @@
   // so the English product page and every 404 greeted the reader in a language
   // they had not chosen.
   //
-  // Prices are not grouped by this language at all: money follows the
-  // currency, the rule public/format.js and the server both apply, so a VND
-  // price keeps its dot grouping on an English page exactly as it does on the
-  // receipt.
+  // Prices are chosen by the language the page is being read in, but the
+  // currency a number is *written* in never follows the language: money() keeps
+  // each currency in its own locale, so a VND price keeps its dot grouping on an
+  // English page exactly as it does on the receipt. What changed is which number
+  // an English page quotes — it now shows the USD figure PayPal actually charges
+  // (see priceFor below), because a shelf price divided by the raw rate is a sum
+  // no buyer is charged.
   //
   // The dictionary is used when the page has it. It used to be reasoned that this
   // file could not: the comment here claimed the 404 has no language switch and no
@@ -55,6 +58,23 @@
   var escapeHtml = function (value) { return window.SVDFormat.esc(value); };
 
   var money = function (value, currency) { return window.SVDFormat.money(value, currency); };
+
+  // The price follows the language the reader chose, and only when the server
+  // also sent the USD figure it actually charges. priceUsd is resolved through
+  // the same conversion checkout uses, so an English page quotes the number
+  // PayPal takes instead of the shelf price divided by the raw rate — a sum
+  // nobody pays. Without priceUsd the shelf price is shown: wrong for the
+  // language, but never a number the buyer is not charged.
+  //
+  // money() still formats each currency in its own locale (en-US for USD,
+  // vi-VN for VND), so a dong amount keeps its dot grouping on an English page
+  // exactly as it does on the receipt.
+  var priceFor = function (p) {
+    if (lang === 'en' && p && p.priceUsd !== undefined && p.priceUsd !== null) {
+      return money(p.priceUsd, 'USD');
+    }
+    return money(p && p.price, p && p.currency);
+  };
 
   var EMPTY = 'products.onlyOne';
   var emptyText = function () {
@@ -86,7 +106,7 @@
         return '<a class="related-card" href="' + escapeHtml(href) + '">' +
           '<b>' + escapeHtml(text(p.name, '')) + '</b>' +
           '<span>v' + escapeHtml(version) + ' · ' + escapeHtml(text(p.platform, 'Windows')) + '</span>' +
-          '<span>' + escapeHtml(money(p.price, p.currency)) + '</span>' +
+          '<span>' + escapeHtml(priceFor(p)) + '</span>' +
           '</a>';
       }).join('');
     })

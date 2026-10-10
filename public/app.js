@@ -211,6 +211,20 @@ function render() {
   grid.querySelectorAll('.product-card').forEach((c) => { c.onclick = () => openProduct(c.dataset.id); });
 }
 
+// The price on screen follows the language the reader chose, and only when the
+// server also sent the USD figure it actually charges. priceUsd comes from the
+// same conversion checkout uses, so an English page quotes the number PayPal
+// takes rather than the shelf price divided by the raw rate — which is a sum
+// nobody pays and shows up first as a buyer who was quoted low at the payment
+// step. Without priceUsd the shelf price is shown: wrong for the language, but
+// never a number the buyer is not charged.
+function priceFor(p) {
+  if (window.I18N && window.I18N.lang === 'en' && p.priceUsd !== undefined && p.priceUsd !== null) {
+    return money(p.priceUsd, 'USD');
+  }
+  return money(p.price, p.currency);
+}
+
 function card(p) {
   const art = esc(p.category.toLowerCase().replace(/\s+/g, '-'));
   return `<article class="product-card" data-id="${esc(p.id)}">
@@ -226,7 +240,7 @@ function card(p) {
       <p>${esc(p.shortDescription || p.description || '')}</p>
       <ul>${(p.features || []).slice(0, 2).map((f) => `<li>✓ ${esc(f)}</li>`).join('')}</ul>
       <div class="product-buy">
-        <strong>${money(p.price, p.currency)}</strong>
+        <strong>${priceFor(p)}</strong>
         <button class="round-arrow" aria-label="${esc(T('products.buyAria'))} ${esc(p.name)}">↗</button>
       </div>
     </div>
@@ -258,7 +272,7 @@ function openProduct(id) {
       </div>
     </div>
     <div class="detail-footer">
-      <div><small>${esc(T('product.priceOnce'))}</small><strong>${money(p.price, p.currency)}</strong></div>
+      <div><small>${esc(T('product.priceOnce'))}</small><strong>${priceFor(p)}</strong></div>
       <button class="button button-primary" id="buy-product">${esc(T('product.buyNow'))} <span>→</span></button>
     </div>`;
   modal.hidden = false;

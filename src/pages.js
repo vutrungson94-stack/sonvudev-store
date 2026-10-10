@@ -834,13 +834,26 @@ export const localised = (value, map, fallback = "") => {
  * server even though the English copy had been sitting in the database all along
  * and the browser already used it, which meant an assistant asked in English
  * found a page it could only cite in translation.
+ *
+ * `usd` is the payable USD amount for this product, resolved by the caller
+ * through the same conversion checkout uses. It is passed in rather than looked
+ * up here because this renderer is synchronous: the rate can require a network
+ * call, and a page render must never wait on a rate service to emit HTML. When
+ * it is missing — no rate, no fallback — the shelf price is shown instead, in
+ * its own currency, which is always a figure the buyer is actually charged.
  */
-export function renderProductPage(rawProduct, lang = "vi", reviews = []) {
+export function renderProductPage(rawProduct, lang = "vi", reviews = [], usd = null) {
   const product = localize(rawProduct, lang);
   const en = lang === "en";
   const url = absolute(productUrl(product.slug, lang));
   const { intro, groups } = sections(product.description);
   const features = product.features || [];
+  // The currency on screen follows the language the reader asked for, but the
+  // number has to stay the one PayPal takes. money() formats each currency in
+  // its own locale (en-US for USD, vi-VN for VND), which is what makes "$7.02"
+  // read as a dollar amount rather than a dong amount with the label changed.
+  const showUsd = en && Number.isFinite(usd) && String(product.currency || "VND").toUpperCase() === "VND";
+  const priceLabel = showUsd ? money(usd, "USD") : money(product.price, product.currency);
   // The headline leads with what someone types into a search box, not with the
   // product's own name, which nobody outside this site has heard of. The two are
   // the same sentence read differently: "bật macro Excel" is the problem, "Excel
@@ -880,7 +893,7 @@ ${jsonLd([organization(), websiteSchema(), productSchema(product, lang), breadcr
 <p class="product-lede">${esc(product.short_description || product.shortDescription || "")}</p>
 </div>
 <aside class="buy-card" id="mua">
-<div class="buy-price">${esc(money(product.price, product.currency))}</div>
+<div class="buy-price">${esc(priceLabel)}</div>
 <p class="buy-note">${copy.buyNote}</p>
 <a class="button button-primary button-wide" href="/?buy=${encodeURIComponent(product.id)}#products">${copy.buyNow} <span>→</span></a>
 <ul class="buy-points"><li>${copy.pointDownload}</li><li>${copy.pointLookup}</li><li>${copy.pointRefund}</li></ul>
