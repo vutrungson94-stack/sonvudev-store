@@ -13,7 +13,10 @@
   "security": {
     "sast": {
       "enabled": true,
-      "failOnFindings": true
+      "failOnFindings": true,
+      "tools": {
+        "Docker": "npm"
+      }
     },
     "excludeDirs": [
       ".env"

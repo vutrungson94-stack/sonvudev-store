@@ -14,7 +14,7 @@ any team can pick up and run without tribal knowledge.
 | Audit | `npm run audit` | No hardcoded domains, broken links, orphan i18n keys, missing Vietnamese diacritics | Fix reported issues, re-run |
 | Case Sensitivity | `npm run case` | All filesystem references match actual casing | Fix imports/paths, re-run |
 | Metrics | `npm run metrics` | No metric regressed vs baseline | If intentional: `npm run metrics:update` |
-| Tests | `npm test` | 424 tests pass (unit + integration + contract) | Fix failing tests, re-run |
+| Tests | `npm test` | 429 tests pass (unit + integration + contract) | Fix failing tests, re-run |
 | Lint | `npm run lint` | Code style, no unused vars, consistent patterns | Fix lint errors, re-run |
 | Build | `npm run build` | Produce deployable artifact in `publish-output/` | Fix build errors, re-run |
 
@@ -95,7 +95,7 @@ RCA Template: `docs/rca/YYYY-MM-DD-short-description.md`
 ```bash
 # Full deploy with verification
 npm run render:sync:deploy
-npm run seo:check -- "https://your-app.onrender.com"
+npm run seo:check -- "${APP_URL}"
 npm run health:check
 ```
 
@@ -193,7 +193,7 @@ npm run render:sync
 npm run render:sync:deploy
 
 # SEO + health check post-deploy
-npm run seo:check -- "https://your-app.onrender.com"
+npm run seo:check -- "${APP_URL}"
 npm run health:check
 ```
 
@@ -203,10 +203,15 @@ npm run health:check
 
 | Tool | Version | Location |
 |------|---------|----------|
-| Node.js | ≥20 | `G:\TRUNG SON\TOOLS\node-v20.19.5-win-x64` (portable) |
+| Node.js | ≥20 | Any ≥20 install on PATH (a portable copy works) |
 | npm | ≥10 | Bundled with Node |
-| gbuild | Latest | `D:\_Build\gbuild.bat` |
+| gbuild | Latest | The gbuild tool directory, invoked as `_Build\gbuild.bat -Project <path>` |
 | curl | With `--ssl-no-revoke` | System PATH (TLS proxy workaround) |
+
+**Path note**: the exact machine-local paths (a portable Node folder, the `_Build`
+directory) differ per workstation and are intentionally not written here — this
+document is the process asset any team picks up. Point `-Project` at the
+repository root and the gates in section 1 run unchanged.
 
 **TLS Proxy Note**: Corporate network intercepts TLS. Use `curl.exe --ssl-no-revoke` for external calls. Node.js requires `NODE_EXTRA_CA_CERTS` or same workaround.
 

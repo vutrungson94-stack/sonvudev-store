@@ -1,19 +1,13 @@
 import { env } from "./config.js";
 import { isSellable } from "./store.js";
 import { esc, money } from "./format.js";
-import { spawnSync } from "node:child_process";
-import { fileURLToPath } from "node:url";
-import path from "node:path";
+import { commitHash } from "./lib/git.mjs";
 
-const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
-const gitCommit = () => {
-  try {
-    const r = spawnSync('git', ['rev-parse', '--short', 'HEAD'], { cwd: root, encoding: 'utf8' });
-    return r.status === 0 ? (r.stdout || '').trim() : '';
-  } catch { return ''; }
-};
-const commitHash = gitCommit() || Date.now().toString(36);
-const cssVersion = commitHash.slice(0, 8);
+// The commit that produced this process, for CSS cache-busting. It used to be a
+// private copy of the git call that scripts/build-web.mjs also carries, so the
+// live page and the packaged page could name different stylesheet versions. Both
+// now read the one implementation in src/lib/git.mjs.
+const cssVersion = commitHash().slice(0, 8);
 
 // Product pages are rendered here, on the server, rather than in the browser.
 // The storefront ships an empty skeleton and fills it in with JavaScript, which
