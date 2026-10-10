@@ -30,3 +30,8 @@ Thumbs.db
 # its source map. Not source, and committing it means the repo contains a second
 # copy of the Worker that can drift from the one that runs.
 .wrangler/
+
+# Command output pasted at the repo root by hand. The build writes its real
+# reports to build-reports/ (ignored) and tests to logs/ (ignored); a loose
+# *-results.txt at the root is a stale copy nobody reads.
+*-results.txt
