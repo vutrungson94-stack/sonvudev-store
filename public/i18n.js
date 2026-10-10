@@ -345,12 +345,21 @@ const DICT = {
     // they would be judged by, in a language they did not choose. Nothing on
     // those pages was in here at all: no key, no toggle, no dictionary.
     //
-    // Three things are deliberately not keys. {{brandName}}, {{site}},
-    // {{support}}, {{year}} and {{paymentWindowHours}} are filled by the server
-    // from configuration, so a sentence carrying one of them is left as
-    // server-rendered text — the same rule the rest of the storefront uses for
-    // values it fills in itself. A <code> file name, an em dash and the vendor
-    // names in the privacy list are not language either.
+    // Five things are deliberately not keys. {{brandName}}, {{site}},
+    // {{support}}, {{year}} and {{paymentWindowHours}} are configuration, so a
+    // sentence carrying one is filled from it rather than translated.
+    //
+    // They still have to work after a language switch, which the dictionary
+    // alone cannot do: I18N.t() returns this text verbatim, so the placeholder
+    // would come back with it. The server fills them into the HTML it renders
+    // *and* ships them in <meta name="sv-tokens">, and t() substitutes them from
+    // there on the way out. That is why a sentence here keeps its
+    // {{paymentWindowHours}} rather than a hard-coded "24": the window is set in
+    // configuration and read by checkout, so a third copy in a dictionary would
+    // be a number that can drift.
+    //
+    // A <code> file name, an em dash and the vendor names in the privacy list
+    // are not language either.
     //
     // Where a sentence carries a bold or italic phrase, the markup is kept and
     // the text around it is split into keys, so a reader switching to English
@@ -976,15 +985,55 @@ function readStored() {
 
 let current = readStored();
 
+// The configuration values the server ships in <meta name="sv-tokens">.
+//
+// legal.terms.p5d and its seven siblings carry {{brandName}},
+// {{paymentWindowHours}} or {{support}} *inside the dictionary*. The server
+// fills those into the HTML it renders, and that is the only copy it can
+// reach — when a reader switches language this function returns the dictionary
+// copy, and the placeholder comes back with it. The sentence then reads
+// "cancelled after {{paymentWindowHours}} hours" on a page that was correct a
+// second earlier, in both languages.
+//
+// Reading them from a meta tag rather than re-deriving them here is the point:
+// the payment window is configuration, and a second copy of it in the browser
+// is a number that can drift from the one checkout enforces. The tag carries
+// JSON so no separator of our own is invented, and the one escape helper in
+// public/format.js stays the only one there is.
+const TOKENS = (() => {
+  const values = {};
+  const meta = document.querySelector('meta[name="sv-tokens"]');
+  if (!meta || !meta.content) return values;
+  try {
+    const parsed = JSON.parse(meta.content);
+    for (const [name, value] of Object.entries(parsed || {})) {
+      if (value !== undefined && value !== null) values[name] = String(value);
+    }
+  } catch (error) {
+    // A malformed tag is logged, not thrown. One bad value must not take the
+    // language switch down with it, and the placeholder then stays visible —
+    // which is the honest outcome.
+    console.error('[i18n] meta sv-tokens is not valid JSON:', error.message);
+  }
+  return values;
+})();
+
 const I18N = {
   get lang() { return current; },
   t(key, fallback, vars) {
     const table = DICT[current] || DICT.vi;
-    const fill = (text) => String(text).replace(/\{(\w+)\}/g, (match, name) => {
-      if (vars && vars[name] !== undefined) return vars[name];
-      if (name === "brand") return host();
-      return match;
-    });
+    const fill = (text) => String(text)
+      .replace(/\{\{(\w+)\}\}/g, (match, name) => {
+        if (vars && vars[name] !== undefined) return vars[name];
+        if (name === "brand") return host();
+        if (TOKENS[name] !== undefined) return TOKENS[name];
+        return match;
+      })
+      .replace(/\{(\w+)\}/g, (match, name) => {
+        if (vars && vars[name] !== undefined) return vars[name];
+        if (name === "brand") return host();
+        return match;
+      });
     if (table[key] !== undefined) return fill(table[key]);
     if (DICT.vi[key] !== undefined) return fill(DICT.vi[key]);
     return fill(fallback !== undefined ? fallback : key);

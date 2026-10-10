@@ -10,7 +10,7 @@ import { paypalEnvironmentIsSet } from "./config.js";
 import { createDownloadUrl, createUploadUrl } from "./r2.js";
 import { captureOrder, createOrder as createPayPalOrder, hashToken, newOrderId, newToken, paypalChargeForProduct, paymentMatchesOrder, readOrder, verifyWebhook } from "./paypal.js";
 import { paymentInstructions, paymentOptions } from "./payments.js";
-import { brandMeta, esc, fillCopy, fillPageTokens, pageTokenValues, renderFeed, renderIndexCount, renderIndexFilters, renderIndexGrid, renderLlmsTxt, renderOgImage, renderProductPage, renderStats, verificationFile, verificationMeta } from "./pages.js";
+import { brandMeta, esc, fillCopy, fillPageTokens, pageTokenValues, renderFeed, renderIndexCount, renderIndexFilters, renderIndexGrid, renderLlmsTxt, renderOgImage, renderProductPage, renderStats, tokenMeta, verificationFile, verificationMeta } from "./pages.js";
 import { hasPayment, isClosed, isUnpaid, markOrderDelivered, markOrderPaid, paymentDeadline, sweeperRunning, voidPayment } from "./orders.js";
 import { notifyOrder, notifyMode } from "./notify.js";
 import { resolveCountry } from "./geo.js";
@@ -299,7 +299,7 @@ async function renderPage(file) {
   // verification tags, the catalogue and the counts, each derived from the same
   // product list the tokens describe.
   const html = fillPageTokens(template, pageTokenValues({ products, reviewLimits }))
-    .replace("</head>", `${verificationMeta()}\n${brandMeta()}\n</head>`)
+    .replace("</head>", `${tokenMeta()}\n${verificationMeta()}\n${brandMeta()}\n</head>`)
     .replace(/(<span[^>]*class="product-count"[^>]*id="product-count"[^>]*>)[\s\S]*?(<\/span>)/, `$1${esc(renderIndexCount(products))}$2`)
     .replace(/<!--filters:start-->[\s\S]*?<!--filters:end-->/, `<!--filters:start-->${renderIndexFilters(products)}<!--filters:end-->`)
     .replace(/(<section class="stats wrap" id="stats">)([\s\S]*?)(<\/section>)/, (_all, open, _body, close) => {

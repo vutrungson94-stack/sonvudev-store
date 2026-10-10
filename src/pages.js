@@ -460,6 +460,43 @@ export function fillPageTokens(html, values) {
 }
 
 /**
+ * The configuration values a language switch still needs, shipped in one meta
+ * tag.
+ *
+ * The legal pages carry {{paymentWindowHours}} and {{support}} inside their
+ * *translations*. The server fills those placeholders into the HTML it renders,
+ * and that is the only copy it can reach: when a reader switches language,
+ * i18n.js replaces the paragraph with the dictionary copy through I18N.t(),
+ * which brings the placeholder back with it. The sentence then reads "cancelled
+ * after {{paymentWindowHours}} hours", on a page that was correct a second
+ * earlier. Both dictionaries are affected, so neither language is the safe one.
+ *
+ * Hard-coding the numbers into both dictionaries is the other way out, and it
+ * is worse: the refund window would then be written in three places (config,
+ * English, Vietnamese) with nothing tying them together. The values travel with
+ * the page instead, and the browser substitutes them on the way out.
+ *
+ * Values are percent-encoded because a support address contains "@" and a
+ * payment window does not — the delimiter has to survive both.
+ */
+export const tokenMeta = () => {
+  // JSON rather than name=value pairs joined by a delimiter. The joined form
+  // needs a separator no value can contain, and escaping it needs an escape
+  // helper of its own — which is a third copy of esc() and exactly what the
+  // escCopies metric is there to catch. esc(JSON.stringify(...)) reuses the one
+  // in format.js, and the browser gets clean JSON back after parsing the
+  // attribute.
+  const values = {
+    brandName: String(env.brand.name ?? ""),
+    site: String(env.appUrl ?? ""),
+    support: String(env.email.supportEmail ?? ""),
+    year: String(new Date().getFullYear()),
+    paymentWindowHours: String(env.orders.paymentWindowHours ?? ""),
+  };
+  return `<meta name="sv-tokens" content="${esc(JSON.stringify(values))}">`;
+};
+
+/**
  * The verification file a search engine fetches from the site root.
  *
  * Google names it google<token>.html and wants a one-line body naming itself;
@@ -871,6 +908,7 @@ export function renderProductPage(rawProduct, lang = "vi", reviews = [], usd = n
   return `<!doctype html>
 <html lang="${en ? "en" : "vi"}">
 <head>
+${tokenMeta()}
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 ${meta({ title, description, url, type: "product", lang, alternates: { vi: absolute(productUrl(product.slug, "vi")), en: absolute(productUrl(product.slug, "en")) } })}
