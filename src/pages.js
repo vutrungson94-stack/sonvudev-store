@@ -359,6 +359,34 @@ export const brandMeta = () => [
 ].join("\n");
 
 /**
+ * Cloudflare Web Analytics, on every page.
+ *
+ * There was no way to answer "has anyone ever actually visited this shop?" —
+ * the only orders on record were the owner's own test purchases. Cloudflare's
+ * edge already fronts this site, so the beacon is first-party to the same
+ * operator and the measurement costs nothing.
+ *
+ * The snippet is written here rather than pasted into ten templates for the
+ * same reason brandMeta exists: one definition, every page gets the same tag,
+ * and rotating the token is a one-line change. The automatic injection Cloudflare
+ * offers for proxied zones did not fire for this zone, which is why the tag is
+ * explicit.
+ *
+ * Two CSP entries back it (see src/app.js): the script host, and the endpoint
+ * the beacon reports to. Without them the browser blocks the tag and the
+ * dashboard shows a confident zero.
+ */
+export const analyticsMeta = () => {
+  const token = env.analytics.webAnalyticsToken;
+  if (!token) return "";
+  return [
+    "<!-- Cloudflare Web Analytics -->",
+    `<script type="module" src="https://static.cloudflareinsights.com/beacon.min.js" data-cf-beacon='{"token": "${esc(token)}"}'></script>`,
+    "<!-- End Cloudflare Web Analytics -->",
+  ].join("");
+};
+
+/**
  * The wordmark every header shows, built from BRAND_NAME.
  *
  * It is generated rather than templated because of the typographic split: the last
@@ -917,6 +945,7 @@ ${meta({ title, description, url, type: "product", lang, alternates: { vi: absol
 <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="/styles.css?v=${cssVersion}">
 ${brandMeta()}
+${analyticsMeta()}
 ${jsonLd([organization(), websiteSchema(), productSchema(product, lang), breadcrumbSchema(product, lang), faq])}
 </head>
 <body class="product-page">

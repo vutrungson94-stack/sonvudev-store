@@ -323,7 +323,15 @@ const skipped = [];
 if (!appUrl) skipped.push("domain gõ tay (cần APP_URL)");
 if (!supportEmail) skipped.push("địa chỉ hỗ trợ gõ tay (cần SUPPORT_EMAIL)");
 const appHost = appUrl ? new URL(appUrl).hostname.toLowerCase() : "";
-const thirdParty = new Set(["www.w3.org", "schema.org", "www.sitemaps.org", "localhost", "img.vietqr.io", "fonts.googleapis.com", "fonts.gstatic.com", "resend.com", "supabase.com", "supabase.co", "paypal.com", "google.com", "cloudflare.com", "render.com", "ipapi.co", "ipwho.is", "er-api.com", "exchangerate-api.com", "indexnow.org"]);
+const thirdParty = new Set(["www.w3.org", "schema.org", "www.sitemaps.org", "localhost", "img.vietqr.io", "fonts.googleapis.com", "fonts.gstatic.com", "resend.com", "supabase.com", "supabase.co", "paypal.com", "google.com", "cloudflare.com", "render.com", "ipapi.co", "ipwho.is", "er-api.com", "exchangerate-api.com", "indexnow.org",
+  // Cloudflare Web Analytics. Both hosts are named because the match above is
+  // exact rather than by suffix, and they are two different hosts: the first
+  // serves the beacon script (src/pages.js), the second receives what the beacon
+  // reports (the CSP connect-src in src/app.js). Neither can be reached from a
+  // configuration value — Cloudflare issues the token, not the address — so
+  // they are constants by nature, and the audit's real target, a hand typed
+  // sonvudev.com, still fails as it should.
+  "static.cloudflareinsights.com", "cloudflareinsights.com"]);
 // i18n.js is scanned too: brand.supportEmail is the configured default the pages
 // fall back to, so letting it drift away from .env would mean an empty mailto on
 // exactly the page a paying customer is reading.

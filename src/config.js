@@ -147,6 +147,12 @@ export const env = {
     url: value("SUPABASE_URL").replace(/\/$/, ""),
     serviceRoleKey: value("SUPABASE_SERVICE_ROLE_KEY"),
   },
+  analytics: {
+    // Cloudflare Web Analytics token. Empty disables the beacon entirely, so a
+    // checkout that is being run without the variable simply serves no tag
+    // rather than one that fails to load.
+    webAnalyticsToken: value("CF_WEB_ANALYTICS_TOKEN"),
+  },
   geo: {
     // "off" disables the country lookup entirely and the storefront falls back
     // to listing every payment method without a recommendation.

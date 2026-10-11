@@ -10,7 +10,7 @@ import { paypalEnvironmentIsSet } from "./config.js";
 import { createDownloadUrl, createUploadUrl } from "./r2.js";
 import { captureOrder, createOrder as createPayPalOrder, hashToken, newOrderId, newToken, paypalChargeForProduct, paymentMatchesOrder, readOrder, verifyWebhook } from "./paypal.js";
 import { paymentInstructions, paymentOptions } from "./payments.js";
-import { brandMeta, esc, fillCopy, fillPageTokens, pageTokenValues, renderFeed, renderIndexCount, renderIndexFilters, renderIndexGrid, renderLlmsTxt, renderOgImage, renderProductPage, renderStats, tokenMeta, verificationFile, verificationMeta } from "./pages.js";
+import { analyticsMeta, brandMeta, esc, fillCopy, fillPageTokens, pageTokenValues, renderFeed, renderIndexCount, renderIndexFilters, renderIndexGrid, renderLlmsTxt, renderOgImage, renderProductPage, renderStats, tokenMeta, verificationFile, verificationMeta } from "./pages.js";
 import { hasPayment, isClosed, isUnpaid, markOrderDelivered, markOrderPaid, paymentDeadline, sweeperRunning, voidPayment } from "./orders.js";
 import { notifyOrder, notifyMode } from "./notify.js";
 import { resolveCountry } from "./geo.js";
@@ -140,7 +140,12 @@ app.use((req, res, next) => {
   res.setHeader("Referrer-Policy", "strict-origin-when-cross-origin");
   res.setHeader("X-Frame-Options", "DENY");
   res.setHeader("Permissions-Policy", "camera=(), microphone=(), geolocation=()");
-  res.setHeader("Content-Security-Policy", "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: https://img.vietqr.io; connect-src 'self' https://*.r2.cloudflarestorage.com; frame-ancestors 'none'; base-uri 'self'; form-action 'self'");
+  // script-src and connect-src carry static.cloudflareinsights.com and
+// cloudflareinsights.com because analyticsMeta() in src/pages.js puts the Web
+// Analytics beacon on every page. Without the two entries the browser blocks
+// the tag and Cloudflare reports a confident zero, which is worse than not
+// measuring: the shop would look visited when nobody had been.
+res.setHeader("Content-Security-Policy", "default-src 'self'; script-src 'self' https://static.cloudflareinsights.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: https://img.vietqr.io; connect-src 'self' https://*.r2.cloudflarestorage.com https://cloudflareinsights.com; frame-ancestors 'none'; base-uri 'self'; form-action 'self'");
   if (req.secure) res.setHeader("Strict-Transport-Security", "max-age=15552000; includeSubDomains");
   next();
 });
@@ -299,7 +304,7 @@ async function renderPage(file) {
   // verification tags, the catalogue and the counts, each derived from the same
   // product list the tokens describe.
   const html = fillPageTokens(template, pageTokenValues({ products, reviewLimits }))
-    .replace("</head>", `${tokenMeta()}\n${verificationMeta()}\n${brandMeta()}\n</head>`)
+    .replace("</head>", `${tokenMeta()}\n${verificationMeta()}\n${brandMeta()}\n${analyticsMeta()}\n</head>`)
     .replace(/(<span[^>]*class="product-count"[^>]*id="product-count"[^>]*>)[\s\S]*?(<\/span>)/, `$1${esc(renderIndexCount(products))}$2`)
     .replace(/<!--filters:start-->[\s\S]*?<!--filters:end-->/, `<!--filters:start-->${renderIndexFilters(products)}<!--filters:end-->`)
     .replace(/(<section class="stats wrap" id="stats">)([\s\S]*?)(<\/section>)/, (_all, open, _body, close) => {

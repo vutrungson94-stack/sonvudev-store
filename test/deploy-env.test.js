@@ -69,6 +69,10 @@ const OPTIONAL = new Map(Object.entries({
   INDEXNOW_KEY: 'tắt IndexNow nếu trống.',
   GOOGLE_SITE_VERIFICATION: 'chỉ cho Search Console.',
   BING_SITE_VERIFICATION: 'chỉ cho Bing Webmaster.',
+  // Thiếu thì không có beacon, site vẫn chạy. Nhưng thiếu nó thì bảng lượt truy
+  // cập đọc 0 vĩnh viễn, và người đọc sẽ tưởng chưa ai từng vào — nên biến này
+  // phải có mặt ở production.
+  CF_WEB_ANALYTICS_TOKEN: 'đo lượt truy cập; thiếu thì Cloudflare báo 0 chứ không phải "không có ai".',
 }));
 
 // Variables whose absence removes a payment method without any error. These are
