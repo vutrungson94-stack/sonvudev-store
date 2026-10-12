@@ -446,3 +446,13 @@ body.modal-open{overflow:hidden}
 .admin-product-list{max-height:min(46vh,420px);overflow-y:auto;overscroll-behavior:contain;border:1px solid var(--line);border-radius:10px;margin-top:16px;padding:0 12px}
 .admin-product-list .admin-product-row:last-child{border-bottom:0}
 .admin-panel-count{color:var(--muted);font-size:11px;font-weight:500;margin-left:auto;white-space:nowrap}
+/* ===== Footer: mot bo cuc flex cho moi kho, khong con cot bi che =====
+   Truoc day footer dung grid 3 cot: duoi 961px cot tagline bi che con ~60px
+   (moi dong mot tu) con cot link chiem cung 494px, nhin nhu link nam tren logo.
+   Flex wrap giu đúng thu tu DOM: brand + tagline truoc, link sau, khong bao gio
+   đảo lenh, va tu xuống dòng khi hết chỗ. */
+.site-footer{display:flex;flex-wrap:wrap;align-items:center;gap:14px 28px}
+.site-footer p{flex:1 1 220px;max-width:340px;margin:0}
+.footer-links{flex:1 1 auto;justify-content:flex-end;flex-wrap:wrap;white-space:normal;row-gap:10px;column-gap:18px}
+.site-footer small{flex:1 1 100%;border-top:1px solid var(--line);padding-top:20px;margin-top:6px}
+@media(max-width:800px){.footer-links{justify-content:flex-start}}
