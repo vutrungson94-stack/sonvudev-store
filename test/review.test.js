@@ -82,7 +82,7 @@ async function purchase({ email = 'buyer@example.com', deliver = false } = {}) {
   const response = await fetch(`${base}/api/checkout`, {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
-    body: JSON.stringify({ productId: product.id, email, customerName: 'Buyer', paymentMethod: 'bank_transfer' }),
+    body: JSON.stringify({ productId: product.id, email, customerName: 'Buyer', acceptPolicy: 'on', paymentMethod: 'bank_transfer' }),
   });
   assert.equal(response.status, 200, 'checkout phải thành công');
   const data = await response.json();
@@ -206,7 +206,7 @@ test('đánh giá hiện trên trang sản phẩm, và mất khi đơn bị hoà
   await fetch(`${base}/api/admin/orders/${fulfilled.order.id}`, {
     method: 'PATCH',
     headers,
-    body: JSON.stringify({ refund: true, reason: 'Sản phẩm không đúng mô tả' }),
+    body: JSON.stringify({ refund: true, reason: 'Sản phẩm không đúng mô tả', category: 'defect' }),
   });
 
   const after = await (await fetch(`${base}/product/reviewable-tool`)).text();

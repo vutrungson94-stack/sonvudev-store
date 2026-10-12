@@ -48,7 +48,7 @@ test.after(async () => { server?.close(); await fs.rm(tempDir, { recursive: true
 
 // Places an order against the shared product and returns the checkout response.
 async function placeOrder(email) {
-  const response = await fetch(`${base}/api/checkout`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ productId: product.id, email, customerName: 'Buyer', paymentMethod: 'bank_transfer' }) });
+  const response = await fetch(`${base}/api/checkout`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ productId: product.id, email, customerName: 'Buyer', acceptPolicy: 'on', paymentMethod: 'bank_transfer' }) });
   assert.equal(response.status, 200);
   return response.json();
 }

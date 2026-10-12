@@ -115,26 +115,42 @@ export async function markOrderDelivered(order) {
  * looks like a bug the next time the owner compares it with a bank statement,
  * so the refund is recorded as its own number and the report shows collected,
  * refunded and net side by side.
+ *
+ * `category` and `amount` exist because not every refund is the same shape. A
+ * defect or a duplicate returns the whole payment; a buyer who already has the
+ * file and has changed their mind returns only the part the owner agreed to. The
+ * order records both, so the figure on the row is the money that actually moved
+ * and not an assumption.
  */
-export async function voidPayment(order, { reason = "refunded", source = "admin" } = {}) {
+export async function voidPayment(order, { reason = "refunded", source = "admin", category = "", amount = null } = {}) {
   // Reads the payment columns rather than the status, so an order whose file was
   // already handed over can still be refunded. That is the common case: the buyer
   // downloaded, the file was broken, and the refund is what they asked for.
   if (!hasPayment(order)) return null;
   const now = new Date().toISOString();
+  const paid = Number(order.paidAmount || order.amount || 0);
+  // Clamped rather than trusted. A caller that sends more than was ever taken, or
+  // a negative number, would otherwise write a refund the shop never made. An
+  // omitted amount means everything — what every refund did before categories
+  // existed — rather than zero, which would look like a refund that lost the sale
+  // and moved no money.
+  const requested = Number(amount);
+  const refundAmount = Number.isFinite(requested) && requested > 0 ? Math.min(requested, paid) : paid;
   const update = {
     status: "refunded",
     refundedAt: now,
     refundReason: String(reason).slice(0, 200),
+    refundCategory: String(category).slice(0, 40),
+    refundAmount,
     refundedCount: Number(order.refundedCount || 0) + 1,
-    refundedAmount: Number(order.refundedAmount || 0) + Number(order.paidAmount || order.amount || 0),
+    refundedAmount: Number(order.refundedAmount || 0) + refundAmount,
     deliveredAt: null,
     updatedAt: now,
   };
   if (Number(order.paidProviderAmount || 0) > 0) update.refundedProviderAmount = Number(order.refundedProviderAmount || 0) + Number(order.paidProviderAmount);
   const updated = await updateOrder(order.id, update);
   await notifyOrder(updated, "refunded", `refunded:${update.refundedCount}`);
-  console.log(`[orders] ${order.id} refunded via ${source}: ${update.refundReason}`);
+  console.log(`[orders] ${order.id} refunded via ${source} [${update.refundCategory || "uncategorised"}] ${update.refundReason}`);
   return updated;
 }
 

@@ -48,7 +48,7 @@ const makeOrder = async (overrides = {}) => {
   seq += 1;
   return (await (await fetch(`${base}/api/checkout`, {
     method: 'POST', headers: { 'content-type': 'application/json' },
-    body: JSON.stringify({ productId: product.id, email: `buyer${seq}@example.com`, customerName: 'Test', paymentMethod: 'bank_transfer', ...overrides }),
+    body: JSON.stringify({ productId: product.id, email: `buyer${seq}@example.com`, customerName: 'Test', acceptPolicy: 'on', paymentMethod: 'bank_transfer', ...overrides }),
   })).json()).order;
 };
 
@@ -162,13 +162,13 @@ test('đặt đơn có giới hạn, và chỉ tính đơn mới thật sự', a
   // charged for the retry — that would lose the sale and fix nothing.
   const first = await (await fetch(`${base}/api/checkout`, {
     method: 'POST', headers: { 'content-type': 'application/json', 'x-forwarded-for': ip },
-    body: JSON.stringify({ productId: product.id, email: 'retry@example.com', paymentMethod: 'bank_transfer', idempotencyKey: 'same-key' }),
+    body: JSON.stringify({ productId: product.id, email: 'retry@example.com', acceptPolicy: 'on', paymentMethod: 'bank_transfer', idempotencyKey: 'same-key' }),
   })).json();
   assert.ok(first.order?.id, 'lần đầu phải tạo đơn');
   for (let i = 0; i < 20; i += 1) {
     const repeat = await fetch(`${base}/api/checkout`, {
       method: 'POST', headers: { 'content-type': 'application/json', 'x-forwarded-for': ip },
-      body: JSON.stringify({ productId: product.id, email: 'retry@example.com', paymentMethod: 'bank_transfer', idempotencyKey: 'same-key' }),
+    body: JSON.stringify({ productId: product.id, email: 'retry@example.com', acceptPolicy: 'on', paymentMethod: 'bank_transfer', idempotencyKey: 'same-key' }),
     });
     assert.equal(repeat.status, 200, 'thử lại cùng một đơn phải không bao giờ bị chặn');
   }
@@ -179,7 +179,7 @@ test('đặt đơn có giới hạn, và chỉ tính đơn mới thật sự', a
   for (let i = 0; i < 40; i += 1) {
     const response = await fetch(`${base}/api/checkout`, {
       method: 'POST', headers: { 'content-type': 'application/json', 'x-forwarded-for': '198.51.100.7' },
-      body: JSON.stringify({ productId: product.id, email: `flood${i}@example.com`, paymentMethod: 'bank_transfer' }),
+      body: JSON.stringify({ productId: product.id, email: `flood${i}@example.com`, acceptPolicy: 'on', paymentMethod: 'bank_transfer' }),
     });
     statuses.push(response.status);
     if (response.status === 429) break;

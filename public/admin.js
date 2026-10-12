@@ -1,4 +1,4 @@
-const body=document.getElementById('orders-body'),summary=document.getElementById('order-summary'),login=document.getElementById('login-card'),dashboard=document.getElementById('dashboard'),tokenInput=document.getElementById('admin-token'),status=document.getElementById('login-status'),logout=document.getElementById('logout'),toast=document.getElementById('toast'),productPanel=document.getElementById('product-panel'),productForm=document.getElementById('product-form'),productStatus=document.getElementById('product-status'),productList=document.getElementById('admin-product-list'),revenuePanel=document.getElementById('revenue-panel'),moreRow=document.getElementById('orders-more'),moreBtn=document.getElementById('orders-more-btn'),revenueBody=document.getElementById('revenue-body'),revenueTotals=document.getElementById('revenue-totals'),revenueNote=document.getElementById('revenue-note'),revenueRefresh=document.getElementById('revenue-refresh'),orderSearch=document.getElementById('order-search'),orderStatusFilter=document.getElementById('order-status'),productSearch=document.getElementById('product-search'),productStatusFilter=document.getElementById('product-status');let token=sessionStorage.getItem('sonvudev_admin')||'';const esc=v=>window.SVDFormat.esc(v);// Money is formatted for the currency of the row, never for VND with the code
+const body=document.getElementById('orders-body'),summary=document.getElementById('order-summary'),login=document.getElementById('login-card'),dashboard=document.getElementById('dashboard'),tokenInput=document.getElementById('admin-token'),status=document.getElementById('login-status'),logout=document.getElementById('logout'),toast=document.getElementById('toast'),productPanel=document.getElementById('product-panel'),productForm=document.getElementById('product-form'),productStatus=document.getElementById('product-status'),productList=document.getElementById('admin-product-list'),revenuePanel=document.getElementById('revenue-panel'),moreRow=document.getElementById('orders-more'),moreBtn=document.getElementById('orders-more-btn'),revenueBody=document.getElementById('revenue-body'),revenueTotals=document.getElementById('revenue-totals'),revenueNote=document.getElementById('revenue-note'),revenueRefresh=document.getElementById('revenue-refresh'),orderSearch=document.getElementById('order-search'),orderStatusFilter=document.getElementById('order-status'),productSearch=document.getElementById('product-search'),productStatusFilter=document.getElementById('product-status'),refundModal=document.getElementById('refund-modal'),refundForm=document.getElementById('refund-form'),refundOrderLine=document.getElementById('refund-order'),refundEvidence=document.getElementById('refund-evidence'),refundStatus=document.getElementById('refund-status'),refundPartial=document.getElementById('refund-partial'),refundSubmit=document.getElementById('refund-submit');let token=sessionStorage.getItem('sonvudev_admin')||'';const esc=v=>window.SVDFormat.esc(v);// Money is formatted for the currency of the row, never for VND with the code
 // appended afterwards. That combination is wrong the moment a row is not VND: the
 // amount was grouped as vi-VN with no decimals and then labelled USD, which is the
 // exact mistake src/format.js documents — a PayPal order read "3 USD" or
@@ -65,8 +65,43 @@ document.addEventListener('visibilitychange',()=>{if(!document.hidden)pollPendin
 async function reopenOrder(id){if(!confirm('Mở lại đơn để khách tải lại?'))return;try{await api('/api/admin/orders/'+encodeURIComponent(id),{method:'PATCH',body:JSON.stringify({reopen:true})});showToast('Đã mở lại đơn, khách tải lại được');resetOrderPage();loadRevenue()}catch(e){showToast(e.message,true)}}
 
 // A refund needs a reason because the buyer is emailed with it, and "cancelled"
-// tells them nothing when money already moved.
-async function refundOrder(id){const reason=prompt('Lý do hoàn tiền (khách sẽ thấy nội dung này trong email):');if(!reason||!reason.trim())return;try{await api('/api/admin/orders/'+encodeURIComponent(id),{method:'PATCH',body:JSON.stringify({refund:true,reason:reason.trim()})});showToast('Đã ghi nhận hoàn tiền và gửi email cho khách');resetOrderPage();loadRevenue()}catch(e){showToast(e.message,true)}}
+// tells them nothing when money already moved. It also needs a *category*, because
+// the three kinds are not the same decision and only one of them is a partial: a
+// defect and a duplicate are the shop's fault and return everything, while a buyer
+// who already holds the file is the case the policy is written for. The evidence
+// panel above the form is there on purpose — how many times the file left, and
+// when, is what the conversation with that buyer is actually about.
+let refundTarget=null;
+function refundOrder(id){const order=ordersById.get(id);if(order)openRefund(order)}
+function refundCategory(){return (refundForm.querySelector('input[name=category]:checked')||{}).value||''}
+function openRefund(order){
+  refundTarget=order;
+  const paid=Number(order.paidAmount||order.amount)||0,delivered=order.deliveredAt?new Date(order.deliveredAt).toLocaleString('vi-VN',{timeZone:'Asia/Ho_Chi_Minh'}):'',paidAt=order.paidAt?new Date(order.paidAt).toLocaleString('vi-VN',{timeZone:'Asia/Ho_Chi_Minh'}):'';
+  refundOrderLine.textContent=`Đơn ${order.id} · ${order.customerEmail||order.customer_name||''} · đã thu ${amount(paid,order.currency)}`;
+  const facts=[paidAt?`Đã thu tiền lúc ${paidAt}`:'',delivered?`File đã giao lúc ${delivered}`:'Chưa giao file',order.downloads?`Đã tải ${order.downloads} lần`:'Chưa tải lần nào',order.policyAcceptedAt?`Đồng ý điều khoản lúc ${new Date(order.policyAcceptedAt).toLocaleString('vi-VN',{timeZone:'Asia/Ho_Chi_Minh'})}${order.policyAcceptedIp?` (IP ${order.policyAcceptedIp})`:''}${order.policyAcceptedVersion?` · chính sách ${order.policyAcceptedVersion}`:''}`:'Không có bản ghi đồng ý điều khoản'].filter(Boolean);
+  refundEvidence.innerHTML=facts.map(f=>`<div>${esc(f)}</div>`).join('');
+  refundEvidence.hidden=false;
+  refundForm.reset();
+  refundPartial.hidden=true;
+  refundStatus.textContent='';
+  refundModal.hidden=false;
+}
+function closeRefund(){refundModal.hidden=true;refundTarget=null}
+for(const el of[document.getElementById('refund-close'),document.getElementById('refund-cancel')])if(el)el.onclick=closeRefund;
+if(refundForm)refundForm.onchange=()=>{refundPartial.hidden=refundCategory()!=='changed_mind';if(refundCategory()==='changed_mind'&&refundTarget)refundPartial.querySelector('input').placeholder=`Giá trị thực, nhỏ hơn ${amount(Number(refundTarget.paidAmount||refundTarget.amount)||0,refundTarget.currency)}`};
+if(refundForm)refundForm.onsubmit=async event=>{
+  event.preventDefault();
+  const category=refundCategory(),reason=new FormData(refundForm).get('reason')||'';
+  if(!category||!String(reason).trim())return;
+  const payload={refund:true,category,reason:String(reason).trim()};
+  if(category==='changed_mind')payload.partialAmount=Number(new FormData(refundForm).get('partialAmount'));
+  refundSubmit.disabled=true;refundSubmit.textContent='Đang hoàn…';
+  try{
+    await api('/api/admin/orders/'+encodeURIComponent(refundTarget.id),{method:'PATCH',body:JSON.stringify(payload)});
+    showToast('Đã ghi nhận hoàn tiền và gửi email cho khách');closeRefund();resetOrderPage();loadRevenue()
+  }catch(e){refundStatus.textContent=e.message;refundStatus.className='form-message error'}
+  finally{refundSubmit.disabled=false;refundSubmit.textContent='Hoàn tiền'}
+};
 // A refunded order can be reopened if the money came back to the buyer by
 // mistake, or the chargeback was reversed.
 async function reopenRefunded(id){if(!confirm('Mở lại đơn đã hoàn tiền? Khách tải lại được.'))return;try{await api('/api/admin/orders/'+encodeURIComponent(id),{method:'PATCH',body:JSON.stringify({status:'paid'})});showToast('Đã mở lại đơn');resetOrderPage();loadRevenue()}catch(e){showToast(e.message,true)}}
@@ -136,6 +171,9 @@ async function loadOrders({append=false}={}){
     const d=await api('/api/admin/orders?'+orderQuery(append)),orders=d.orders||[];
     orderPage=append?orderPage+1:1;
     orderHasMore=Boolean(d.hasMore);
+    refundedEmails=new Set((d.refundedEmails||[]).map(e=>String(e).toLowerCase()));
+    if(!append)ordersById.clear();
+    for(const order of orders)ordersById.set(order.id,order);
     // Live orders are counted across the whole shop rather than the page on
     // screen, so the figure does not drop back just because the owner scrolled.
     const open=(Number(d.live)||0)+orders.filter(o=>o.status==='pending_transfer'&&!o.deliveredAt).length;
@@ -171,7 +209,17 @@ const suffix=orderHasMore?'+':'';
   finally{orderLoading=false;moreBtn.disabled=false}
 }
 function resetOrderPage(){orderPage=0;orderHasMore=false;return loadOrders()}
-moreBtn.onclick=()=>loadOrders({append:true});function orderRow(o){const item=o.items?.[0]||{};const when=new Date(o.createdAt||o.created_at).toLocaleString('vi-VN',{timeZone:'Asia/Ho_Chi_Minh'});return `<tr><td data-label="Mã đơn"><code>${esc(o.id)}</code><small title="${esc(when)}">${esc(new Date(o.createdAt||o.created_at).toLocaleString('vi-VN',{timeZone:'Asia/Ho_Chi_Minh',hour:'2-digit',minute:'2-digit',day:'2-digit',month:'2-digit'}))}</small></td><td data-label="Khách hàng">${esc(o.customerName||o.customer_name||'—')}<small>${esc(o.customerEmail||o.customer_email)}</small></td><td data-label="Sản phẩm">${esc(item.name||'—')}<small>v${esc(item.version||'—')}</small></td><td data-label="Số tiền"><strong>${esc(amount(o.amount, o.currency))}</strong>${o.paidCount?`<small>${o.paidCount} lần đã thu</small>`:''}</td><td data-label="Trạng thái"><span class="status-pill status-${esc(o.status)}">${esc(labels[o.status]||o.status)}</span>${o.deliveredAt?`<small>đã giao ${esc(new Date(o.deliveredAt).toLocaleString('vi-VN',{timeZone:'Asia/Ho_Chi_Minh'}))}</small>`:''}${o.refundedAt?`<small>đã hoàn ${esc(new Date(o.refundedAt).toLocaleString('vi-VN',{timeZone:'Asia/Ho_Chi_Minh'}))}</small>`:''}${o.status==='cancelled'&&o.cancelledAt?`<small>hết hạn lúc ${esc(new Date(o.cancelledAt).toLocaleString('vi-VN',{timeZone:'Asia/Ho_Chi_Minh'}))}</small>`:''}</td><td data-label="Thao tác">${o.status==='pending_transfer'?`<button class="table-action" data-status="${esc(o.id)}" data-next="paid">Xác nhận thu</button>`:o.status==='paid'?`<button class="table-action" data-delivered="${esc(o.id)}">Đã giao xong</button> <button class="table-action" data-refund="${esc(o.id)}">Hoàn tiền</button>`:o.status==='refunded'?`<button class="table-action" data-reopen2="${esc(o.id)}">Mở lại đơn</button>`:o.deliveredAt?`<button class="table-action" data-reopen="${esc(o.id)}">Mở lại đơn</button>`:'—'}</td></tr>`}async function updateOrder(id,nextStatus){if(!confirm('Xác nhận đơn hàng đã thanh toán?'))return;try{await api('/api/admin/orders/'+encodeURIComponent(id),{method:'PATCH',body:JSON.stringify({status:nextStatus})});showToast('Đã cập nhật đơn hàng và gửi email cho khách');resetOrderPage()}catch(e){showToast(e.message,true)}}async function markDelivered(id){if(!confirm('Đóng đơn hàng? Nút tải sẽ khóa lại.'))return;try{await api('/api/admin/orders/'+encodeURIComponent(id),{method:'PATCH',body:JSON.stringify({delivered:true})});showToast('Đã đóng đơn hàng');resetOrderPage()}catch(e){showToast(e.message,true)}}
+// A returning buyer who was once given money back is the row the owner has to see
+// before confirming a second payment. The set comes from the server and answers
+// for every order ever refunded, not just the page on screen — which is why it is
+// a Set and not something derived from the rows currently rendered.
+let refundedEmails=new Set();
+const refundedFlag=(o)=>{const email=String(o.customerEmail||o.customer_email||'').toLowerCase();return o.status!=='refunded'&&email&&refundedEmails.has(email)?'<small class="refunded-flag">KH này đã từng được hoàn tiền</small>':''};
+// The refund dialog is opened from an order id on a button, but it is about the
+// order: the evidence it shows is read off the row. The map holds every order the
+// page has loaded, so a click on a row appended three pages deep still finds it.
+const ordersById=new Map();
+moreBtn.onclick=()=>loadOrders({append:true});function orderRow(o){const item=o.items?.[0]||{};const when=new Date(o.createdAt||o.created_at).toLocaleString('vi-VN',{timeZone:'Asia/Ho_Chi_Minh'});return `<tr><td data-label="Mã đơn"><code>${esc(o.id)}</code><small title="${esc(when)}">${esc(new Date(o.createdAt||o.created_at).toLocaleString('vi-VN',{timeZone:'Asia/Ho_Chi_Minh',hour:'2-digit',minute:'2-digit',day:'2-digit',month:'2-digit'}))}</small></td><td data-label="Khách hàng">${esc(o.customerName||o.customer_name||'—')}<small>${esc(o.customerEmail||o.customer_email)}</small>${refundedFlag(o)}</td><td data-label="Sản phẩm">${esc(item.name||'—')}<small>v${esc(item.version||'—')}</small></td><td data-label="Số tiền"><strong>${esc(amount(o.amount, o.currency))}</strong>${o.paidCount?`<small>${o.paidCount} lần đã thu</small>`:''}</td><td data-label="Trạng thái"><span class="status-pill status-${esc(o.status)}">${esc(labels[o.status]||o.status)}</span>${o.deliveredAt?`<small>đã giao ${esc(new Date(o.deliveredAt).toLocaleString('vi-VN',{timeZone:'Asia/Ho_Chi_Minh'}))}</small>`:''}${o.refundedAt?`<small>đã hoàn ${esc(new Date(o.refundedAt).toLocaleString('vi-VN',{timeZone:'Asia/Ho_Chi_Minh'}))}</small>`:''}${o.status==='cancelled'&&o.cancelledAt?`<small>hết hạn lúc ${esc(new Date(o.cancelledAt).toLocaleString('vi-VN',{timeZone:'Asia/Ho_Chi_Minh'}))}</small>`:''}${o.downloads?`<small>đã tải ${esc(String(o.downloads))} lần</small>`:''}</td><td data-label="Thao tác">${o.status==='pending_transfer'?`<button class="table-action" data-status="${esc(o.id)}" data-next="paid">Xác nhận thu</button>`:o.status==='paid'?`<button class="table-action" data-delivered="${esc(o.id)}">Đã giao xong</button> <button class="table-action" data-refund="${esc(o.id)}">Hoàn tiền</button>`:o.status==='refunded'?`<button class="table-action" data-reopen2="${esc(o.id)}">Mở lại đơn</button>`:o.deliveredAt?`<button class="table-action" data-reopen="${esc(o.id)}">Mở lại đơn</button>`:'—'}</td></tr>`}async function updateOrder(id,nextStatus){if(!confirm('Xác nhận đơn hàng đã thanh toán?'))return;try{await api('/api/admin/orders/'+encodeURIComponent(id),{method:'PATCH',body:JSON.stringify({status:nextStatus})});showToast('Đã cập nhật đơn hàng và gửi email cho khách');resetOrderPage()}catch(e){showToast(e.message,true)}}async function markDelivered(id){if(!confirm('Đóng đơn hàng? Nút tải sẽ khóa lại.'))return;try{await api('/api/admin/orders/'+encodeURIComponent(id),{method:'PATCH',body:JSON.stringify({delivered:true})});showToast('Đã đóng đơn hàng');resetOrderPage()}catch(e){showToast(e.message,true)}}
 async function uploadRelease(file, productRef, version, onProgress = () => {}) {
   onProgress('Đang tạo link upload R2…');
   const presign = await api('/api/admin/uploads/presign', { method: 'POST', body: JSON.stringify({ productRef, version, fileName: file.name, contentType: file.type || 'application/octet-stream' }) });

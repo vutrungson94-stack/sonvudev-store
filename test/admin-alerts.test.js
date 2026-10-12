@@ -40,7 +40,7 @@ async function publish(email) {
   const headers = { 'content-type': 'application/json', ...auth() };
   const created = await fetch(`${base}/api/admin/products`, { method: 'POST', headers, body: JSON.stringify({ name: 'Alert Tester', category: 'Công cụ', platform: 'Windows', version: '1.0.0', price: 99000, currency: 'VND', fileKey: 'products/alert/test.exe', status: 'active' }) });
   const product = (await created.json()).product;
-  const response = await fetch(`${base}/api/checkout`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ productId: product.id, email, customerName: 'Buyer', paymentMethod: 'bank_transfer' }) });
+  const response = await fetch(`${base}/api/checkout`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ productId: product.id, email, customerName: 'Buyer', acceptPolicy: 'on', paymentMethod: 'bank_transfer' }) });
   return (await response.json()).order;
 }
 

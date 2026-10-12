@@ -57,7 +57,7 @@ const makeOrder = async () => {
   seq += 1;
   return (await (await fetch(`${base}/api/checkout`, {
     method: 'POST', headers: { 'content-type': 'application/json' },
-    body: JSON.stringify({ productId: product.id, email: `page${seq}@example.com`, paymentMethod: 'bank_transfer' }),
+    body: JSON.stringify({ productId: product.id, email: `page${seq}@example.com`, acceptPolicy: 'on', paymentMethod: 'bank_transfer' }),
   })).json()).order;
 };
 

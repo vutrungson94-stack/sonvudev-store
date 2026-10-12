@@ -444,7 +444,18 @@ export const brandWordmark = () => {
 export const PAGE_TOKENS = [
   "site", "brandName", "brandWordmark", "support", "paymentWindowHours",
   "reviewMinLength", "reviewMaxLength", "year", "legalEntityLine", "jsonLd", "iconLinks", "cssVersion",
+  "policyUpdated",
 ];
+/**
+ * The date printed at the top of the refund policy.
+ *
+ * It is a constant rather than "today" on purpose. A buyer who asks for a refund
+ * five months from now is answering to the policy that was published when they
+ * paid, not the one that has been reworded since; the order records this value
+ * beside the moment they accepted it, and the policy page renders the same one so
+ * the two can never say different dates.
+ */
+export const REFUND_POLICY_UPDATED = "2026-09-28";
 /** Placeholders inside product copy, filled on the way out rather than in a page. */
 export const COPY_TOKENS = ["founder", "brand"];
 export const KNOWN_TEMPLATE_TOKENS = [...PAGE_TOKENS, ...COPY_TOKENS];
@@ -464,6 +475,12 @@ export function pageTokenValues({ products = [], reviewLimits = null } = {}) {
     reviewMinLength: String(reviewLimits?.minLength ?? 20),
     reviewMaxLength: String(reviewLimits?.maxLength ?? 1200),
     year: String(new Date().getFullYear()),
+    // The day the refund policy was last reworded. Written on the policy page and
+    // stored on every order placed after it, so a buyer who disputes the terms can
+    // be shown the exact text they were given rather than whatever the page says
+    // today. Two copies of this date is the bug where they disagree under a
+    // dispute; it lives here because every reader imports it from one module.
+    policyUpdated: REFUND_POLICY_UPDATED,
     legalEntity: env.brand.legalEntity,
     legalEntityLine: legalEntityLine(),
     jsonLd: jsonLdGraph(products),
@@ -520,6 +537,10 @@ export const tokenMeta = () => {
     support: String(env.email.supportEmail ?? ""),
     year: String(new Date().getFullYear()),
     paymentWindowHours: String(env.orders.paymentWindowHours ?? ""),
+    // The refund policy's own date, for the sentence the buyer reads on the policy
+    // page. It travels with the page tokens so the policy date in the dictionary
+    // and the one recorded on the order are filled from the same constant.
+    policyUpdated: REFUND_POLICY_UPDATED,
   };
   return `<meta name="sv-tokens" content="${esc(JSON.stringify(values))}">`;
 };

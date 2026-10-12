@@ -77,6 +77,9 @@ const DICT = {
     'api.err.uploadLink': 'Không thể tạo link upload',
     'api.err.refundNotPaid': 'Chỉ hoàn tiền được đơn đã nhận tiền',
     'api.err.refundReasonRequired': 'Cần ghi lý do hoàn tiền',
+    'api.err.refundCategoryRequired': 'Cần chọn loại lý do hoàn tiền',
+    'api.err.refundPartialAmountRequired': 'Hoàn kiểu “khách đổi ý” phải ghi số tiền lớn hơn 0 và nhỏ hơn số đã thu',
+    'api.err.policyNotAccepted': 'Bạn cần đồng ý với điều khoản và chính sách hoàn tiền trước khi thanh toán',
     'api.err.invalidStatus': 'Trạng thái không hợp lệ',
     'api.err.transferUnconfigured': 'Phương thức chuyển khoản chưa được cấu hình',
     'api.err.noReleaseFile': 'Sản phẩm chưa có file phát hành',
@@ -268,7 +271,7 @@ const DICT = {
     'order.check': 'Kiểm tra đơn hàng',
     'order.errStatus': 'Không kiểm tra được trạng thái đơn hàng',
     'order.errDownload': 'Chưa thể tải sản phẩm lúc này',
-    'cart.agree': 'Tôi đồng ý với điều khoản sử dụng và chính sách bảo mật.',
+    'cart.agree': 'Tôi đã đọc Điều khoản, Chính sách bảo mật và Chính sách hoàn tiền, và hiểu phần mềm điện tử không được hoàn tiền sau khi đã tải.',
     'product.requirements': 'Yêu cầu hệ thống',
     'product.version': 'Phiên bản',
     'product.buyNow': 'Mua ngay',
@@ -367,7 +370,7 @@ const DICT = {
     // the text around it is split into keys, so a reader switching to English
     // sees the same emphasis rather than a paragraph that lost it.
     'legal.eyebrow': 'Pháp lý',
-    'legal.updated': 'Cập nhật: 28/09/2026 · Áp dụng cho mọi giao dịch tại',
+    'legal.updated': 'Cập nhật: {{policyUpdated}} · Áp dụng cho mọi giao dịch tại',
 
     // ---- about ----
     // The homepage header links say "Vì sao chọn {brand}" and "FAQ"; this page
@@ -575,6 +578,9 @@ const DICT = {
     'api.err.uploadLink': 'Could not create the upload link',
     'api.err.refundNotPaid': 'Only a paid order can be refunded',
     'api.err.refundReasonRequired': 'A reason is required to refund',
+    'api.err.refundCategoryRequired': 'A refund reason category is required',
+    'api.err.refundPartialAmountRequired': 'A good-will refund must be for an amount between zero and what was actually paid',
+    'api.err.policyNotAccepted': 'You need to accept the terms and the refund policy before paying',
     'api.err.invalidStatus': 'That status is not valid',
     'api.err.transferUnconfigured': 'Bank transfer is not configured',
     'api.err.noReleaseFile': 'This product has no release file yet',
@@ -698,7 +704,7 @@ const DICT = {
     'cart.name': 'Full name',
     'cart.paying': 'Processing…',
     'cart.note': 'You are only charged when the payment succeeds.',
-    'cart.agree': 'I agree to the Terms of Use and the Privacy Policy.',
+    'cart.agree': 'I have read the Terms of Use, the Privacy Policy and the Refund Policy, and understand that software is not refundable once it has been downloaded.',
     'product.requirements': 'System requirements',
     'product.version': 'Version',
     'product.buyNow': 'Buy now',
@@ -809,7 +815,7 @@ const DICT = {
     // A fragment key continues the sentence it sits in, which is why several of
     // them begin or end mid-clause.
     'legal.eyebrow': 'Legal',
-    'legal.updated': 'Updated: 28/09/2026 · Applies to every transaction at',
+    'legal.updated': 'Updated: {{policyUpdated}} · Applies to every transaction at',
 
     // ---- about ----
     'about.nav.why': 'Why us',

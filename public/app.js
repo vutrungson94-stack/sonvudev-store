@@ -304,7 +304,7 @@ function openCheckout(p) {
       ${expiryNote()}
       <p class="safety-note">${esc(T('cart.safety'))}</p>
       <button class="button button-primary button-wide" type="submit">${esc(T('cart.continue'))} <span>→</span></button>
-      <p class="legal-copy">${esc(T('cart.agree'))} <a href="/terms" target="_blank" rel="noopener">${esc(T('nav.terms'))}</a> · <a href="/privacy" target="_blank" rel="noopener">${esc(T('nav.privacy'))}</a> · <a href="/refund" target="_blank" rel="noopener">${esc(T('nav.refund'))}</a>.</p>
+      <label class="policy-check"><input type="checkbox" name="acceptPolicy" required><span>${esc(T('cart.agree'))} <a href="/terms" target="_blank" rel="noopener">${esc(T('nav.terms'))}</a> · <a href="/privacy" target="_blank" rel="noopener">${esc(T('nav.privacy'))}</a> · <a href="/refund" target="_blank" rel="noopener">${esc(T('nav.refund'))}</a>.</span></label>
       <p class="legal-copy">${esc(T('cart.lostCode'))} <a href="/lookup">${esc(T('nav.lookup'))}</a></p>
     </form>`;
   document.getElementById('back-product').onclick = () => openProduct(p.id);

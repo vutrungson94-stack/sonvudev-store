@@ -54,14 +54,14 @@ let counter = 0;
 const buy = async () => {
   const response = await fetch(`${base}/api/checkout`, {
     method: 'POST', headers: { 'content-type': 'application/json' },
-    body: JSON.stringify({ productId: product.id, email: 'buyer@example.com', paymentMethod: 'bank_transfer', idempotencyKey: `r-${++counter}` }),
+    body: JSON.stringify({ productId: product.id, email: 'buyer@example.com', acceptPolicy: 'on', paymentMethod: 'bank_transfer', idempotencyKey: `r-${++counter}` }),
   });
   const data = await response.json();
   await markOrderPaid(await getOrder(data.order.id), { source: 'admin' });
   return data;
 };
-const refund = (id, reason = 'Khách mua nhầm') =>
-  fetch(`${base}/api/admin/orders/${id}`, { method: 'PATCH', headers: jsonHeaders, body: JSON.stringify({ refund: true, reason }) });
+const refund = (id, reason = 'Khách mua nhầm', category = 'defect') =>
+  fetch(`${base}/api/admin/orders/${id}`, { method: 'PATCH', headers: jsonHeaders, body: JSON.stringify({ refund: true, reason, category }) });
 const revenue = () => fetch(`${base}/api/admin/revenue`, { headers: auth() }).then((r) => r.json());
 
 test('hoàn tiền đổi trạng thái, giữ nguyên doanh thu gộp và ghi số tiền hoàn riêng', async () => {
@@ -108,7 +108,7 @@ test('phải có lý do mới cho hoàn, vì khách sẽ đọc lý do đó', as
 });
 
 test('không hoàn được đơn chưa thanh toán', async () => {
-  const response = await fetch(`${base}/api/checkout`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ productId: product.id, email: 'buyer@example.com', paymentMethod: 'bank_transfer', idempotencyKey: `u-${counter}` }) });
+  const response = await fetch(`${base}/api/checkout`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ productId: product.id, email: 'buyer@example.com', acceptPolicy: 'on', paymentMethod: 'bank_transfer', idempotencyKey: `u-${counter}` }) });
   const { order } = await response.json();
   const result = await refund(order.id);
   assert.equal(result.status, 409, 'đơn chưa thu tiền thì không có gì để hoàn');

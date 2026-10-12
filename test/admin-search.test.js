@@ -48,7 +48,7 @@ const makeOrder = async (email, customerName) => {
   seq += 1;
   return (await (await fetch(`${base}/api/checkout`, {
     method: 'POST', headers: { 'content-type': 'application/json' },
-    body: JSON.stringify({ productId: product.id, email: email || `buyer${seq}@example.com`, customerName, paymentMethod: 'bank_transfer' }),
+    body: JSON.stringify({ productId: product.id, email: email || `buyer${seq}@example.com`, customerName, acceptPolicy: 'on', paymentMethod: 'bank_transfer' }),
   })).json()).order;
 };
 const setStatus = (id, status) => fetch(`${base}/api/admin/orders/${id}`, { method: 'PATCH', headers: auth, body: JSON.stringify({ status }) }).then((r) => r.json());

@@ -247,6 +247,26 @@ export async function countOrders(filter = {}) {
   return Number.isFinite(total) ? total : 0;
 }
 
+/**
+ * Every address that has ever been handed money back.
+ *
+ * Refunds are rare, so this is one short query for the whole table rather than one
+ * per row of the page. The panel uses it to flag a returning buyer: not to refuse
+ * the sale, but so the owner sees on the next order from that address that this
+ * customer has already been given a refund once. Without it, a second order from
+ * someone who refunded their first reads exactly like a brand-new customer, which
+ * is the whole reason the list is worth the query.
+ */
+const REFUNDED_STATUS = "refunded";
+export async function listRefundedEmails() {
+  if (local) {
+    const items = await readJson(files.orders, []);
+    return [...new Set(items.filter((o) => o.status === REFUNDED_STATUS && o.customerEmail).map((o) => String(o.customerEmail).toLowerCase()))];
+  }
+  const rows = await supabase(`orders?select=customer_email&status=eq.${REFUNDED_STATUS}`);
+  return [...new Set((rows || []).map((row) => String(row.customer_email || row.customerEmail || "").toLowerCase()).filter(Boolean))];
+}
+
 export async function listOrders({ limit = 200, offset = 0, q = "", status = "" } = {}) {
   const { needle, status: wanted, matches } = orderFilter({ q, status });
   if (local) {

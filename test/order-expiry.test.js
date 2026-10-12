@@ -65,7 +65,7 @@ const checkout = async (overrides = {}) => {
   const email = overrides.email || `buyer${(buyerSeq += 1)}@example.com`;
   const response = await fetch(`${base}/api/checkout`, {
     method: 'POST', headers: { 'content-type': 'application/json' },
-    body: JSON.stringify({ productId: product.id, email, customerName: 'Test User', paymentMethod: 'bank_transfer', ...overrides }),
+    body: JSON.stringify({ productId: product.id, email, customerName: 'Test User', acceptPolicy: 'on', paymentMethod: 'bank_transfer', ...overrides }),
   });
   return { response, data: await response.json(), email };
 };
@@ -290,10 +290,15 @@ test('mọi đường truy vấn đều hỏi cả hai trạng thái chưa thanh
   const source = (await readSrc('src/store.js'))
     .replace(/\/\*[\s\S]*?\*\//g, '')
     .replace(/^\s*\/\/.*$/gm, '');
-  const orderQueries = [...source.matchAll(/orders\?([^`"']*)/g)].map((match) => match[1]);
-  assert.ok(orderQueries.length >= 2, 'phai co it nhat hai truy vấn bảng orders');
-  const handWritten = orderQueries.filter((query) => /status=eq\./.test(query));
-  assert.deepEqual(handWritten, [], `truy vấn orders còn ghi cứng trạng thái: ${handWritten.join(' | ')}`);
+    const orderQueries = [...source.matchAll(/orders\?([^`"']*)/g)].map((match) => match[1]);
+    assert.ok(orderQueries.length >= 2, 'phai co it nhat hai truy vấn bảng orders');
+    // The rule is about the *unpaid* statuses: an unpaid query that asks for one of
+    // them silently hides the other's rows, which is the bug described above. A
+    // query for the settled `refunded` status cannot go one-sided that way — there
+    // is exactly one such status and asking for any other would be wrong — so it is
+    // allowed, and it reads that status from the same named constant as its readers.
+    const handWritten = orderQueries.filter((query) => /status=eq\./.test(query) && !query.includes('status=eq.${REFUNDED_STATUS}'));
+    assert.deepEqual(handWritten, [], `truy vấn orders còn ghi cứng trạng thái: ${handWritten.join(' | ')}`);
   assert.ok(/status=in\.\(\$\{UNPAID_STATUSES/.test(source), 'bộ lọc PostgREST phải dựng từ UNPAID_STATUSES, không gõ tay');
 
   // Both statuses are unpaid, and the sweep's own rule agrees.

@@ -126,6 +126,24 @@
 <div id="admin-product-list" class="admin-product-list"></div>
 </section>
 </main>
+<div class="refund-modal" id="refund-modal" hidden role="dialog" aria-modal="true" aria-labelledby="refund-title">
+<div class="refund-card">
+<button type="button" class="back-button" id="refund-close">← Đóng</button>
+<p class="eyebrow">Hoàn tiền</p>
+<h2 id="refund-title">Chọn lý do hoàn tiền</h2>
+<p class="refund-order" id="refund-order"></p>
+<div class="refund-evidence" id="refund-evidence" hidden></div>
+<form id="refund-form">
+<label class="refund-reason"><input type="radio" name="category" value="defect" required><span><b>Phần mềm lỗi hoặc không đúng mô tả</b><small>Không chạy được trên hệ thống đã nêu, hoặc thiếu tính năng đã mô tả. Hoàn toàn bộ số đã thu.</small></span></label>
+<label class="refund-reason"><input type="radio" name="category" value="duplicate" required><span><b>Trừ nhầm, trùng đơn</b><small>Khách trả hai lần, hoặc số tiền trừ sai. Hoàn toàn bộ số đã thu.</small></span></label>
+<label class="refund-reason"><input type="radio" name="category" value="changed_mind" required><span><b>Khách đổi ý sau khi đã nhận file</b><small>Theo chính sách thì không hoàn toàn phần: ghi số tiền thỏa thuận. Khách không chấp nhận thì bấm Đóng, đơn giữ nguyên.</small></span></label>
+<div class="refund-partial" id="refund-partial" hidden><label>Số tiền hoàn (theo số đã thu của đơn)<input name="partialAmount" type="number" min="0" step="1000" placeholder="0"></label></div>
+<label>Ghi chú (khách sẽ thấy câu này trong email hoàn tiền)<textarea name="reason" rows="2" maxlength="200" required placeholder="Ví dụ: file báo thiếu DLL X, đã xác nhận qua ảnh khách gửi"></textarea></label>
+<div class="refund-actions"><button class="button button-primary" type="submit" id="refund-submit">Hoàn tiền</button><button class="button button-secondary" type="button" id="refund-cancel">Đóng</button></div>
+<p class="form-message" id="refund-status"></p>
+</form>
+</div>
+</div>
 <div class="toast" id="toast" role="status"></div>
 <script src="format.js"></script>
 <script src="admin.js"></script>

@@ -211,7 +211,7 @@ test('mọi thao tác admin đều để lại dấu vết gắn với id của 
   const checkout = await fetch(`${base}/api/checkout`, {
     method: 'POST',
     headers: jsonHeaders,
-    body: JSON.stringify({ productId: product.id, email: 'observe@example.com', customerName: 'Test', paymentMethod: 'bank_transfer' }),
+    body: JSON.stringify({ productId: product.id, email: 'observe@example.com', customerName: 'Test', acceptPolicy: 'on', paymentMethod: 'bank_transfer' }),
   });
   const order = (await checkout.json()).order;
 
@@ -228,7 +228,7 @@ test('mọi thao tác admin đều để lại dấu vết gắn với id của 
   const refund = await fetch(`${base}/api/admin/orders/${order.id}`, {
     method: 'PATCH',
     headers: adminHeaders,
-    body: JSON.stringify({ refund: true, reason: 'Sản phẩm không đúng mô tả' }),
+    body: JSON.stringify({ refund: true, reason: 'Sản phẩm không đúng mô tả', category: 'defect' }),
   });
   assert.equal(refund.status, 200);
   const refundId = refund.headers.get('x-request-id');
@@ -261,7 +261,7 @@ test('mọi nhánh thao tác đều ghi, không chỉ nhánh hoàn tiền', asyn
   const checkout = await fetch(`${base}/api/checkout`, {
     method: 'POST',
     headers: jsonHeaders,
-    body: JSON.stringify({ productId: product.id, email: 'observe2@example.com', customerName: 'Test', paymentMethod: 'bank_transfer' }),
+    body: JSON.stringify({ productId: product.id, email: 'observe2@example.com', customerName: 'Test', acceptPolicy: 'on', paymentMethod: 'bank_transfer' }),
   });
   const order = (await checkout.json()).order;
 

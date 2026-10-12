@@ -4,13 +4,13 @@ import { promises as fs } from "node:fs";
 import { fileURLToPath } from "node:url";
 import crypto from "node:crypto";
 import { env, isConfigured } from "./config.js";
-import { ORDER_STATUSES, countOrders, countOrdersForProduct, dataDir, ensureSeed, findOrderByIdempotencyKey, getOrder, getProduct, getProductBySlug, isOrderOwner, isSellable, latestOrder, listOpenOrders, listOrders, listOrdersForRevenue, listProducts, createOrder, updateOrder, createProduct, updateProduct, deleteProduct, persistenceMode } from "./store.js";
+import { ORDER_STATUSES, countOrders, countOrdersForProduct, dataDir, ensureSeed, findOrderByIdempotencyKey, getOrder, getProduct, getProductBySlug, isOrderOwner, isSellable, latestOrder, listOpenOrders, listOrders, listOrdersForRevenue, listProducts, listRefundedEmails, createOrder, updateOrder, createProduct, updateProduct, deleteProduct, persistenceMode } from "./store.js";
 import { supabaseRequest } from "./supabase-http.js";
 import { paypalEnvironmentIsSet } from "./config.js";
 import { createDownloadUrl, createUploadUrl } from "./r2.js";
 import { captureOrder, createOrder as createPayPalOrder, hashToken, newOrderId, newToken, paypalChargeForProduct, paymentMatchesOrder, readOrder, verifyWebhook } from "./paypal.js";
 import { paymentInstructions, paymentOptions } from "./payments.js";
-import { analyticsMeta, brandMeta, esc, fillCopy, fillPageTokens, pageTokenValues, renderFeed, renderIndexCount, renderIndexFilters, renderIndexGrid, renderLlmsTxt, renderOgImage, renderProductPage, renderStats, tokenMeta, verificationFile, verificationMeta } from "./pages.js";
+import { analyticsMeta, brandMeta, esc, fillCopy, fillPageTokens, pageTokenValues, renderFeed, renderIndexCount, renderIndexFilters, renderIndexGrid, renderLlmsTxt, renderOgImage, renderProductPage, renderStats, tokenMeta, verificationFile, verificationMeta, REFUND_POLICY_UPDATED } from "./pages.js";
 import { hasPayment, isClosed, isUnpaid, markOrderDelivered, markOrderPaid, paymentDeadline, sweeperRunning, voidPayment } from "./orders.js";
 import { notifyOrder, notifyMode } from "./notify.js";
 import { resolveCountry } from "./geo.js";
@@ -48,6 +48,22 @@ const publicProduct = (product) => {
   return filled;
 };
 const publicOrder = (order) => { if (!order) return null; const { accessTokenHash, access_token_hash, idempotencyKey, idempotency_key, notifications, ...safe } = order; return { ...safe, items: (safe.items || []).map(({ fileKey, file_key, ...item }) => item) }; };
+// The three kinds of refund, and the amount each one is allowed to move.
+//
+// A defect or a duplicate is the shop's fault and returns everything. The third is
+// the one the policy exists for — a buyer who has the file and has changed their
+// mind — and it moves only the part the owner types in. The bounds are the whole
+// point: an amount of zero would sell the software for nothing, an amount equal to
+// the payment would refund in full against a policy that says not to, and anything
+// above the payment would refund money that was never taken.
+const REFUND_CATEGORIES = ["defect", "duplicate", "changed_mind"];
+const refundAmountFor = (category, order, partial) => {
+  const paid = Number(order?.paidAmount || order?.amount || 0);
+  if (category !== "changed_mind") return paid;
+  const amount = Number(partial);
+  if (!Number.isFinite(amount) || amount <= 0 || amount >= paid) return null;
+  return amount;
+};
 
 // The USD figure a buyer is actually charged, attached in front of the public
 // copy of a product so a storefront read in English quotes the same number
@@ -752,9 +768,18 @@ app.post("/api/checkout", json, async (req, res) => {
     const idempotencyKey = text(req.body.idempotencyKey, 64);
     if (!isEmail(email)) return res.status(400).json(refuse("api.err.invalidEmail", "Email không hợp lệ", 400));
     // A buyer whose connection dropped mid-request may already have an order.
-    // Handing it back beats silently opening a second one.
+    // Handing it back beats silently opening a second one — and it must not be
+    // asked to consent a second time, so the consent check sits after this.
     const repeated = idempotencyKey ? await findOrderByIdempotencyKey(idempotencyKey) : null;
     if (repeated) return res.json(await resumeOrder(repeated));
+    // The one thing a refund dispute turns on. A policy nobody ticked is a policy
+    // nobody agreed to, so the checkout refuses to take money without the box, and
+    // what was ticked is written onto the order beside the version of the policy it
+    // pointed at and the address it came from. Split three ways because the browser
+    // sends "on" for a checkbox, JSON for anything else, and both must be accepted.
+    if (req.body.acceptPolicy !== true && req.body.acceptPolicy !== "on" && req.body.acceptPolicy !== "true") {
+      return res.status(400).json(refuse("api.err.policyNotAccepted", "Bạn cần đồng ý với điều khoản và chính sách hoàn tiền trước khi thanh toán", 400));
+    }
     const product = await getProduct(productId);
     if (!product || product.status !== "active") return res.status(404).json(refuse("api.err.productUnavailable", "Sản phẩm không khả dụng", 404));
     if (!product.fileKey || !isConfigured.r2) return res.status(503).json(refuse("api.err.productNotSellable", "Sản phẩm chưa sẵn sàng để nhận thanh toán", 503));
@@ -776,6 +801,11 @@ app.post("/api/checkout", json, async (req, res) => {
       // countdown they read and the moment the sweep acts on cannot drift apart.
       expiresAt: new Date(Date.now() + env.orders.paymentWindowHours * 60 * 60 * 1000).toISOString(),
       idempotencyKey: idempotencyKey || null, notifications: {},
+      // What the buyer agreed to, when, from where, and which version of the
+      // policy they were shown. Four separate facts because a dispute argues about
+      // all four separately: that they consented, that it was before the money
+      // moved, that it was this person, and that the text is the one still quoted.
+      policyAcceptedAt: now, policyAcceptedIp: req.ip || null, policyAcceptedVersion: REFUND_POLICY_UPDATED,
       items: [{ productId: product.id, name: product.name, version: product.version, price: product.price, currency: product.currency, fileKey: product.fileKey || "", paypalAmount: paypalCharge?.amount ?? null, paypalCurrency: paypalCharge?.currency ?? null, paypalRate: paypalQuote?.rate?.vndPerUsd ?? null }],
       createdAt: now, updatedAt: now,
     };
@@ -820,6 +850,12 @@ app.get("/api/orders/:id/download", async (req, res) => {
     const item = order.items?.[0];
     if (!item?.fileKey) return res.status(409).json(refuse("api.err.noReleaseFile", "Sản phẩm chưa có file phát hành", 409));
     if (!isConfigured.r2) return res.status(503).json(refuse("api.err.r2Unconfigured", "R2 chưa được cấu hình", 503));
+    // Every download is counted on the order. This is the only evidence the shop
+    // has that a file ever left, and a refund argument turns on it: "tải ba lần rồi
+    // đòi hoàn" is a different conversation from "chưa tải lần nào". Writing it
+    // here, where the link is issued, means it cannot be skipped by a browser that
+    // never calls the endpoint that reports the transfer finished.
+    await updateOrder(order.id, { downloads: Number(order.downloads || 0) + 1, updatedAt: new Date().toISOString() });
     res.json({ url: await createDownloadUrl(item.fileKey, `${item.name}-${item.version}.zip`), expiresIn: env.r2.downloadTtl });
   } catch (error) { console.error(error); res.status(500).json(refuse("api.err.downloadLink", "Không thể tạo link tải", 500)); }
 });
@@ -960,8 +996,8 @@ app.get("/api/admin/orders", admin, async (req, res) => {
     // that matches nothing, so a hand-edited URL shows the orders, not an empty
     // table that looks like an outage.
     const filter = { q: text(req.query.q, 80), status: ORDER_STATUSES.includes(text(req.query.status, 30)) ? text(req.query.status, 30) : "" };
-    const [orders, open, total] = await Promise.all([listOrders({ ...filter, limit, offset }), listOpenOrders(), countOrders(filter)]);
-    res.json({ orders: orders.map(publicOrder), live: open.length, limit, offset, hasMore: orders.length === limit, total, filter });
+    const [orders, open, total, refundedEmails] = await Promise.all([listOrders({ ...filter, limit, offset }), listOpenOrders(), countOrders(filter), listRefundedEmails()]);
+    res.json({ orders: orders.map(publicOrder), live: open.length, limit, offset, hasMore: orders.length === limit, total, filter, refundedEmails });
   }
   catch (error) { console.error(error); res.status(500).json(refuse("api.err.orderLoad", "Không thể tải đơn hàng", 500)); }
 });
@@ -1189,9 +1225,20 @@ app.patch("/api/admin/orders/:id", admin, json, async (req, res) => {
       if (!hasPayment(existing)) return res.status(409).json(refuse("api.err.refundNotPaid", "Chỉ hoàn tiền được đơn đã nhận tiền", 409));
       const reason = typeof req.body.reason === "string" ? req.body.reason.trim() : "";
       if (!reason) return res.status(400).json(refuse("api.err.refundReasonRequired", "Cần ghi lý do hoàn tiền", 400));
+      // Which of the three refunds this is. Picked from a list rather than typed,
+      // because the category decides the amount and the category is the part that
+      // has to be arguable later: a defect and a duplicate are the shop's fault and
+      // refund everything; a buyer who already holds the file and wants their money
+      // back is the case the policy is written for, and only moves the part the
+      // owner types in — never zero, which would sell the product for nothing, and
+      // never the whole payment, which would sell it for nothing on purpose.
+      const category = REFUND_CATEGORIES.includes(req.body.category) ? req.body.category : "";
+      if (!category) return res.status(400).json(refuse("api.err.refundCategoryRequired", "Cần chọn loại lý do hoàn tiền", 400));
+      const amount = refundAmountFor(category, existing, req.body.partialAmount);
+      if (amount === null) return res.status(400).json(refuse("api.err.refundPartialAmountRequired", "Hoàn kiểu “khách đổi ý” phải ghi số tiền lớn hơn 0 và nhỏ hơn số đã thu", 400));
       // The reason is in the order row; the request that carried it is here.
-      acted("refund", { amount: existing.amount, currency: existing.currency, reason });
-      return res.json({ order: publicOrder(await voidPayment(existing, { reason })) });
+      acted("refund", { amount: existing.amount, currency: existing.currency, reason, category });
+      return res.json({ order: publicOrder(await voidPayment(existing, { reason, category, amount })) });
     }
     if (!ORDER_STATUSES.includes(status)) return res.status(400).json(refuse("api.err.invalidStatus", "Trạng thái không hợp lệ", 400));
     // Confirming by hand goes through the same path as a webhook, so the buyer

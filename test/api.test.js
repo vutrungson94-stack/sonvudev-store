@@ -89,7 +89,7 @@ test('checkout rejects a product without a release file', async () => {
   const response = await fetch(`${base}/api/checkout`, {
     method: 'POST',
     headers: jsonHeaders,
-    body: JSON.stringify({ productId: 'sonvu-starter', email: 'test@example.com', customerName: 'Test User', paymentMethod: 'bank_transfer' }),
+    body: JSON.stringify({ productId: 'sonvu-starter', email: 'test@example.com', customerName: 'Test User', acceptPolicy: 'on', paymentMethod: 'bank_transfer' }),
   });
   assert.equal(response.status, 503);
 });
@@ -139,7 +139,7 @@ test('admin can publish a product and checkout creates a private order', async (
   const response = await fetch(`${base}/api/checkout`, {
     method: 'POST',
     headers: jsonHeaders,
-    body: JSON.stringify({ productId: product.id, email: 'buyer@example.com', customerName: 'Test User', paymentMethod: 'bank_transfer' }),
+    body: JSON.stringify({ productId: product.id, email: 'buyer@example.com', customerName: 'Test User', acceptPolicy: 'on', paymentMethod: 'bank_transfer' }),
   });
   assert.equal(response.status, 200);
   const data = await response.json();
