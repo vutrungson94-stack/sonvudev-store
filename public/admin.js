@@ -10,7 +10,7 @@ const amount=(v,currency)=>window.SVDFormat.money(v,currency);const labels={pend
 // Expired orders are already cancelled by the server, so only orders that are
 // still inside their payment window are worth waking the owner for.
 const alertBox=document.getElementById('admin-alert'),alertTitle=document.getElementById('admin-alert-title'),alertText=document.getElementById('admin-alert-text'),alertGo=document.getElementById('admin-alert-go');
-let seenLatest=null,pendingTimer=null;
+let seenLatest=null,pendingTimer=null,alertAcked=false,lastPending=null;
 const titleBase=document.title;
 function beep(){try{const C=window.AudioContext||window.webkitAudioContext;if(!C)return;const ctx=new C(),osc=ctx.createOscillator(),gain=ctx.createGain();osc.connect(gain);gain.connect(ctx.destination);osc.type='sine';osc.frequency.setValueAtTime(880,ctx.currentTime);osc.frequency.setValueAtTime(1180,ctx.currentTime+.18);gain.gain.setValueAtTime(.0001,ctx.currentTime);gain.gain.exponentialRampToValueAtTime(.25,ctx.currentTime+.02);gain.gain.exponentialRampToValueAtTime(.0001,ctx.currentTime+.45);osc.start();osc.stop(ctx.currentTime+.5)}catch(e){}}
 function notifyOrder(text){try{if(document.hidden&&'Notification'in window&&Notification.permission==='granted')new Notification((document.querySelector('.brand')?.textContent||'Shop').trim()+': đơn hàng mới',{body:text,tag:'sonvudev-order'})}catch(e){}}
@@ -23,17 +23,26 @@ async function pollPending(){
   if(!token||(document.hidden&&seenLatest!==null))return;
   try{
     const data=await api('/api/admin/orders/pending');
-    if(seenLatest===null){seenLatest=data.latest;return}
+    if(seenLatest===null){seenLatest=data.latest;lastPending=data.pending;return}
     if(data.latest>seenLatest){
       seenLatest=data.latest;
+      lastPending=data.pending;
+      // Một đơn mới luôn báo, kể cả khi chủ shop vừa bỏ qua nhắc nhở cũ.
+      alertAcked=false;
       showAlert('new',0,data.newest);
       document.title='(NEW) '+titleBase;
       beep();
       notifyOrder(data.newest?'Đơn '+data.newest.id:'Có đơn mới chờ xữ lý');
       resetOrderPage();
     }else if(data.pending>0){
-      showAlert('pending',data.pending,null);
+      // Số đơn chờ thay đổi thì nhắc lại; cùng số thì im nếu đã bỏ qua.
+      if(data.pending!==lastPending)alertAcked=false;
+      lastPending=data.pending;
+      if(alertAcked)alertBox.hidden=true;
+      else showAlert('pending',data.pending,null);
     }else{
+      lastPending=null;
+      alertAcked=false;
       alertBox.hidden=true;
       document.title=titleBase;
     }
@@ -41,7 +50,10 @@ async function pollPending(){
 }
 function startPolling(){stopPolling();pollPending();pendingTimer=setInterval(pollPending,30000)}
 function stopPolling(){if(pendingTimer)clearInterval(pendingTimer);pendingTimer=null;seenLatest=null;document.title=titleBase;if(alertBox)alertBox.hidden=true}
-if(alertGo)alertGo.onclick=()=>{alertBox.hidden=true;resetOrderPage()};
+// Bỏ qua chỉ tắt nhắc nhở hiện tại: đơn mới, hoặc số đơn chờ thay đổi, vẫn báo lại.
+if(alertGo)alertGo.onclick=()=>{alertAcked=true;alertBox.hidden=true;document.title=titleBase;resetOrderPage()};
+const alertClose=document.getElementById('admin-alert-close');
+if(alertClose)alertClose.onclick=()=>{alertAcked=true;alertBox.hidden=true;document.title=titleBase};
 document.addEventListener('visibilitychange',()=>{if(!document.hidden)pollPending()});
 // Revenue lives in the admin panel rather than a separate page: it reads the
 // same orders the table below shows, it is behind the same token, and the owner
@@ -76,7 +88,7 @@ async function loadRevenue(){
     const waiting=bucket(data.outstanding);
     revenueTotals.innerHTML=`<div><b>${esc(parts.join(' + ')||'Chưa có doanh thu')}</b><small>thu ròng, ${data.paidOrders} lượt đã thu${data.refundedOrders?`, ${data.refundedOrders} đã hoàn lại`:''}</small></div><div><b>${back.length?esc(back.join(' + ')):'0đ'}</b><small>đã hoàn trả cho khách</small></div><div><b>${waiting.length?esc(waiting.join(' + ')):'0'}</b><small>đang chờ thu, chưa quá hạn</small></div>`;
     const rows=data.products||[];
-    revenueBody.innerHTML=rows.length?rows.map(r=>`<tr><td><b>${esc(r.name)}</b><small>v${esc(r.version||'—')}</small></td><td>${r.units}</td><td>${r.orders}</td><td><strong>${esc(amount(r.revenue, r.currency))}</strong><small>TB ${esc(amount(r.avg, r.currency))}${r.refunds?` · hoàn ${esc(amount(r.refunds, r.currency))}`:''}</small></td><td>${r.provider>0?`<strong>${esc(amount(r.provider, 'USD'))}</strong>`:'—'}</td></tr>`).join(''):'<tr><td colspan="5" class="table-empty">Chưa có doanh thu.</td></tr>';
+    revenueBody.innerHTML=rows.length?rows.map(r=>`<tr><td data-label="Sản phẩm"><b>${esc(r.name)}</b><small>v${esc(r.version||'—')}</small></td><td data-label="Đã bán">${r.units}</td><td data-label="Số đơn">${r.orders}</td><td data-label="Doanh thu"><strong>${esc(amount(r.revenue, r.currency))}</strong><small>TB ${esc(amount(r.avg, r.currency))}${r.refunds?` · hoàn ${esc(amount(r.refunds, r.currency))}`:''}</small></td><td data-label="Thực nhận PayPal">${r.provider>0?`<strong>${esc(amount(r.provider, 'USD'))}</strong>`:'—'}</td></tr>`).join(''):'<tr><td colspan="5" class="table-empty">Chưa có doanh thu.</td></tr>';
     revenueNote.textContent=`Cột USD là số tiền thực nhận từ PayPal, chưa trừ phí. Cột VND là giá niêm yết của đơn chuyển khoản. Hoàn tiền được ghi riêng, không bị trừ khỏi doanh thu gộp.`;
     revenueNote.hidden=false;
   }catch(e){
@@ -122,7 +134,7 @@ async function loadOrders({append=false}={}){
     for(const attr of ['data-status','data-delivered','data-reopen','data-refund','data-reopen2']){
       body.querySelectorAll('['+attr+']').forEach(btn=>{
         const id=btn.dataset[attr.slice(5).replace(/-([a-z])/g,(m,c)=>c.toUpperCase())];
-        if(attr==='data-status')btn.onclick=()=>updateOrder(id,btn.dataset.status);
+        if(attr==='data-status')btn.onclick=()=>updateOrder(id,btn.dataset.next);
         else if(attr==='data-delivered')btn.onclick=()=>markDelivered(id);
         else if(attr==='data-reopen')btn.onclick=()=>reopenOrder(id);
         else if(attr==='data-refund')btn.onclick=()=>refundOrder(id);
@@ -143,7 +155,7 @@ const suffix=orderHasMore?'+':'';
   finally{orderLoading=false;moreBtn.disabled=false}
 }
 function resetOrderPage(){orderPage=0;orderHasMore=false;return loadOrders()}
-moreBtn.onclick=()=>loadOrders({append:true});function orderRow(o){const item=o.items?.[0]||{};return `<tr><td><code>${esc(o.id)}</code><small>${esc(new Date(o.createdAt||o.created_at).toLocaleString('vi-VN',{timeZone:'Asia/Ho_Chi_Minh'}))}</small></td><td>${esc(o.customerName||o.customer_name||'—')}<small>${esc(o.customerEmail||o.customer_email)}</small></td><td>${esc(item.name||'—')}<small>v${esc(item.version||'—')}</small></td><td><strong>${esc(amount(o.amount, o.currency))}</strong>${o.paidCount?`<small>${o.paidCount} lần đã thu</small>`:''}</td><td><span class="status-pill status-${esc(o.status)}">${esc(labels[o.status]||o.status)}</span>${o.deliveredAt?`<small>đã giao ${esc(new Date(o.deliveredAt).toLocaleString('vi-VN',{timeZone:'Asia/Ho_Chi_Minh'}))}</small>`:''}${o.refundedAt?`<small>đã hoàn ${esc(new Date(o.refundedAt).toLocaleString('vi-VN',{timeZone:'Asia/Ho_Chi_Minh'}))}</small>`:''}${o.status==='cancelled'&&o.cancelledAt?`<small>hết hạn lúc ${esc(new Date(o.cancelledAt).toLocaleString('vi-VN',{timeZone:'Asia/Ho_Chi_Minh'}))}</small>`:''}</td><td>${o.status==='pending_transfer'?`<button class="table-action" data-id="${esc(o.id)}" data-status="paid">Xác nhận đã thanh toán</button>`:o.status==='paid'?`<button class="table-action" data-delivered="${esc(o.id)}">Đã giao xong</button> <button class="table-action" data-refund="${esc(o.id)}">Hoàn tiền</button>`:o.status==='refunded'?`<button class="table-action" data-reopen2="${esc(o.id)}">Mở lại đơn</button>`:o.deliveredAt?`<button class="table-action" data-reopen="${esc(o.id)}">Mở lại đơn</button>`:'—'}</td></tr>`}async function updateOrder(id,nextStatus){if(!confirm('Xác nhận đơn hàng đã thanh toán?'))return;try{await api('/api/admin/orders/'+encodeURIComponent(id),{method:'PATCH',body:JSON.stringify({status:nextStatus})});showToast('Đã cập nhật đơn hàng và gửi email cho khách');resetOrderPage()}catch(e){showToast(e.message,true)}}async function markDelivered(id){if(!confirm('Đóng đơn hàng? Nút tải sẽ khóa lại.'))return;try{await api('/api/admin/orders/'+encodeURIComponent(id),{method:'PATCH',body:JSON.stringify({delivered:true})});showToast('Đã đóng đơn hàng');resetOrderPage()}catch(e){showToast(e.message,true)}}
+moreBtn.onclick=()=>loadOrders({append:true});function orderRow(o){const item=o.items?.[0]||{};const when=new Date(o.createdAt||o.created_at).toLocaleString('vi-VN',{timeZone:'Asia/Ho_Chi_Minh'});return `<tr><td data-label="Mã đơn"><code>${esc(o.id)}</code><small title="${esc(when)}">${esc(new Date(o.createdAt||o.created_at).toLocaleString('vi-VN',{timeZone:'Asia/Ho_Chi_Minh',hour:'2-digit',minute:'2-digit',day:'2-digit',month:'2-digit'}))}</small></td><td data-label="Khách hàng">${esc(o.customerName||o.customer_name||'—')}<small>${esc(o.customerEmail||o.customer_email)}</small></td><td data-label="Sản phẩm">${esc(item.name||'—')}<small>v${esc(item.version||'—')}</small></td><td data-label="Số tiền"><strong>${esc(amount(o.amount, o.currency))}</strong>${o.paidCount?`<small>${o.paidCount} lần đã thu</small>`:''}</td><td data-label="Trạng thái"><span class="status-pill status-${esc(o.status)}">${esc(labels[o.status]||o.status)}</span>${o.deliveredAt?`<small>đã giao ${esc(new Date(o.deliveredAt).toLocaleString('vi-VN',{timeZone:'Asia/Ho_Chi_Minh'}))}</small>`:''}${o.refundedAt?`<small>đã hoàn ${esc(new Date(o.refundedAt).toLocaleString('vi-VN',{timeZone:'Asia/Ho_Chi_Minh'}))}</small>`:''}${o.status==='cancelled'&&o.cancelledAt?`<small>hết hạn lúc ${esc(new Date(o.cancelledAt).toLocaleString('vi-VN',{timeZone:'Asia/Ho_Chi_Minh'}))}</small>`:''}</td><td data-label="Thao tác">${o.status==='pending_transfer'?`<button class="table-action" data-status="${esc(o.id)}" data-next="paid">Xác nhận thu</button>`:o.status==='paid'?`<button class="table-action" data-delivered="${esc(o.id)}">Đã giao xong</button> <button class="table-action" data-refund="${esc(o.id)}">Hoàn tiền</button>`:o.status==='refunded'?`<button class="table-action" data-reopen2="${esc(o.id)}">Mở lại đơn</button>`:o.deliveredAt?`<button class="table-action" data-reopen="${esc(o.id)}">Mở lại đơn</button>`:'—'}</td></tr>`}async function updateOrder(id,nextStatus){if(!confirm('Xác nhận đơn hàng đã thanh toán?'))return;try{await api('/api/admin/orders/'+encodeURIComponent(id),{method:'PATCH',body:JSON.stringify({status:nextStatus})});showToast('Đã cập nhật đơn hàng và gửi email cho khách');resetOrderPage()}catch(e){showToast(e.message,true)}}async function markDelivered(id){if(!confirm('Đóng đơn hàng? Nút tải sẽ khóa lại.'))return;try{await api('/api/admin/orders/'+encodeURIComponent(id),{method:'PATCH',body:JSON.stringify({delivered:true})});showToast('Đã đóng đơn hàng');resetOrderPage()}catch(e){showToast(e.message,true)}}
 async function uploadRelease(file, productRef, version, onProgress = () => {}) {
   onProgress('Đang tạo link upload R2…');
   const presign = await api('/api/admin/uploads/presign', { method: 'POST', body: JSON.stringify({ productRef, version, fileName: file.name, contentType: file.type || 'application/octet-stream' }) });
@@ -161,7 +173,7 @@ async function uploadRelease(file, productRef, version, onProgress = () => {}) {
 // finish. Reading the state as named rather than as not-the-other-one is what
 // keeps the panel telling the truth about what the shop is actually selling.
 const productStatusLabel=(status)=>({active:'Đang bán',archived:'Đã ẩn khỏi cửa hàng'}[status]||'Bản nháp');
-async function loadProducts(){try{const d=await api('/api/admin/products');productList.innerHTML=d.products.length?d.products.map(p=>`<div class="admin-product-row"><span class="admin-product-icon">${esc((p.name||'SV').slice(0,2).toUpperCase())}</span><div><b>${esc(p.name)}</b><small>${esc(p.version)} · ${esc(amount(p.price, p.currency))} · ${esc(productStatusLabel(p.status))}</small></div><div class="admin-product-actions"><span>${p.fileKey?'Đã có file':'Chưa có file'}</span><label class="admin-upload-button">Cập nhật file<input type="file" accept=".zip,.exe,.msi,.7z" data-product-id="${esc(p.id)}" data-product-ref="${esc(p.slug)}" data-version="${esc(p.version)}" hidden></label><button class="text-link" type="button" data-seo-toggle="${esc(p.id)}">${p.seoTitle?'Sửa SEO':'Thêm SEO'}</button></div>${seoEditor(p)}</div>`).join(''):'<p class="table-empty">Chưa có sản phẩm.</p>';productList.querySelectorAll('input[type=file]').forEach(input=>input.onchange=uploadExistingProduct);productList.querySelectorAll('[data-seo-toggle]').forEach(button=>button.onclick=()=>{const form=productList.querySelector(`[data-seo-form="${button.dataset.seoToggle}"]`);if(form){form.hidden=!form.hidden;if(!form.hidden){seoLock(form,false);countSeo(form)}}});productList.querySelectorAll('[data-seo-form]').forEach(form=>{form.onsubmit=saveSeo;seoLock(form,true);form.querySelectorAll('input,textarea').forEach(input=>input.oninput=()=>countSeo(form))})}catch(e){showToast(e.message,true)}}
+const productCount=document.getElementById('product-count');async function loadProducts(){try{const d=await api('/api/admin/products');if(productCount)productCount.textContent=d.products.length+' sản phẩm';productList.innerHTML=d.products.length?d.products.map(p=>`<div class="admin-product-row"><span class="admin-product-icon">${esc((p.name||'SV').slice(0,2).toUpperCase())}</span><div><b>${esc(p.name)}</b><small>${esc(p.version)} · ${esc(amount(p.price, p.currency))} · ${esc(productStatusLabel(p.status))}</small></div><div class="admin-product-actions"><span>${p.fileKey?'Đã có file':'Chưa có file'}</span><label class="admin-upload-button">Cập nhật file<input type="file" accept=".zip,.exe,.msi,.7z" data-product-id="${esc(p.id)}" data-product-ref="${esc(p.slug)}" data-version="${esc(p.version)}" hidden></label><button class="text-link" type="button" data-seo-toggle="${esc(p.id)}">${p.seoTitle?'Sửa SEO':'Thêm SEO'}</button></div>${seoEditor(p)}</div>`).join(''):'<p class="table-empty">Chưa có sản phẩm.</p>';productList.querySelectorAll('input[type=file]').forEach(input=>input.onchange=uploadExistingProduct);productList.querySelectorAll('[data-seo-toggle]').forEach(button=>button.onclick=()=>{const form=productList.querySelector(`[data-seo-form="${button.dataset.seoToggle}"]`);if(form){form.hidden=!form.hidden;if(!form.hidden){seoLock(form,false);countSeo(form)}}});productList.querySelectorAll('[data-seo-form]').forEach(form=>{form.onsubmit=saveSeo;seoLock(form,true);form.querySelectorAll('input,textarea').forEach(input=>input.oninput=()=>countSeo(form))})}catch(e){showToast(e.message,true)}}
 function seoEditor(p){return `<form class="admin-seo-form" data-seo-form="${esc(p.id)}" data-seo-title="${esc(p.seoTitle||'')}" data-seo-description="${esc(p.seoDescription||'')}" data-seo-title-en="${esc(p.seoTitleEn||'')}" data-seo-description-en="${esc(p.seoDescriptionEn||'')}" hidden><label>Tiêu đề tìm kiếm<input name="seoTitle" maxlength="70" value="${esc(p.seoTitle||'')}" placeholder="Để trống thì lấy tên sản phẩm"></label><label>Mô tả tìm kiếm<textarea name="seoDescription" maxlength="175" rows="2" placeholder="Câu người ta gõ vào Google, trả lời thẳng vấn đề của họ">${esc(p.seoDescription||'')}</textarea></label><label>SEO tiếng Anh — tiêu đề<input name="seoTitleEn" maxlength="70" value="${esc(p.seoTitleEn||'')}" placeholder="Để trống: trang /en/ tự sinh tiêu đề từ tên sản phẩm"></label><label>SEO tiếng Anh — mô tả<textarea name="seoDescriptionEn" maxlength="175" rows="2" placeholder="Để trống: trang /en/ dùng mô tả tiếng Anh của sản phẩm">${esc(p.seoDescriptionEn||'')}</textarea></label><p class="admin-seo-count"></p><button class="button button-primary" type="submit" disabled>Lưu SEO</button></form>`}
 // Read-only once saved, editable once "Sửa SEO" is pressed.
 //
