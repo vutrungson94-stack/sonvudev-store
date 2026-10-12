@@ -110,7 +110,34 @@ export const isSellable = (product) => Boolean(product)
   && Boolean(product.fileKey)
   && isConfigured.r2;
 
-export async function listProducts({ includeDrafts = false } = {}) { if (!local) { const query = includeDrafts ? "select=*" : "select=*&status=eq.active"; return (await supabase(`products?${query}&order=created_at.desc`)).map(fromProduct); } const items = await readJson(files.products, []); return includeDrafts ? items : items.filter((p) => p.status === "active"); }
+// The admin list, optionally narrowed to what the owner typed and to one status.
+//
+// A hundred products became a page nobody could use: the row being looked for was
+// somewhere below the fold and scrolling was the only way to reach it. `q` and
+// `status` are applied by the database rather than here because the panel must
+// show the same filtered set whether the shop has ten products or ten thousand.
+//
+// `status` wins over `includeDrafts` when both ask for something: an explicit
+// status is the narrower request, and answering the broader one silently shows
+// drafts under a heading that says "Đang bán".
+export async function listProducts({ includeDrafts = false, q = "", status = "" } = {}) {
+  const needle = String(q || "").toLowerCase();
+  if (!local) {
+    const params = ["select=*"];
+    if (status) params.push(`status=eq.${encodeURIComponent(status)}`);
+    else if (!includeDrafts) params.push("status=eq.active");
+    // Name and slug are both what a person recognises: the label on the row and the
+    // code that appears in URLs and in upload paths.
+    if (needle) params.push(`or=${encodeURIComponent(`(name.ilike.*${needle}*,slug.ilike.*${needle}*)`)}`);
+    params.push("order=created_at.desc");
+    return (await supabase(`products?${params.join("&")}`)).map(fromProduct);
+  }
+  let items = await readJson(files.products, []);
+  if (status) items = items.filter((p) => p.status === status);
+  else if (!includeDrafts) items = items.filter((p) => p.status === "active");
+  if (needle) items = items.filter((p) => `${p.name || ""} ${p.slug || ""}`.toLowerCase().includes(needle));
+  return items;
+}
 export async function getProduct(id) { if (!local) return fromProduct((await supabase(`products?id=eq.${encodeURIComponent(id)}&limit=1`))[0]); return (await readJson(files.products, [])).find((p) => p.id === id || p.slug === id) || null; }
 // Product pages are addressed by slug because it is what goes in a URL and in
 // the sitemap. Slugs are unique, so an ambiguous match is a data problem worth
@@ -118,39 +145,118 @@ export async function getProduct(id) { if (!local) return fromProduct((await sup
 export async function getProductBySlug(slug) { if (!local) return fromProduct((await supabase(`products?slug=eq.${encodeURIComponent(slug)}&select=*&limit=2`))[0] || null); return (await readJson(files.products, [])).find((p) => p.slug === slug) || null; }
 export async function createProduct(product) { if (!local) return fromProduct((await supabase("products", { method: "POST", body: JSON.stringify(toProduct({ ...product, id: product.id || crypto.randomUUID() })) }))[0]); const items = await readJson(files.products, []); const item = { ...product, id: product.id || crypto.randomUUID(), createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() }; await writeJson(files.products, [item, ...items]); return item; }
 export async function updateProduct(id, patch) { if (!local) return fromProduct((await supabase(`products?id=eq.${encodeURIComponent(id)}`, { method: "PATCH", body: JSON.stringify(toProduct(patch)) }))[0]); const items = await readJson(files.products, []); const item = items.find((p) => p.id === id); if (!item) return null; Object.assign(item, patch, { updatedAt: new Date().toISOString() }); await writeJson(files.products, items); return item; }
+
+/**
+ * How many orders were ever placed for one product.
+ *
+ * Deleting a product nobody has bought is housekeeping. Deleting one somebody has
+ * bought is erasing the only link between those orders and a name, a price and a
+ * version, so the panel refuses and offers to archive instead. The buyer's own copy
+ * of the item — which the download reads — is not affected either way, which is
+ * exactly why this check is about the owner's ledger rather than the delivery.
+ *
+ * The JSON containment filter is how PostgREST reaches inside an array column
+ * without a join: `items` holds an array of objects, and the containment asks
+ * whether any element carries this product id.
+ */
+export async function countOrdersForProduct(productId) {
+  if (!productId) return 0;
+  if (local) return (await readJson(files.orders, [])).filter((o) => (o.items || []).some((item) => item && item.productId === productId)).length;
+  const headers = { apikey: env.supabase.serviceRoleKey, Prefer: "count=exact", Range: "0-0" };
+  if (env.supabase.serviceRoleKey.startsWith("eyJ")) headers.Authorization = `Bearer ${env.supabase.serviceRoleKey}`;
+  // Built with JSON.stringify so a product id containing a quote or a backslash
+  // lands in the filter escaped rather than breaking the query string.
+  const filter = encodeURIComponent(`items=cs.${JSON.stringify([{ productId: String(productId) }])}`);
+  const response = await fetch(`${env.supabase.url}/rest/v1/orders?select=id&${filter}`, { headers });
+  if (!response.ok) throw new Error(`Supabase ${response.status}: ${await response.text()}`);
+  const total = Number(String(response.headers.get("content-range") || "").split("/")[1]);
+  return Number.isFinite(total) ? total : 0;
+}
+
+/**
+ * Removes the product row and returns it, or null when there was nothing to remove.
+ *
+ * The release file in R2 is deliberately left alone: an order that was already paid
+ * holds the storage key it was sold with, and deleting the object would take the
+ * download away from a customer who paid. Orphaned bytes are the cheaper mistake.
+ */
+export async function deleteProduct(id) {
+  if (!local) return fromProduct((await supabase(`products?id=eq.${encodeURIComponent(id)}`, { method: "DELETE" }))[0] || null);
+  const items = await readJson(files.products, []);
+  const item = items.find((p) => p.id === id);
+  if (!item) return null;
+  await writeJson(files.products, items.filter((p) => p.id !== id));
+  return item;
+}
 // Every order ever written, newest first. This is deliberately the wide one: the
 // admin history view shows the lot. Anything on a timer or a poll must use one of
 // the narrow queries below instead, because the cost of this one grows forever
 // while the work those callers do does not.
 /**
- * How many orders exist in total.
+ * The one filter the admin order list is allowed to have.
  *
- * The admin panel used to label "orders in the system" with
- * `page * pageSize`, which is how many orders have been *scrolled through* — after
- * one page of 50 it said "50 orders in the system" about a shop with two. A figure
- * that is right by coincidence is worse than no figure, because the owner stops
- * looking at it and then cannot tell a real spike from a rendering bug.
+ * A search box that narrowed the page but not the count told the owner there were
+ * rows the panel refused to show: "2 đơn khớp 'son'" over a total of five, in a
+ * table where only one of the two matched. The page and the count take this same
+ * object so the figure on screen describes the rows on screen.
+ *
+ * The three fields are the ones a person has on hand when a buyer writes in: the
+ * order id they were emailed, their address, their name. What they bought is not
+ * searchable here — the item name lives inside a JSON array PostgREST cannot
+ * filter on, and "which orders bought X" is what the revenue panel already
+ * answers, under each product.
+ */
+const orderFilter = ({ q = "", status = "" } = {}) => {
+  const needle = String(q || "").trim();
+  const state = String(status || "").trim();
+  // An unknown status is a filter nobody asked for, not an error: the admin
+  // dropdown is a client-side list and the URL can be edited by hand.
+  const wanted = ORDER_STATUSES.includes(state) ? state : "";
+  const lower = needle.toLowerCase();
+  return {
+    needle,
+    status: wanted,
+    matches: (order) => (wanted ? order.status === wanted : true)
+      && (!needle || [order.id, order.customerEmail, order.customer_email, order.customerName, order.customer_name]
+        .filter(Boolean)
+        .some((value) => String(value).toLowerCase().includes(lower))),
+  };
+};
+
+/**
+ * How many orders match the current filter.
  *
  * PostgREST reports the total in Content-Range when asked to count exactly, so this
- * costs one header on a query that fetches a single id rather than the table.
+ * costs one header on a query that fetches a single id rather than the table — the
+ * same shape this function has always used, with the filter appended. A count that
+ * ignored the panel's own search would put "2 đơn khớp 'son'" next to a total of
+ * five and call the other three a mystery.
  */
-export async function countOrders() {
-  if (local) return (await readJson(files.orders, [])).length;
+export async function countOrders(filter = {}) {
+  const { needle, status, matches } = orderFilter(filter);
+  if (local) return (await readJson(files.orders, [])).filter(matches).length;
+  const params = ["select=id"];
+  if (status) params.push(`status=eq.${encodeURIComponent(status)}`);
+  if (needle) params.push(`or=${encodeURIComponent(`(id.ilike.*${needle}*,customer_name.ilike.*${needle}*,customer_email.ilike.*${needle}*)`)}`);
   const headers = { apikey: env.supabase.serviceRoleKey, Prefer: "count=exact", Range: "0-0" };
   if (env.supabase.serviceRoleKey.startsWith("eyJ")) headers.Authorization = `Bearer ${env.supabase.serviceRoleKey}`;
-  const response = await fetch(`${env.supabase.url}/rest/v1/orders?select=id`, { headers });
+  const response = await fetch(`${env.supabase.url}/rest/v1/orders?${params.join("&")}`, { headers });
   if (!response.ok) throw new Error(`Supabase ${response.status}: ${await response.text()}`);
   // "0-0/2" — the part after the slash is the total, not the length of the slice.
   const total = Number(String(response.headers.get("content-range") || "").split("/")[1]);
   return Number.isFinite(total) ? total : 0;
 }
 
-export async function listOrders({ limit = 200, offset = 0 } = {}) {
+export async function listOrders({ limit = 200, offset = 0, q = "", status = "" } = {}) {
+  const { needle, status: wanted, matches } = orderFilter({ q, status });
   if (local) {
     const items = (await readJson(files.orders, [])).slice().sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0));
-    return items.slice(offset, offset + limit);
+    return items.filter(matches).slice(offset, offset + limit);
   }
-  return (await supabase(`orders?select=*&order=created_at.desc&limit=${limit}&offset=${offset}`)).map(fromOrder);
+  const params = ["select=*", "order=created_at.desc"];
+  if (wanted) params.push(`status=eq.${encodeURIComponent(wanted)}`);
+  if (needle) params.push(`or=${encodeURIComponent(`(id.ilike.*${needle}*,customer_name.ilike.*${needle}*,customer_email.ilike.*${needle}*)`)}`);
+  return (await supabase(`orders?${params.join("&")}&limit=${limit}&offset=${offset}`)).map(fromOrder);
 }
 
 /**

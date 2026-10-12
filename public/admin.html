@@ -27,7 +27,19 @@
 </div>
 <div class="admin-toolbar">
 <div><h2>Đơn hàng gần đây</h2><p id="order-summary">Đang tải…</p></div>
+<div class="admin-tools">
+<input class="admin-search" id="order-search" type="search" autocomplete="off" placeholder="Tìm mã đơn, email, tên khách…" aria-label="Tìm đơn hàng">
+<select class="admin-filter" id="order-status" aria-label="Lọc theo trạng thái">
+<option value="">Tất cả trạng thái</option>
+<option value="pending_transfer">Chờ chuyển khoản</option>
+<option value="paid">Đã thanh toán</option>
+<option value="refunded">Đã hoàn tiền</option>
+<option value="cancelled">Đã hủy</option>
+<option value="pending">Chờ xử lý</option>
+<option value="payment_failed">Thất bại</option>
+</select>
 <button id="refresh" class="text-link">Làm mới ↻</button>
+</div>
 </div>
 <div class="admin-table-wrap">
 <table class="admin-table">
@@ -55,6 +67,15 @@
 <div><h2>Thêm sản phẩm mới</h2><p>File được upload thẳng lên kho R2 riêng tư.</p></div>
 <span class="admin-panel-count" id="product-count"></span>
 <button type="button" id="toggle-products" class="text-link">Ẩn danh sách ↑</button>
+</div>
+<div class="admin-tools product-tools">
+<input class="admin-search" id="product-search" type="search" autocomplete="off" placeholder="Tìm sản phẩm theo tên hoặc mã…" aria-label="Tìm sản phẩm">
+<select class="admin-filter" id="product-status" aria-label="Lọc theo trạng thái sản phẩm">
+<option value="">Tất cả trạng thái</option>
+<option value="active">Đang bán</option>
+<option value="draft">Bản nháp</option>
+<option value="archived">Đã lưu trữ</option>
+</select>
 </div>
 <form id="product-form">
 <fieldset class="form-block">

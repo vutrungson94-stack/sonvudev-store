@@ -199,6 +199,18 @@
 .admin-toolbar h2{margin:0 0 3px}
 .admin-toolbar p{margin:0;color:var(--muted);font-size:12px}
 .admin-toolbar .text-link{font-size:12px;white-space:nowrap}
+/* Ô tìm và bộ lọc nằm cùng hàng với tiêu đề mỗi bảng: chỗ cần đọc và chỗ cần gõ
+   ở một dải, không phải hai vùng của trang. Cùng cỡ chữ và viền với ô nhập của
+   form để cả trang nói một kiểu. */
+.admin-tools{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.admin-page .admin-search,.admin-page .admin-filter{border:1px solid #d6e2dc;border-radius:8px;padding:7px 10px;font:400 12px 'DM Sans',Arial,sans-serif;background:#fff;color:var(--ink);outline:none}
+.admin-page .admin-search{flex:1 1 200px;max-width:280px;min-width:150px}
+.admin-page .admin-search::placeholder{color:#9fb0a8}
+.admin-page .admin-search:focus,.admin-page .admin-filter:focus{border-color:var(--green);box-shadow:var(--focus)}
+.admin-page .admin-filter{cursor:pointer}
+.admin-page .text-link-danger{color:#b43c30}
+.admin-page .text-link-danger:hover{color:#8e2f25;text-decoration:underline;text-underline-offset:3px}
+.product-tools{margin:0 0 14px}
 /* Bảng: tràn khung, chữ 13px, hàng thoáng. 6 cột rốt ráo vừa 1120px. */
 .admin-table-wrap .admin-table{border-collapse:collapse;width:100%;min-width:0;font-size:13px}
 .admin-table-wrap .admin-table th{text-align:left;color:#66756e;text-transform:uppercase;letter-spacing:.07em;font-size:10.5px;font-weight:700;background:#f4f8f6;padding:11px 14px;border-bottom:1px solid #dfe9e4;white-space:nowrap}

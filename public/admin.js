@@ -1,4 +1,4 @@
-const body=document.getElementById('orders-body'),summary=document.getElementById('order-summary'),login=document.getElementById('login-card'),dashboard=document.getElementById('dashboard'),tokenInput=document.getElementById('admin-token'),status=document.getElementById('login-status'),logout=document.getElementById('logout'),toast=document.getElementById('toast'),productPanel=document.getElementById('product-panel'),productForm=document.getElementById('product-form'),productStatus=document.getElementById('product-status'),productList=document.getElementById('admin-product-list'),revenuePanel=document.getElementById('revenue-panel'),moreRow=document.getElementById('orders-more'),moreBtn=document.getElementById('orders-more-btn'),revenueBody=document.getElementById('revenue-body'),revenueTotals=document.getElementById('revenue-totals'),revenueNote=document.getElementById('revenue-note'),revenueRefresh=document.getElementById('revenue-refresh');let token=sessionStorage.getItem('sonvudev_admin')||'';const esc=v=>window.SVDFormat.esc(v);// Money is formatted for the currency of the row, never for VND with the code
+const body=document.getElementById('orders-body'),summary=document.getElementById('order-summary'),login=document.getElementById('login-card'),dashboard=document.getElementById('dashboard'),tokenInput=document.getElementById('admin-token'),status=document.getElementById('login-status'),logout=document.getElementById('logout'),toast=document.getElementById('toast'),productPanel=document.getElementById('product-panel'),productForm=document.getElementById('product-form'),productStatus=document.getElementById('product-status'),productList=document.getElementById('admin-product-list'),revenuePanel=document.getElementById('revenue-panel'),moreRow=document.getElementById('orders-more'),moreBtn=document.getElementById('orders-more-btn'),revenueBody=document.getElementById('revenue-body'),revenueTotals=document.getElementById('revenue-totals'),revenueNote=document.getElementById('revenue-note'),revenueRefresh=document.getElementById('revenue-refresh'),orderSearch=document.getElementById('order-search'),orderStatusFilter=document.getElementById('order-status'),productSearch=document.getElementById('product-search'),productStatusFilter=document.getElementById('product-status');let token=sessionStorage.getItem('sonvudev_admin')||'';const esc=v=>window.SVDFormat.esc(v);// Money is formatted for the currency of the row, never for VND with the code
 // appended afterwards. That combination is wrong the moment a row is not VND: the
 // amount was grouped as vi-VN with no decimals and then labelled USD, which is the
 // exact mistake src/format.js documents — a PayPal order read "3 USD" or
@@ -112,6 +112,17 @@ async function checkMail(){
 // numbers, and only one of them is written to the screen.
 let orderPage=0, orderHasMore=false, orderLoading=false;
 const ORDER_PAGE=50;
+// What the owner typed or picked, sent to the server on every request. The count
+// in the summary below is filtered by the same terms, so the sentence on screen
+// describes the rows on screen instead of the rows the panel refused to show.
+const orderFilterActive=()=>Boolean(orderSearch.value.trim()||orderStatusFilter.value);
+const orderQuery=(append)=>{
+  const params=new URLSearchParams({limit:String(ORDER_PAGE),offset:String(append?orderPage*ORDER_PAGE:0)});
+  const q=orderSearch.value.trim();
+  if(q)params.set('q',q);
+  if(orderStatusFilter.value)params.set('status',orderStatusFilter.value);
+  return params.toString();
+};
 // The order list grew past what one screen holds, so it loads a page at a time
 // and says plainly how many are still below. Appending rather than replacing
 // keeps the scroll position and the row the owner was reading, which page
@@ -122,7 +133,7 @@ async function loadOrders({append=false}={}){
   moreBtn.disabled=true;
   moreBtn.textContent='Đang tải…';
   try{
-    const d=await api('/api/admin/orders?limit='+ORDER_PAGE+'&offset='+(append?orderPage*ORDER_PAGE:0)),orders=d.orders||[];
+    const d=await api('/api/admin/orders?'+orderQuery(append)),orders=d.orders||[];
     orderPage=append?orderPage+1:1;
     orderHasMore=Boolean(d.hasMore);
     // Live orders are counted across the whole shop rather than the page on
@@ -130,7 +141,7 @@ async function loadOrders({append=false}={}){
     const open=(Number(d.live)||0)+orders.filter(o=>o.status==='pending_transfer'&&!o.deliveredAt).length;
     const rows=orders.map(orderRow).join('');
     if(append&&body.innerHTML)body.insertAdjacentHTML('beforeend',rows);
-    else body.innerHTML=orders.length?rows:'<tr><td colspan="6" class="table-empty">Chưa có đơn hàng.</td></tr>';
+    else body.innerHTML=orders.length?rows:`<tr><td colspan="6" class="table-empty">${orderFilterActive()?'Không có đơn nào khớp bộ lọc.':'Chưa có đơn hàng.'}</td></tr>`;
     for(const attr of ['data-status','data-delivered','data-reopen','data-refund','data-reopen2']){
       body.querySelectorAll('['+attr+']').forEach(btn=>{
         const id=btn.dataset[attr.slice(5).replace(/-([a-z])/g,(m,c)=>c.toUpperCase())];
@@ -146,9 +157,14 @@ const suffix=orderHasMore?'+':'';
     // used to be page * pageSize, which labelled "50 orders in the system" for a shop
     // with two — right by coincidence, which is worse than wrong on purpose.
     const total=Number(d.total)||0;
-    summary.textContent=open
-      ? (open+' đơn đang chờ chuyển khoản · đã xem '+(orderPage*ORDER_PAGE)+suffix+' / '+total)
-      : (total+' đơn hàng trong hệ thống');
+    // Filtered, the scroll figure is meaningless ("đã xem 50 / 2"), so it gives way
+    // to how many matched — with the shop-wide waiting count kept beside it, since
+    // that figure is about the shop rather than about the rows being looked at.
+    summary.textContent=orderFilterActive()
+      ? (total+' đơn khớp bộ lọc'+(open?' · '+open+' đơn đang chờ thu trên toàn shop':''))
+      : open
+        ? (open+' đơn đang chờ chuyển khoản · đã xem '+(orderPage*ORDER_PAGE)+suffix+' / '+total)
+        : (total+' đơn hàng trong hệ thống');
     moreRow.hidden=!orderHasMore;
     moreBtn.textContent=orderHasMore?'Tải thêm đơn hàng':'Đã xem hết đơn hàng';
   }catch(e){showToast(e.message,true)}
@@ -173,7 +189,14 @@ async function uploadRelease(file, productRef, version, onProgress = () => {}) {
 // finish. Reading the state as named rather than as not-the-other-one is what
 // keeps the panel telling the truth about what the shop is actually selling.
 const productStatusLabel=(status)=>({active:'Đang bán',archived:'Đã ẩn khỏi cửa hàng'}[status]||'Bản nháp');
-const productCount=document.getElementById('product-count');async function loadProducts(){try{const d=await api('/api/admin/products');if(productCount)productCount.textContent=d.products.length+' sản phẩm';productList.innerHTML=d.products.length?d.products.map(p=>`<div class="admin-product-row"><span class="admin-product-icon">${esc((p.name||'SV').slice(0,2).toUpperCase())}</span><div><b>${esc(p.name)}</b><small>${esc(p.version)} · ${esc(amount(p.price, p.currency))} · ${esc(productStatusLabel(p.status))}</small></div><div class="admin-product-actions"><span>${p.fileKey?'Đã có file':'Chưa có file'}</span><label class="admin-upload-button">Cập nhật file<input type="file" accept=".zip,.exe,.msi,.7z" data-product-id="${esc(p.id)}" data-product-ref="${esc(p.slug)}" data-version="${esc(p.version)}" hidden></label><button class="text-link" type="button" data-seo-toggle="${esc(p.id)}">${p.seoTitle?'Sửa SEO':'Thêm SEO'}</button></div>${seoEditor(p)}</div>`).join(''):'<p class="table-empty">Chưa có sản phẩm.</p>';productList.querySelectorAll('input[type=file]').forEach(input=>input.onchange=uploadExistingProduct);productList.querySelectorAll('[data-seo-toggle]').forEach(button=>button.onclick=()=>{const form=productList.querySelector(`[data-seo-form="${button.dataset.seoToggle}"]`);if(form){form.hidden=!form.hidden;if(!form.hidden){seoLock(form,false);countSeo(form)}}});productList.querySelectorAll('[data-seo-form]').forEach(form=>{form.onsubmit=saveSeo;seoLock(form,true);form.querySelectorAll('input,textarea').forEach(input=>input.oninput=()=>countSeo(form))})}catch(e){showToast(e.message,true)}}
+const productCount=document.getElementById('product-count');
+// A hundred products made this list a page of its own; the owner looks for one of
+// them by name. The filter goes to the server so a shop with a thousand products
+// costs the same query, and the row count reflects what matched rather than what
+// the shop holds.
+const productQuery=()=>{const params=new URLSearchParams();if(productSearch.value.trim())params.set('q',productSearch.value.trim());if(productStatusFilter.value)params.set('status',productStatusFilter.value);return params};
+const productFiltering=()=>Boolean(productSearch.value.trim()||productStatusFilter.value);
+async function loadProducts(){try{const params=productQuery(),d=await api('/api/admin/products'+(params.toString()?'?'+params.toString():'')),list=d.products||[];if(productCount)productCount.textContent=list.length+' sản phẩm';productList.innerHTML=list.length?list.map(p=>`<div class="admin-product-row"><span class="admin-product-icon">${esc((p.name||'SV').slice(0,2).toUpperCase())}</span><div><b>${esc(p.name)}</b><small>${esc(p.version)} · ${esc(amount(p.price, p.currency))} · ${esc(productStatusLabel(p.status))}</small></div><div class="admin-product-actions"><span>${p.fileKey?'Đã có file':'Chưa có file'}</span><label class="admin-upload-button">Cập nhật file<input type="file" accept=".zip,.exe,.msi,.7z" data-product-id="${esc(p.id)}" data-product-ref="${esc(p.slug)}" data-version="${esc(p.version)}" hidden></label><button class="text-link" type="button" data-seo-toggle="${esc(p.id)}">${p.seoTitle?'Sửa SEO':'Thêm SEO'}</button><button class="text-link" type="button" data-archive="${esc(p.id)}" data-archive-to="${p.status==='archived'?(p.fileKey?'active':'draft'):'archived'}">${p.status==='archived'?'Bỏ lưu trữ':'Lưu trữ'}</button><button class="text-link text-link-danger" type="button" data-delete="${esc(p.id)}">Xoá</button></div>${seoEditor(p)}</div>`).join(''):`<p class="table-empty">${productFiltering()?'Không có sản phẩm nào khớp bộ lọc.':'Chưa có sản phẩm.'}</p>`;productList.querySelectorAll('input[type=file]').forEach(input=>input.onchange=uploadExistingProduct);productList.querySelectorAll('[data-seo-toggle]').forEach(button=>button.onclick=()=>{const form=productList.querySelector(`[data-seo-form="${button.dataset.seoToggle}"]`);if(form){form.hidden=!form.hidden;if(!form.hidden){seoLock(form,false);countSeo(form)}}});productList.querySelectorAll('[data-seo-form]').forEach(form=>{form.onsubmit=saveSeo;seoLock(form,true);form.querySelectorAll('input,textarea').forEach(input=>input.oninput=()=>countSeo(form))});productList.querySelectorAll('[data-archive]').forEach(button=>button.onclick=()=>changeProductStatus(button));productList.querySelectorAll('[data-delete]').forEach(button=>button.onclick=()=>deleteProductRow(button))}catch(e){showToast(e.message,true)}}
 function seoEditor(p){return `<form class="admin-seo-form" data-seo-form="${esc(p.id)}" data-seo-title="${esc(p.seoTitle||'')}" data-seo-description="${esc(p.seoDescription||'')}" data-seo-title-en="${esc(p.seoTitleEn||'')}" data-seo-description-en="${esc(p.seoDescriptionEn||'')}" hidden><label>Tiêu đề tìm kiếm<input name="seoTitle" maxlength="70" value="${esc(p.seoTitle||'')}" placeholder="Để trống thì lấy tên sản phẩm"></label><label>Mô tả tìm kiếm<textarea name="seoDescription" maxlength="175" rows="2" placeholder="Câu người ta gõ vào Google, trả lời thẳng vấn đề của họ">${esc(p.seoDescription||'')}</textarea></label><label>SEO tiếng Anh — tiêu đề<input name="seoTitleEn" maxlength="70" value="${esc(p.seoTitleEn||'')}" placeholder="Để trống: trang /en/ tự sinh tiêu đề từ tên sản phẩm"></label><label>SEO tiếng Anh — mô tả<textarea name="seoDescriptionEn" maxlength="175" rows="2" placeholder="Để trống: trang /en/ dùng mô tả tiếng Anh của sản phẩm">${esc(p.seoDescriptionEn||'')}</textarea></label><p class="admin-seo-count"></p><button class="button button-primary" type="submit" disabled>Lưu SEO</button></form>`}
 // Read-only once saved, editable once "Sửa SEO" is pressed.
 //
@@ -233,6 +256,23 @@ async function submitProduct(event){event.preventDefault();const form=event.curr
 // machine to keep showing.
 const hideAll=()=>{for(const panel of[dashboard,productPanel,revenuePanel])if(panel)panel.hidden=true};
 const showAfterLogin=()=>{hideAll();if(revenuePanel)revenuePanel.hidden=false;dashboard.hidden=false;productPanel.hidden=false;logout.hidden=false};
+// Archiving is how a product comes off sale without its history going with it: it
+// leaves the shop, the sitemap and the catalogue, and keeps its page, its reviews
+// and every order ever placed for it. Coming back puts it where the file allows —
+// a product with no release file returns as a draft rather than straight on sale.
+async function changeProductStatus(button){const next=button.dataset.archiveTo;if(!confirm(next==='archived'?'Lưu trữ sản phẩm này? Nó sẽ biến khỏi cửa hàng; đơn cũ và doanh thu vẫn giữ nguyên.':'Bỏ lưu trữ để sản phẩm hiện lại trong cửa hàng?'))return;try{await api('/api/admin/products/'+encodeURIComponent(button.dataset.archive),{method:'PATCH',body:JSON.stringify({status:next})});showToast(next==='archived'?'Đã lưu trữ sản phẩm':'Đã bỏ lưu trữ sản phẩm');await loadProducts()}catch(e){showToast(e.message,true)}}
+// Deletion is for a product that never sold. The server is the one that knows: a
+// product with orders behind it is refused, and its sentence is shown exactly as
+// it arrived — how many orders there are, and to archive instead — because that
+// reply is the whole point of asking in the first place.
+async function deleteProductRow(button){if(!confirm('Xoá hẳn sản phẩm này? Không hoàn tác được.'))return;try{await api('/api/admin/products/'+encodeURIComponent(button.dataset.delete),{method:'DELETE'});showToast('Đã xoá sản phẩm');await loadProducts()}catch(e){showToast(e.message,true)}}
+// One request per pause, not per keystroke. Both boxes answer from the shop's own
+// data, so typing a long email address used to fire a query per character.
+const debounce=(fn,ms)=>{let timer;return()=>{clearTimeout(timer);timer=setTimeout(fn,ms)}};
+if(orderSearch){orderSearch.addEventListener('input',debounce(()=>resetOrderPage(),300));orderSearch.addEventListener('keydown',(e)=>{if(e.key==='Enter'){e.preventDefault();resetOrderPage()}else if(e.key==='Escape'){orderSearch.value='';resetOrderPage()}})}
+if(orderStatusFilter)orderStatusFilter.addEventListener('change',()=>resetOrderPage());
+if(productSearch){productSearch.addEventListener('input',debounce(()=>loadProducts(),300));productSearch.addEventListener('keydown',(e)=>{if(e.key==='Enter'){e.preventDefault();loadProducts()}else if(e.key==='Escape'){productSearch.value='';loadProducts()}})}
+if(productStatusFilter)productStatusFilter.addEventListener('change',()=>loadProducts());
 document.getElementById('login-form').onsubmit=loginSubmit;logout.onclick=()=>{stopPolling();sessionStorage.removeItem('sonvudev_admin');token='';hideAll();login.hidden=false;logout.hidden=true};document.getElementById('refresh').onclick=()=>{resetOrderPage();loadProducts()};// The list now starts visible; the button collapses it, so the label has to
 // describe the action rather than the destination.
 const productToggle=document.getElementById('toggle-products');productToggle.onclick=()=>{productList.hidden=!productList.hidden;productToggle.textContent=productList.hidden?'Xem danh sách ↓':'Ẩn danh sách ↑'};productForm.onsubmit=submitProduct;if(token){login.hidden=true;showAfterLogin();resetOrderPage();loadRevenue();loadProducts();checkMail();startPolling()}

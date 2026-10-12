@@ -4,7 +4,7 @@ import { promises as fs } from "node:fs";
 import { fileURLToPath } from "node:url";
 import crypto from "node:crypto";
 import { env, isConfigured } from "./config.js";
-import { ORDER_STATUSES, countOrders, dataDir, ensureSeed, findOrderByIdempotencyKey, getOrder, getProduct, getProductBySlug, isOrderOwner, isSellable, latestOrder, listOpenOrders, listOrders, listOrdersForRevenue, listProducts, createOrder, updateOrder, createProduct, updateProduct, persistenceMode } from "./store.js";
+import { ORDER_STATUSES, countOrders, countOrdersForProduct, dataDir, ensureSeed, findOrderByIdempotencyKey, getOrder, getProduct, getProductBySlug, isOrderOwner, isSellable, latestOrder, listOpenOrders, listOrders, listOrdersForRevenue, listProducts, createOrder, updateOrder, createProduct, updateProduct, deleteProduct, persistenceMode } from "./store.js";
 import { supabaseRequest } from "./supabase-http.js";
 import { paypalEnvironmentIsSet } from "./config.js";
 import { createDownloadUrl, createUploadUrl } from "./r2.js";
@@ -947,20 +947,29 @@ app.get("/api/admin/orders/pending", admin, async (_req, res) => {
   } catch (error) { console.error(error); res.status(500).json(refuse("api.err.orderCheck", "Không kiểm tra được đơn hàng", 500)); }
 });
 
-// The history view, paged. Capping it matters for the same reason: an admin
-// panel that silently stops showing older orders is a trap, so the total count
-// travels with the page and the panel can say what it is not showing.
+// The history view, paged and filtered. Capping it matters for the same reason: an
+// admin panel that silently stops showing older orders is a trap, so the total count
+// travels with the page and the panel can say what it is not showing. Filtering
+// narrows the count along with the page, or the two disagree about what exists.
 app.get("/api/admin/orders", admin, async (req, res) => {
   try {
     const limit = Math.min(200, Math.max(1, Number(req.query.limit) || 50));
     const offset = Math.max(0, Number(req.query.offset) || 0);
-    const [orders, open, total] = await Promise.all([listOrders({ limit, offset }), listOpenOrders(), countOrders()]);
-    res.json({ orders: orders.map(publicOrder), live: open.length, limit, offset, hasMore: orders.length === limit, total });
+    // The same filter object goes to the page and to the count. A status that is
+    // not one of the six reaches the store as "no filter" rather than as a query
+    // that matches nothing, so a hand-edited URL shows the orders, not an empty
+    // table that looks like an outage.
+    const filter = { q: text(req.query.q, 80), status: ORDER_STATUSES.includes(text(req.query.status, 30)) ? text(req.query.status, 30) : "" };
+    const [orders, open, total] = await Promise.all([listOrders({ ...filter, limit, offset }), listOpenOrders(), countOrders(filter)]);
+    res.json({ orders: orders.map(publicOrder), live: open.length, limit, offset, hasMore: orders.length === limit, total, filter });
   }
   catch (error) { console.error(error); res.status(500).json(refuse("api.err.orderLoad", "Không thể tải đơn hàng", 500)); }
 });
-app.get("/api/admin/products", admin, async (_req, res) => {
-  try { res.json({ products: await listProducts({ includeDrafts: true }) }); }
+// The product list, optionally narrowed the same way. `includeDrafts` stays on
+// because this is the owner's own list: a draft and an archived product both have
+// to be reachable from here or there is nowhere left to finish or restore them.
+app.get("/api/admin/products", admin, async (req, res) => {
+  try { res.json({ products: await listProducts({ includeDrafts: true, q: text(req.query.q, 80), status: text(req.query.status, 30) }) }); }
   catch (error) { console.error(error); res.status(500).json(refuse("api.err.productLoad", "Không thể tải sản phẩm", 500)); }
 });
 app.post("/api/admin/products", admin, json, async (req, res) => {
@@ -1012,6 +1021,35 @@ app.patch("/api/admin/products/:id", admin, json, async (req, res) => {
     invalidatePages();
   }
   catch (error) { console.error(error); res.status(500).json(refuse("api.err.productUpdate", "Không thể cập nhật sản phẩm", 500)); }
+});
+// Removing a product from the catalogue.
+//
+// Two ways to take a product off sale, and the difference is the buyer who already
+// has one. An archived product simply stops being sold and keeps its page, its
+// reviews and its history. A deleted one is gone from the owner's records too —
+// which nothing on the buyer's side notices, because their order carries its own
+// copy of the item and the download reads that copy rather than this row.
+//
+// What deleting *does* erase is the link between those orders and a name and a
+// price, so a product with orders behind it cannot be deleted: the owner is told
+// how many there are and to archive instead, rather than finding out the next time
+// the revenue report reads short.
+app.delete("/api/admin/products/:id", admin, async (req, res) => {
+  try {
+    const item = await getProduct(req.params.id);
+    if (!item) return res.status(404).json(refuse("api.err.productNotFound", "Không tìm thấy sản phẩm", 404));
+    const sold = await countOrdersForProduct(item.id);
+    if (sold > 0) return res.status(409).json(refuse("api.err.productHasOrders", `Sản phẩm này đã có ${sold} đơn hàng. Hãy lưu trữ thay vì xoá để giữ lịch sử bán hàng.`, 409));
+    const removed = await deleteProduct(item.id);
+    if (!removed) return res.status(404).json(refuse("api.err.productNotFound", "Không tìm thấy sản phẩm", 404));
+    // The sitemap served the deleted page, and only IndexNow is told it is gone;
+    // the homepage, /llms.txt and /feed.json cached the catalogue that no longer
+    // has it. Same treatment a new product gets.
+    await pingIndexNow(["/"]);
+    res.json({ ok: true, id: removed.id });
+    invalidatePages();
+  }
+  catch (error) { console.error(error); res.status(500).json(refuse("api.err.productDelete", "Không thể xoá sản phẩm", 500)); }
 });
 app.post("/api/admin/uploads/presign", admin, json, async (req, res) => {
   try {
