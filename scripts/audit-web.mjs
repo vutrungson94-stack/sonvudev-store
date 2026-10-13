@@ -286,6 +286,37 @@ for (const [name, label] of [["vi", "tiếng Việt"], ["en", "tiếng Anh"]]) {
 }
 
 // ---------------------------------------------------------------------------
+// 3d. The badge translations the server page has and the storefront card does not.
+//
+//     The product page and the storefront card each translate the badge column.
+//     The two tables were added to independently, so "Phổ biện", "Doanh nghiệp"
+//     and "Ưu đãi sớm" were translated on the product page and not on the card:
+//     the reader switched the whole shop to English, every price and description
+//     followed, and the badge above them stayed in Vietnamese.
+//
+//     That drift is invisible until somebody remembers both tables exist. The
+//     check below requires the storefront map to carry every badge the product
+//     page declares, so adding one and forgetting the other is a failing audit
+//     rather than a page that looks half-translated.
+// ---------------------------------------------------------------------------
+{
+  const storefrontBlock = storefrontSource.match(/const BADGES\s*=\s*\{([\s\S]*?)\};/)?.[1] || "";
+  const storefrontBadges = new Set([...storefrontBlock.matchAll(/"([^"]+)"\s*:/g)].map((m) => m[1]));
+  const pageBadges = new Set(
+    [...pagesSource.matchAll(/badges:\s*\{([\s\S]*?)\}/g)]
+      .flatMap((match) => [...match[1].matchAll(/"([^"]+)"\s*:/g)].map((m) => m[1]))
+  );
+  if (!storefrontBadges.size || !pageBadges.size) {
+    fail("badge thiếu bản dịch", "public/app.js", "không đọc được BADGES hoặc bảng badges trong src/pages.js — không thể so sánh hai nơi dịch badge");
+  } else {
+    const missingOnCard = [...pageBadges].filter((badge) => !storefrontBadges.has(badge));
+    const missingOnPage = [...storefrontBadges].filter((badge) => !pageBadges.has(badge));
+    if (missingOnCard.length) fail("badge thiếu bản dịch", "public/app.js", `thẻ sản phẩm chưa dịch: ${missingOnCard.join(", ")}`);
+    if (missingOnPage.length) fail("badge thiếu bản dịch", "src/pages.js", `trang sản phẩm chưa dịch: ${missingOnPage.join(", ")}`);
+  }
+}
+
+// ---------------------------------------------------------------------------
 // 4. A value that belongs in config and is also written into a file.
 //    The support address lives in .env, in the mail templates and in three
 //    static pages. Change it in one place and the others keep sending buyers to
