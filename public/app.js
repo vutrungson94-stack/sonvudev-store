@@ -169,22 +169,33 @@ function visibleProducts() {
 // product that has not been translated yet never shows an empty description.
 const CATEGORIES = { "Công cụ": "Tools", "Tiện ích": "Utilities", "Phần mềm": "Software", "Khác": "Other" };
 const CATEGORIES_VI = Object.fromEntries(Object.entries(CATEGORIES).map(([k, v]) => [v, k]));
-const BADGES = { "Mới": "New", "Bán chạy": "Best seller", "Cập nhật": "Updated", "Phát hành": "Release" };
+const BADGES = { "Mới": "New", "Bán chạy": "Best seller", "Cập nhật": "Updated", "Phát hành": "Release", "Phổ biến": "Popular", "Chuyên nghiệp": "Professional", "Tiết kiệm": "Value", "Doanh nghiệp": "Enterprise", "Ưu đãi sớm": "Early Bird", "Safe Edition v4.3": "Safe Edition v4.3", "Phát hành 1.4.0": "Release 1.4.0" };
 const BADGES_VI = Object.fromEntries(Object.entries(BADGES).map(([k, v]) => [v, k]));
 // A diacritic-tolerant map so a "con co" or "CON CO" in the catalogue still
 // maps to Tools instead of leaking raw Vietnamese text on the English page.
 const CATEGORIES_NORM = Object.fromEntries(
   Object.entries(CATEGORIES).map(([k, v]) => [foldDiacritics(k), v])
 );
+const CATEGORIES_VI_NORM = Object.fromEntries(
+  Object.entries(CATEGORIES).map(([k, v]) => [foldDiacritics(v), k])
+);
 // Same treatment for badges, including badges that carry a trailing version
 // such as "Phat hanh 1.4.0" so the map key is the badge alone.
 const BADGES_NORM = Object.fromEntries(
   Object.entries(BADGES).map(([k, v]) => [foldDiacritics(k), v])
 );
+const BADGES_VI_NORM = Object.fromEntries(
+  Object.entries(BADGES).map(([k, v]) => [foldDiacritics(v), k])
+);
+const mapValue = (exact, tolerant, raw) => {
+  const value = String(raw || "").trim();
+  if (!value) return value;
+  return exact[value] || tolerant[foldDiacritics(value)] || value;
+};
 function localized(p) {
   if (window.I18N.lang !== 'en') {
-    const cat = CATEGORIES_VI[p.category] || p.category;
-    const badge = BADGES_VI[p.badge] || p.badge;
+    const cat = mapValue(CATEGORIES_VI, CATEGORIES_VI_NORM, p.category);
+    const badge = mapValue(BADGES_VI, BADGES_VI_NORM, p.badge);
     if (cat === p.category && badge === p.badge) return p;
     return { ...p, category: cat, badge };
   }
@@ -192,8 +203,8 @@ function localized(p) {
   if (!hasEn) return p;
   return {
     ...p,
-    category: CATEGORIES[p.category] || p.category,
-    badge: BADGES[p.badge] || p.badge || undefined,
+    category: mapValue(CATEGORIES, CATEGORIES_NORM, p.category),
+    badge: mapValue(BADGES, BADGES_NORM, p.badge) || undefined,
     shortDescription: p.shortDescriptionEn || p.shortDescription,
     description: p.descriptionEn,
     features: (p.featuresEn && p.featuresEn.length ? p.featuresEn : p.features) || [],
