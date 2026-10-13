@@ -121,7 +121,7 @@ try {
   const checkout = await call(`${base}/api/checkout`, {
     method: "POST",
     headers: { "content-type": "application/json" },
-    body: JSON.stringify({ productId: product.id, email, customerName: "Flow Tester", paymentMethod: "bank_transfer" }),
+    body: JSON.stringify({ productId: product.id, email, customerName: "Flow Tester", paymentMethod: "bank_transfer", acceptPolicy: true }),
   });
   const placed = await checkout.json();
   const orderId = placed.order?.id;
