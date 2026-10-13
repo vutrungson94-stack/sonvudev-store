@@ -11,6 +11,7 @@ let activeFilter = 'all';
 let payOptions = null;
 let lastOrder = null;
 let lastToken = null;
+let currentOpenProduct = null;
 // One key per checkout attempt, so a retry after a dropped connection returns
 // the order that already exists instead of opening a second one for one
 // purchase. Cleared once an order is safely in hand.
@@ -248,6 +249,7 @@ function card(p) {
 }
 
 function openProduct(id) {
+  currentOpenProduct = id;
   const raw = products.find((x) => x.id === id);
   if (!raw) return;
   // Leaving the order view behind, so its background polling cannot repaint the
@@ -281,6 +283,7 @@ function openProduct(id) {
 }
 
 function closeModal() {
+  currentOpenProduct = null;
   modal.hidden = true;
   document.body.classList.remove('modal-open');
   stopWatch();
@@ -571,6 +574,7 @@ window.addEventListener('i18n:ready', () => { render(); });
 window.I18N.onChange(() => {
   if (lastOrder && lastToken) showOrder(lastOrder, lastToken, null, { serverTime: new Date(Date.now() + deadlineState.offset).toISOString(), expiresAt: deadlineState.expiresAt });
   else if (!modal.hidden && lastOrder) showOrder(lastOrder, lastToken, null);
+  else if (!modal.hidden && currentOpenProduct) openProduct(currentOpenProduct);
   else render();
 });
 // A connection that comes back should immediately re-check whatever order is
