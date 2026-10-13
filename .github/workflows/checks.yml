@@ -85,6 +85,14 @@ jobs:
       - name: case
         run: npm run case
 
+      # A workflow that does not parse starts zero jobs: the run ends "failure"
+      # with no jobs and no logs to read, which looks exactly like a red build.
+      # This is the only gate that reads .github/workflows/ as YAML — the audit
+      # reads it as text, and the guard tests regex it, so both stayed green on a
+      # file that could not start a job.
+      - name: workflows
+        run: npm run workflow
+
       - name: metrics
         run: npm run metrics
 
@@ -107,11 +115,16 @@ jobs:
       # identical file per event. That is what exhausts the artifact quota, and the
       # failure it produces ("Artifact storage quota has been hit") reads like a
       # broken build rather than a full bucket.
-      //
+      #
       # The report is about a deploy, so only the branch a deploy comes from needs
       # it, and it is byte-identical across the three Node versions — hence one leg.
       # This costs nothing to a red run: a genuine build failure still uploads on
       # main, and the error stays loud rather than being swallowed.
+      #
+      # YAML comments are `#` and only `#`. A `//` line here is not a comment but a
+      # parse error, and a workflow that does not parse starts zero jobs: the run
+      # ends "failure" with nothing in it, which looks like a red build rather than
+      # a broken file. That typo cost two red runs before anyone could say why.
       - name: upload build report
         if: always() && github.ref == 'refs/heads/main' && matrix.node-version == '24'
         uses: actions/upload-artifact@v4

@@ -24,6 +24,7 @@
     "lint": "node scripts/lint-web.mjs",
     "audit": "node scripts/audit-web.mjs",
     "case": "node scripts/case-check.mjs",
+    "workflow": "node scripts/check-workflows.mjs",
     "metrics": "node scripts/metrics.mjs",
     "metrics:update": "node scripts/metrics.mjs --update",
     "metrics:auto": "node scripts/metrics.mjs --auto-update",
