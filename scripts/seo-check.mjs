@@ -39,8 +39,8 @@ if (!base) {
   // The boundary is deliberately narrow. A URL that was given and does not answer is
   // still a failure — that is the case this script exists for, and skipping it would
   // mean a dead site passes because the workflow forgot to configure itself.
-  console.log("[seo:check] Bo qua: khong co APP_URL va khong co dia chi nao truyen vao.");
-  console.log("[seo:check] De chay that: npm run seo:check -- https://ten-mien-cua-ban");
+  console.log("[seo:check] Bỏ qua: không có APP_URL và không có địa chỉ nào truyền vào.");
+  console.log("[seo:check] Để chạy thật: npm run seo:check -- https://ten-mien-cua-ban");
   process.exit(0);
 }
 const expectedToken = (process.env.GOOGLE_SITE_VERIFICATION || "").trim();
@@ -80,7 +80,7 @@ try {
   const last = chain[chain.length - 1];
   networkBlocked = /self-signed|unable to verify|SELF_SIGNED|DEPTH_ZERO|revocation|CRYPT_E_NO_REVOCATION|ENOTFOUND|EAI_AGAIN/i.test(cause);
   record("Trang chủ", false, networkBlocked
-    ? `may nay khong pho giao duoc domain — ${last}. Do proxy/endpoint cua may chan hoac giai phong TLS, KHONG phai loi cua site. Chay lai tren 4G.`
+    ? `máy này không phô giao được domain — ${last}. Do proxy/endpoint của máy chặn hoặc giải phóng TLS, KHÔNG phải lỗi của site. Chạy lại trên 4G.`
     : (error.name === "TimeoutError" ? "timeout" : cause));
   for (const item of results) console.log(`${item.ok ? "PASS" : "FAIL"}  ${item.name}: ${item.detail}`);
   // Still non-zero, and deliberately different from the missing-URL case above.
@@ -90,7 +90,7 @@ try {
   // that reports "not verified" as "verified" is the thing we just removed. This one
   // fails closed on purpose; the fix is to run it somewhere that can see the site,
   // not to treat the silence as a pass.
-  if (networkBlocked) console.error("\nKHONG KET LUAN DUOC ve site — may nay khong nhin thay no, va day KHONG phai bang chung site binh thuong.");
+  if (networkBlocked) console.error("\nKHÔNG KẾT LUẬN ĐƯỢC về site — máy này không nhìn thấy nó, và đây KHÔNG phải bằng chứng site bình thường.");
   process.exit(1);
 }
 

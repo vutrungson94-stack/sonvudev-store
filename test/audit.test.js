@@ -158,7 +158,7 @@ test('audit chặn được từng loại lỗi nó sinh ra để bắt', async 
     // run. Which means the test has to prove the skipping, not just the passing: an
     // audit that quietly did less would be indistinguishable from one that was fine.
     assert.equal(result.status, 0, `thiếu cấu hình thì các nhóm còn lại vẫn phải chạy:\n${output}`);
-    assert.match(output, /Bo qua \d+ nhom vi thieu cau hinh/, 'phải nói rõ đã bỏ qua gì');
+    assert.match(output, /Bỏ qua \d+ nhóm vì thiếu cấu hình/, 'phải nói rõ đã bỏ qua gì');
     assert.match(output, /APP_URL/, 'phải nói tên biến còn thiếu');
     assert.match(output, /SUPPORT_EMAIL/, 'phải nói tên biến còn thiếu');
     assert.match(output, /\[audit\] PASS/, 'các nhóm không phụ thuộc cấu hình vẫn phải chạy hết');
@@ -171,7 +171,7 @@ test('audit chặn được từng loại lỗi nó sinh ra để bắt', async 
     const configured = runAudit(cwd);
     const configuredOutput = `${configured.stdout}${configured.stderr}`;
     assert.equal(configured.status, 0, `có cấu hình thì phải sạch:\n${configuredOutput}`);
-    const skips = [...configured.stdout.matchAll(/Bo qua \d+ nhom vi thieu cau hinh: ([^\n]+)/g)].map((m) => m[1].trim());
+    const skips = [...configured.stdout.matchAll(/Bỏ qua \d+ nhóm vì thiếu cấu hình: ([^\n]+)/g)].map((m) => m[1].trim());
     assert.deepEqual(skips, ['R2 CORS khớp APP_URL (APP_URL là giá trị giả)'], `có cấu hình thì chỉ được bỏ qua đúng nhóm R2 đã nêu danh, không thêm không bớt:\n${configured.stdout}`);
   }
 
@@ -217,7 +217,7 @@ test('audit chặn được từng loại lỗi nó sinh ra để bắt', async 
     const ok = runWith();
     const okOutput = `${ok.stdout}${ok.stderr}`;
     assert.equal(ok.status, 0, `CORS khớp APP_URL thì phải sạch:\n${okOutput}`);
-    assert.ok(!/Bo qua/.test(ok.stdout), 'không phải fixture thì không được bỏ qua nhóm nào');
+    assert.ok(!/Bỏ qua/.test(ok.stdout), 'không phải fixture thì không được bỏ qua nhóm nào');
     // And a stale file must fail naming the repair, not pass quietly.
     const stale = [...origins.filter((origin) => !origin.includes('r2check')), 'https://cu-ten-mien.example.net'];
     rule[0].AllowedOrigins = stale;

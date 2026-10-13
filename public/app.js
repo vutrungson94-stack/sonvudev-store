@@ -187,6 +187,17 @@ const BADGES_NORM = Object.fromEntries(
 const BADGES_VI_NORM = Object.fromEntries(
   Object.entries(BADGES).map(([k, v]) => [foldDiacritics(v), k])
 );
+// Repairs a Vietnamese value that was typed without diacritics. "Phat hanh 1.4.0"
+// stored in a catalogue row is the same label as "Phát hành 1.4.0"; without this
+// the Vietnamese page printed the column text verbatim while the English page
+// translated it, so the same badge read correctly in one language and as an
+// unaccented typo in the other.
+const BADGES_VI_FIX = Object.fromEntries(
+  Object.entries(BADGES).map(([vi]) => [foldDiacritics(vi), vi])
+);
+const CATEGORIES_VI_FIX = Object.fromEntries(
+  Object.entries(CATEGORIES).map(([vi]) => [foldDiacritics(vi), vi])
+);
 const mapValue = (exact, tolerant, raw) => {
   const value = String(raw || "").trim();
   if (!value) return value;
@@ -194,8 +205,12 @@ const mapValue = (exact, tolerant, raw) => {
 };
 function localized(p) {
   if (window.I18N.lang !== 'en') {
-    const cat = mapValue(CATEGORIES_VI, CATEGORIES_VI_NORM, p.category);
-    const badge = mapValue(BADGES_VI, BADGES_VI_NORM, p.badge);
+    // Unaccented Vietnamese coming from the catalogue is repaired to the accented
+    // form; an already-English value is translated back to its Vietnamese word.
+    const cat = CATEGORIES_VI_FIX[foldDiacritics(p.category)]
+      || mapValue(CATEGORIES_VI, CATEGORIES_VI_NORM, p.category);
+    const badge = BADGES_VI_FIX[foldDiacritics(p.badge)]
+      || mapValue(BADGES_VI, BADGES_VI_NORM, p.badge);
     if (cat === p.category && badge === p.badge) return p;
     return { ...p, category: cat, badge };
   }

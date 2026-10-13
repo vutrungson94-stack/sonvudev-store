@@ -42,25 +42,25 @@ async function authenticate(apiBase) {
  * off the screen. Asking the API is the only honest answer.
  */
 async function detectEnvironment() {
-  console.log("Thu xac thuc credential voi ca hai moi truong PayPal...\n");
+  console.log("Thử xác thực credential với cả hai môi trường PayPal...\n");
   for (const [name, base] of Object.entries(BASES)) {
     const result = await authenticate(base);
     console.log(`  ${name.padEnd(8)} ${result.ok ? "XAC THUC THANH CONG" : `that bai (HTTP ${result.status}: ${result.body.error_description || result.body.error || "unknown"})`}`);
     if (result.ok) {
-      console.log(`\nCredential nay thuoc moi truong: ${name.toUpperCase()}`);
-      console.log(`Dat PAYPAL_ENVIRONMENT=${name} trong .env roi chay lai: npm run paypal:setup`);
+      console.log(`\nCredential này thuộc môi trường: ${name.toUpperCase()}`);
+      console.log(`Đặt PAYPAL_ENVIRONMENT=${name} trong .env rồi chạy lại: npm run paypal:setup`);
       return name;
     }
   }
-  console.error("\nKhong xac thuc duoc o ca hai moi truong.");
-  console.error("Kiem tra lai Client ID / Secret co dung app khong, va co copy thieu ky tu khong.");
+  console.error("\nKhông xác thực được ở cả hai môi trường.");
+  console.error("Kiểm tra lại Client ID / Secret có đúng app không, và có copy thiếu ký tự không.");
   process.exitCode = 1;
   return null;
 }
 
 if (detect) {
   if (!clientId || !clientSecret) {
-    console.error("Can PAYPAL_CLIENT_ID va PAYPAL_CLIENT_SECRET trong .env truoc khi do moi truong.");
+    console.error("Cần PAYPAL_CLIENT_ID và PAYPAL_CLIENT_SECRET trong .env trước khi dò môi trường.");
     process.exit(1);
   }
   const found = await detectEnvironment();
@@ -74,9 +74,9 @@ const webhookUrl = `${env("APP_URL").replace(/\/$/, "")}/api/paypal/webhook`;
 const eventTypes = ["PAYMENT.CAPTURE.COMPLETED"];
 
 if (!resolved.isSet) {
-  console.error(`${resolved.reason}. Khong tao webhook o moi truong nao.`);
-  console.error("Chay `npm run paypal:detect` de PayPal tu tra loi credential thuoc moi truong nao,");
-  console.error("roi dat PAYPAL_ENVIRONMENT vao .env truoc khi tao webhook.");
+  console.error(`${resolved.reason}. Không tạo webhook ở môi trường nào.`);
+  console.error("Chạy `npm run paypal:detect` để PayPal tự trả lời credential thuộc môi trường nào,");
+  console.error("rồi đặt PAYPAL_ENVIRONMENT vào .env trước khi tạo webhook.");
   process.exitCode = 1;
 }
 
@@ -90,7 +90,7 @@ if (!clientId || !clientSecret) {
 // Never call process.exit() while a fetch socket is still open, it aborts
 // libuv on Windows.
 async function main() {
-  console.log(`Moi truong: ${environment} (${apiBase})`);
+  console.log(`Môi trường: ${environment} (${apiBase})`);
 
   if (clientId === clientSecret) {
     console.error("PAYPAL_CLIENT_ID va PAYPAL_CLIENT_SECRET dang giong nhau.");
@@ -106,7 +106,7 @@ async function main() {
   const tokenResult = await authenticate(apiBase);
   if (!tokenResult.ok) {
     console.error(`Xac thuc that bai (${tokenResult.status}): ${tokenResult.body.error_description || tokenResult.body.error || "unknown"}`);
-    console.error("Kiem tra lai Client ID / Secret co dung app khong.");
+    console.error("Kiểm tra lại Client ID / Secret có đúng app không.");
     process.exitCode = 1;
     return;
   }
@@ -123,7 +123,7 @@ async function main() {
 
   const found = existing.find((hook) => hook.url === webhookUrl);
   if (found) {
-    console.log(`Webhook da ton tai cho ${webhookUrl}`);
+    console.log(`Webhook đã tồn tại cho ${webhookUrl}`);
     console.log(`PAYPAL_WEBHOOK_ID=${found.id}`);
   } else {
     console.log(`Dang tao webhook ${webhookUrl} ...`);
@@ -144,7 +144,7 @@ async function main() {
         console.error("  - Hay tao webhook thu cong trong Developer Dashboard > Apps & Credentials > Webhooks.");
         console.error("  - Sau khi có Webhook ID, điền vào .env rồi chạy lại check:production.");
       } else if (createResponse.status === 422 || createResponse.status === 404) {
-        console.error("PayPal khong truy cap duoc URL nay. Kiem tra DNS + HTTPS cua APP_URL truoc khi tao lai.");
+        console.error("PayPal không truy cập được URL này. Kiểm tra DNS + HTTPS của APP_URL trước khi tạo lại.");
       }
       process.exitCode = 1;
       return;
@@ -153,5 +153,5 @@ async function main() {
     console.log(`PAYPAL_WEBHOOK_ID=${createBody.id}`);
   }
 
-  console.log("\nDien vao .env roi chay lai: npm run check:production");
+  console.log("\nĐiền vào .env rồi chạy lại: npm run check:production");
 }

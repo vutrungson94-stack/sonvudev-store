@@ -164,9 +164,9 @@ Báo cáo tính theo `paidCount` chứ không theo `status`, nên đơn đã t�
 Production chạy trên Render, DNS do Cloudflare giữ. `.env` bị `.gitignore` loại nên không bao giờ lên Render — biến môi trường phải khai báo trên Dashboard (Service → Environment) hoặc đẩy bằng script:
 
 ```powershell
-npm run render:sync            # kiem tra, in ra danh sach thay doi
+npm run render:sync            # kiểm tra, in ra danh sách thay đổi
 npm run render:sync:deploy     # ghi len Render roi trigger deploy moi
-npm run render:deploy          # chi deploy, khong doi bien
+npm run render:deploy          # chỉ deploy, không đổi biến
 ```
 
 Mọi lệnh ghi (`:apply`, `:deploy`) đều chạy build (syntax, audit, metrics) và toàn
@@ -211,7 +211,7 @@ Cách nhanh nhất, một lệnh là xong — upload thẳng lên R2 rồi ghi `
 
 ```powershell
 node scripts/publish-product.mjs <duong-dan-file.exe> --dry-run   # xem ke hoach
-node scripts/publish-product.mjs <duong-dan-file.exe>             # phat hanh that
+node scripts/publish-product.mjs <duong-dan-file.exe>             # phát hành thật
 npm run product:publish -- <duong-dan-file.exe>                   # tuong duong
 ```
 

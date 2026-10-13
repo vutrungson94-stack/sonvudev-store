@@ -1260,19 +1260,19 @@ const DECLARED = [
 const callSiteLabels = new Set([...readFileSync(new URL(import.meta.url), "utf8").matchAll(/fail\(\s*"([^"]+)"/g)].map((m) => m[1]));
 const unusedLabels = DECLARED.filter((label) => !callSiteLabels.has(label));
 if (unusedLabels.length) {
-  console.error(`[audit] Nhom kiem tra khai bao nhung khong co call site nao: ${unusedLabels.join(", ")}`);
+  console.error(`[audit] Nhóm kiểm tra khai báo nhưng không có call site nào: ${unusedLabels.join(", ")}`);
   process.exitCode = 1;
 }
 const unknown = [...REGISTERED].filter((label) => !DECLARED.includes(label));
 if (unknown.length) {
-  console.error(`[audit] Nhom kiem tra chua khai bao trong danh sach cuoi file: ${unknown.join(", ")}`);
+  console.error(`[audit] Nhóm kiểm tra chưa khai báo trong danh sách cuối file: ${unknown.join(", ")}`);
   process.exitCode = 1;
 }
 const groups = new Set([...DECLARED, ...REGISTERED]).size;
 for (const item of findings) console.error(`FAIL  ${item.check.padEnd(18)} ${item.file}: ${item.detail}`);
-console.log(`\n[audit] ${groups} nhom kiem tra, ${findings.length} van de.`);
+console.log(`\n[audit] ${groups} nhóm kiểm tra, ${findings.length} vấn đề.`);
 if (skipped.length) {
-  console.log(`[audit] Bo qua ${skipped.length} nhom vi thieu cau hinh: ${skipped.join(", ")}`);
+  console.log(`[audit] Bỏ qua ${skipped.length} nhóm vì thiếu cấu hình: ${skipped.join(", ")}`);
   console.log("[audit] Dat APP_URL va SUPPORT_EMAIL (xem .env.example) de chay day du.");
 }
 if (!findings.length) console.log("[audit] PASS: không có domain gõ tay, route trùng, link gãy, tiếng Việt mất dấu hay khoá i18n mồ côi.");

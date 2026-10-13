@@ -141,7 +141,7 @@ export default {
       // A misconfigured keeper that pings nothing is worse than no keeper, because
       // it looks healthy from the dashboard. Said once, loudly, then silent.
       if (!context.__warned) {
-        console.error('[keep-awake] SHOP_URL chua duoc dat. Worker nay khong lam gi ca — ping mot dia chi rong.');
+        console.error('[keep-awake] SHOP_URL chưa được đặt. Worker này không làm gì cả — ping một địa chỉ rỗng.');
         context.__warned = true;
       }
       return { skipped: 'no-shop-url' };

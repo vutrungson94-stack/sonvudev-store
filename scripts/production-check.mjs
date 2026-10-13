@@ -233,11 +233,11 @@ if (appUrl) {
     const intercepted = /self-signed|unable to verify|SELF_SIGNED|DEPTH_ZERO/i.test(cause);
     const filtered = /ENOTFOUND|EAI_AGAIN|ECONNREFUSED|ECONNRESET|socket hang up/i.test(cause);
     add("HTTPS health", false, intercepted
-      ? `may nay dang bi proxy cong ty giai phong TLS, tra ve chung thu tu ky (${chain[chain.length - 1]}). KHONG phai loi chung thu cua site. Node khong tin CA cua proxy. Chay lai tren 4G, hoac bat SSL inspection trong Kaspersky.`
+      ? `máy này đang bị proxy công ty giải phóng TLS, trả về chứng thư tự ký (${chain[chain.length - 1]}). KHÔNG phải lỗi chứng thư của site. Node không tin CA của proxy. Chạy lại trên 4G, hoặc tắt SSL inspection trong Kaspersky.`
       : revocation
-        ? `may nay khong kiem tra duoc CRL cua chung thu (${chain[chain.length - 1]}) — loi mang noi bo, KHONG phai loi chung thu cua site. Thu lai tren 4G.`
+        ? `máy này không kiểm tra được CRL của chứng thư (${chain[chain.length - 1]}) — lỗi mạng nội bộ, KHÔNG phải lỗi chứng thư của site. Thử lại trên 4G.`
         : filtered
-          ? `may nay khong pho giao duoc domain (${chain[chain.length - 1]}) — thu lai tren mang khac bi chan`
+          ? `máy này không phô giao được domain (${chain[chain.length - 1]}) — thử lại trên mạng khác bị chặn`
           : cause);
     reachable = false;
   }
@@ -259,14 +259,14 @@ if (appUrl) {
 // it are skipped rather than failed, and the run is reported as inconclusive
 // instead of broken. A gate that cannot tell "the site is down" from "I cannot
 // see the site" gets ignored exactly when it matters most.
-const networkBlocked = checks.some((check) => /đang chặn miền|không kiểm tra được CRL|không phỏ giao được domain|giải phóng TLS|giai phong TLS/i.test(check.detail));
+const networkBlocked = checks.some((check) => /đang chặn miền|không kiểm tra được CRL|không phô giao được domain|giải phóng TLS/i.test(check.detail));
 
 for (const check of checks) console.log(`${check.ok ? "PASS" : "FAIL"}  ${check.name}: ${check.detail}`);
 const failed = checks.filter((check) => !check.ok);
 console.log(`\n${checks.length - failed.length}/${checks.length} production checks passed.`);
 if (networkBlocked) {
-  console.error("\nKHONG KET LUAN DUOC: may nay khong truy cap duoc site.\n");
+  console.error("\nKHÔNG KẾT LUẬN ĐƯỢC: máy này không truy cập được site.\n");
   console.error("Một số check cuối bảng phải chạy trên mạng không bị chặn (4G, mạng nhà riêng).");
-  console.error("Cac check khac — cau hinh, PayPal, email, DNS — da dung va khong phu thuoc site.");
+  console.error("Các check khác — cấu hình, PayPal, email, DNS — đã đúng và không phụ thuộc site.");
   process.exitCode = 1;
 } else if (failed.length) process.exitCode = 1;

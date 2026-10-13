@@ -19,14 +19,14 @@ import { releaseKey, releaseClient } from "../src/r2.js";
 
 const args = process.argv.slice(2);
 const usage = [
-  "Dung: node scripts/publish-product.mjs <duong-dan-file.exe> [--slug <slug> | --id <id>]",
+  "Dùng: node scripts/publish-product.mjs <đường-dẫn-file.exe> [--slug <slug> | --id <id>]",
   "                                     [--version <x.y.z>] [--prune] [--dry-run]",
   "",
-  "  --dry-run          chi in ke hoach, khong ghi gi len R2 hay Supabase",
-  "  --slug <slug>      san pham theo slug (mac dinh tu nhan dien)",
-  "  --id <id>          san pham theo id",
+  "  --dry-run          chỉ in kế hoạch, không ghi gì lên R2 hay Supabase",
+  "  --slug <slug>      sản phẩm theo slug (mặc định tự nhận diện)",
+  "  --id <id>          sản phẩm theo id",
   "  --version <x.y.z>  bản phát hành mới (mặc định giữ version hiện tại)",
-  "  --prune            xoa ban cu tren R2 sau khi gan ban moi",
+  "  --prune            xoá bản cũ trên R2 sau khi gắn bản mới",
 ].join("\n");
 
 if (args.includes("--help") || args.includes("-h")) {
@@ -97,20 +97,20 @@ async function main() {
   const fileName = path.basename(filePath);
 
   const product = await resolveProduct();
-  console.log(`San pham: ${product.name} [${product.id}] slug=${product.slug}`);
+  console.log(`Sản phẩm: ${product.name} [${product.id}] slug=${product.slug}`);
 
   const version = flagValue("--version") || product.version || "1.0.0";
   const previousKey = product.file_key || "";
   const key = releaseKey(product.slug, version, fileName);
   console.log(`File    : ${filePath}`);
-  console.log(`Dung luong: ${bytes(stat.size)}`);
-  console.log(`Version : ${version}${product.version && product.version !== version ? ` (truoc: ${product.version})` : ""}`);
+  console.log(`Dung lượng: ${bytes(stat.size)}`);
+  console.log(`Version : ${version}${product.version && product.version !== version ? ` (trước: ${product.version})` : ""}`);
   console.log(`R2 key  : ${key}`);
-  if (previousKey) console.log(`Ban cu  : ${previousKey}${prune ? " (sẽ xoá)" : " (giữ lại, thêm --prune để xoá)"}`);
-  console.log(`Trang thai: ${dryRun ? "DRY-RUN, không ghi gì" : "se upload that + gan file_key + status=active"}`);
+  if (previousKey) console.log(`Bản cũ  : ${previousKey}${prune ? " (sẽ xoá)" : " (giữ lại, thêm --prune để xoá)"}`);
+  console.log(`Trạng thái: ${dryRun ? "DRY-RUN, không ghi gì" : "sẽ upload thật + gắn file_key + status=active"}`);
 
   if (dryRun) {
-    console.log("\nDRY-RUN xong. Bo --dry-run de phat hanh that.");
+    console.log("\nDRY-RUN xong. Bỏ --dry-run để phát hành thật.");
     return;
   }
 
@@ -123,7 +123,7 @@ async function main() {
   }));
   const head = await r2.send(new HeadObjectCommand({ Bucket: env.r2.bucket, Key: key }));
   if (Number(head.ContentLength) !== stat.size) {
-    throw new Error(`Kich thuoc tren R2 khong khop: ${head.ContentLength} != ${stat.size}`);
+    throw new Error(`Kích thước trên R2 không khớp: ${head.ContentLength} != ${stat.size}`);
   }
   console.log(`R2 OK   : ${key} (${bytes(head.ContentLength)})`);
 
@@ -137,15 +137,15 @@ async function main() {
 
   if (prune && previousKey && previousKey !== key) {
     await r2.send(new DeleteObjectCommand({ Bucket: env.r2.bucket, Key: previousKey }));
-    console.log(`Da xoa ban cu tren R2: ${previousKey}`);
+    console.log(`Đã xoá bản cũ trên R2: ${previousKey}`);
   }
   // The address to check comes from APP_URL, which is the value the storefront
   // itself was built from. A literal domain here meant that publishing to a
   // different host still told the operator to go and look at the old one.
-  console.log(`\nPhat hanh xong. Kiem tra tai ${env.appUrl}.`);
+  console.log(`\nPhát hành xong. Kiểm tra tại ${env.appUrl}.`);
 }
 
 main().catch((error) => {
-  console.error(`LOI: ${error.message}`);
+  console.error(`LỖI: ${error.message}`);
   process.exitCode = 1;
 });

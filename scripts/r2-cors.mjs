@@ -52,7 +52,7 @@ let rules = [];
 try {
   rules = JSON.parse(await readFile(file, "utf8"));
 } catch (error) {
-  console.error(`Khong doc duoc cloudflare/r2-cors.json: ${error.message}`);
+  console.error(`Không đọc được cloudflare/r2-cors.json: ${error.message}`);
   process.exit(1);
 }
 
@@ -68,32 +68,32 @@ const command = bucket
 // print the command could not print it.
 if (write) {
   if (commandOnly) {
-    console.error("[r2:cors] khong the vua ghi file vua inh ra lenh. Chay tach hai lenh:");
+    console.error("[r2:cors] không thể vừa ghi file vừa in ra lệnh. Chạy tách hai lệnh:");
     console.error("  npm run r2:cors:write");
     console.error("  npm run r2:cors:command");
     process.exit(1);
   }
   await writeFile(file, `${JSON.stringify(build(requiredOrigins(appUrl)), null, 2)}\n`);
-  console.log(`[r2:cors] da ghi cloudflare/r2-cors.json cho ${hostOf(appUrl)}`);
+  console.log(`[r2:cors] đã ghi cloudflare/r2-cors.json cho ${hostOf(appUrl)}`);
   console.log(`[r2:cors] Ap len bucket: ${command}`);
 } else if (commandOnly) {
   console.log(command);
 } else if (diff.missing.length) {
-  console.error(`[r2:cors] FAIL — thieu ${diff.missing.length} origin trong cloudflare/r2-cors.json:`);
+  console.error(`[r2:cors] FAIL — thiếu ${diff.missing.length} origin trong cloudflare/r2-cors.json:`);
   for (const origin of diff.missing) console.error(`  + ${origin}`);
   if (diff.extra.length) {
-    console.error(`  va thua ${diff.extra.length} origin (van an toan, nen doc lai):`);
+    console.error(`  và thừa ${diff.extra.length} origin (vẫn an toàn, nên đọc lại):`);
     for (const origin of diff.extra) console.error(`  - ${origin}`);
   }
-  console.error("\nSua no:");
+  console.error("\nSửa nó:");
   console.error("  npm run r2:cors:write");
-  console.error("\nRoi ap len bucket:");
+  console.error("\nRồi áp lên bucket:");
   console.error(`  ${command}`);
   process.exit(1);
 } else {
-  console.log(`[r2:cors] PASS: cloudflare/r2-cors.json khop voi ${hostOf(appUrl)} (${requiredOrigins(appUrl).length} origin).`);
+  console.log(`[r2:cors] PASS: cloudflare/r2-cors.json khớp với ${hostOf(appUrl)} (${requiredOrigins(appUrl).length} origin).`);
   if (diff.extra.length) {
-    console.log(`[r2:cors] GHI CHU: ${diff.extra.length} origin khong do APP_URL sinh ra — doc lai truoc khi ap:`);
+    console.log(`[r2:cors] GHI CHÚ: ${diff.extra.length} origin không do APP_URL sinh ra — đọc lại trước khi áp:`);
     for (const origin of diff.extra) console.log(`  - ${origin}`);
   }
   console.log(`[r2:cors] Ap len bucket: ${command}`);

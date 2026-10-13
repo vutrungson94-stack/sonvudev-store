@@ -221,7 +221,7 @@ async function deliver(to, message, order, key) {
     await fs.mkdir(outboxDir, { recursive: true });
   } catch (error) {
     console.error(
-      `[notify] Khong ghi duoc outbox (${error.code || error.message}). `
+      `[notify] Không ghi được outbox (${error.code || error.message}). `
       + "Dat RESEND_API_KEY de gui email that; neu khong, don hàng se khong co email nao gui cho khach.",
     );
     return { via: "outbox-unavailable" };

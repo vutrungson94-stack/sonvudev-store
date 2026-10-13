@@ -37,7 +37,7 @@ test('khong co APP_URL thi bo qua, khong phai fail', () => {
   // reason on a machine that has one.
   const result = run([], { APP_URL: '' });
   assert.equal(result.status, 0, `phai bo qua (exit 0), thuc te exit ${result.status}\n${result.stdout}${result.stderr}`);
-  assert.match(result.stdout, /Bo qua/, 'phai noi ro la bo qua chứ không phải pass');
+  assert.match(result.stdout, /Bỏ qua/, 'phải nói rõ là bỏ qua chứ không phải pass');
   // The distinction that matters: a skipped run must not look like a checked one.
   assert.doesNotMatch(result.stdout, /\d+\/\d+ kiểm tra SEO đạt/, 'một lần bỏ qua không được in ra bảng điểm');
   assert.doesNotMatch(result.stdout, /\bPASS\b/, 'không được in PASS khi không kiểm tra gì');
@@ -65,7 +65,7 @@ test('đúng lệnh CI chạy trên runner sạch thì không đỏ', async () =
   // là thứ workflow thật sự làm.
   const result = run([''], { APP_URL: '' });
   assert.equal(result.status, 0, `lệnh của workflow không được đỏ trên runner sạch, thực tế exit ${result.status}\n${result.stdout}${result.stderr}`);
-  assert.match(result.stdout, /Bo qua/, 'phải báo là bỏ qua');
+  assert.match(result.stdout, /Bỏ qua/, 'phải báo là bỏ qua');
 });
 
 test('workflow truyền secret vào đúng chỗ, nên tự khỏi đỏ khi secret có mặt', async () => {

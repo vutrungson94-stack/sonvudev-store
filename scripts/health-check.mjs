@@ -242,7 +242,7 @@ export async function main(argument) {
     console.error(JSON.stringify(body.checks));
   }
   if (failures) {
-    console.error(`${failures} thieu thong tin. Khong co dong XX nao o tren la canh bao; dong XX moi la thu thieu.`);
+    console.error(`${failures} thiếu thông tin. Không có dòng XX nào ở trên là cảnh báo; dòng XX mới là thư thiếu.`);
     return 1;
   }
   console.log('Du tat ca cac dong bat buoc.');

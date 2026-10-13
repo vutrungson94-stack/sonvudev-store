@@ -160,9 +160,9 @@ if (update || autoUpdate) {
   process.exit(0);
 }
 if (!(await exists(baselineFile))) {
-  console.error(`[metrics] FAIL — khong co ${path.relative(root, baselineFile)} de so sanh.`);
+  console.error(`[metrics] FAIL — không có ${path.relative(root, baselineFile)} để so sánh.`);
   console.error('Không có gì để so sánh thì một dòng "PASS" không có nghĩa gì.');
-  console.error('Ghi baseline mot lan co chu dich: npm run metrics:update');
+  console.error('Ghi baseline một lần có chủ đích: npm run metrics:update');
   process.exit(1);
 }
 

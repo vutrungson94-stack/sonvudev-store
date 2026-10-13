@@ -955,7 +955,18 @@ function localizeToEnglish(product) {
 export const localised = (value, map, fallback = "") => {
   const raw = String(value ?? "").trim();
   if (!raw) return fallback;
-  return map?.[raw] ?? raw;
+  if (map && Object.prototype.hasOwnProperty.call(map, raw)) return map[raw];
+  // A catalogue row typed without diacritics ("Phat hanh 1.4.0") is the same word
+  // as the dictionary key ("Phát hành 1.4.0"). Exact lookup alone left the raw
+  // column text on screen, so the reader saw an unaccented label next to a fully
+  // accented Vietnamese page. Folding both sides matches it without editing data
+  // that was created years ago and may live in a database we do not control.
+  const fold = (text) => String(text).toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim();
+  const foldedRaw = fold(raw);
+  for (const [key, translated] of Object.entries(map || {})) {
+    if (fold(key) === foldedRaw) return translated;
+  }
+  return raw;
 };
 
 /**

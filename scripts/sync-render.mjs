@@ -186,7 +186,7 @@ async function main() {
   }
 
   if (!changes.length) {
-    console.log(`Khong co thay doi. ${wanted.size} bien da khop voi Render.`);
+    console.log(`Không có thay đổi. ${wanted.size} bien da khop voi Render.`);
     // A redeploy is worth doing even with nothing to write, and it is asked for
     // separately from writing: --apply means "put the environment on Render",
     // --deploy means "restart the thing".
@@ -229,7 +229,7 @@ async function main() {
     await call("PUT", `${api}/services/${serviceId}/env-vars/${encodeURIComponent(change.key)}`, { key: change.key, value: wanted.get(change.key) });
     console.log(`Da ghi ${change.key}`);
   }
-  console.log(`\nDa cap nhat ${changes.length} bien tren Render.`);
+  console.log(`\nĐã cập nhật ${changes.length} biến trên Render.`);
 
   if (!redeploy) {
     console.log("Chạy lại với --deploy để trigger deploy mới, hoặc bấm Manual Deploy trên Dashboard.");
