@@ -103,6 +103,7 @@ jobs:
       - name: upload build report
         if: always()
         uses: actions/upload-artifact@v4
+        continue-on-error: true
         with:
           name: web-build-report
           path: build-reports/
