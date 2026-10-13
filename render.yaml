@@ -41,7 +41,7 @@ services:
     # The free tier is a Node default, not a build step. There is nothing to
     # compile — 4 dependencies, no bundler — and a build that only ran `npm ci`
     # would spend the account's 500 build minutes to produce the same tree.
-    buildCommand: npm ci --omit=dev
+    buildCommand: npm ci --omit=dev && npm run build
 
     # `node src/server.js`, and PORT/HOST come from the platform. src/config.js
     # already defaults HOST to 0.0.0.0 and reads PORT, so no code change is needed
