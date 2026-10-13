@@ -119,8 +119,8 @@ const REQUIRED_COLUMNS = {
 // feature and behaved like a lie. Removed from both places so the declared shape
 // and the used shape agree again; an existing database keeps the column, which is
 // harmless, because db-migrate only ever adds what is missing.
-products: ["id", "slug", "name", "short_description", "description", "category", "platform", "version", "price", "currency", "badge", "features", "requirements", "status", "file_key", "created_at", "updated_at",
-    "short_description_en", "description_en", "features_en", "seo_title", "seo_description"],
+products: ["id", "slug", "name", "short_description", "description", "category", "platform", "version", "price", "currency", "badge", "features", "requirements", "status", "file_key", "file_size", "virus_scan_url", "created_at", "updated_at",
+    "short_description_en", "description_en", "features_en", "seo_title", "seo_description", "seo_title_en", "seo_description_en"],
 };
 
 // Indexes the code depends on, and whether a *non-unique* one is enough.

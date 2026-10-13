@@ -482,7 +482,7 @@ app.get("/og/:slug.svg", async (req, res) => {
   // old numbers. There is no price here at all: a card that invents a number is
   // worse than a card that states none.
   if (req.params.slug === siteCardSlug) {
-    return res.set("Cache-Control", "public, max-age=3600").type("image/svg+xml").send(renderOgImage({ name: "Phần mềm Windows cho công việc", platform: "Windows", version: "1.0", price: 0, currency: "VND" }));
+    return res.set("Cache-Control", "public, max-age=3600").type("image/svg+xml").send(renderOgImage({ name: env.brand.name, platform: "Windows", version: "1.0", price: 0, currency: "VND" }));
   }
   const product = await getProductBySlug(req.params.slug);
   // isSellable rather than a second copy of its rule. The rule — active, has a

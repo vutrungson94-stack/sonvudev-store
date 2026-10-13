@@ -51,6 +51,16 @@ const absolute = (path) => `${site()}${path.startsWith("/") ? path : `/${path}`}
  * The name is escaped for HTML because it lands inside page markup and inside
  * structured data, and it comes from configuration like anything else.
  */
+export const formatBytes = (bytes) => {
+  const value = Number(bytes) || 0;
+  if (value <= 0) return "";
+  const units = ["B", "KB", "MB", "GB"];
+  let size = value;
+  let unit = 0;
+  while (size >= 1024 && unit < units.length - 1) { size /= 1024; unit += 1; }
+  return `${size >= 100 || unit === 0 ? size.toFixed(0) : size.toFixed(1)} ${units[unit]}`;
+};
+
 export const fillCopy = (value) => {
   const text = String(value ?? "");
   if (!text.includes("{{")) return text;
@@ -215,6 +225,25 @@ export const organization = () => ({
  * something specific rather than something generic: which platforms it runs on,
  * what it needs to run at all, and where the file actually is.
  */
+/**
+ * The verification block: the links a claim rests on, and nothing else.
+ *
+ * Three things this deliberately does not do. It never asserts the software is
+ * safe, because a page asserting that is worth nothing next to a scan a reader can
+ * open. It does not show the build report as though it described the download — the
+ * report covers this storefront's own server code, and passing it off as product
+ * verification is the same overclaiming the product copy was already corrected
+ * for. And it never renders a row for evidence that is missing: a "verified" link
+ * with no href behind it is worse than no row, because it looks like a pass.
+ */
+const trustBlock = (product, copy) => {
+  const scan = String(product.virusScanUrl || "").trim();
+  if (!scan) return "";
+  const rows = [`<li><a href="${esc(scan)}" rel="nofollow noopener" target="_blank">${esc(copy.trustScan)}</a><small>${esc(copy.trustScanNote)}</small></li>`];
+  rows.push(`<li><a href="/build-report.json">${esc(copy.trustBuild)}</a><small>${esc(copy.trustBuildNote)}</small></li>`);
+  return `<section class="detail-block trust"><h2>${esc(copy.trustHeading)}</h2><ul class="trust-list">${rows.join("")}</ul></section>`;
+};
+
 export const productSchema = (product, lang = "vi") => ({
   "@type": "SoftwareApplication",
   "@id": absolute(productUrl(product.slug, lang)) + "#software",
@@ -770,7 +799,19 @@ export const COPY_VI = {
   // at the top of the English page. These map the values the shop actually uses; an
   // unknown one still renders as written rather than disappearing.
   categories: { "Công cụ": "Công cụ", "Tiện ích": "Tiện ích", "Phần mềm": "Phần mềm", "Khác": "Khác" },
-  badges: { "Mới": "Mới", "Bán chạy": "Bán chạy", "Cập nhật": "Cập nhật", "Phát hành": "Phát hành", "Phổ biến": "Phổ biến", "Chuyên nghiệp": "Chuyên nghiệp", "Tiết kiệm": "Tiết kiệm", "Doanh nghiệp": "Doanh nghiệp", "Ưu đãi sớm": "Ưu đãi sớm" },
+  badges: { "Mới": "Mới", "Bán chạy": "Bán chạy", "Cập nhật": "Cập nhật", "Phát hành": "Phát hành", "Phổ biến": "Phổ biến", "Chuyên nghiệp": "Chuyên nghiệp", "Tiết kiệm": "Tiết kiệm", "Doanh nghiệp": "Doanh nghiệp", "Ưu đãi sớm": "Ưu đãi sớm", "Safe Edition v4.3": "Safe Edition v4.3", "Phát hành 1.4.0": "Phát hành 1.4.0" },
+  // The verification block. What it links to is what the claim rests on, so every
+  // line here points at something a stranger can open and check: an independent
+  // antivirus scan, and the build report of the shop selling the file. Neither
+  // says the software is safe — that is not a thing a page can assert — they give
+  // the reader the evidence to form their own answer, which is the only version of
+  // a trust claim that survives being checked.
+  trustHeading: "Kiểm chứng",
+  trustScan: "Quét virus độc lập (VirusTotal)",
+  trustScanNote: "Chạy bởi hãng thứ ba, không phải bởi shop. Bấm để xem đúng file bạn tải về đã được bao nhiêu công cụ quét, và bao nhiêu báo phát hiện.",
+  trustBuild: "Báo cáo build của shop",
+  trustBuildNote: "Commit, phiên bản Node, danh sách mọi file và mọi thư viện của trang bán hàng này, kèm mã băm SHA-256. Cái này mô tả shop, không mô tả phần mềm bạn mua.",
+  fileSizeLabel: "Kích thước tệp tải về",
   buyNow: "Mua ngay",
   buyNote: "Giấy phép vĩnh viễn, không phí thuê bao. Thanh toán chuyển khoản hoặc PayPal.",
   pointDownload: "Tải ngay sau khi thanh toán",
@@ -799,7 +840,13 @@ export const COPY_EN = {
   // The Vietnamese values, translated. See the note on COPY_VI: the category and
   // badge are free-text columns written in one language and rendered in both.
   categories: { "Công cụ": "Tools", "Tiện ích": "Utilities", "Phần mềm": "Software", "Khác": "Other" },
-  badges: { "Mới": "New", "Bán chạy": "Best seller", "Cập nhật": "Updated", "Phát hành": "Release", "Phổ biến": "Popular", "Chuyên nghiệp": "Professional", "Tiết kiệm": "Value", "Doanh nghiệp": "Enterprise", "Ưu đãi sớm": "Early Bird" },
+  badges: { "Mới": "New", "Bán chạy": "Best seller", "Cập nhật": "Updated", "Phát hành": "Release", "Phổ biến": "Popular", "Chuyên nghiệp": "Professional", "Tiết kiệm": "Value", "Doanh nghiệp": "Enterprise", "Ưu đãi sớm": "Early Bird", "Safe Edition v4.3": "Safe Edition v4.3", "Phát hành 1.4.0": "Release 1.4.0" },
+  trustHeading: "Verification",
+  trustScan: "Independent antivirus scan (VirusTotal)",
+  trustScanNote: "Run by a third party, not by this shop. Open it to see how many engines scanned the exact file you download, and how many flagged it.",
+  trustBuild: "This shop's build report",
+  trustBuildNote: "Commit, Node version, every shipped file and every dependency of this storefront, with SHA-256 digests. That describes the shop, not the software you are buying.",
+  fileSizeLabel: "Download file size",
   buyNow: "Buy now",
   buyNote: "One-time licence, no subscription. Pay by bank transfer or PayPal.",
   pointDownload: "Download immediately after payment",
@@ -989,6 +1036,8 @@ ${jsonLd([organization(), websiteSchema(), productSchema(product, lang), breadcr
 </header>
 ${features.length ? `<section class="detail-block"><h2>${copy.features}</h2><ul class="feature-grid">${features.map((item) => `<li>${esc(item)}</li>`).join("")}</ul></section>` : ""}
 ${product.requirements ? `<section class="detail-block"><h2>${copy.requirements}</h2><p>${esc(product.requirements).replace(/\n/g, "<br>")}</p></section>` : ""}
+${(product.fileSize || product.file_size) ? `<section class="detail-block"><h2>${esc(copy.fileSizeLabel)}</h2><p>${esc(formatBytes(product.fileSize || product.file_size))}</p></section>` : ""}
+${trustBlock(product, copy)}
 ${intro ? `<section class="detail-block prose">${paragraphBlocks(intro)}</section>` : ""}
 ${groups.map((group) => `<section class="detail-block prose">${paragraphBlocks(group)}</section>`).join("")}
 <section class="detail-block">

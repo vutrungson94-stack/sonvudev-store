@@ -65,6 +65,56 @@ const metricsSummary = (metrics.stdout.match(/\[metrics\].*/g) || []).pop() || '
 const provenance = spawnSync(process.execPath, [path.join(root, 'scripts', 'provenance.mjs')], { encoding: 'utf8' });
 if (provenance.status !== 0) throw new Error(`Provenance failed:\n${provenance.stdout}${provenance.stderr}`);
 const provenanceSummary = (provenance.stdout.match(/\[provenance\].*/g) || []).pop() || '';
+
+// The transparency document, written into public/ before the publish copy so it
+// ships with the artifact and is served at /build-report.json.
+//
+// What this is: what the shop selling the software was built from — commit,
+// branch, Node version, every file that shipped with a content hash, and every
+// dependency the server runs. A buyer can check the number they are given against
+// the number in this file instead of taking the download button's word for it.
+//
+// What this deliberately is not: a claim about the product. The SBOM describes
+// this server, not RamCleaner.exe, and calling it anything else would be the same
+// overclaiming the product copy was fixed for. Product-level verification is the
+// antivirus scan and the source, and those live on the product page.
+//
+// The two inputs carry no hostname, username, path or secret, and this writer does
+// nothing but select, so nothing local to the build machine travels with it.
+const transparencyPath = path.join(root, 'public', 'build-report.json');
+try {
+  const [provenanceDoc, sbomDoc] = await Promise.all([
+    readFile(path.join(root, 'build-reports', 'provenance.json'), 'utf8').then(JSON.parse),
+    readFile(path.join(root, 'build-reports', 'sbom.json'), 'utf8').then(JSON.parse),
+  ]);
+  const transparency = {
+    application: provenanceDoc.application,
+    version: provenanceDoc.version,
+    builtAt: provenanceDoc.generatedAt,
+    git: { commit: provenanceDoc.gitCommit, branch: provenanceDoc.gitBranch },
+    runtime: provenanceDoc.node,
+    integrity: { files: (provenanceDoc.files || []).length, filesSha256: provenanceDoc.filesSha256 },
+    // Two writers have used this filename: provenance.mjs writes
+    // `{packages: [{package, version, license}]}`, and an external CycloneDX tool
+    // wrote `{components: [{name, version}]}`. Read both rather than assuming which
+    // one ran last — an empty dependency list reads as "nothing to verify", which
+    // is the one thing this file must never say.
+    dependencies: [...(sbomDoc.packages || []), ...(sbomDoc.components || [])]
+      .map((p) => {
+        if (typeof p === "string") return { name: p, version: null };
+        const name = p.group ? `${p.group}/${p.name}` : (p.name || p.package);
+        return { name, version: p.version || null, ...(p.license ? { license: p.license } : {}) };
+      })
+      .filter((p) => p.name && p.name !== "--help"),
+  };
+  await writeFile(transparencyPath, `${JSON.stringify(transparency, null, 2)}\n`, 'utf8');
+  console.log(`[transparency] ${transparency.integrity.files} files, ${transparency.dependencies.length} packages -> public/build-report.json`);
+} catch (error) {
+  // Non-fatal on purpose: a missing report must stop a transparency claim from
+  // being made, never stop the shop from deploying.
+  console.log(`[transparency] skipped: ${error.message}`);
+}
+
 // The artifact is the single definition of what ships, and deploy/deploy.sh
 // deploys this directory and nothing else. It used to be written here and then
 // ignored: the deploy script copied the entire working tree instead, so the

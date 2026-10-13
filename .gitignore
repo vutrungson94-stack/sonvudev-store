@@ -14,6 +14,11 @@ publish-output/
 .gbuild-state.gbuildstate
 --help/
 
+# Generated at build time from build-reports/ and served from public/. Committing
+# it would freeze a claim about the current build into a file that only talks
+# about the build it was committed with.
+public/build-report.json
+
 # Local runtime scratch
 logs/
 data/

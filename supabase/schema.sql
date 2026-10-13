@@ -94,6 +94,12 @@ alter table public.products add column if not exists seo_description text not nu
 -- from the English copy — it never borrows the Vietnamese one.
 alter table public.products add column if not exists seo_title_en text not null default '';
 alter table public.products add column if not exists seo_description_en text not null default '';
+-- The link to a third-party scan of the exact file this product hands over, shown
+-- on the product page and nowhere else. Empty by design: a product with no scan
+-- yet renders no claim, which is the only honest state for a product nobody has
+-- scanned. The page whose job is to assert safety is not the place to guess at it.
+alter table public.products add column if not exists virus_scan_url text not null default '';
+alter table public.products add column if not exists file_size bigint not null default 0;
 
 -- Order lifecycle. An unpaid order stops being payable at expires_at and is
 -- cancelled by the background sweep; a proven payment sets paid_at and bumps
