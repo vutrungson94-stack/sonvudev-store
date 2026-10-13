@@ -100,10 +100,21 @@ jobs:
       # Uploads the build report so a failing deploy can be traced without asking
       # whoever ran it. The report lists every packaged file, which is the
       # difference between "it broke" and "this file was not in it".
+      #
+      # Gated on the live branch and one Node version on purpose. The step used to
+      # run on `if: always()` alone, so every push — and every pull request, on all
+      # three Node legs — uploaded the same report again: up to three copies of an
+      # identical file per event. That is what exhausts the artifact quota, and the
+      # failure it produces ("Artifact storage quota has been hit") reads like a
+      # broken build rather than a full bucket.
+      //
+      # The report is about a deploy, so only the branch a deploy comes from needs
+      # it, and it is byte-identical across the three Node versions — hence one leg.
+      # This costs nothing to a red run: a genuine build failure still uploads on
+      # main, and the error stays loud rather than being swallowed.
       - name: upload build report
-        if: always()
+        if: always() && github.ref == 'refs/heads/main' && matrix.node-version == '24'
         uses: actions/upload-artifact@v4
-        continue-on-error: true
         with:
           name: web-build-report
           path: build-reports/
@@ -129,26 +140,35 @@ jobs:
 
       - run: npm ci
 
-      # LIVE CHECK: cần network + secrets.APP_URL. Thiếu secret thì báo warning,
-      # không fail — thay thế một fail cứng trước đó.
+      # Reads APP_URL from the repository secret rather than a workflow variable,
+      # so the same value the server is configured with is the one audited.
+      - name: check the live site
+        run: npm run seo:check -- "${{ secrets.APP_URL }}"
+        env:
+          GOOGLE_SITE_VERIFICATION: ${{ secrets.GOOGLE_SITE_VERIFICATION }}
+
+      # The step above is the last line of defence and it is not a good one.
       #
-      # Lý do không fail: CI đỏ liên tục vì một bước tự động hóa chưa được cấu hình
-      # khiến người đọc không phân biệt được "chưa ai kiểm tra" với "kiểm tra rồi,
-      # hỏng". Job đỏ vĩnh viễn là job không ai đọc nữa.
-      - name: warn if the live-site URL was not configured
+      # seo:check exits 0 with a "skipped" message when it has no URL, which is
+      # right when someone runs it locally and has not got a .env — but inside a
+      # job whose entire purpose is to check the live site, an absent secret
+      # produces a green run that verified nothing. That is the worst shape a
+      # check can have: it reports the thing it exists to report, without having
+      # looked at it.
+      #
+      # So the absence is made explicit and fatal here. A skipped run is never
+      # mistaken for a passing one, and the fix is written on the log: the
+      # secret is not set, in this repository, under this name.
+      #
+      # NOTE: the `secrets` context is NOT available in an `if:` expression
+      # (startup failure: "Unrecognized named-value: 'secrets'", 0 jobs run).
+      # So the secret is passed via `env` and tested inside `run` instead.
+      - name: fail if the URL was not configured
         env:
           CHECK_URL: ${{ secrets.APP_URL }}
         run: |
           if [ -z "$CHECK_URL" ]; then
-            echo "::warning::secrets.APP_URL chua duoc dat, nen CI KHONG kiem tra site dang chay."
-            echo "::warning::Đe mo live check: Settings > Secrets and variables > Actions > Repository secrets > APP_URL = https://<domain-cua-ban>"
-            exit 0
+            echo "::error::secrets.APP_URL chua duoc dat, nen bo deploy nay KHONG kiem tra gi ca."
+            echo "::error::Dat no trong Settings > Secrets and variables > Actions > Repository secrets, ten APP_URL, gia tri https://<domain-cua-ban>"
+            exit 1
           fi
-
-      # Reads APP_URL from the repository secret rather than a workflow variable,
-      # so the same value the server is configured with is the one audited.
-      - name: check the live site
-        env:
-          CHECK_URL: ${{ secrets.APP_URL }}
-          GOOGLE_SITE_VERIFICATION: ${{ secrets.GOOGLE_SITE_VERIFICATION }}
-        run: npm run seo:check -- "$CHECK_URL"

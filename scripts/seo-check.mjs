@@ -343,10 +343,24 @@ if (organization && !sameAs.length) {
 for (const url of sameAs) {
   let status = 0;
   try { status = (await fetch(url, { redirect: "follow", signal: AbortSignal.timeout(TIMEOUT_MS) })).status; } catch { status = 0; }
+  // Unreachable from *this network* is not a dead link, and the difference is
+  // not academic: every CI runner and every cloud VM lives on a datacenter IP,
+  // and Facebook answers those with a TLS error before a status code exists —
+  // while the very same URL opens fine in the owner's browser. Counting that as
+  // a dead sameAs made this check red on a perfectly healthy site, and a
+  // permanently red check is one nobody reads.
+  //
+  // So a network failure is reported apart from the results, where it cannot
+  // move the exit code, and says plainly that only a browser can judge it: the
+  // check above still exists for the failure it can actually see — 404 and 410.
+  if (status === 0) {
+    console.log(`NOTE  sameAs không kiểm tra được từ mạng này: ${url} — bị chặn hoặc lỗi TLS. Mở link trong trình duyệt để xác nhận nó còn sống.`);
+    continue;
+  }
   // 401/403 still mean the page exists and is not public. Treating those as dead
   // would push the owner towards deleting a perfectly good private-ish profile.
-  const alive = status > 0 && status !== 404 && status !== 410;
-  record(`sameAs sống: ${url}`, alive, status === 0 ? "không phản hồi" : `HTTP ${status}${alive ? "" : " (trang không tồn tại)"}`);
+  const alive = status !== 404 && status !== 410;
+  record(`sameAs sống: ${url}`, alive, `HTTP ${status}${alive ? "" : " (trang không tồn tại)"}`);
 }
 
 if (organization?.logo) {
