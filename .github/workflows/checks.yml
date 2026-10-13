@@ -105,33 +105,52 @@ jobs:
       - name: build
         run: npm run build
 
-      # Uploads the build report so a failing deploy can be traced without asking
-      # whoever ran it. The report lists every packaged file, which is the
-      # difference between "it broke" and "this file was not in it".
+      # The build report is written into the job summary rather than uploaded as
+      # an artifact, and that is not a convenience choice.
       #
-      # Gated on the live branch and one Node version on purpose. The step used to
-      # run on `if: always()` alone, so every push — and every pull request, on all
-      # three Node legs — uploaded the same report again: up to three copies of an
-      # identical file per event. That is what exhausts the artifact quota, and the
-      # failure it produces ("Artifact storage quota has been hit") reads like a
-      # broken build rather than a full bucket.
+      # GitHub's artifact quota is an account-wide allowance, not a per-repository
+      # one. A full bucket anywhere on the account fails this upload with "Artifact
+      # storage quota has been hit", and there is nothing in this file that can
+      # free it — no amount of trimming this repo's 69 artifacts, which together
+      # total 0.3 MB, will help. The result was three red runs on a build that had
+      # passed every gate, for a report of three small files.
       #
-      # The report is about a deploy, so only the branch a deploy comes from needs
-      # it, and it is byte-identical across the three Node versions — hence one leg.
-      # This costs nothing to a red run: a genuine build failure still uploads on
-      # main, and the error stays loud rather than being swallowed.
+      # `$GITHUB_STEP_SUMMARY` renders on the run page itself, beside the logs
+      # that made you want the report in the first place. Same content, no storage,
+      # no quota, no download step. It also removes the temptation this repository
+      # already guards against: the two ways a pipeline reports success for work
+      # that failed — the YAML flag and the shell fallback — are both banned here,
+      # and the guard greps the whole file for them, comments included. A gate that
+      # swallows its own failure is worse than a loud one. There is now nothing
+      # left to swallow.
       #
-      # YAML comments are `#` and only `#`. A `//` line here is not a comment but a
-      # parse error, and a workflow that does not parse starts zero jobs: the run
-      # ends "failure" with nothing in it, which looks like a red build rather than
-      # a broken file. That typo cost two red runs before anyone could say why.
-      - name: upload build report
+      # Still gated to the live branch and one Node version: the report is
+      # byte-identical across the three legs, and a pull request has nothing to
+      # deploy and so nothing to trace.
+      - name: publish build report to the job summary
         if: always() && github.ref == 'refs/heads/main' && matrix.node-version == '24'
-        uses: actions/upload-artifact@v4
-        with:
-          name: web-build-report
-          path: build-reports/
-          if-no-files-found: ignore
+        run: |
+          {
+            echo "### Báo cáo build"
+            echo
+            echo "Commit: ${GITHUB_SHA}"
+            echo
+            for f in build-reports/*.json; do
+              [ -e "$f" ] || continue
+              echo "<details><summary>$(basename "$f")</summary>"
+              echo
+              echo '```json'
+              cat "$f"
+              echo '```'
+              echo "</details>"
+              echo
+            done
+            echo "### File được đóng gói"
+            echo
+            echo '```'
+            find publish-output/node -type f | sed "s|^publish-output/node/||" | sort | head -100
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
 
   # The live site, checked the way a crawler sees it. Separate from the checks
   # above because it needs the deployed host and the network, and because it is
