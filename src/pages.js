@@ -770,7 +770,7 @@ export const COPY_VI = {
   // at the top of the English page. These map the values the shop actually uses; an
   // unknown one still renders as written rather than disappearing.
   categories: { "Công cụ": "Công cụ", "Tiện ích": "Tiện ích", "Phần mềm": "Phần mềm", "Khác": "Khác" },
-  badges: { "Mới": "Mới", "Bán chạy": "Bán chạy", "Cập nhật": "Cập nhật", "Phát hành": "Phát hành" },
+  badges: { "Mới": "Mới", "Bán chạy": "Bán chạy", "Cập nhật": "Cập nhật", "Phát hành": "Phát hành", "Phổ biến": "Phổ biến", "Chuyên nghiệp": "Chuyên nghiệp", "Tiết kiệm": "Tiết kiệm", "Doanh nghiệp": "Doanh nghiệp", "Ưu đãi sớm": "Ưu đãi sớm" },
   buyNow: "Mua ngay",
   buyNote: "Giấy phép vĩnh viễn, không phí thuê bao. Thanh toán chuyển khoản hoặc PayPal.",
   pointDownload: "Tải ngay sau khi thanh toán",
@@ -799,7 +799,7 @@ export const COPY_EN = {
   // The Vietnamese values, translated. See the note on COPY_VI: the category and
   // badge are free-text columns written in one language and rendered in both.
   categories: { "Công cụ": "Tools", "Tiện ích": "Utilities", "Phần mềm": "Software", "Khác": "Other" },
-  badges: { "Mới": "New", "Bán chạy": "Best seller", "Cập nhật": "Updated", "Phát hành": "Release" },
+  badges: { "Mới": "New", "Bán chạy": "Best seller", "Cập nhật": "Updated", "Phát hành": "Release", "Phổ biến": "Popular", "Chuyên nghiệp": "Professional", "Tiết kiệm": "Value", "Doanh nghiệp": "Enterprise", "Ưu đãi sớm": "Early Bird" },
   buyNow: "Buy now",
   buyNote: "One-time licence, no subscription. Pay by bank transfer or PayPal.",
   pointDownload: "Download immediately after payment",
