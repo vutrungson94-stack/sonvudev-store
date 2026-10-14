@@ -185,6 +185,10 @@ const shippedEnv = artifactFiles.filter((file) => {
 if (shippedEnv.length) {
   throw new Error(`Artifact chứa file biến môi trường, không được deploy:\n  ${shippedEnv.join('\n  ')}\n.env.example là file duy nhất được phép.`);
 }
-const report = { application: 'SonVuDev Store', mode: 'web-node', generatedAt: new Date().toISOString(), javascriptFilesChecked: jsFiles.length, requiredFilesChecked: required.length, audit: auditSummary, caseCheck: caseSummary, metrics: metricsSummary, provenance: provenanceSummary, artifactFiles: artifactFiles.length, artifactPath: 'publish-output/node', status: 'passed' };
+// The application name is read from package.json, the same manifest
+// scripts/provenance.mjs writes its report from. It used to be a literal here,
+// so the two reports describing one build could name two different shops, and
+// neither would have failed a gate.
+const report = { application: manifest.name, mode: 'web-node', generatedAt: new Date().toISOString(), javascriptFilesChecked: jsFiles.length, requiredFilesChecked: required.length, audit: auditSummary, caseCheck: caseSummary, metrics: metricsSummary, provenance: provenanceSummary, artifactFiles: artifactFiles.length, artifactPath: 'publish-output/node', status: 'passed' };
 await writeFile(path.join(root, 'build-reports', 'web-build.json'), JSON.stringify(report, null, 2));
 console.log(`[build] PASS: ${required.length} required files, ${jsFiles.length} JavaScript files checked, ${auditSummary}, ${caseSummary}, ${metricsSummary}, ${provenanceSummary}, ${artifactFiles.length} deploy files packaged into publish-output/node.`);

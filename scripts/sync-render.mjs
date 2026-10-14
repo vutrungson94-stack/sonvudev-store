@@ -86,7 +86,17 @@ async function call(method, url, body) {
 async function findService() {
   const explicit = env("RENDER_SERVICE_ID");
   if (explicit) return { service: { id: explicit }, name: explicit };
-  const wanted = env("RENDER_SERVICE") || "sonvudev";
+  // The name used to fall back to a literal typed into this file. A service
+  // name belongs to the Render account, not to the script: renaming the service
+  // on the dashboard would fail with a message pointing at a name that no
+  // longer exists, instead of naming the variable that decides it. So the
+  // variable is required and its absence says what to set.
+  const wanted = env("RENDER_SERVICE");
+  if (!wanted) {
+    console.error("Thieu RENDER_SERVICE hoac RENDER_SERVICE_ID trong .env.");
+    console.error("Dat mot trong hai: RENDER_SERVICE_ID (id cua service) hoac RENDER_SERVICE (ten service).");
+    throw new Error("Khong xac dinh duoc service Render.");
+  }
   // The ?name= filter only matches the exact service name and returns nothing
   // when it differs, so list everything and match here where the naming can be
   // normalised and the failure can show the user what actually exists.

@@ -192,6 +192,25 @@ test('ảnh preview sinh theo từng sản phẩm', async () => {
   assert.equal((await get(`/og/khong-ton-tai.svg`)).status, 404);
 });
 
+test('ảnh preview nói đúng ngôn ngữ và không bịa giá', async () => {
+  // The footer sentence used to be written into the SVG template in Vietnamese,
+  // so the one card an English product page could hand a crawler was the one
+  // page that ignored the language it was rendered for.
+  const vi = await (await get(`/og/${product.slug}.svg`)).text();
+  const en = await (await get(`/og/${product.slug}.svg?lang=en`)).text();
+  assert.ok(vi.includes('Giấy phép vĩnh viễn'), 'card tiếng Việt phải có chân trang tiếng Việt');
+  assert.ok(en.includes('One-time licence'), 'card ?lang=en phải có chân trang tiếng Anh');
+  assert.ok(!en.includes('Giấy phép'), 'card ?lang=en không được còn câu tiếng Việt');
+
+  // The shop-wide card passes no price, and money(0) happily renders "0 ₫" —
+  // an invented number, on the card that exists to introduce the shop.
+  const cardSlug = 'sonvudev';
+  const siteCard = await (await get(`/og/${cardSlug}.svg`)).text();
+  assert.ok(siteCard.includes('SonVuDev'), 'card của shop phải có tên shop');
+  assert.ok(!siteCard.includes('0 ₫'), 'card của shop không được hiện giá bịa');
+  assert.ok(!siteCard.includes('· v1.0'), 'card của shop không được hiện phiên bản bịa');
+});
+
 test('trang chủ có nội dung tiếng Việt ngay trong HTML, không cần chạy JavaScript', async () => {
   const html = await text('/');
   // Everything used to be an empty <span data-i18n="...">, which is what a

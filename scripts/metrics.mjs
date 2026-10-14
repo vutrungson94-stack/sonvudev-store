@@ -61,6 +61,13 @@ const appSource = srcText[srcFiles.findIndex((f) => relative(f) === 'src/app.js'
 const i18nText = publicText[publicJs.findIndex((f) => relative(f) === 'public/i18n.js')] || '';
 
 const countCopies = (text, pattern) => (text.match(pattern) || []).length;
+
+// Shared-helper implementations are counted per file, never per occurrence: one
+// file holding the marker twice is still one copy, and the money formatter holds
+// it twice by design (USD styled, everything else grouped). See the note on the
+// escCopies row for what counting occurrences cost the first time.
+const filesWithMarker = (serverTexts, browserTexts, pattern) =>
+  [...serverTexts, ...browserTexts].filter((text) => pattern.test(text)).length;
 const totalTests = testText.reduce((sum, source) => sum + countCopies(source, /^test\(/gm), 0);
 const routes = new Set([...appSource.matchAll(/app\.(get|post|patch|put|delete)\(\s*"([^"]+)"/g)]
   .map((match) => `${match[1].toUpperCase()} ${match[2]}`));
@@ -93,8 +100,31 @@ const rows = [
 // and public/format.js (browsers, loaded before every page that needs it).
 // public/i18n.js, public/admin.js and public/related.js all call through
 // window.SVDFormat instead of carrying their own.
-['escCopies', [...srcText, ...publicText].reduce((n, s) => n + countCopies(s, /&quot;/g), 0), 'down', 'bản sao hàm escape'],
-['moneyCopies', [...srcText, ...publicText].reduce((n, s) => n + countCopies(s, /style:\s*['"]currency['"]/g), 0), 'down', 'bản sao hàm định dạng tiền'],
+//
+// Counted PER FILE, not per occurrence, and that correction is not cosmetic. The
+// money formatter styles USD one way and everything else another, so a single
+// implementation contains the marker twice — the counter used to report four
+// for two implementations, and the number then rose by two when both runtimes
+// gained the second branch while nothing was duplicated at all. A metric whose
+// value moves for a reason unrelated to what it claims to count is worse than
+// no metric: the builds read it, and one wrong direction is all a reader needs
+// to stop trusting the rest of the list.
+['escCopies', filesWithMarker(srcText, publicText, /&quot;/), 'down', 'bản sao hàm escape'],
+['moneyCopies', filesWithMarker(srcText, publicText, /style:\s*['"]currency['"]/), 'down', 'bản sao hàm định dạng tiền'],
+// The same counter for the two helpers that were shared across three call
+// sites in two runtimes and counted nowhere: initials (the product icon) and
+// the byte formatter (the release file size). Both existed as src/pages.js
+// (server), public/app.js (browser card) and public/admin.js (panel) copies,
+// and the panel's icon had already drifted — it took the first two characters
+// of a name, so "Ram Cleaner" showed "RA" against the storefront's "RC".
+//
+// Counted the same way esc and money are: by a marker string only a real
+// implementation contains, so a thunk that calls the shared one — the shape
+// app.js and admin.js now use — does not count, and a third copy fails the
+// build. Two are expected, one per runtime, held in step by the tests in
+// test/shared-libs.test.js.
+['initialsCopies', filesWithMarker(srcText, publicText, /["']SV["']/), 'down', 'bản sao hàm initials'],
+['sizeCopies', filesWithMarker(srcText, publicText, /["']KB["']/), 'down', 'bản sao hàm định dạng byte'],
   ['i18nKeys', countCopies(i18nText, /^\s{4}'[\w.]+':/gm), 'up', 'khóa i18n'],
   // A page that allows indexing is a page a crawler can be pointed at. Losing one
   // is a silent loss of traffic that no other check would notice.
@@ -210,12 +240,33 @@ async function hasRegressionsAgainstBaseline(measurements) {
 
 async function analyzeTrends(measurements) {
   const MAX_HISTORY = 50;
-  let trends = { history: [] };
+  // Which instrument produced a snapshot. Bump this whenever a row's definition
+  // changes — a series measured by two different instruments is not a series,
+  // it is two short ones glued together, and every statistic below quietly
+  // assumes they are comparable.
+  //
+  // This was not hypothetical: moneyCopies counted occurrences until the formatter
+  // gained its second branch, at which point the number rose by two while the
+  // amount of duplicated code fell, and the trend analysis reported a metric
+  // "trending the wrong way" for a change that was an improvement. The fix is
+  // counting per file; the reason this version exists is so the next change of
+  // definition cannot spend weeks alerting on the mismatch before it works its
+  // way out of the window.
+  const SCHEMA = 3;
+  let trends = { schema: SCHEMA, history: [] };
+  let carriedOver = 0;
   if (await exists(trendsFile)) {
     try {
-      trends = JSON.parse(await readFile(trendsFile, 'utf8'));
+      const stored = JSON.parse(await readFile(trendsFile, 'utf8'));
+      if (stored?.schema === SCHEMA && Array.isArray(stored.history)) {
+        trends = stored;
+      } else if (Array.isArray(stored?.history) && stored.history.length) {
+        carriedOver = stored.history.length;
+      }
     } catch {
-      // ignore corrupt file
+      // A corrupt trends file is not a reason to fail a build over a cache: the
+      // measurements are recomputed from source every run, and the next snapshot
+      // starts a fresh series.
     }
   }
 
@@ -226,6 +277,7 @@ async function analyzeTrends(measurements) {
     ),
   };
 
+  trends.schema = SCHEMA;
   trends.history.push(snapshot);
   if (trends.history.length > MAX_HISTORY) {
     trends.history = trends.history.slice(-MAX_HISTORY);
@@ -234,8 +286,13 @@ async function analyzeTrends(measurements) {
   await writeFile(trendsFile, `${JSON.stringify(trends, null, 2)}\n`);
 
   console.log('\n[trends] Analyzing ' + trends.history.length + ' snapshots...');
+  if (carriedOver) {
+    console.log(`[trends] Bỏ ${carriedOver} snapshot cũ: đo bằng định nghĩa chỉ số khác (schema ${SCHEMA}).`);
+    console.log('[trends] Xem SCHEMA trong scripts/metrics.mjs — đổi định nghĩa một chỉ số là đổi thiết bị đo, chuỗi cũ không so được với chuỗi mới.');
+  }
 
   const alerts = [];
+  const outOfControl = [];
   for (const [key, entry] of Object.entries(measurements)) {
     const direction = entry.direction;
     const values = trends.history.map((h) => h.measurements[key]).filter((v) => v !== undefined);
@@ -270,6 +327,49 @@ async function analyzeTrends(measurements) {
         warning: wrongDirection ? 'xu hướng ngược chiều' : 'tăng tốc sai chiều',
       });
     }
+
+    // Statistical process control: a snapshot outside three sigma of the mean is
+    // a special cause, not noise, and it is worth naming even when the value is
+    // one the gate happily accepts. This is the half of CMMI Level 5 that
+    // regression slopes cannot do on their own — a slope answers "which way is
+    // this moving", a control limit answers "is this even stable enough for a
+    // slope to mean anything".
+    //
+    // Reported and never made a failure: a metric that leaves the band is a
+    // signal to look, not proof of a defect, and a build that goes red on
+    // statistics gets bypassed rather than read.
+    const mean = overallAvg;
+    const variance = values.reduce((sum, v) => sum + (v - mean) ** 2, 0) / n;
+    const sigma = Math.sqrt(variance);
+    // A run of identical values has sigma 0, where everything that differs is
+    // infinitely far out. The gate direction already covers that case, so the
+    // limit is only computed where the metric actually varies.
+    if (sigma > 0) {
+      const limit = 3 * sigma;
+      const escapes = values
+        .map((value, index) => ({ value, index }))
+        .filter(({ value }) => Math.abs(value - mean) > limit);
+      for (const { value, index } of escapes) {
+        outOfControl.push({
+          key,
+          label: label[key],
+          value,
+          mean: mean.toFixed(1),
+          sigma: sigma.toFixed(2),
+          snapshot: index + 1,
+        });
+      }
+    }
+  }
+
+  if (outOfControl.length) {
+    console.error('\n[trends] NGOÀI KIỂM SOÁT THỐNG KÊ — snapshot lệch quá 3σ so với mean (nguyên nhân đặc biệt, không phải nhiễu):');
+    for (const item of outOfControl) {
+      console.error(
+        `  ${item.key.padEnd(19)} snapshot #${item.snapshot} = ${String(item.value).padStart(4)} | mean=${String(item.mean).padStart(6)} | 3σ=${(3 * Number(item.sigma)).toFixed(2).padStart(7)}`,
+      );
+    }
+    console.error('  Chỉ là tín hiệu để xem, không chặn build: một chỉ số ra khỏi dải kiểm soát là lời mời điều tra nguyên nhân gốc.');
   }
 
   if (alerts.length) {

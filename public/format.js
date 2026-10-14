@@ -1,9 +1,13 @@
-// The one escape and money implementation every browser page shares.
+// The one escape, money, initials and size implementation every browser page
+// shares.
 //
 // admin.js, related.js and i18n.js each carried their own copy, and two of them
 // had already drifted: admin formatted VND without a currency argument and
 // related.js grouped prices for the wrong locale on English pages. One order
-// read differently depending on which screen showed it.
+// read differently depending on which screen showed it. app.js and admin.js
+// also had a private copy of the product initials and the byte formatter, and
+// the admin copy of the byte formatter had already lost a decimal place the
+// server's keeps. Both now live here beside the two that were always shared.
 //
 // One plain classic script rather than a module, because these pages run under
 // script-src 'self' with no bundler: every page loads this file first, then
@@ -36,5 +40,17 @@
       return amount + ' ' + (currency || '');
     }
   }
-  window.SVDFormat = { esc: esc, money: money };
+  function initials(name) {
+    return String(name || 'SV').split(/\s+/).map(function (p) { return p[0]; }).join('').slice(0, 2).toUpperCase();
+  }
+  function formatBytes(bytes) {
+    var value = Number(bytes) || 0;
+    if (value <= 0) return '';
+    var units = ['B', 'KB', 'MB', 'GB'];
+    var size = value;
+    var unit = 0;
+    while (size >= 1024 && unit < units.length - 1) { size /= 1024; unit += 1; }
+    return (size >= 100 || unit === 0 ? size.toFixed(0) : size.toFixed(1)) + ' ' + units[unit];
+  }
+  window.SVDFormat = { esc: esc, money: money, initials: initials, formatBytes: formatBytes };
 })();

@@ -18,6 +18,7 @@ import { fileURLToPath } from "node:url";
 import dotenv from "dotenv";
 import { corsDiff, isFixtureHost } from "./lib/cors.mjs";
 import { walkProjectFiles } from "./lib/files.mjs";
+import { stripComments } from "./lib/source.mjs";
 
 const rootFlag = process.argv.indexOf("--root");
 const root = rootFlag > -1
@@ -789,11 +790,12 @@ for (const name of ["app.js", "store.js", "orders.js", "payments.js", "r2.js", "
 // Comments are removed before the scan. A key that appears only in prose is not
 // a key anyone sends, and reading documentation as code produced thirty-eight
 // phantom usages on the first run of this check — the same mistake
-// objectLiteralAt above made, in a different parser.
-const withoutComments = (source) => source.replace(/\/\*[\s\S]*?\*\//g, "").replace(/(^|[^:])\/\/.*$/gm, "$1");
+// objectLiteralAt above made, in a different parser. The stripper is the shared
+// one in scripts/lib/source.mjs: this file used to carry two of its own, and the
+// regex one could not tell a URL inside a string from a comment.
 
 for (const [name, source] of keyProducers) {
-  for (const match of withoutComments(source).matchAll(/refuse\("([\w.]+)"/g)) {
+  for (const match of stripComments(source).matchAll(/refuse\("([\w.]+)"/g)) {
     if (!declared.has(match[1])) {
       fail("khoá i18n chưa định nghĩa", name, `máy chủ gửi "${match[1]}" mà từ điển không có — trình duyệt sẽ hiện tiếng Việt`);
     }
@@ -935,15 +937,16 @@ const suspects = [...PHRASES.keys()].sort((a, b) => b.length - a.length);
 const customerFacing = [...htmlFiles, ...scriptFiles.filter((name) => name !== "i18n.js")].map((name) => path.join("public", name));
 // Comments are stripped first, and only comments: they are English, and a save
 // handler documented in prose is full of "that" and "them". Strings are kept,
-// because that is where the customer-facing text lives.
-const stripComments = (source) => source
-  .replace(/\/\*[\s\S]*?\*\//g, " ")
-  .replace(/(^|[^:])\/\/[^\n]*/g, "$1 ");
+// because that is where the customer-facing text lives. The stripper is the
+// shared scanner in scripts/lib/source.mjs, which unlike the regex this used to
+// have keeps a URL inside a string out of its way and keeps every offset where
+// it was.
+const customerFacingText = (relative, raw) => stripComments(relative.endsWith(".js")
+  ? raw
+  : raw.replace(/<script[\s\S]*?<\/script>/gi, " ").replace(/<style[\s\S]*?<\/style>/gi, " ").replace(/<!--[\s\S]*?-->/g, " "));
 for (const relative of customerFacing) {
   const raw = await read(relative);
-  const text = stripComments(relative.endsWith(".js")
-    ? raw
-    : raw.replace(/<script[\s\S]*?<\/script>/gi, " ").replace(/<style[\s\S]*?<\/style>/gi, " ").replace(/<!--[\s\S]*?-->/g, " "));
+  const text = customerFacingText(relative, raw);
   for (const phrase of suspects) {
     const match = new RegExp(`(?<![\\wÀ-ỹ])${phrase.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}(?![\\wÀ-ỹ])`, "i").exec(text);
     if (match) fail("tiếng Việt không dấu", relative, `"${match[0]}" — viết đúng là "${PHRASES.get(match[0].toLowerCase())}"`);

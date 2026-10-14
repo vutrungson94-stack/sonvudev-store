@@ -22,7 +22,15 @@
       "direction": "down"
     },
     "moneyCopies": {
-      "value": 4,
+      "value": 2,
+      "direction": "down"
+    },
+    "initialsCopies": {
+      "value": 2,
+      "direction": "down"
+    },
+    "sizeCopies": {
+      "value": 2,
       "direction": "down"
     },
     "i18nKeys": {

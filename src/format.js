@@ -1,4 +1,4 @@
-// The two formatters that every HTML-producing module in this project needs.
+// The formatters every HTML-producing module in this project needs.
 //
 // They were each written twice in this repository — once in pages.js and once in
 // notify.js, byte for byte identical — and the reason two identical copies of an
@@ -7,9 +7,42 @@
 // quietly disagreeing about what counts as escaped, and the two are used in the
 // same sentence: the page a crawler reads and the email a buyer reads.
 //
+// initials and formatBytes are here for the same reason: they were written once
+// for the server card, once for the browser card and once for the admin panel,
+// and the admin panel's size formatter had already dropped a decimal place the
+// server one kept.
+//
 // Kept free of imports on purpose. Anything that needs to know the site URL, the
 // catalogue or the configuration does not belong here, and a module with no
 // dependencies cannot end up in a cycle.
+
+/**
+ * The initials shown in place of a product icon before its image exists.
+ *
+ * Used by the server-rendered catalogue card, the browser catalogue and the
+ * admin panel — three call sites in two runtimes, which is why it lives here
+ * next to the other shared formatters rather than being written a fourth time.
+ * The browser twin in public/format.js is held in step by scripts/metrics.mjs,
+ * the same way esc and money are.
+ */
+export const initials = (name) => String(name || "SV").split(/\s+/).map((part) => part[0]).join("").slice(0, 2).toUpperCase();
+
+/**
+ * A release file's size, in the unit a person reads it in.
+ *
+ * Bytes below 1024 are shown whole — "999 B", not "999.0 B" — and anything at
+ * or above a hundred in a unit drops to one decimal so "1.0 GB" does not sit
+ * beside "120 MB" and look like it rounds worse than it does.
+ */
+export const formatBytes = (bytes) => {
+  const value = Number(bytes) || 0;
+  if (value <= 0) return "";
+  const units = ["B", "KB", "MB", "GB"];
+  let size = value;
+  let unit = 0;
+  while (size >= 1024 && unit < units.length - 1) { size /= 1024; unit += 1; }
+  return `${size >= 100 || unit === 0 ? size.toFixed(0) : size.toFixed(1)} ${units[unit]}`;
+};
 
 /**
  * Escapes a value for interpolation into HTML text or an attribute value.

@@ -480,9 +480,14 @@ app.get("/og/:slug.svg", async (req, res) => {
   // The price used to be written into this line as "Từ 99.000₫" and the platform
   // and version as literals, so a shop that changed either kept publishing the
   // old numbers. There is no price here at all: a card that invents a number is
-  // worse than a card that states none.
+  // worse than a card that states none. The platform, version and price
+  // fallbacks live in the generator, so this call no longer repeats them.
+  //
+  // The language is an optional query parameter rather than a second route: the
+  // card renders in the language it is asked for, and an English page that
+  // hands this URL to a crawler can say so.
   if (req.params.slug === siteCardSlug) {
-    return res.set("Cache-Control", "public, max-age=3600").type("image/svg+xml").send(renderOgImage({ name: env.brand.name, platform: "Windows", version: "1.0", price: 0, currency: "VND" }));
+    return res.set("Cache-Control", "public, max-age=3600").type("image/svg+xml").send(renderOgImage({ name: env.brand.name }));
   }
   const product = await getProductBySlug(req.params.slug);
   // isSellable rather than a second copy of its rule. The rule — active, has a
@@ -493,7 +498,7 @@ app.get("/og/:slug.svg", async (req, res) => {
   // renders for something with no file behind it.
   if (!isSellable(product)) return res.status(404).type("text/plain").send("Not found");
   res.set("Cache-Control", "public, max-age=3600");
-  res.type("image/svg+xml").send(renderOgImage(product));
+  res.type("image/svg+xml").send(renderOgImage(product, req.query.lang === "en" ? "en" : "vi"));
 });
 
 app.get("/sitemap.xml", async (_req, res) => {

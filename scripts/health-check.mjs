@@ -207,7 +207,7 @@ const defaultBase = async () => {
  * @param {string} [argument] a base URL, or undefined to read APP_URL from .env
  * @returns {Promise<number>} a process exit code
  */
-export async function main(argument) {
+async function main(argument) {
   const base = (argument || '').trim().replace(/\/$/, '') || await defaultBase();
   const url = `${base}/api/health`;
 

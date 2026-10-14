@@ -70,7 +70,7 @@ export const isExcludedDir = (name) => (
  * @param {string} name a single file name
  * @returns {boolean} true when the file should be skipped
  */
-export const isExcludedFile = (name) => name.startsWith('.tmp-');
+const isExcludedFile = (name) => name.startsWith('.tmp-');
 
 /**
  * Recursively collects files under a directory, skipping generated directories.

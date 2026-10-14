@@ -12,7 +12,7 @@
 // attaches it is a second place to get that wrong.
 import { env, isConfigured } from "./config.js";
 
-export function supabaseHeaders() {
+function supabaseHeaders() {
   return {
     apikey: env.supabase.serviceRoleKey,
     "Content-Type": "application/json",

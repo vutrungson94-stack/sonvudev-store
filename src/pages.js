@@ -1,6 +1,6 @@
 import { env } from "./config.js";
 import { isSellable } from "./store.js";
-import { esc, money } from "./format.js";
+import { esc, money, formatBytes, initials } from "./format.js";
 import { commitHash } from "./lib/git.mjs";
 
 // The commit that produced this process, for CSS cache-busting. It used to be a
@@ -51,16 +51,6 @@ const absolute = (path) => `${site()}${path.startsWith("/") ? path : `/${path}`}
  * The name is escaped for HTML because it lands inside page markup and inside
  * structured data, and it comes from configuration like anything else.
  */
-export const formatBytes = (bytes) => {
-  const value = Number(bytes) || 0;
-  if (value <= 0) return "";
-  const units = ["B", "KB", "MB", "GB"];
-  let size = value;
-  let unit = 0;
-  while (size >= 1024 && unit < units.length - 1) { size /= 1024; unit += 1; }
-  return `${size >= 100 || unit === 0 ? size.toFixed(0) : size.toFixed(1)} ${units[unit]}`;
-};
-
 export const fillCopy = (value) => {
   const text = String(value ?? "");
   if (!text.includes("{{")) return text;
@@ -104,7 +94,7 @@ export function productSummary(product, max = 155) {
  * @param {string} lang "en" or anything else for Vietnamese
  * @returns {string}
  */
-export const metaDescriptionFor = (product, lang = "vi", max = 155) => {
+const metaDescriptionFor = (product, lang = "vi", max = 155) => {
   const own = fillCopy(String(product.seoDescription || "").trim());
   if (own) return own.length <= max ? own : `${own.slice(0, own.lastIndexOf(" ") || max)}…`;
   if (lang !== "en") return productSummary(product, max);
@@ -181,7 +171,7 @@ export const iconLinkMarkup = () => ICON_LINKS.map((link) => {
  * scripts/make-og-image.mjs and committed, so neither the build nor the server
  * needs an image library to produce a shareable card.
  */
-export const OG_IMAGE_PATH = "/og.png";
+const OG_IMAGE_PATH = "/og.png";
 
 /**
  * Every page og:image, og:image:width and og:image:height have to agree, so the
@@ -244,7 +234,7 @@ const trustBlock = (product, copy) => {
   return `<section class="detail-block trust"><h2>${esc(copy.trustHeading)}</h2><ul class="trust-list">${rows.join("")}</ul></section>`;
 };
 
-export const productSchema = (product, lang = "vi") => ({
+const productSchema = (product, lang = "vi") => ({
   "@type": "SoftwareApplication",
   "@id": absolute(productUrl(product.slug, lang)) + "#software",
   name: `${product.name} ${product.version ? `v${product.version}` : ""}`.trim(),
@@ -276,7 +266,7 @@ export const productSchema = (product, lang = "vi") => ({
   },
 });
 
-export const breadcrumbSchema = (product, lang = "vi") => {
+const breadcrumbSchema = (product, lang = "vi") => {
   const labels = lang === "en"
     ? { home: "Home", products: "Products", here: product.name }
     : { home: "Trang chủ", products: "Sản phẩm", here: product.name };
@@ -298,7 +288,7 @@ export const breadcrumbSchema = (product, lang = "vi") => {
  * highest-yield thing on the page for an assistant: it is the shape of text these
  * systems quote, and it is the shape they can verify against the page itself.
  */
-export const faqSchema = (product, lang = "vi") => {
+const faqSchema = (product, lang = "vi") => {
   const window = env.orders.paymentWindowHours;
   const entries = lang === "en" ? [
     ["How do I receive the file?", "Pay by bank transfer or PayPal and the download link is emailed to you straight away. Nothing is queued for manual approval."],
@@ -329,7 +319,7 @@ export const faqSchema = (product, lang = "vi") => {
 // recovery form, which robots.txt disallows and which serves noindex. Telling a
 // search engine the site's search feature is a page it must not read is a
 // contradiction in the markup, so the action is gone.
-export const websiteSchema = () => ({
+const websiteSchema = () => ({
   "@type": "WebSite",
   "@id": `${site()}/#website`,
   name: brand(),
@@ -469,6 +459,12 @@ export const brandWordmark = () => {
  * passed every gate. One list, exported from the module that also builds the
  * values, so adding a token in one place updates the renderer, the audit and
  * the tests together.
+ *
+ * PAGE_TOKENS and COPY_TOKENS stay `export const` even though almost nothing
+ * imports them: scripts/audit-web.mjs reads them out of this file as *text*
+ * (see readTokenList there), so the literal words `export const` are the
+ * contract. The exports the audit does not read and nothing imports were
+ * removed — an export with no reader is an API nobody agreed to.
  */
 export const PAGE_TOKENS = [
   "site", "brandName", "brandWordmark", "support", "paymentWindowHours",
@@ -590,7 +586,7 @@ export const verificationFile = (prefix, suffix, token) => {
 };
 
 /** One product's canonical address. Vietnamese is the root; English sits under /en. */
-export const productUrl = (slug, lang = "vi") => (lang === "en" ? `/en/product/${slug}` : `/product/${slug}`);
+const productUrl = (slug, lang = "vi") => (lang === "en" ? `/en/product/${slug}` : `/product/${slug}`);
 
 /**
  * The legal-entity line, or nothing at all.
@@ -776,8 +772,6 @@ export const renderStats = (products) => {
   };
 };
 
-const initials = (name) => String(name || "SV").split(/\s+/).map((part) => part[0]).join("").slice(0, 2).toUpperCase();
-
 /**
  * The words on a product page, in both languages.
  *
@@ -814,6 +808,10 @@ export const COPY_VI = {
   fileSizeLabel: "Kích thước tệp tải về",
   buyNow: "Mua ngay",
   buyNote: "Giấy phép vĩnh viễn, không phí thuê bao. Thanh toán chuyển khoản hoặc PayPal.",
+  // The footer on the link-preview card. It was written into the SVG template in
+  // Vietnamese, so the one card an English page can hand a crawler was the one
+  // page on the site that ignored the language it was rendered for.
+  ogFooter: "Giấy phép vĩnh viễn · Tải ngay sau khi thanh toán",
   pointDownload: "Tải ngay sau khi thanh toán",
   pointLookup: "Mã tra cứu gửi qua email",
   pointRefund: "Hoàn tiền nếu file lỗi",
@@ -849,6 +847,7 @@ export const COPY_EN = {
   fileSizeLabel: "Download file size",
   buyNow: "Buy now",
   buyNote: "One-time licence, no subscription. Pay by bank transfer or PayPal.",
+  ogFooter: "One-time licence · Download immediately after payment",
   pointDownload: "Download immediately after payment",
   pointLookup: "Lookup code sent by email",
   pointRefund: "Refunded if the file is broken",
@@ -1081,19 +1080,39 @@ ${reviews.length ? `<section class="detail-block reviews"><h2>${copy.reviewsHead
  * LinkedIn and most AI answer engines refuse SVG and show nothing. og:image
  * points at the committed raster card instead, and this stays available for the
  * crawlers that do handle SVG.
+ *
+ * The footer sentence is language-aware for the same reason the page is: the
+ * Vietnamese sentence used to be written straight into the template, which made
+ * the card the one place on an English page that still spoke Vietnamese.
+ *
+ * The price line is only drawn when a price is actually known. The shop-wide
+ * card passes no price, and money(0) renders "0 ₫" — an invented number, on the
+ * card that exists to introduce the shop.
  */
-export function renderOgImage(product) {
+ export function renderOgImage(product, lang = "vi") {
   const name = String(product.name || "");
   const lines = name.length > 34 ? [name.slice(0, 34), name.slice(34, 68)] : [name];
+  const copy = getCopy(lang);
+  const price = product.price === undefined || product.price === null || product.price === ""
+    ? ""
+    : `<text x="90" y="556" fill="#ffffff" font-family="Helvetica, Arial, sans-serif" font-size="44" font-weight="600">${esc(money(product.price, product.currency))}</text>`;
+  // The platform and version line exists because a product has both. The
+  // shop-wide card has neither, and the fallbacks this replaces printed
+  // "Windows · v1.0" — an invented platform and an invented version, on the one
+  // card that is not about a release at all. A missing line is honest.
+  const meta = [product.platform, product.version && `v${product.version}`].filter(Boolean).join(" · ");
+  const metaLine = meta
+    ? `<text x="90" y="${270 + lines.length * 74 + 26}" fill="#8fd3b2" font-family="Helvetica, Arial, sans-serif" font-size="34">${esc(meta)}</text>`
+    : "";
   return `<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="630" viewBox="0 0 1200 630" role="img" aria-label="${esc(name)}">
 <defs><linearGradient id="bg" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#0f2a22"/><stop offset="1" stop-color="#163a2f"/></linearGradient></defs>
 <rect width="1200" height="630" fill="url(#bg)"/>
 <circle cx="1080" cy="90" r="220" fill="#1d4a3c" opacity="0.55"/>
 <text x="90" y="150" fill="#4fbf8b" font-family="Helvetica, Arial, sans-serif" font-size="30" font-weight="600" letter-spacing="5">${esc(brand().toUpperCase())}</text>
-${lines.map((line, index) => `<text x="90" y="${270 + index * 74}" fill="#ffffff" font-family="Helvetica, Arial, sans-serif" font-size="62" font-weight="700">${esc(line)}</text>`).join("")}
-<text x="90" y="${270 + lines.length * 74 + 26}" fill="#8fd3b2" font-family="Helvetica, Arial, sans-serif" font-size="34">${esc(product.platform || "Windows")} · v${esc(product.version || "1.0")}</text>
-<text x="90" y="556" fill="#ffffff" font-family="Helvetica, Arial, sans-serif" font-size="44" font-weight="600">${esc(money(product.price, product.currency))}</text>
-<text x="90" y="596" fill="#7fb39c" font-family="Helvetica, Arial, sans-serif" font-size="24">Giấy phép vĩnh viễn · Tải ngay sau khi thanh toán</text>
+ ${lines.map((line, index) => `<text x="90" y="${270 + index * 74}" fill="#ffffff" font-family="Helvetica, Arial, sans-serif" font-size="62" font-weight="700">${esc(line)}</text>`).join("")}
+${metaLine}
+${price}
+<text x="90" y="596" fill="#7fb39c" font-family="Helvetica, Arial, sans-serif" font-size="24">${esc(copy.ogFooter)}</text>
 </svg>`;
 }
 
@@ -1200,7 +1219,7 @@ export { esc };
  * FAQPage is included because the homepage's own questions are the most-asked
  * ones on the site, and they are asked in the wording people actually use.
  */
-export function jsonLdGraph(products = []) {
+function jsonLdGraph(products = []) {
   return JSON.stringify({
     "@context": "https://schema.org",
     "@graph": [

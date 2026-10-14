@@ -42,7 +42,13 @@ const paragraphs = (text) => String(text || '')
   .filter(Boolean)
   .map((block) => `<p>${esc(block).replace(/\n/g, '<br>')}</p>`)
   .join('');
-const initials = (n) => String(n || 'SV').split(/\s+/).map((p) => p[0]).join('').slice(0, 2).toUpperCase();
+// initials used to be written out here in full, next to the copy the server
+// renders the catalogue cards with. Two copies of a two-line function are not
+// wrong today, but the card on the server and the card in the browser are the
+// same card, and a product whose initials split differently after a rename is
+// a product that looks like two products. The shared implementation is loaded
+// before this file (format.js, then i18n.js, then this).
+const initials = (n) => window.SVDFormat.initials(n);
 
 function toastMsg(message, isError = false) {
   toast.textContent = message;

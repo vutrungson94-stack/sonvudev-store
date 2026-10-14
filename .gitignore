@@ -12,6 +12,10 @@ node_modules_stale_*/
 build-reports/
 publish-output/
 .gbuild-state.gbuildstate
+# The build tool takes a lock beside its state file. Left out of the first
+# pattern it shows up as a new untracked file after every build, and an
+# untracked file nobody ignores is one commit away from being committed.
+.gbuild-state.gbuildstate.lock
 --help/
 
 # Generated at build time from build-reports/ and served from public/. Committing

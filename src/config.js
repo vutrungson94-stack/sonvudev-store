@@ -27,7 +27,7 @@ const value = (name, fallback = "") => (process.env[name] || fallback).trim();
  * Exported so that isConfigured, the production check and anything else asking the
  * same question read the same value.
  */
-export const NOT_SET = "Chưa cập nhật";
+const NOT_SET = "Chưa cập nhật";
 
 /**
  * Whether a value is a placeholder rather than something somebody filled in.

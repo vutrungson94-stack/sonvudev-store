@@ -6,7 +6,7 @@ const sanitizeQrText = (value) => String(value || "").replace(/[^\w\s\-/]/g, " "
  * Builds the VietQR image URL for a bank transfer order.
  * Bank BIN + account number come from config so the storefront never hard-codes them.
  */
-export function vietQrUrl({ amount, transferNote }) {
+function vietQrUrl({ amount, transferNote }) {
   if (!isConfigured.bank) return null;
   const bin = String(env.bank.bin || "").replace(/\D/g, "");
   const account = String(env.bank.accountNumber || "").replace(/\D/g, "");

@@ -43,6 +43,7 @@ import path from 'node:path';
 import { readFile, readdir } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 import { walkProjectFiles, isExcludedDir } from './lib/files.mjs';
+import { stripComments } from './lib/source.mjs';
 
 // Như audit-web.mjs: mặc định quét chính repo này, `--root <dir>` để quét
 // một bản sao fixture trong test mà không cần copy cả script sang.
@@ -50,47 +51,6 @@ const rootFlag = process.argv.indexOf("--root");
 const root = rootFlag > -1 && process.argv[rootFlag + 1]
   ? path.resolve(process.argv[rootFlag + 1])
   : path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
-
-/**
- * Removes comments while keeping string literals, and keeping byte offsets
- * roughly aligned so a reported line number still points at the right place.
- *
- * A block comment becomes newlines of the same length rather than nothing, which
- * is what keeps the line arithmetic in the caller honest.
- *
- * @param {string} source JavaScript source
- * @returns {string} the same text with comments blanked out
- */
-export const withoutComments = (source) => {
-  let out = '';
-  let quote = '';
-  for (let i = 0; i < source.length; i += 1) {
-    const char = source[i];
-    if (quote) {
-      out += char;
-      if (char === "\\") { out += source[i + 1] ?? ''; i += 1; continue; }
-      if (char === quote) quote = "";
-      continue;
-    }
-    if (char === "'" || char === '"' || char === "`") { quote = char; out += char; continue; }
-    if (char === "/" && source[i + 1] === "/") {
-      while (i < source.length && source[i] !== "\n") { out += " "; i += 1; }
-      out += "\n";
-      continue;
-    }
-    if (char === "/" && source[i + 1] === "*") {
-      while (i < source.length && !(source[i] === "*" && source[i + 1] === "/")) {
-        out += source[i] === "\n" ? "\n" : " ";
-        i += 1;
-      }
-      out += "  ";
-      i += 1;
-      continue;
-    }
-    out += char;
-  }
-  return out;
-};
 
 /** A reference that names a file, as opposed to a route or a template value. */
 const NAMED_FILE = /\.[a-z0-9]{2,5}$/i;
@@ -103,7 +63,7 @@ const lineOf = (source, index) => source.slice(0, index).split("\n").length;
  * @param {string} [scanRoot] thư mục cần quét, mặc định là root của repo
  * @returns {Promise<{problems: Array<object>, checked: number, fileCount: number}>}
  */
-export async function findCaseProblems(scanRoot = root) {
+async function findCaseProblems(scanRoot = root) {
   const files = await walkProjectFiles(scanRoot, { extensions: [".js", ".mjs", ".cjs", ".html"] });
 
   // The real names, grouped by lower-cased directory so a lookup can find the
@@ -156,7 +116,7 @@ export async function findCaseProblems(scanRoot = root) {
 
   for (const file of files) {
     const raw = await readFile(file, "utf8");
-    const source = file.endsWith(".html") ? raw : withoutComments(raw);
+    const source = file.endsWith(".html") ? raw : stripComments(raw);
 
     const references = [];
     if (file.endsWith(".html")) {

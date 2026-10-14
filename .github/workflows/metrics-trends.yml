@@ -1,0 +1,49 @@
+name: metrics-trends
+
+# One real measurement a week, committed to the repository.
+#
+# The metrics gate compares one run against a committed baseline, which answers
+# "did this change make it worse" and nothing else. "Is this week better than
+# last week" needs a series, and the series is worth what the snapshots in it
+# were measured with. So this measures on a schedule and commits the result, and
+# the analysis (slope, acceleration, control limits) runs in scripts/metrics.mjs
+# on every one of those runs.
+#
+# No fixture environment is needed here: the measurement counts lines of source,
+# and touches neither the server nor its configuration.
+on:
+  schedule:
+    - cron: "0 3 * * 1"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  trends:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    # Write access is the point of the job: a snapshot committed nowhere never
+    # reaches the next run's analysis.
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+      - run: npm ci
+      - name: measure and analyse
+        run: npm run metrics:trends
+      - name: commit the snapshot
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add metrics-trends.json
+          if git diff --cached --quiet; then
+            echo "No new snapshot: nothing moved since the last measurement."
+          else
+            git commit -m "ci: weekly metrics-trends snapshot"
+            git push
+          fi
