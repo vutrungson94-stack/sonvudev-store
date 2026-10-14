@@ -591,8 +591,20 @@ body.modal-open{overflow:hidden}
    (moi dong mot tu) con cot link chiem cung 494px, nhin nhu link nam tren logo.
    Flex wrap giu đúng thu tu DOM: brand + tagline truoc, link sau, khong bao gio
    đảo lenh, va tu xuống dòng khi hết chỗ. */
-.site-footer{display:flex;flex-wrap:wrap;align-items:center;gap:14px 28px}
+/* Pinned to the bottom of the viewport for the whole scroll — the mirror of the
+   header, and on the same shared class, so every page that has a footer has it
+   pinned. /about carried a sticky header for a year while /terms scrolled its
+   footer away; one rule is the fix for both bars at once.
+   The fill is the same near-opaque glass, hairline on top, because the bar
+   floats over the page while you read it. z-index 15 is deliberate and not a
+   guess: the checkout sheet and the toast sit at 20 and 30, and the footer is
+   the last element in the document — at the header's 20 an equal z-index would
+   be decided by document order and the footer would paint over the modal. */
+.site-footer{display:flex;flex-wrap:wrap;align-items:center;gap:10px 28px;position:sticky;bottom:0;z-index:15;background:rgba(247,249,248,.92);-webkit-backdrop-filter:blur(8px);backdrop-filter:blur(8px);border-top:1px solid var(--line);padding:10px 0}
 .site-footer p{flex:1 1 220px;max-width:340px;margin:0}
-.footer-links{flex:1 1 auto;justify-content:flex-end;flex-wrap:wrap;white-space:normal;row-gap:10px;column-gap:18px}
-.site-footer small{flex:1 1 100%;border-top:1px solid var(--line);padding-top:20px;margin-top:6px}
-@media(max-width:800px){.footer-links{justify-content:flex-start}}
+.footer-links{flex:1 1 auto;justify-content:flex-end;flex-wrap:wrap;white-space:normal;row-gap:8px;column-gap:18px}
+.site-footer small{flex:1 1 100%;border-top:1px solid var(--line);padding-top:8px;margin-top:2px}
+/* The bar eats its height from the reading area, so on a phone it stops forcing
+   a second full-width row: the copyright joins the flow instead of being pushed
+   onto its own line with a border. */
+@media(max-width:800px){.footer-links{justify-content:flex-start}.site-footer{gap:6px 16px}.site-footer small{flex:1 1 auto;border-top:0;padding-top:0;margin-top:0}}
