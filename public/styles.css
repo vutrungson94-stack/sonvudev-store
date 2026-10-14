@@ -375,7 +375,15 @@ body.modal-open{overflow:hidden}
 /* ── Trang chi tiết sản phẩm ────────────────────────────────────────────
    Rendered on the server so a crawler sees the whole page. No JavaScript is
    needed to read or buy from it. */
-.product-page .site-header{position:sticky;top:0;z-index:20}
+/* A sticky header needs a fill, and this one had position and a z-index without
+   one: the page scrolled up *behind* the bar, so every line of text sliding past
+   showed through it and the header became a strip of half-readable copy. The
+   404 page already styled its own sticky header with a solid fill, which is why
+   the two pages behaved differently for the same scroll. One rule now covers
+   both: nearly opaque, with a blur behind it so the content passing under is
+   hinted at rather than doubled, and a hairline to mark the edge against a
+   background of the same colour. */
+.product-page .site-header,.page-404 .site-header{position:sticky;top:0;z-index:20;background:rgba(247,249,248,.92);-webkit-backdrop-filter:blur(8px);backdrop-filter:blur(8px);border-bottom:1px solid var(--line)}
 .crumbs{display:flex;gap:8px;align-items:center;flex-wrap:wrap;padding:26px 0 8px;font-size:12px;color:var(--muted)}
 .crumbs a{color:var(--muted);text-decoration:none}
 .crumbs a:hover{color:var(--green)}
@@ -420,7 +428,6 @@ body.modal-open{overflow:hidden}
 .related-empty{font-size:13px;color:var(--muted);margin:0}
 
 /* ── Trang 404 ─────────────────────────────────────────────────────────── */
-.page-404 .site-header{position:sticky;top:0;z-index:20;background:#f6faf8}
 .notfound{max-width:640px;padding:70px 0 90px}
 .notfound h1{font:600 clamp(28px,4vw,42px)/1.15 'Space Grotesk';letter-spacing:-.035em;margin:10px 0 16px}
 .notfound-text{font-size:15.5px;line-height:1.72;color:#4b6159;margin:0 0 30px}

@@ -169,23 +169,36 @@ test('không có khoá pháp lý nào mồ côi, và không câu tiếng Việt 
   assert.deepEqual(orphaned, [],
     `khoá pháp lý không trang nào dùng: ${orphaned.join(', ')} — hoặc là câu đó chưa được gắn data-i18n, hoặc khoá thừa`);
 
-  // Paragraph text on these pages must be reachable by the switch. The attribute is
-  // allowed to sit on the <p> or on a <span> inside it — which is the pattern
-  // index.html already uses, and which the legal pages need because a clause like
-  // §1 wraps "a personal, non-transferable licence" in <strong>: putting data-i18n on
-  // the <p> would replace its textContent and throw the markup away.
+  // Paragraph and heading text on these pages must be reachable by the switch. The
+  // attribute is allowed to sit on the element itself or on a descendant — which is
+  // the pattern index.html already uses, and which the legal pages need because a
+  // clause like §1 wraps "a personal, non-transferable licence" in <strong>: putting
+  // data-i18n on the <p> would replace its textContent and throw the markup away.
   //
-  // So what is checked is whether the paragraph's whole text can change, which is what
-  // "contains a keyed element" means here — not whether one particular tag carries it.
-  const paragraphs = [...allHtml.matchAll(/<p[^>]*>([\s\S]*?)<\/p>/g)]
-    .map((m) => ({ markup: m[0], inner: m[1] }))
+  // The tags checked are the ones these pages actually write prose in, and that
+  // list is the point: <p> alone was the whole check for a while, and the About
+  // page's <h1> sat outside it, written straight into the HTML, for as long as the
+  // gate was green.
+  const blocks = [...allHtml.matchAll(/<(p|h1|h2|h3|li)[^>]*>([\s\S]*?)<\/\1>/g)]
+    .map((m) => ({ markup: m[0], inner: m[2] }))
     .filter(({ inner }) => /[a-zà-ỹ]{3,}/i.test(inner.replace(/<[^>]+>/g, '')));
-  const unkeyed = paragraphs
+  const unkeyed = blocks
     .filter(({ markup }) => !/data-i18n(-html)?/.test(markup))
-    .map(({ inner }) => inner.replace(/<[^>]+>/g, '').replace(/\s+/g, ' ').trim())
-    // Sentences the renderer fills server-side stay Vietnamese by design: a {{token}}
-    // inside one is the reason there is no dictionary entry for it.
-    .filter((text) => /[a-zà-ỹ]{3,}/i.test(text) && !text.includes('{{'));
+    .map(({ inner }) => inner.replace(/<[^>]+>/g, '').replace(/\s+/g, ' ').trim());
   assert.deepEqual(unkeyed, [],
     `câu tiếng Việt còn nằm thẳng trong HTML, nút đổi ngôn ngữ không tới được:\n  ${unkeyed.join('\n  ')}`);
+
+  // The browser tab. apply() walks the whole document, so a keyed <title> switches
+  // like anything else — but not one page used one: nine hardcoded Vietnamese
+  // strings, and the 404 used data-i18n-attr, which sets an *attribute* on the
+  // title element and therefore changed nothing at all. The tab was the first
+  // thing a reader saw of the page and the one place the switch never reached.
+  for (const name of LEGAL_PAGES) {
+    const title = /<title([^>]*)>([\s\S]*?)<\/title>/.exec(await page(name));
+    assert.ok(title, `${name} phải có <title>`);
+    assert.match(title[1], /data-i18n="/, `${name}: <title> phải mang data-i18n, không phải data-i18n-attr — attribute không đổi được chữ trên tab`);
+    assert.ok(!/data-i18n-attr/.test(title[1]), `${name}: <title> không được dùng data-i18n-attr`);
+    const key = /data-i18n="([\w.]+)"/.exec(title[1])[1];
+    assert.ok(vi.has(key), `${name}: khoá title "${key}" không có trong DICT.vi`);
+  }
 });

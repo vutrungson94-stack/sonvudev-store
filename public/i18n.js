@@ -38,6 +38,22 @@ const DICT = {
     'nav.products': 'Sản phẩm',
     'nav.home': 'Về trang chủ',
 
+    // The tab title of every page. A language switch that leaves the browser tab
+    // in Vietnamese is a switch that only half happened — the tab is the first
+    // thing a reader sees of a page and the last thing they look at when they
+    // come back to it. apply() walks the whole document, [data-i18n] on <title>
+    // included, so these keys were the only thing missing; the pages each carried
+    // a hardcoded Vietnamese string and no way to change it.
+    'title.home': 'Bật macro Excel & kiểm tra dung lượng USB | {brand}',
+    'title.about': 'Về chúng tôi — ai làm ra {brand} và vì sao',
+    'title.terms': 'Điều khoản sử dụng — {brand}',
+    'title.privacy': 'Chính sách bảo mật — {brand}',
+    'title.refund': 'Chính sách hoàn tiền — {brand}',
+    'title.lookup': 'Tra cứu đơn hàng — {brand}',
+    'title.order': 'Đơn hàng — {brand}',
+    'title.paypalReturn': 'Đang xác nhận thanh toán — {brand}',
+    'title.notfound': 'Không tìm thấy trang — {brand}',
+
     // Every refusal the API makes. The server sends the key and the Vietnamese
     // sentence together (src/refuse.js); the browser uses the key, so a visitor who
     // switched the shop to English is told what went wrong in English.
@@ -380,6 +396,10 @@ const DICT = {
     'about.nav.why': 'Vì sao',
     'about.nav.faq': 'Câu hỏi',
     'about.crumbs.home': 'Trang chủ',
+    // The h1 is two pieces because the brand name is a token the server
+    // substitutes and <em> styles: the Vietnamese sentence is a span the switch
+    // can reach, the brand is markup it must not touch.
+    'about.h1': 'Ai đứng sau',
     'about.lede': 'Một người viết phần mềm dùng cho công việc thật, rồi bán đúng những gì mình đã dùng. Không công ty, không nhà đầu tư, không đội quảng cáo.',
     'about.h2': 'Chúng tôi làm gì',
     'about.p1': 'Tiện ích và công cụ cho Windows, viết để giải quyết một việc cụ thể trong công việc văn phòng hoặc kỹ thuật. Mỗi sản phẩm trả lời đúng một câu hỏi: "vấn đề này thì làm sao?". Sản phẩm nào không trả lời được câu hỏi nào thì không lên cửa hàng.',
@@ -388,6 +408,13 @@ const DICT = {
     'about.p3': 'Không xóa gì trên máy bạn mà không nói trước. Sản phẩm nào có cài đặt đều có script hoàn tác. Sản phẩm nào chạy nền đều nói rõ nó tự khởi động cùng Windows và tự tắt thế nào.',
     'about.p4': 'File lỗi thì gửi lại hoặc hoàn tiền, không cần lý do. Một sản phẩm không làm việc thì bạn không nên trả tiền để dùng nó.',
     'about.h4': 'Hỏi chúng tôi',
+    // The ask-us paragraph is split around the mailto link: the address itself is
+    // a token from configuration, so the sentence is keyed on both sides of it
+    // rather than as a whole. It was the one paragraph on this page written
+    // straight into the HTML, and it is the paragraph a buyer with a question
+    // reads.
+    'about.ask': 'Mọi câu hỏi, kể cả "cái này có phù hợp với máy tôi không", đều trả lời được:',
+    'about.ask2': '. Chúng tôi không có chatbot, nên câu trả lời đến từ đúng người đã viết phần mềm.',
     'about.p5': 'Đơn hàng của bạn cũng tra cứu được tại',
     'about.p6': 'bằng mã đơn và email đã dùng khi mua.',
 
@@ -544,6 +571,19 @@ const DICT = {
     'announce.cta': 'Explore now',
     'nav.products': 'Products',
     'nav.home': 'Back to home',
+
+    // Tab titles, English side. Kept in the same order as the Vietnamese half so
+    // the two tables can be read against each other line by line — which is what
+    // the key-parity gate compares them with.
+    'title.home': 'Excel macros and USB capacity, sorted | {brand}',
+    'title.about': 'About us — who makes {brand} and why',
+    'title.terms': 'Terms of use — {brand}',
+    'title.privacy': 'Privacy policy — {brand}',
+    'title.refund': 'Refund policy — {brand}',
+    'title.lookup': 'Order lookup — {brand}',
+    'title.order': 'Your order — {brand}',
+    'title.paypalReturn': 'Confirming your payment — {brand}',
+    'title.notfound': 'Page not found — {brand}',
 
     'api.err.unauthorized': 'Not authorised.',
     'api.err.forbidden': 'The viewer role is read-only.',
@@ -821,6 +861,7 @@ const DICT = {
     'about.nav.why': 'Why us',
     'about.nav.faq': 'Questions',
     'about.crumbs.home': 'Home',
+    'about.h1': 'Who stands behind',
     'about.lede': 'One person writes software for real work, then sells exactly what they use themselves. No company, no investors, no ads team.',
     'about.h2': 'What we build',
     'about.p1': 'Utilities and tools for Windows, written to solve one specific job in office or technical work. Every product answers exactly one question: "how do I solve this?". A product that answers no question at all does not go on sale.',
@@ -829,6 +870,8 @@ const DICT = {
     'about.p3': 'We do not delete anything on your computer without telling you first. Anything that installs itself ships with an undo script. Anything that runs in the background tells you plainly that it starts with Windows, and how to switch it off.',
     'about.p4': 'If a file is broken we resend it or refund it, no reason needed. A product that does not do its job is not something you should be paying to use.',
     'about.h4': 'Ask us',
+    'about.ask': 'Every question is answered, including "will this work on my machine":',
+    'about.ask2': '. There is no chatbot here, so the answer comes from the person who wrote the software.',
     'about.p5': 'You can also look up your order at',
     'about.p6': 'with the order code and the email you paid with.',
 

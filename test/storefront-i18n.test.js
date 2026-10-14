@@ -230,6 +230,65 @@ test('chỉ trang chủ mới có nút đổi ngôn ngữ', () => {
     'CSS của nút đã bỏ phải bị gỡ — còn lại thì là quy tắc chết');
 });
 
+// The tab title, on every page that is not the admin panel.
+//
+// A language switch that leaves the browser tab in Vietnamese is a switch that only
+// half happened: the tab is the first thing a reader sees of a page and the label
+// they find it by again. All nine pages carried a hardcoded Vietnamese string, and
+// the 404 page carried the near-miss — data-i18n-attr="title:...", which sets an
+// *attribute* on the <title> element and therefore changed nothing at all. The gate
+// that was supposed to catch untranslated sentences only walked <p> elements, so a
+// <title> in the document head was outside its reach by construction.
+test('mọi trang đều đổi được tiêu đề tab', async () => {
+  const pages = ['index.html', 'about.html', 'terms.html', 'privacy.html', 'refund.html',
+    'lookup.html', 'order.html', '404.html', 'paypal-return.html'];
+
+  // The real dictionary, booted once. A regex over i18n.js source cannot tell a
+  // key that resolves from one that is spelled slightly differently, which is the
+  // whole failure mode here.
+  const { document } = createDom(IDS);
+  const res = await runScript(read('i18n.js'), {
+    document, window: {}, localStorage: { _v: {}, getItem: () => null, setItem() {}, removeItem() {} },
+  });
+  const I18N = res.window.I18N;
+
+  for (const name of pages) {
+    const html = read(name);
+    const title = /<title([^>]*)>/.exec(html);
+    assert.ok(title, `${name} phải có <title>`);
+    assert.match(title[1], /data-i18n="title\./, `${name}: <title> phải mang data-i18n trỏ tới khoá tiêu đề`);
+    assert.ok(!/data-i18n-attr/.test(title[1]),
+      `${name}: <title> không được dùng data-i18n-attr — attribute không đổi được chữ trên tab`);
+    const key = /data-i18n="([\w.]+)"/.exec(title[1])[1];
+    for (const lang of ['vi', 'en']) {
+      I18N.set(lang);
+      const value = I18N.t(key);
+      assert.notEqual(value, key, `${name}: khoá "${key}" không có trong bảng ${lang}`);
+      // A title that resolves to the Vietnamese text in the English table is the
+      // same bug wearing a working key.
+      if (lang === 'en') assert.ok(!/[à-ỹ]/.test(value),
+        `${name}: bảng tiếng Anh của "${key}" vẫn chứa tiếng Việt: ${value}`);
+    }
+    // And both halves must actually differ, or the switch is decoration.
+    I18N.set('vi');
+    const vi = I18N.t(key);
+    I18N.set('en');
+    assert.notEqual(I18N.t(key), vi, `${name}: tiêu đề "${key}" phải khác nhau giữa hai ngôn ngữ`);
+  }
+
+  // The sticky header needs a fill or the page scrolls up behind it and the header
+  // becomes a strip of half-readable copy. Reported as a scrolling bug on /about,
+  // which carries a product page's body class, so the rule that had position and
+  // z-index without a background is the one a reader actually hit.
+  const css = read('styles.css');
+  const sticky = css.match(/^\.product-page \.site-header[^{]*\{([^}]*)\}/m);
+  assert.ok(sticky, 'product-page cần có header sticky');
+  assert.match(sticky[1], /background:/, 'header sticky phải có nền, nếu không chữ nội trang sẽ hiện lên xuyên qua nó khi cuộn');
+  assert.match(sticky[1], /position:sticky/, 'header sticky phải giữ position:sticky');
+  const notFound = css.match(/^\.page-404 \.site-header[^{]*\{([^}]*)\}/m);
+  if (notFound) assert.match(notFound[1], /background:/, '404 cũng cần nền cho header sticky');
+});
+
 
 // End-to-end click path, the one a customer actually walks: tap a product,
 // then tap the buy button. The extra modal nodes are cached so getElementById
