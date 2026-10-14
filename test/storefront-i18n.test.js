@@ -674,6 +674,45 @@ test('styles.css parse được: comment cân, ngoặc cân, và không có văn
   assert.equal(badPrelude, undefined, `có văn xuất tiếng Anh trước một rule: ${badPrelude}`);
 });
 
+// Every band on the homepage shares one horizontal frame, and this is the gate
+// that keeps them sharing it.
+//
+// The why-section was the one that spanned the full bleed with a .wrap inside
+// it, so its edges floated past the header and the footer on both sides while
+// its content sat on the shared frame — the green band's left edge was not the
+// logo's left edge. The legal pages had the same problem from the other side:
+// a 760px island in the middle of a 1160px frame, lining up with nothing.
+//
+// What is checked is the shared class rather than any one width, because the
+// point is that a band joins the page's grid or declares itself an exception.
+test('mọi section của trang chủ nằm trên cùng một khung ngang', () => {
+  const html = read('index.html');
+  const sections = [...html.matchAll(/<section class="([^"]*)"/g)].map((m) => m[1]);
+  assert.ok(sections.length >= 4, `chỉ thấy ${sections.length} section trên trang chủ`);
+  const offFrame = sections.filter((classes) => !classes.split(/\s+/).includes('wrap'));
+  assert.deepEqual(offFrame, [],
+    `section không nằm trên khung .wrap: ${offFrame.join(', ')} — cạnh của nó sẽ trôi qua header và footer`);
+
+  // And the reading column on the legal pages uses the same frame as the header
+  // and footer it sits above. Compared against .wrap rather than a number, so a
+  // change to the page's grid moves both instead of leaving them disagreeing.
+  const css = read('styles.css');
+  const frame = /\.wrap\{[^}]*\}/.exec(css);
+  const legal = /\.legal\{([^}]*)\}/.exec(css);
+  assert.ok(frame, 'cần có rule .wrap');
+  assert.ok(legal, 'cần có rule .legal');
+  const frameWidth = /width:min\(([^)]*)\)/.exec(frame[0])[1];
+  assert.match(legal[1], new RegExp(`width:min\\(${frameWidth.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\)`),
+    '.legal phải dùng cùng khung ngang với .wrap, không phải một cột hẹp lặng lẽ giữa trang');
+  assert.match(legal[1], /margin:0 auto/, '.legal phải căn giữa theo khung đó');
+  // A page of clauses is read, not scanned: the lines inside the frame stay at a
+  // measure, so widening the frame to join the grid did not turn the text into a
+  // 160-character scan.
+  const measure = /^\.legal-updated,\.legal h2,\.legal p,\.legal ul\{([^}]*)\}/m.exec(css);
+  assert.ok(measure, 'cần giới hạn chiều rộng đoạn văn pháp lý');
+  assert.match(measure[1], /max-width:\d+px/, 'đoạn văn pháp lý phải có giới hạn chiều rộng để đọc được');
+});
+
 test('vùng cuộn phải có overflow và min-height:0 ngay ở rule cơ bản', () => {
   const css = read('styles.css');
   // These have to hold on a desktop too, where the 700px query never applies.
