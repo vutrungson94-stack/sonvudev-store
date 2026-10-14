@@ -293,13 +293,10 @@ const DICT = {
     'product.buyNow': 'Mua ngay',
     // Trang đơn hàng. Trước đây copy ở đây nằm thẳng trong order.js nên khách
     // nước ngoài đọc tiếng Việt sau khi đã trả tiền, và cùng một trạng thái lại
-    // hiện hai chữ khác nhau ở popup thanh toán với ở trang đơn.
-    'order.status.pending': 'Đang chờ thanh toán',
-    'order.status.pendingTransfer': 'Đang chờ chuyển khoản',
-    'order.status.paid': 'Đã thanh toán',
-    'order.status.failed': 'Thanh toán thất bại',
-    'order.status.cancelled': 'Đã hủy',
-    'order.status.refunded': 'Đã hoàn tiền',
+    // hiện hai chữ khác nhau ở popup thanh toán với ở trang đơn. Nhãn trạng thái
+    // đơn bây giờ nằm ở format.js (SVDFormat.STATUS_LABELS) và đọc qua
+    // I18N.status() — admin.html không nạp file từ điển này nên bảng đó phải ở
+    // chỗ mà cả hai cùng tải được.
     'order.title': 'Đơn {id}',
     'order.row.product': 'Sản phẩm',
     'order.row.amount': 'Số tiền',
@@ -386,7 +383,7 @@ const DICT = {
     // the text around it is split into keys, so a reader switching to English
     // sees the same emphasis rather than a paragraph that lost it.
     'legal.eyebrow': 'Pháp lý',
-    'legal.updated': 'Cập nhật: {{policyUpdated}} · Áp dụng cho mọi giao dịch tại',
+    'legal.updated': 'Cập nhật: {{policyUpdatedDisplay}} · Áp dụng cho mọi giao dịch tại',
 
     // ---- about ----
     // The homepage header links say "Vì sao chọn {brand}" and "FAQ"; this page
@@ -788,12 +785,9 @@ const DICT = {
     'order.check': 'Check order status',
     'order.errStatus': 'Could not check the order status',
     'order.errDownload': 'The product is not available for download right now',
-    'order.status.pending': 'Awaiting payment',
-    'order.status.pendingTransfer': 'Awaiting bank transfer',
-    'order.status.paid': 'Paid',
-    'order.status.failed': 'Payment failed',
-    'order.status.cancelled': 'Cancelled',
-    'order.status.refunded': 'Refunded',
+    // The English half of the order status table lives in format.js too, beside
+    // the Vietnamese half, so the two cannot drift and the admin panel can read
+    // the same six names.
     'order.title': 'Order {id}',
     'order.row.product': 'Product',
     'order.row.amount': 'Amount',
@@ -855,7 +849,7 @@ const DICT = {
     // A fragment key continues the sentence it sits in, which is why several of
     // them begin or end mid-clause.
     'legal.eyebrow': 'Legal',
-    'legal.updated': 'Updated: {{policyUpdated}} · Applies to every transaction at',
+    'legal.updated': 'Updated: {{policyUpdatedDisplayEn}} · Applies to every transaction at',
 
     // ---- about ----
     'about.nav.why': 'Why us',
@@ -1012,17 +1006,18 @@ const DICT = {
 };
 
 // ---------------------------------------------------------------------------
-// One mapping from the status column to its key. The checkout modal and the order
-// page used to carry separate copies, and a bank transfer read as "Đang chờ thanh toán"
-// in one and "Đang chờ chuyển khoản" in the other.
-const STATUS_KEYS = {
-  pending: 'order.status.pending',
-  pending_transfer: 'order.status.pendingTransfer',
-  paid: 'order.status.paid',
-  payment_failed: 'order.status.failed',
-  cancelled: 'order.status.cancelled',
-  refunded: 'order.status.refunded',
-};
+// The order status table is not here. It lives in format.js, which every page
+// loads before this file, and the admin panel — which does not load this file
+// at all — reads the same table. It used to be a mapping here plus a Vietnamese
+// object in admin.js, and three of the six statuses had drifted between them:
+// the owner and the buyer were shown two different names for the same order.
+//
+// So there are no order.status.* keys left to resolve, and adding one back
+// here is the mistake to watch for.
+
+// The language a label table is asked for. Anything that is not English is
+// Vietnamese, which is the same rule the rest of this file falls back on.
+const langOf = (lang) => (String(lang) === 'en' ? 'en' : 'vi');
 
 const SUPPORTED = ['vi', 'en'];
 const STORAGE_KEY = 'sonvudev_lang';
@@ -1112,8 +1107,16 @@ const I18N = {
     const at = value ? new Date(value) : new Date(NaN);
     return Number.isFinite(at.getTime()) ? at.toLocaleString(I18N.locale) : '';
   },
-  statusKey(status) { return STATUS_KEYS[status] || 'order.status.pending'; },
-  status(status) { return I18N.t(I18N.statusKey(status), status); },
+  statusKey(status) {
+    return (window.SVDFormat && window.SVDFormat.ORDER_STATUSES.indexOf(status) >= 0) ? status : 'pending';
+  },
+  status(status) {
+    // The one table, read through the page's language. Falling back to the raw
+    // value keeps this readable on a page that somehow loaded without
+    // format.js, rather than rendering an empty cell where a status should be.
+    const F = window.SVDFormat;
+    return F ? F.statusLabel(status, langOf(current)) : String(status || '');
+  },
   apiError(payload, fallbackKey) {
     const code = payload && payload.code;
     if (code) return I18N.t(code, payload.error || I18N.t(fallbackKey, ''));

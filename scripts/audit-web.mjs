@@ -29,7 +29,28 @@ const env = (key) => (process.env[key] || "").trim();
 
 const findings = [];
 const fail = (check, file, detail) => findings.push({ check, file, detail });
-const read = (relative) => readFile(path.join(root, relative), "utf8");
+
+// Files a directory scan listed and this process then failed to open.
+//
+// This is not hypothetical: a scan that lists a file and crashes on it reports
+// exit 1, which is the same status a real finding produces. A crash therefore
+// lets a page that is supposed to FAIL pass for the wrong reason, and a page that
+// is supposed to pass go red for the wrong one. Both happened here, intermittently,
+// against a fixture tree being rewritten underneath the audit on a Windows host.
+//
+// So a vanished file is recorded and skipped, and reported at the end as its own
+// finding. The gate then says what it knows — "I could not read these" — instead
+// of throwing a stack trace and being read as a verdict.
+const unreadable = [];
+const read = async (relative) => {
+  try {
+    return await readFile(path.join(root, relative), "utf8");
+  } catch (error) {
+    if (error.code !== "ENOENT") throw error;
+    unreadable.push(relative);
+    return "";
+  }
+};
 
 const publicDir = path.join(root, "public");
 const htmlFiles = (await readdir(publicDir)).filter((name) => name.endsWith(".html")).sort();
@@ -287,34 +308,61 @@ for (const [name, label] of [["vi", "tiếng Việt"], ["en", "tiếng Anh"]]) {
 }
 
 // ---------------------------------------------------------------------------
-// 3d. The badge translations the server page has and the storefront card does not.
+// ---------------------------------------------------------------------------
+// 3d. The category and badge translations, compared by value and not only by key.
 //
-//     The product page and the storefront card each translate the badge column.
-//     The two tables were added to independently, so "Phổ biện", "Doanh nghiệp"
-//     and "Ưu đãi sớm" were translated on the product page and not on the card:
-//     the reader switched the whole shop to English, every price and description
-//     followed, and the badge above them stayed in Vietnamese.
+//     The product page and the storefront card each translate two columns: the
+//     category and the badge. The tables were added independently, so "Phổ biến",
+//     "Doanh nghiệp" and "Ưu đãi sớm" were translated on the product page and not
+//     on the card: the reader switched the whole shop to English, every price and
+//     description followed, and the badge above them stayed Vietnamese.
 //
-//     That drift is invisible until somebody remembers both tables exist. The
-//     check below requires the storefront map to carry every badge the product
-//     page declares, so adding one and forgetting the other is a failing audit
-//     rather than a page that looks half-translated.
+//     It then compared key sets only. A half-finished edit that changes a value
+//     on one side passes every key check there is, which is the one direction a
+//     gate cannot afford to be blind in — the keys still line up, the words do
+//     not, and nothing reports it. So this compares pairs, not sets.
+//
+//     Categories had no check at all. Half a gate reads as covered: the badge
+//     half existed and the category half was simply forgotten, so a category
+//     added to src/pages.js and not to the card translates on the product page
+//     and leaks raw Vietnamese into the storefront grid.
 // ---------------------------------------------------------------------------
 {
-  const storefrontBlock = storefrontSource.match(/const BADGES\s*=\s*\{([\s\S]*?)\};/)?.[1] || "";
-  const storefrontBadges = new Set([...storefrontBlock.matchAll(/"([^"]+)"\s*:/g)].map((m) => m[1]));
-  const pageBadges = new Set(
-    [...pagesSource.matchAll(/badges:\s*\{([\s\S]*?)\}/g)]
-      .flatMap((match) => [...match[1].matchAll(/"([^"]+)"\s*:/g)].map((m) => m[1]))
-  );
-  if (!storefrontBadges.size || !pageBadges.size) {
-    fail("badge thiếu bản dịch", "public/app.js", "không đọc được BADGES hoặc bảng badges trong src/pages.js — không thể so sánh hai nơi dịch badge");
-  } else {
-    const missingOnCard = [...pageBadges].filter((badge) => !storefrontBadges.has(badge));
-    const missingOnPage = [...storefrontBadges].filter((badge) => !pageBadges.has(badge));
-    if (missingOnCard.length) fail("badge thiếu bản dịch", "public/app.js", `thẻ sản phẩm chưa dịch: ${missingOnCard.join(", ")}`);
-    if (missingOnPage.length) fail("badge thiếu bản dịch", "src/pages.js", `trang sản phẩm chưa dịch: ${missingOnPage.join(", ")}`);
-  }
+  // "key": "value" pairs from an object-literal block. The value is what two
+  // places have to agree on, so it is captured rather than inferred from the key.
+  const pairs = (block) => {
+    const map = new Map();
+    for (const match of block.matchAll(/"([^"]+)"\s*:\s*"([^"]*)"/g)) map.set(match[1], match[2]);
+    return map;
+  };
+  const compare = (label, storefrontBlock, pageBlocks) => {
+    const onCard = pairs(storefrontBlock);
+    const onPage = new Map();
+    for (const block of pageBlocks) for (const [key, value] of pairs(block)) onPage.set(key, value);
+    if (!onCard.size || !onPage.size) {
+      fail("dịch thiếu", "public/app.js", `không đọc được bảng ${label} ở storefront hoặc ở trang sản phẩm — không thể so sánh hai nơi dịch ${label}`);
+      return;
+    }
+    const missingOnCard = [...onPage.keys()].filter((key) => !onCard.has(key));
+    const missingOnPage = [...onCard.keys()].filter((key) => !onPage.has(key));
+    if (missingOnCard.length) fail("dịch thiếu", `public/app.js (${label})`, `thẻ sản phẩm chưa dịch: ${missingOnCard.join(", ")}`);
+    if (missingOnPage.length) fail("dịch thiếu", `src/pages.js (${label})`, `trang sản phẩm chưa dịch: ${missingOnPage.join(", ")}`);
+    // Both sides hold the key, so the key-set comparison stops here. The words
+    // still have to be the same, and this is the only place that would notice.
+    const wrong = [...onPage.entries()]
+      .filter(([key, value]) => onCard.has(key) && onCard.get(key) !== value)
+      .map(([key, value]) => `"${key}": "${value}" ở trang sản phẩm, "${onCard.get(key)}" ở thẻ`);
+    if (wrong.length) {
+      fail("dịch lệch", `public/app.js (${label})`, `hai nơi dịch ${label} khác nhau — ${wrong.join("; ")}`);
+    }
+  };
+
+  compare("badge",
+    storefrontSource.match(/const BADGES\s*=\s*\{([\s\S]*?)\};/)?.[1] || "",
+    [...pagesSource.matchAll(/badges:\s*\{([\s\S]*?)\}/g)].map((match) => match[1]));
+  compare("danh mục",
+    storefrontSource.match(/const CATEGORIES\s*=\s*\{([\s\S]*?)\};/)?.[1] || "",
+    [...pagesSource.matchAll(/categories:\s*\{([\s\S]*?)\}/g)].map((match) => match[1]));
 }
 
 // ---------------------------------------------------------------------------
@@ -1239,14 +1287,18 @@ const REGISTERED = new Set(findings.map((item) => item.check));
 // The labels below are the call sites' spelling, character for character.
 const DECLARED = [
   "link gãy", "route trùng", "thiếu bản dịch", "khoá i18n mồ côi", "khoá i18n chưa định nghĩa",
-  "khoá i18n trùng", "nút đổi ngữ không có từ điển",
+  "khoá i18n trùng", "nút đổi ngữ không có từ điển", "dịch thiếu", "dịch lệch",
   "domain gõ tay", "email gõ tay", "R2 CORS lệch", "R2 CORS thừa origin", "biến CSS chưa khai báo",
-  "nút đổi ngữ không có từ điển", "nút đổi ngữ lặp hoặc thiếu", "trang chủ mất từ điển",
+  "nút đổi ngữ lặp hoặc thiếu", "trang chủ mất từ điển",
   "thương hiệu khai báo hai lần", "placeholder lạ",
   "schema chặn", "tiếng Việt không dấu", "tiếng Việt ở phía máy chủ", "token chưa nối",
   "trang chưa render", "hreflang chết", "thương hiệu gõ cứng", "trang mồ côi",
   "trùng tên toàn cục", "chữ rỗng", "thiếu font thương hiệu",
   "lỗi tiếng Việt cho trình duyệt", "ngôn ngữ khai báo sai",
+  // A file the scan listed and could not open. This one was missing while it was
+  // already being produced, which is the shape of rot the reverse guard below
+  // exists to catch: a check can be live and still not be counted.
+  "không đọc được file",
 ];
 // The reverse direction, which is the one that actually rots.
 //
@@ -1272,6 +1324,13 @@ if (unknown.length) {
   process.exitCode = 1;
 }
 const groups = new Set([...DECLARED, ...REGISTERED]).size;
+// Recorded as a finding rather than thrown: a file that was listed and then
+// could not be opened is a file this run could not check, and saying so is the
+// only honest verdict. Exit status follows, because a gate that quietly checked
+// less than it claims is the failure mode this replaces.
+for (const relative of unreadable) {
+  fail("không đọc được file", relative, "có trong danh sách quét nhưng không mở được — lần chạy này không kiểm tra được file này");
+}
 for (const item of findings) console.error(`FAIL  ${item.check.padEnd(18)} ${item.file}: ${item.detail}`);
 console.log(`\n[audit] ${groups} nhóm kiểm tra, ${findings.length} vấn đề.`);
 if (skipped.length) {

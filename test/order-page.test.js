@@ -286,9 +286,10 @@ test('mọi trang đơn hàng đều dùng chung một bộ nhãn trạng thái'
   // copies of the *hint* drifted the same way, and worse: the checkout modal knew
   // five states and the order page knew ten, so a refunded order or an
   // unconfirmed PayPal capture read as a bland "awaiting payment" in one and as
-  // the truth in the other. Both are now one function in i18n.js.
-  assert.ok(!/const statusLabels\s*=/.test(source), 'order.js khong duoc tu dinh nghia nhan trang thai');
-  assert.ok(!/const labels\s*=\s*\{\s*pending/.test(app), 'app.js khong duoc tu dinh nghia nhan trang thai');
+  // the truth in the other. Both are now one table in format.js, which every page
+  // loads — the admin panel, which does not load the dictionary at all.
+  assert.ok(!/const statusLabels\s*=/.test(source), 'order.js không được tự định nghĩa nhãn trạng thái');
+  assert.ok(!/const labels\s*=\s*\{\s*pending/.test(app), 'app.js không được tự định nghĩa nhãn trạng thái');
   for (const [name, file] of [['order.js', source], ['app.js', app]]) {
     // Neither page may reason about order state on its own. The word is
     // orderHint, not status(), because the sentence a buyer reads has to come

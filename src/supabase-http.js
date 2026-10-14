@@ -53,3 +53,42 @@ export async function supabaseRequest(pathname, options = {}) {
 export function requireSupabase() {
   if (!isConfigured.supabase) throw new Error("Thiếu cấu hình Supabase trong .env");
 }
+
+/**
+ * The header set, for a caller that needs to shape its own request.
+ *
+ * Exported because six places had rebuilt this pair by hand — src/store.js twice
+ * and three scripts — and one of them sent an unconditional bearer while the
+ * server sniffed for a JWT first. Both readings are defensible; only one of them
+ * can be right at a time, and which one was in force depended on which file the
+ * request came from.
+ *
+ * @param {Record<string, string>} [extra] headers to add or override
+ * @returns {Record<string, string>}
+ */
+export function supabaseAuthHeaders(extra = {}) {
+  return { ...supabaseHeaders(), ...extra };
+}
+
+/**
+ * Counts matching rows with a range request, which is how PostgREST reports a
+ * total without sending the rows.
+ *
+ * The two callers that need a count had each written this block themselves, down
+ * to the content-range arithmetic and the error message. They agreed, which is
+ * how a third copy of the service-key header could go unnoticed beside them.
+ *
+ * @param {string} pathname the table, e.g. "orders"
+ * @param {string} [query] a pre-encoded query string, without the leading "?"
+ * @returns {Promise<number>} the total, or 0 when the header is missing or odd
+ */
+export async function supabaseCount(pathname, query = "") {
+  const response = await fetch(`${env.supabase.url}/rest/v1/${pathname}${query ? `?${query}` : ""}`, {
+    headers: supabaseAuthHeaders({ Prefer: "count=exact", Range: "0-0" }),
+    signal: AbortSignal.timeout(30000),
+  });
+  if (!response.ok) throw new Error(`Supabase ${response.status}: ${await response.text().catch(() => "")}`);
+  // "0-0/2" — the part after the slash is the total, not the length of the slice.
+  const total = Number(String(response.headers.get("content-range") || "").split("/")[1]);
+  return Number.isFinite(total) ? total : 0;
+}

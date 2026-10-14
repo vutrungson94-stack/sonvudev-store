@@ -17,7 +17,6 @@ const T=(key,fallback,vars)=>window.I18N.t(key,fallback,vars);
 // cannot drift from the one the emails go to. The dictionary holds the
 // configured default for the case where the page was served without it.
 const SUPPORT=()=>document.body?.dataset?.support||window.I18N.t('brand.supportEmail');
-function goHome(){location.href='/'}
 function showMissing(){eyebrow.textContent=T('paypal.eyebrow');title.textContent=T('order.notFound');message.textContent=T('paypal.noSession');loader.hidden=true;actions.innerHTML=`<a class="button button-primary" href="/lookup">${T('nav.lookup')}</a>`}
 function link(token){const dl=document.createElement('button');dl.className='button button-primary';dl.id='download';dl.textContent=T('order.download')+' ↓';dl.onclick=async()=>{const result=await window.OrderClient.download(state.id,token);if(!result.ok)message.textContent=result.offline?T('order.errOffline'):T('order.errDownload')};return dl}
 function showPaid(){eyebrow.textContent=T('paypal.success');title.textContent=T('paypal.success');message.textContent=T('paypal.successHint');actions.innerHTML='';actions.appendChild(link(state.token));const back=document.createElement('a');back.className='button button-secondary';back.href='/';back.textContent=T('paypal.back');actions.appendChild(back);loader.hidden=true}

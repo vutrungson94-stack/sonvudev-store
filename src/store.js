@@ -3,7 +3,7 @@ import { promises as fs } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { env, isConfigured } from "./config.js";
-import { supabaseRequest } from "./supabase-http.js";
+import { supabaseCount, supabaseRequest } from "./supabase-http.js";
 
 /**
  * Where this process keeps its files.
@@ -165,15 +165,10 @@ export async function updateProduct(id, patch) { if (!local) return fromProduct(
 export async function countOrdersForProduct(productId) {
   if (!productId) return 0;
   if (local) return (await readJson(files.orders, [])).filter((o) => (o.items || []).some((item) => item && item.productId === productId)).length;
-  const headers = { apikey: env.supabase.serviceRoleKey, Prefer: "count=exact", Range: "0-0" };
-  if (env.supabase.serviceRoleKey.startsWith("eyJ")) headers.Authorization = `Bearer ${env.supabase.serviceRoleKey}`;
   // Built with JSON.stringify so a product id containing a quote or a backslash
   // lands in the filter escaped rather than breaking the query string.
   const filter = encodeURIComponent(`items=cs.${JSON.stringify([{ productId: String(productId) }])}`);
-  const response = await fetch(`${env.supabase.url}/rest/v1/orders?select=id&${filter}`, { headers });
-  if (!response.ok) throw new Error(`Supabase ${response.status}: ${await response.text()}`);
-  const total = Number(String(response.headers.get("content-range") || "").split("/")[1]);
-  return Number.isFinite(total) ? total : 0;
+  return supabaseCount("orders", `select=id&${filter}`);
 }
 
 /**
@@ -241,13 +236,7 @@ export async function countOrders(filter = {}) {
   const params = ["select=id"];
   if (status) params.push(`status=eq.${encodeURIComponent(status)}`);
   if (needle) params.push(`or=${encodeURIComponent(`(id.ilike.*${needle}*,customer_name.ilike.*${needle}*,customer_email.ilike.*${needle}*)`)}`);
-  const headers = { apikey: env.supabase.serviceRoleKey, Prefer: "count=exact", Range: "0-0" };
-  if (env.supabase.serviceRoleKey.startsWith("eyJ")) headers.Authorization = `Bearer ${env.supabase.serviceRoleKey}`;
-  const response = await fetch(`${env.supabase.url}/rest/v1/orders?${params.join("&")}`, { headers });
-  if (!response.ok) throw new Error(`Supabase ${response.status}: ${await response.text()}`);
-  // "0-0/2" — the part after the slash is the total, not the length of the slice.
-  const total = Number(String(response.headers.get("content-range") || "").split("/")[1]);
-  return Number.isFinite(total) ? total : 0;
+  return supabaseCount("orders", params.join("&"));
 }
 
 /**

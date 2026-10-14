@@ -89,6 +89,16 @@ if ! command -v caddy >/dev/null 2>&1; then
   echo "       Install caddy, or remove deploy/Caddyfile from scripts/lib/artifact.mjs." >&2
   exit 1
 fi
+# The unit is installed from the artifact on every deploy, for the same reason the
+# Caddyfile is: the change to a unit file has to be able to reach the host.
+#
+# It used to be copied only by bootstrap, so a host set up before that edit had no
+# unit at all, and this script then ran `systemctl enable --now sonvudev-store`
+# against a unit the system had never heard of. Under `set -e` that aborts the
+# deploy after the release symlink has already been swapped — the new code is
+# live, the service that is supposed to run it is not, and the rollback below is
+# the thing that gets reached for.
+install -m 0644 "$SOURCE_DIR/deploy/sonvudev-store.service" /etc/systemd/system/sonvudev-store.service
 systemctl daemon-reload
 systemctl enable --now sonvudev-store
 systemctl restart sonvudev-store

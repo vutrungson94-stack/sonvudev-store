@@ -2,6 +2,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { readFile } from "node:fs/promises";
 import dotenv from "dotenv";
+import { supabaseAuthHeaders } from "../src/supabase-http.js";
 
 // The store talks to Supabase over PostgREST, which cannot run DDL. So a schema
 // change is either pasted into the SQL editor by hand or applied here through the
@@ -158,7 +159,7 @@ async function check() {
   }
   const present = new Set();
   for (const table of Object.keys(REQUIRED_COLUMNS)) {
-    const response = await fetch(`${supabaseUrl}/rest/v1/${table}?select=*&limit=1`, { headers: { apikey: key, Authorization: `Bearer ${key}` }, signal: AbortSignal.timeout(15000) });
+    const response = await fetch(`${supabaseUrl}/rest/v1/${table}?select=*&limit=1`, { headers: supabaseAuthHeaders(), signal: AbortSignal.timeout(15000) });
     if (response.status === 404 || response.status === 400) { console.log(`MISSING  bảng ${table}`); continue; }
     if (!response.ok) { console.error(`ERROR    bảng ${table}: HTTP ${response.status} ${await response.text()}`); process.exitCode = 1; continue; }
     const rows = await response.json();
@@ -199,7 +200,7 @@ async function check() {
 // present says nothing about the guarantee.
 async function checkIndexes(key) {
   const response = await fetch(`${supabaseUrl}/rest/v1/rpc/indexes`, {
-    headers: { apikey: key, Authorization: `Bearer ${key}` },
+    headers: supabaseAuthHeaders(),
     signal: AbortSignal.timeout(15000),
   });
   // No such RPC on most projects. A missing introspection endpoint must not be
@@ -231,7 +232,7 @@ async function checkIndexes(key) {
 // exist makes PostgREST name the ones it does know. Cheaper than the Management
 // API and needs no extra token.
 async function columnsViaError(table, key) {
-  const response = await fetch(`${supabaseUrl}/rest/v1/${table}?select=__sonvudev_missing_column__&limit=1`, { headers: { apikey: key, Authorization: `Bearer ${key}` }, signal: AbortSignal.timeout(15000) });
+  const response = await fetch(`${supabaseUrl}/rest/v1/${table}?select=__sonvudev_missing_column__&limit=1`, { headers: supabaseAuthHeaders(), signal: AbortSignal.timeout(15000) });
   if (response.ok) return [];
   const body = await response.json().catch(() => ({}));
   const found = String(body.hint || body.message || "").match(/column[s]? [^.;]+/i);

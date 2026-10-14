@@ -13,22 +13,64 @@ const read = (file) => fs.readFileSync(path.join(root, file), 'utf8');
 // The keys of a `{ pending: ..., ... }` object literal, without evaluating it.
 const literalKeys = (block) => [...block.matchAll(/([A-Za-z_][\w]*)\s*:/g)].map((m) => m[1]);
 
-test('mọi nơi đặt tên trạng thái đơn đều khớp một danh sách', () => {
-  // The browser cannot import src/, so the admin panel and the dictionary carry
-  // their own status maps. That is a deliberate copy, not a second definition —
-  // and a seventh status added to ORDER_STATUSES but forgotten in either map is
-  // an order the panel cannot name and the buyer cannot read. This holds the
-  // three together without a bundler.
-  const adminSource = read(path.join('public', 'admin.js'));
-  const adminLabels = adminSource.match(/labels=\{([^}]+)\}/)?.[1] || '';
-  assert.ok(adminLabels, 'public/admin.js phải có bảng labels cho trạng thái đơn');
+test('mọi nơi đặt tên trạng thái đơn dùng một danh sách', () => {
+  // The browser cannot import src/, but it no longer has to carry its own list
+  // either. The table lives in public/format.js, which every page loads — the
+  // admin panel included — so the panel, the buyer's order page and the server
+  // all read one set of six names.
+  //
+  // This used to assert that two separate copies in admin.js and i18n.js each
+  // covered ORDER_STATUSES. That held the key sets together while letting the
+  // wording drift, and the wording is what a support call is made of: "Chờ xử lý"
+  // in the panel against "Đang chờ thanh toán" on the buyer's page.
+  const formatSource = read(path.join('public', 'format.js'));
+  const exported = /ORDER_STATUSES\s*=\s*\[([^\]]*)\]/.exec(formatSource)?.[1] || '';
+  const viBlock = /vi\s*:\s*\{([^}]*)\}/.exec(formatSource)?.[1] || '';
+  const enBlock = /en\s*:\s*\{([^}]*)\}/.exec(formatSource)?.[1] || '';
+  assert.ok(exported, 'public/format.js phải khai báo ORDER_STATUSES');
+  assert.ok(viBlock && enBlock, 'public/format.js phải có bảng tiếng Việt và tiếng Anh');
 
-  const i18nSource = read(path.join('public', 'i18n.js'));
-  const statusMap = i18nSource.match(/STATUS_KEYS\s*=\s*\{([^}]+)\}/)?.[1] || '';
-  assert.ok(statusMap, 'public/i18n.js phải có STATUS_KEYS cho trạng thái đơn');
+  const listed = exported.split(',').map((s) => s.trim().replace(/^['"]|['"]$/g, '')).filter(Boolean);
+  assert.deepEqual([...listed].sort(), [...ORDER_STATUSES].sort(),
+    'ORDER_STATUSES trong public/format.js phải khớp src/store.js');
+  assert.deepEqual(literalKeys(viBlock).sort(), [...ORDER_STATUSES].sort(),
+    'bảng tiếng Việt phải phủ đúng các trạng thái này, không thiếu và không thừa');
+  assert.deepEqual(literalKeys(enBlock).sort(), [...ORDER_STATUSES].sort(),
+    'bảng tiếng Anh phải phủ đúng các trạng thái này, không thiếu và không thừa');
 
-  assert.deepEqual(literalKeys(adminLabels).sort(), [...ORDER_STATUSES].sort(), 'labels của admin phải khớp ORDER_STATUSES trong src/store.js');
-  assert.deepEqual(literalKeys(statusMap).sort(), [...ORDER_STATUSES].sort(), 'STATUS_KEYS của i18n phải khớp ORDER_STATUSES trong src/store.js');
+  // No second home. A copy left behind is exactly what drifted before, and the
+  // audit's orphan-key check cannot see a table that is not a dictionary.
+  for (const file of ['admin.js', 'i18n.js']) {
+    const source = read(path.join('public', file));
+    assert.ok(!/STATUS_KEYS\s*=/.test(source), `public/${file} không được mang bảng nhãn riêng nữa`);
+    assert.ok(!/labels\s*=\s*\{\s*pending\s*:/.test(source),
+      `public/${file} không được mang bảng nhãn riêng — lấy từ format.js`);
+    assert.ok(!/'order\.status\./.test(source),
+      `public/${file} không được chứa khoá order.status.* — nhãn lấy từ format.js`);
+  }
+});
+
+test('mọi trạng thái lên từ format.js, không phải lặt rút một lần', () => {
+  // Read through the real file rather than a regex of its source: the table is
+  // data, and a page rendering the wrong name for an order is the failure this
+  // consolidation exists to stop.
+  const window = {};
+  new Function('window', read(path.join('public', 'format.js')))(window);
+  const F = window.SVDFormat;
+  assert.ok(F, 'format.js phải gán window.SVDFormat');
+  for (const status of ORDER_STATUSES) {
+    const vi = F.statusLabel(status, 'vi');
+    const en = F.statusLabel(status, 'en');
+    assert.ok(vi && vi !== status, `trạng thái ${status} phải có nhãn tiếng Việt, không rơi về chính nó`);
+    assert.ok(en && en !== status, `trạng thái ${status} phải có nhãn tiếng Anh, không rơi về chính nó`);
+    assert.notEqual(vi, en, `hai ngôn ngữ của ${status} không nên trùng nhau`);
+  }
+  // An unknown status is shown as itself. Substituting a different one would
+  // misreport an order rather than admit the table is behind.
+  assert.equal(F.statusLabel('some_future_status', 'vi'), 'some_future_status');
+  // Anything that is not English is Vietnamese, the same fallback the rest of
+  // the browser code uses.
+  assert.equal(F.statusLabel('paid', 'fr'), F.statusLabel('paid', 'vi'));
 });
 
 test('nhóm trạng thái chưa trả tiền là tập con của danh sách đầy đủ', async () => {

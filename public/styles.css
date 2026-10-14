@@ -101,16 +101,28 @@
    links to now shares one grid. */
 .legal{width:min(1160px,calc(100% - 64px));margin:0 auto;padding:70px 0 90px}
 /* A three-step ladder, because a document's job is to say what introduces what
-   before a word is read: the children of the h1 step in one level, the children
-   of a numbered section step in a second, and the cases listed inside a section
-   step in a third. Everything used to start on one line — heading, clause and
-   bullet all flush — which is the shape of a wall, not of a document. */
-.legal h1 ~ *{padding-left:40px}
-.legal h2 ~ *{padding-left:80px}
-/* A list carries its own marker offset in a rule further down the file at the
-   same specificity, so the third step is spelled out with the pair to win by
-   order — otherwise the bullets hang to the left of the clause above them. */
-.legal h2 ~ ul{padding-left:120px}
+   before a word is read: what the h1 introduces steps in one level, what a
+   numbered section introduces steps in a second, and the cases listed inside a
+   section step in a third. The step is 24px, which reads as nesting without
+   pushing the text away from the frame the header and footer sit on. */
+.legal h1 ~ *{padding-left:24px}
+/* A list the h1 introduces directly, with no numbered section above it, would
+   fall back to the 20px the bare .legal ul rule sets and hang to the left of the
+   paragraphs beside it. This is its first step, so it is written before the
+   deeper list rule: the two selectors carry the same specificity, and at that
+   tie the cascade reads the one that comes later in the file. */
+.legal h1 ~ ul{padding-left:24px}
+/* `~` reaches every following sibling, and that includes the section headings
+   themselves: the second heading on the page is a following sibling of the
+   first, so with a bare `*` every heading after the first matched this step and
+   sat one step deeper than the first one — the numbered sections of 1, 2, 3…
+   on two different lines. :not(h2) is what makes the step mean "what this section
+   introduces" instead of "whatever happens to come after a section". */
+.legal h2 ~ *:not(h2){padding-left:48px}
+/* The third step, for the cases listed inside a section. Also spelled out with
+   the pair so it wins by order against the list's own marker offset in the bare
+   .legal ul rule further down the file. */
+.legal h2 ~ ul{padding-left:72px}
 .legal .legal-updated,.legal .legal-entity{padding-left:0}
 /* Justified, and given the full width of the frame it now sits on: a ragged right
    edge beside a full-width rule under the title block is the one thing that

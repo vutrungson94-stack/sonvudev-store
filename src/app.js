@@ -6,6 +6,7 @@ import crypto from "node:crypto";
 import { env, isConfigured } from "./config.js";
 import { ORDER_STATUSES, countOrders, countOrdersForProduct, dataDir, ensureSeed, findOrderByIdempotencyKey, getOrder, getProduct, getProductBySlug, isOrderOwner, isSellable, latestOrder, listOpenOrders, listOrders, listOrdersForRevenue, listProducts, listRefundedEmails, createOrder, updateOrder, createProduct, updateProduct, deleteProduct, persistenceMode } from "./store.js";
 import { supabaseRequest } from "./supabase-http.js";
+import { slugify } from "./format.js";
 import { paypalEnvironmentIsSet } from "./config.js";
 import { createDownloadUrl, createUploadUrl } from "./r2.js";
 import { captureOrder, createOrder as createPayPalOrder, hashToken, newOrderId, newToken, paypalChargeForProduct, paymentMatchesOrder, readOrder, verifyWebhook } from "./paypal.js";
@@ -101,7 +102,6 @@ const adminEntryFor = (req) => {
   const supplied = req.get("x-admin-token") || (req.get("authorization") || "").replace(/^Bearer\s+/i, "");
   return matchAdminToken(supplied, adminEntries());
 };
-const isAdmin = (req) => Boolean(adminEntryFor(req));
 // GET cho phép viewer + admin, ghi (POST/PATCH/PUT/DELETE) chỉ admin.
 // Token cũ không role mặc định admin nên mọi test/caller hiện tại giữ nguyên.
 const admin = (req, res, next) => {
@@ -149,7 +149,7 @@ const wwwHost = canonicalHost && !/^(localhost|127\.|0\.0\.0\.0|\[?::1|.*\.local
 // made /og/sonvudev.svg 404 while every other page on the site carried the new name,
 // so the one image a link preview depended on was the only thing still wearing the
 // old brand. Derived from configuration instead, so it follows the name.
-const siteCardSlug = env.brand.name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "") || "shop";
+const siteCardSlug = slugify(env.brand.name) || "shop";
 
 app.use((req, res, next) => {
   res.setHeader("X-Content-Type-Options", "nosniff");
@@ -695,15 +695,18 @@ app.get("/api/products", async (_req, res) => {
     res.json({ products: await Promise.all(products.map(withUsdPrice)) });
   } catch (error) { console.error(error); res.status(500).json(refuse("api.err.catalogLoad", "Không thể tải danh mục", 500)); }
 });
-app.get("/api/products/:id", async (req, res) => {
-  try {
-    const product = await getProduct(req.params.id);
-    // Same rule as the storefront and the sitemap, so a product cannot be
-    // readable through the API while being invisible on the page.
-    if (!isSellable(product)) return res.status(404).json(refuse("api.err.productNotFound", "Không tìm thấy sản phẩm", 404));
-    res.json({ product: await withUsdPrice(publicProduct(product)) });
-  } catch (error) { console.error(error); res.status(500).json(refuse("api.err.productLoad", "Không thể tải sản phẩm", 500)); }
-});
+// GET /api/products/:id used to sit here.
+//
+// Nothing called it. The storefront reads the whole catalogue from /api/products, the
+// product page is rendered on the server, and no script, test or document in this
+// repository ever asked for a single product by id. It was public and unauthenticated,
+// disclosing the same fields the list endpoint already publishes (including the USD
+// figure) and scripts/metrics.mjs then pinned it as a route that must never go down,
+// so a dead endpoint became the one thing on this server a regression gate defended.
+//
+// The collection endpoint already answers "give me this product" for any consumer that
+// needs it. If a single-product endpoint is ever genuinely wanted, it belongs behind
+// the admin token like every other per-record read.
 
 // Tells the storefront where the visitor is, so checkout can put the sensible
 // rail first. It is advisory only: the client renders whatever comes back and
@@ -1017,7 +1020,7 @@ app.post("/api/admin/products", admin, json, async (req, res) => {
   try {
     const name = text(req.body.name, 120); const price = Number(req.body.price);
     if (!name || !Number.isFinite(price) || price < 0) return res.status(400).json(refuse("api.err.invalidProductInput", "Tên hoặc giá sản phẩm không hợp lệ", 400));
-    const slug = text(req.body.slug, 80) || name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
+    const slug = text(req.body.slug, 80) || slugify(name);
     // Checked here as well as by the unique index, so the panel gets a sentence it
     // can show rather than a 500. Postgres rejects the second row with a 23505
     // that used to reach the owner as "server error" with no way to tell which
@@ -1268,3 +1271,4 @@ app.use((req, res) => {
 app.use((error, _req, res, _next) => { console.error(error); res.status(500).json(refuse("api.err.internal", "Lỗi máy chủ", 500)); });
 export async function createApp() { await ensureSeed(); return app; }
 export default app;
+

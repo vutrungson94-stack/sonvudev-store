@@ -88,3 +88,26 @@ export const money = (amount, currency) => {
     return `${value} ${currency || ""}`.trim();
   }
 };
+
+/**
+ * A URL slug from a display name.
+ *
+ * There were two of these in src/app.js and they disagreed about the edges: one
+ * stripped every leading and trailing hyphen, the other stripped exactly one of
+ * each. A name already wrapped in dashes came out clean under one and with the
+ * dashes still on under the other, and the second spelling is the one that
+ * reached the R2 object key, the sitemap URL and the link the buyer is emailed.
+ * A slug with a stray hyphen names a different object, so the edges are stripped
+ * properly here, once.
+ *
+ * Non-Latin names collapse to an empty string rather than to dashes. That is the
+ * honest answer: there is no ASCII spelling of a Vietnamese product name, and the
+ * caller already decides what to do about an empty one.
+ *
+ * @param {string} value the display name
+ * @returns {string} a lowercase slug, possibly empty
+ */
+export const slugify = (value) => String(value || "")
+  .toLowerCase()
+  .replace(/[^a-z0-9]+/g, "-")
+  .replace(/^-+|-+$/g, "");

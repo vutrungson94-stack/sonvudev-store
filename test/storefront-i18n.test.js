@@ -727,29 +727,213 @@ test('mọi section của trang chủ nằm trên cùng một khung ngang', () =
 // like before it is laid out. The ladder is three steps now: the title block
 // introduces a numbered section, the section introduces its clause, and the
 // clause introduces its cases.
+//
+// What is checked here is the resolved indent of the real markup, not the
+// numbers written in the rules. The previous version of this gate did the
+// opposite and stayed green while all three legal pages were visibly broken: the
+// numbers were in the file and in the right order, but `~` means "any following
+// sibling", so `.legal h2 ~ *` reached the section headings themselves. The
+// second heading on a page is a following sibling of the first, so 10 of the 11
+// numbered sections matched the deeper step and sat one step below section 1.
+//
+// Checking that a rule holds a number is not checking that the page is right.
+
+const VOID_TAGS = new Set(['br', 'img', 'meta', 'link', 'input', 'hr', 'source', 'area', 'col']);
+
+// The two bylines that close the title block. They are the only blocks on the
+// page that sit back on the h1's line, and they are checked apart from the rest
+// because a page without them would otherwise pass for an indented one.
+const BYLINES = ['legal-updated', 'legal-entity'];
+
+// The terms page carries a prose comment and a `{{legalEntityLine}}` token
+// between its bylines; neither is markup, and the token is the only way the
+// entity byline ever reaches the page, so it is stood in for here the way
+// src/pages.js stands in for it at render time.
+const withoutComments = (source) => source.replace(/<!--[\s\S]*?-->/g, ' ').replace(/\/\*[\s\S]*?\*\//g, ' ');
+
+const classesOf = (attrs) => (/class="([^"]*)"/.exec(attrs) || [, ''])[1].trim().split(/\s+/).filter(Boolean);
+
+// The direct children of <article class="legal">, in document order. The ladder
+// addresses siblings, so a <span> inside a clause is not on it and must not be
+// counted as a block of its own.
+function legalBlocks(html) {
+  const article = /<article class="legal">([\s\S]*?)<\/article>/.exec(withoutComments(html));
+  assert.ok(article, 'trang pháp lý phải có <article class="legal">');
+  const blocks = [];
+  const open = ['article'];
+  const tags = /<(\/?)([a-z][\w-]*)((?:"[^"]*"|'[^']*'|[^>"'])*?)(\/?)>|([^<]+)/g;
+  let m;
+  while ((m = tags.exec(article[1]))) {
+    const [, close, tag, , selfClose, text] = m;
+    if (text !== undefined) continue;
+    if (close) { open.pop(); continue; }
+    if (open.length === 1) blocks.push({ tag, classes: classesOf(m[0]) });
+    if (!selfClose && !VOID_TAGS.has(tag)) open.push(tag);
+  }
+  return blocks;
+}
+
+// Every leaf rule under `.legal` that sets a padding-left, in source order. The
+// cascade breaks a specificity tie on order, so the order is part of the rule
+// and cannot be reconstructed afterwards. `padding-left:0` carries no unit —
+// the byline rules are written that way, and an extractor that insists on `px`
+// silently drops the two rules that put them back on the h1's line.
+function legalIndentRules(css) {
+  const rules = [];
+  for (const m of withoutComments(css).matchAll(/([^{}@]+)\{([^{}]*)\}/g)) {
+    const px = /(?:^|;)\s*padding-left:(\d+)(?:px)?\s*(?:;|$)/.exec(m[2]);
+    if (!px) continue;
+    const selectors = m[1].trim().split(',').map((s) => s.trim())
+      .filter((s) => /(?:^|[\s,>+~])\.legal(?![\w-])/.test(s));
+    if (selectors.length) rules.push({ selectors, px: Number(px[1]), order: rules.length });
+  }
+  return rules;
+}
+
+// Models the selector shapes the ladder is allowed to use. A shape it does not
+// recognise is a thrown error, never a silent skip: an unmeasured rule would read
+// as "this block is not indented" and the gate would go green again, which is the
+// failure this whole rewrite exists to prevent.
+function compileSelector(selector) {
+  const unsupported = () => {
+    throw new Error(
+      `selector "${selector}" đặt padding-left dưới .legal nhưng gate này chưa mô phỏng — `
+      + 'phải mô phỏng nó, không được bỏ qua: bỏ qua thì nó đọc như "không thụt" và gate lại xanh');
+  };
+  const rest = selector.startsWith('.legal') ? selector.slice(6).trim() : unsupported();
+
+  if (rest.startsWith('.')) {
+    const only = /^\.([\w-]+)$/.exec(rest);
+    if (!only) unsupported();
+    return { cls: only[1], tag: null, not: null, head: null };
+  }
+
+  const tilde = /^([a-z][\w-]*)\s*~\s*(.+)$/.exec(rest);
+  if (!tilde) {
+    if (rest && !/^[a-z][\w-]*$/.test(rest)) unsupported();
+    return { cls: null, tag: rest || null, not: null, head: null };
+  }
+
+  const negated = /^(\*|[a-z][\w-]*):not\(([a-z][\w-]*)\)$/.exec(tilde[2]);
+  const tag = negated ? negated[1] : tilde[2];
+  if (tag !== '*' && !/^[a-z][\w-]*$/.test(tag)) unsupported();
+  return { cls: null, tag, not: negated ? negated[2] : null, head: tilde[1] };
+}
+
+// [ids, classes+attributes+pseudo-classes, types]. `:not()` contributes the
+// specificity of its argument, which is what makes `.legal h2 ~ *:not(h2)` tie
+// with `.legal h2 ~ ul` and hand the decision to source order.
+const specificityOf = (selector) => {
+  const expanded = selector.replace(/:not\(([^)]*)\)/g, ' $1 ');
+  const withoutNames = expanded
+    .replace(/\.[\w-]+/g, ' ').replace(/#[^\s]+/g, ' ').replace(/\[[^\]]+\]/g, ' ').replace(/:[\w-]+/g, ' ');
+  return [
+    (expanded.match(/#[\w-]+/g) || []).length,
+    (expanded.match(/\.[\w-]+|\[[^\]]+\]|:[\w-]+/g) || []).length,
+    (withoutNames.match(/\b[a-zA-Z][\w-]*/g) || []).length,
+  ];
+};
+const compareSpecificity = (a, b) => a[0] - b[0] || a[1] - b[1] || a[2] - b[2];
+
+// The padding-left each block of a legal article actually ends up with. A
+// selector list applies when any of its selectors matches, and the cascade ranks
+// the one that matched — so the list is expanded into one entry per selector
+// before anything is compared.
+function resolveLegalIndents(css, blocks) {
+  const rules = legalIndentRules(css).flatMap((rule) => rule.selectors.map((selector) => ({
+    ...compileSelector(selector), px: rule.px, order: rule.order, specificity: specificityOf(selector),
+  })));
+  return blocks.map((block, index) => {
+    let winner = null;
+    for (const rule of rules) {
+      if (rule.cls ? !block.classes.includes(rule.cls)
+        : rule.tag && rule.tag !== '*' && block.tag !== rule.tag) continue;
+      if (rule.not && block.tag === rule.not) continue;
+      if (rule.head && !blocks.slice(0, index).some((before) => before.tag === rule.head)) continue;
+      if (!winner) { winner = rule; continue; }
+      const gap = compareSpecificity(rule.specificity, winner.specificity);
+      if (gap > 0 || (gap === 0 && rule.order > winner.order)) winner = rule;
+    }
+    return winner ? winner.px : 0;
+  });
+}
+
 test('nội dung trang pháp lý thụt vào theo từng cấp', () => {
   const css = read('styles.css');
-  const first = /\.legal h1 ~ \*\{([^}]*)\}/.exec(css);
-  assert.ok(first, 'phải có quy tắc thụt nội dung sau h1 — thẳng tuột thì trang pháp lý nhìn như một bức tường');
-  const step1 = Number(/padding-left:(\d+)px/.exec(first[1])[1]);
-  assert.ok(step1 >= 24 && step1 <= 64, `bậc đầu phải vừa đủ thấy (24–64px), đang là ${step1}px`);
-  // One more step for the children of a numbered section, and a third for the
-  // cases listed inside it. Read from the rules rather than assumed, because the
-  // ladder is three numbers that have to keep their distances.
-  const second = /\.legal h2 ~ \*\{([^}]*)\}/.exec(css);
-  assert.ok(second, 'nội dung của mục 1., 2. phải thụt sâu hơn tiêu đề mục');
-  const step2 = Number(/padding-left:(\d+)px/.exec(second[1])[1]);
-  assert.ok(step2 > step1, `bậc thứ hai (${step2}px) phải sâu hơn bậc đầu (${step1}px)`);
-  const third = /\.legal h2 ~ ul\{([^}]*)\}/.exec(css);
-  assert.ok(third, 'danh sách trong mục phải thụt sâu hơn đoạn văn của mục đó');
-  const step3 = Number(/padding-left:(\d+)px/.exec(third[1])[1]);
-  assert.ok(step3 > step2, `bậc thứ ba (${step3}px) phải sâu hơn bậc thứ hai (${step2}px)`);
-  assert.ok(step3 - step2 >= 16 && step3 - step2 <= 80,
-    `khoảng cách giữa bậc ba và bậc hai phải là một bậc rõ ràng, đang là ${step3 - step2}px`);
-  // The bylines under the h1 stay on the parent line: they close the title block,
-  // and the hairline under them is the boundary a reader sees.
+  for (const file of ['terms.html', 'privacy.html', 'refund.html']) {
+    const html = read(file).replace('{{legalEntityLine}}', '<p class="legal-entity">Công ty</p>');
+    const blocks = legalBlocks(html);
+    const indent = resolveLegalIndents(css, blocks);
+    const levelsOf = (tag, from = 0) => [...new Set(
+      blocks.map((b, i) => (b.tag === tag && i >= from ? indent[i] : null)).filter((v) => v !== null))];
+    const spelled = (list) => [...list].sort((a, b) => a - b).join('px và ');
+
+    const headings = levelsOf('h2');
+    assert.ok(headings.length === 1, `${file}: các mục 1., 2., 3. phải nằm cùng một bậc thụt lề, đang là ${spelled(headings)}`);
+    assert.ok(headings[0] >= 16 && headings[0] <= 48, `bậc đầu phải vừa đủ thấy (16–48px), đang là ${headings[0]}px`);
+    assert.ok(blocks.filter((b) => b.tag === 'h2').length >= 5,
+      `${file}: phải có ít nhất 5 mục thì mới thấy được các mục có cùng bậc hay không`);
+
+    // What the h1 introduces directly — the intro paragraph — belongs to the
+    // first step, beside the section headings. Only what a numbered section
+    // introduces is a clause, so the two are counted apart rather than assumed
+    // to share a level. The bylines and the eyebrow close the title block and
+    // are checked elsewhere; they sit on the h1's own line by design.
+    const firstHeading = blocks.findIndex((b) => b.tag === 'h2');
+    const title = blocks.findIndex((b) => b.tag === 'h1');
+    assert.ok(title >= 0 && firstHeading > title, `${file}: phải có phần mở đầu giữa tiêu đề và mục đầu tiên`);
+    const intro = blocks.slice(title + 1, firstHeading)
+      .filter((b) => b.tag === 'p' && !b.classes.some((c) => BYLINES.includes(c)))
+      .map((b) => indent[blocks.indexOf(b)]);
+    assert.ok(intro.length >= 1, `${file}: phải có đoạn dẫn nhập trước mục đầu tiên`);
+    assert.ok(new Set(intro).size === 1 && intro[0] === headings[0],
+      `${file}: phần mở đầu phải cùng bậc với tiêu đề mục, đang là ${[...new Set(intro)].join(' và ')}px so với ${headings[0]}px`);
+
+    const clauses = levelsOf('p', firstHeading);
+    assert.ok(clauses.length === 1, `${file}: các đoạn thân mục phải cùng một bậc, đang là ${spelled(clauses)}`);
+    assert.ok(clauses[0] > headings[0], `${file}: đoạn thân mục (${clauses[0]}px) phải sâu hơn tiêu đề mục (${headings[0]}px)`);
+    assert.ok(clauses[0] - headings[0] <= 48, `${file}: bậc hai cách bậc một ${clauses[0] - headings[0]}px — quá rộng so với một bậc thụt lề`);
+
+    const lists = levelsOf('ul', firstHeading);
+    if (lists.length) {
+      assert.ok(lists.length === 1, `${file}: các danh sách phải cùng một bậc, đang là ${spelled(lists)}`);
+      assert.ok(lists[0] > clauses[0], `${file}: các ca trong mục (${lists[0]}px) phải sâu hơn đoạn của mục đó (${clauses[0]}px)`);
+      assert.ok(lists[0] - clauses[0] <= 48, `${file}: bậc ba cách bậc hai ${lists[0] - clauses[0]}px — quá rộng so với một bậc thụt lề`);
+    }
+
+    // The bylines under the h1 stay on the parent line: they close the title
+    // block, and the hairline under them is the boundary a reader sees.
+    for (const byline of BYLINES) {
+      const at = blocks.findIndex((b) => b.classes.includes(byline));
+      assert.ok(at >= 0, `${file}: phải có dòng phụ đề .${byline}`);
+      assert.equal(indent[at], 0, `${file}: dòng .${byline} phải nằm cùng hàng với tiêu đề, đang thụt ${indent[at]}px`);
+    }
+    assert.ok(Math.max(...indent) <= 96,
+      `${file}: bậc sâu nhất là ${Math.max(...indent)}px — quá sâu, chữ bị đẩy khỏi khung ngang của header và footer`);
+  }
   assert.match(css, /\.legal \.legal-updated,\.legal \.legal-entity\{[^}]*padding-left:0/,
-    'dòng "Updated" và dòng pháp nhân phải nằm cùng hàng với tiêu đề, không thụt theo phần thân');
+    'dòng "Cập nhật" và dòng pháp nhân phải nằm cùng hàng với tiêu đề, không thụt theo phần thân');
+});
+
+// A gate that cannot go red is not a gate. These two mutations are the failures
+// this page has actually shipped: the second step swallowing the headings, and
+// the ladder being flattened back to one line. If either stops being detected
+// here, the resolver above has stopped seeing the thing it was written to see.
+test('gate thụt lề pháp lý phải bắt được hai lỗi nó sinh ra', () => {
+  const css = read('styles.css');
+  const blocks = legalBlocks(read('terms.html'));
+  const headingLevels = (sheet) => [...new Set(
+    resolveLegalIndents(sheet, blocks).filter((_, i) => blocks[i].tag === 'h2'))].sort((a, b) => a - b);
+
+  const swallowed = css.replace('.legal h2 ~ *:not(h2)', '.legal h2 ~ *');
+  assert.notEqual(swallowed, css, 'phải còn rule .legal h2 ~ *:not(h2) để mutation này có ý nghĩa');
+  assert.equal(headingLevels(swallowed).length, 2,
+    'bỏ :not(h2) phải làm các mục lệch bậc — nếu không, gate này không bắt được đúng lỗi đó');
+
+  const flattened = css.replace('.legal h2 ~ *:not(h2)', '.legal h2 ~ *:not(h2){padding-left:24px}');
+  assert.notEqual(flattened, css, 'phải còn bậc hai riêng để mutation này có ý nghĩa');
+  assert.equal(headingLevels(flattened).length, 1,
+    'làm bậc hai bằng bậc một phải làm tiêu đề mục trùng với đoạn thân mục');
 });
 
 test('vùng cuộn phải có overflow và min-height:0 ngay ở rule cơ bản', () => {

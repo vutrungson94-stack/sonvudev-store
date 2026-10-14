@@ -5,6 +5,7 @@ import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import dotenv from 'dotenv';
+import { supabaseAuthHeaders } from '../src/supabase-http.js';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 dotenv.config({ path: path.join(root, '.env'), override: true });
@@ -29,7 +30,7 @@ if (url && key && /^https:\/\/[a-z0-9-]+\.supabase\.co$/i.test(url)) {
   for (const table of ['products', 'orders']) {
     try {
       const res = await fetch(`${url}/rest/v1/${table}?select=*`, {
-        headers: { apikey: key, Authorization: `Bearer ${key}` },
+        headers: supabaseAuthHeaders(),
         signal: AbortSignal.timeout(30000),
       });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);

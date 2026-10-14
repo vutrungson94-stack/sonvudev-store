@@ -19,13 +19,28 @@ import { fileURLToPath } from "node:url";
 // default is here so a consumer does not have to re-derive the same expression.
 const selfRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
 
-/** The short SHA of HEAD, or "" when git is unavailable (no repo, no binary). */
-export const gitCommit = (root = selfRoot) => {
+/**
+ * Runs a git command and returns its trimmed stdout, or "" when git is
+ * unavailable or the command failed.
+ *
+ * Exported because three consumers each wrote this wrapper. A caller that needs
+ * something other than the commit — a branch name, a dirty flag — used to reach
+ * for spawnSync directly, which is how scripts/provenance.mjs kept a private copy
+ * of the same call that this module already owned.
+ *
+ * @param {string[]} args arguments after "git"
+ * @param {string} [root] the repository to ask
+ * @returns {string} stdout, trimmed, or "" on any failure
+ */
+export const gitCommand = (args, root = selfRoot) => {
   try {
-    const r = spawnSync("git", ["rev-parse", "--short", "HEAD"], { cwd: root, encoding: "utf8" });
+    const r = spawnSync("git", args, { cwd: root, encoding: "utf8" });
     return r.status === 0 ? (r.stdout || "").trim() : "";
   } catch { return ""; }
 };
+
+/** The short SHA of HEAD, or "" when git is unavailable (no repo, no binary). */
+export const gitCommit = (root = selfRoot) => gitCommand(["rev-parse", "--short", "HEAD"], root);
 
 /**
  * A stable-enough version string for cache-busting: the commit when there is

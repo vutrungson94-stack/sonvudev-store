@@ -12,7 +12,13 @@ const amount=(v,currency)=>window.SVDFormat.money(v,currency);// The byte format
 // Cleaner" showed "RA" where the storefront it belongs to shows "RC". Both
 // helpers now come from the one implementation in format.js, which this page
 // loads before this script.
-const formatBytes=(bytes)=>window.SVDFormat.formatBytes(bytes);const initials=(name)=>window.SVDFormat.initials(name);const labels={pending:'Chờ xử lý',pending_transfer:'Chờ chuyển khoản',paid:'Đã thanh toán',payment_failed:'Thất bại',cancelled:'Đã hủy',refunded:'Đã hoàn tiền'};function showToast(m,error=false){toast.textContent=m;toast.className=`toast show${error?' error':''}`;clearTimeout(showToast.timer);showToast.timer=setTimeout(()=>toast.className='toast',3500)}async function api(path,options={}){const r=await fetch(path,{...options,headers:{'Content-Type':'application/json','x-admin-token':token,...(options.headers||{})}}),d=await r.json();if(!r.ok)throw Error(d.error||'Không thể tải dữ liệu');return d}
+const formatBytes=(bytes)=>window.SVDFormat.formatBytes(bytes);const initials=(name)=>window.SVDFormat.initials(name);// The order status names come from format.js, the same table the buyer's order
+// page reads through I18N.status(). This panel carried its own object and three
+// of the six had drifted from the buyer's wording, so the owner and the customer
+// were shown two different names for one order. This page does not load
+// i18n.js — it is an operator screen with no language switch — which is exactly
+// why the table lives in the file both screens load.
+const labels=window.SVDFormat.STATUS_LABELS.vi;function showToast(m,error=false){toast.textContent=m;toast.className=`toast show${error?' error':''}`;clearTimeout(showToast.timer);showToast.timer=setTimeout(()=>toast.className='toast',3500)}async function api(path,options={}){const r=await fetch(path,{...options,headers:{'Content-Type':'application/json','x-admin-token':token,...(options.headers||{})}}),d=await r.json();if(!r.ok)throw Error(d.error||'Không thể tải dữ liệu');return d}
 // Order alerts. A bank transfer can sit unpaid for hours, so the panel polls a
 // cheap endpoint and complains loudly rather than waiting for a manual refresh.
 // Expired orders are already cancelled by the server, so only orders that are

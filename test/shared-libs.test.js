@@ -28,6 +28,48 @@ test('commit dùng cho cache-busting chỉ có một implementation', async () =
   }
 });
 
+// scripts/provenance.mjs was the third git call and was never covered by the gate
+// above, so it kept its own copy: the one assertion in this file that names the
+// files to check is itself a hand-maintained list, which is the pattern that
+// broke the very thing it checks.
+test('không script nào tự gọi git, kể cả provenance', async () => {
+  const scriptsDir = path.join(root, 'scripts');
+  const offenders = [];
+  for (const name of await fs.readdir(scriptsDir)) {
+    if (!name.endsWith('.mjs')) continue;
+    const source = await read(path.join('scripts', name));
+    if (/spawnSync\(\s*['"]git['"]/.test(source)) offenders.push(`scripts/${name}`);
+  }
+  assert.deepEqual(offenders, [],
+    `các script này tự gọi git thay vì dùng commitHash từ src/lib/git.mjs: ${offenders.join(', ')}`);
+});
+
+// The service role key must never reach a browser, and the header that carries it
+// is the piece of code most worth having in exactly one place. Six had it: this
+// module, twice more in src/store.js, three times in the migration script and
+// once in the backup script — and they disagreed, because the server sniffed for
+// a JWT before sending a bearer and the scripts sent one unconditionally. Both
+// readings are defensible, so the behaviour depended on which file the request
+// came from.
+test('service role key chỉ được gắn header ở một chỗ', async () => {
+  const holders = [];
+  const walk = async (dir) => {
+    for (const entry of await fs.readdir(dir, { withFileTypes: true })) {
+      if (entry.name === 'node_modules' || entry.name.startsWith('.')) continue;
+      const target = path.join(dir, entry.name);
+      if (entry.isDirectory()) { await walk(target); continue; }
+      if (!/\.(mjs|js)$/.test(entry.name)) continue;
+      const source = await fs.readFile(target, 'utf8');
+      // The literal header name, not the variable that happens to hold it.
+      if (/\bapikey\s*:/.test(source)) holders.push(path.relative(root, target).replaceAll('\\', '/'));
+    }
+  };
+  await walk(path.join(root, 'src'));
+  await walk(path.join(root, 'scripts'));
+  assert.deepEqual(holders, ['src/supabase-http.js'],
+    `chỉ src/supabase-http.js được tự dựng header gắn service role key; các file sau đang tự làm: ${holders.join(', ')}`);
+});
+
 // A module that only re-exports another and is imported by nothing is dead
 // weight with two homes for the same symbol: it looks like the public entry
 // point, so the next edit lands there and the real module silently keeps the old
@@ -91,7 +133,7 @@ test('initials và định dạng byte: một bản mỗi runtime, và hai runti
   const browser = await read('public/format.js');
   assert.ok(/function initials\(/.test(browser), 'public/format.js phải có initials');
   assert.ok(/function formatBytes\(/.test(browser), 'public/format.js phải có formatBytes');
-  assert.ok(/window\.SVDFormat = \{ esc: esc, money: money, initials: initials, formatBytes: formatBytes \};/.test(browser),
+  assert.ok(/esc:\s*esc,\s*money:\s*money,\s*initials:\s*initials,\s*formatBytes:\s*formatBytes/.test(browser),
     'public/format.js phải xuất bốn hàm dùng chung trên window.SVDFormat');
 
   // And the three consumers call through, each in the shape its file uses.

@@ -4,20 +4,19 @@
 // thêm tool ngoài làm hỏng CI offline.
 import { createHash } from 'node:crypto';
 import { readFile, writeFile, mkdir } from 'node:fs/promises';
-import { spawnSync } from 'node:child_process';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { walkProjectFiles } from './lib/files.mjs';
 import { ARTIFACT_DIRECTORIES, ARTIFACT_FILES } from './lib/artifact.mjs';
+import { gitCommand } from '../src/lib/git.mjs';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const sha256 = (buf) => createHash('sha256').update(buf).digest('hex');
-const git = (...args) => {
-  try {
-    const r = spawnSync('git', args, { cwd: root, encoding: 'utf8' });
-    return r.status === 0 ? (r.stdout || '').trim() : '';
-  } catch { return ''; }
-};
+// The same call src/pages.js and scripts/build-web.mjs use. This file carried its
+// own copy for as long as the shared module existed, which is the pattern that
+// produced the duplication the module was written to remove — and it went
+// unnoticed because the gate over the other two named them explicitly.
+const git = (...args) => gitCommand(args, root);
 
 const files = [];
 for (const d of ARTIFACT_DIRECTORIES) {

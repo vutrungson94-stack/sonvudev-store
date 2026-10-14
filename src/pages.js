@@ -469,7 +469,7 @@ export const brandWordmark = () => {
 export const PAGE_TOKENS = [
   "site", "brandName", "brandWordmark", "support", "paymentWindowHours",
   "reviewMinLength", "reviewMaxLength", "year", "legalEntityLine", "jsonLd", "iconLinks", "cssVersion",
-  "policyUpdated",
+  "policyUpdated", "policyUpdatedDisplay",
 ];
 /**
  * The date printed at the top of the refund policy.
@@ -481,6 +481,31 @@ export const PAGE_TOKENS = [
  * the two can never say different dates.
  */
 export const REFUND_POLICY_UPDATED = "2026-09-28";
+
+/**
+ * The same date as a reader sees it.
+ *
+ * The constant stays ISO because it is written onto every order and has to sort
+ * and compare as a date. A legal page is not that: it prints "28/09/2026" in
+ * Vietnamese and "28 September 2026" to an English reader. Formatting that at
+ * each of the six places it appears is how the six came to disagree in the first
+ * place — three templates typed the date by hand and drifted from the dictionary
+ * the moment the constant moved.
+ *
+ * So there is one formatter and one token, and the fallback text in the HTML and
+ * the string in the dictionary are the same value filled the same way.
+ *
+ * @param {string} iso an ISO date
+ * @param {string} lang the page language
+ * @returns {string} the date as that language writes it
+ */
+export const policyUpdatedFor = (iso, lang) => {
+  const at = new Date(`${String(iso)}T00:00:00Z`);
+  if (!Number.isFinite(at.getTime())) return String(iso);
+  return at.toLocaleDateString(lang === "en" ? "en-GB" : "vi-VN", {
+    day: "2-digit", month: "2-digit", year: "numeric", timeZone: "UTC",
+  });
+};
 /** Placeholders inside product copy, filled on the way out rather than in a page. */
 export const COPY_TOKENS = ["founder", "brand"];
 export const KNOWN_TEMPLATE_TOKENS = [...PAGE_TOKENS, ...COPY_TOKENS];
@@ -506,6 +531,7 @@ export function pageTokenValues({ products = [], reviewLimits = null } = {}) {
     // today. Two copies of this date is the bug where they disagree under a
     // dispute; it lives here because every reader imports it from one module.
     policyUpdated: REFUND_POLICY_UPDATED,
+    policyUpdatedDisplay: policyUpdatedFor(REFUND_POLICY_UPDATED, "vi"),
     legalEntity: env.brand.legalEntity,
     legalEntityLine: legalEntityLine(),
     jsonLd: jsonLdGraph(products),
@@ -566,6 +592,10 @@ export const tokenMeta = () => {
     // page. It travels with the page tokens so the policy date in the dictionary
     // and the one recorded on the order are filled from the same constant.
     policyUpdated: REFUND_POLICY_UPDATED,
+    policyUpdatedDisplay: policyUpdatedFor(REFUND_POLICY_UPDATED, "vi"),
+    // The browser fills the English sentences from this too, so a language switch
+    // shows the date written the way that language writes dates.
+    policyUpdatedDisplayEn: policyUpdatedFor(REFUND_POLICY_UPDATED, "en"),
   };
   return `<meta name="sv-tokens" content="${esc(JSON.stringify(values))}">`;
 };
