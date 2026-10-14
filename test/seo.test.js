@@ -204,11 +204,20 @@ test('ảnh preview nói đúng ngôn ngữ và không bịa giá', async () => 
 
   // The shop-wide card passes no price, and money(0) happily renders "0 ₫" —
   // an invented number, on the card that exists to introduce the shop.
-  const cardSlug = 'sonvudev';
+  //
+  // The card's slug is derived from the configured brand rather than typed in,
+  // the same derivation src/app.js makes. CI runs with a random BRAND_NAME, so a
+  // literal here would pass on this machine and 404 in the gate that matters.
+  const { env } = await import('../src/config.js');
+  const cardSlug = env.brand.name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "") || "shop";
   const siteCard = await (await get(`/og/${cardSlug}.svg`)).text();
-  assert.ok(siteCard.includes('SonVuDev'), 'card của shop phải có tên shop');
+  assert.ok(siteCard.includes(env.brand.name), 'card của shop phải có tên shop');
+  assert.ok(siteCard.includes('Giấy phép vĩnh viễn'), 'mặc định card của shop nói tiếng Việt');
   assert.ok(!siteCard.includes('0 ₫'), 'card của shop không được hiện giá bịa');
   assert.ok(!siteCard.includes('· v1.0'), 'card của shop không được hiện phiên bản bịa');
+  const siteCardEn = await (await get(`/og/${cardSlug}.svg?lang=en`)).text();
+  assert.ok(siteCardEn.includes('One-time licence'), 'card của shop ?lang=en phải nói tiếng Anh');
+  assert.ok(!siteCardEn.includes('Giấy phép'), 'card của shop ?lang=en không được còn câu tiếng Việt');
 });
 
 test('trang chủ có nội dung tiếng Việt ngay trong HTML, không cần chạy JavaScript', async () => {

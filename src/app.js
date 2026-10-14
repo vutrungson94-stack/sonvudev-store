@@ -487,7 +487,7 @@ app.get("/og/:slug.svg", async (req, res) => {
   // card renders in the language it is asked for, and an English page that
   // hands this URL to a crawler can say so.
   if (req.params.slug === siteCardSlug) {
-    return res.set("Cache-Control", "public, max-age=3600").type("image/svg+xml").send(renderOgImage({ name: env.brand.name }));
+    return res.set("Cache-Control", "public, max-age=3600").type("image/svg+xml").send(renderOgImage({ name: env.brand.name }, req.query.lang === "en" ? "en" : "vi"));
   }
   const product = await getProductBySlug(req.params.slug);
   // isSellable rather than a second copy of its rule. The rule — active, has a
