@@ -583,6 +583,84 @@ test('mọi bọc T() phải chuyển tiếp đủ 3 đối số, và placeholde
   }
 });
 
+// The stylesheet itself has to parse, and until this existed nothing checked it.
+//
+// A comment above a rule lost its opening line to an edit that split it in half,
+// which left English prose sitting in the stylesheet. CSS does not nest comments:
+// the first stray */ closed it, and the sentences after it were read as one
+// enormous selector that swallowed the .site-header rule whole. Every other test
+// here still passed, because they all read the file as text and the rule was
+// still right there in it — it was the browser that could not see it. The header
+// collapsed into the corner of the page: no width, no flex, links stacked.
+//
+// Balanced braces alone would not have caught it — the prose swallowed exactly
+// one rule, so the counts still matched. What does catch it is reading the
+// document the way a CSS parser does and looking at what sits in front of each
+// rule: prose, which in a stylesheet means an English sentence where a selector
+// belongs.
+test('styles.css parse được: comment cân, ngoặc cân, và không có văn xuất trước rule', () => {
+  const css = read('styles.css');
+
+  // Walk the file once the way a stylesheet parser does: comments skipped, string
+  // literals skipped, and everything else tracked. Braces inside either of those
+  // are data, not structure.
+  let depth = 0;
+  let inComment = false;
+  let inString = null;
+  const problems = [];
+  const preludes = [];
+  let prelude = '';
+  for (let i = 0; i < css.length; i += 1) {
+    const char = css[i];
+    const next = css[i + 1];
+    if (inComment) {
+      if (char === '*' && next === '/') { inComment = false; i += 1; }
+      continue;
+    }
+    if (inString) {
+      if (char === '\\') { i += 1; continue; }
+      if (char === inString) inString = null;
+      continue;
+    }
+    if (char === '/' && next === '*') { inComment = true; i += 1; continue; }
+    if (char === '"' || char === "'") { inString = char; continue; }
+    if (char === '{') {
+      depth += 1;
+      preludes.push(prelude);
+      prelude = '';
+      continue;
+    }
+    if (char === '}') {
+      depth -= 1;
+      if (depth < 0) { problems.push(`ngoặc đóng thừa tại offset ${i}`); depth = 0; }
+      prelude = '';
+      continue;
+    }
+    if (depth === 0) prelude += char;
+  }
+  if (inComment) problems.push('có comment /* không được đóng — phần còn lại của file sẽ bị coi là comment');
+  if (depth !== 0) problems.push(`${depth} ngoặc mở không được đóng`);
+  const openComments = (css.match(/\/\*/g) || []).length;
+  const closeComments = (css.match(/\*\//g) || []).length;
+  if (openComments !== closeComments) problems.push(`số comment mở (${openComments}) khác số comment đóng (${closeComments})`);
+
+  // A selector never contains an apostrophe: this stylesheet quotes attribute
+  // values with double quotes, and prose always has one ("page's", "doesn't").
+  // One character, and it cannot be fooled by a selector that happens to read
+  // like a sentence.
+  for (const prelude of preludes) {
+    if (prelude.includes("'")) {
+      problems.push(`có dấu nháy đơn ngay trước một rule — văn xuất nằm chỗ selector phải ở: ${prelude.trim().slice(0, 60)}`);
+    }
+  }
+  assert.deepEqual(problems, [], `styles.css không parse được:\n  ${problems.join('\n  ')}`);
+
+  // And the rule that broke is still a rule: an English word where a selector
+  // belongs is the same failure one edit earlier.
+  const badPrelude = preludes.map((p) => p.trim()).find((p) => p && /^(a|an|the|so|and|which|that|it|for|to)\s/i.test(p));
+  assert.equal(badPrelude, undefined, `có văn xuất tiếng Anh trước một rule: ${badPrelude}`);
+});
+
 test('vùng cuộn phải có overflow và min-height:0 ngay ở rule cơ bản', () => {
   const css = read('styles.css');
   // These have to hold on a desktop too, where the 700px query never applies.
