@@ -97,7 +97,12 @@ try {
 // ---------------------------------------------------------------------------
 // 2. The homepage's own metadata.
 // ---------------------------------------------------------------------------
-const title = one(home.body, /<title>([^<]*)<\/title>/i);
+// The title tag carries data-i18n now — the tab title is the one piece of page
+// metadata the language switch has to reach, and a keyed <title> is the only way
+// apply() can touch it. The pattern allows attributes so the checker reads the
+// title that ships rather than an empty string from a stricter pattern that
+// no longer matches anything.
+const title = one(home.body, /<title[^>]*>([^<]*)<\/title>/i);
 const description = one(home.body, /<meta\s+name="description"\s+content="([^"]*)"/i);
 const canonical = one(home.body, /<link\s+rel="canonical"\s+href="([^"]*)"/i);
 record("Tiêu đề trang chủ", title.length > 10 && title.length <= 70, `${title.length} ký tự — "${title}"`);
@@ -442,7 +447,10 @@ try {
     const graph = blocks.flatMap((b) => { try { const p = JSON.parse(b[1].replace(/\\u003c/g, "<")); return p["@graph"] || p; } catch { return []; } });
     const software = graph.find((n) => n["@type"] === "SoftwareApplication");
     const problems = [];
-    if ((body.match(/<title>/g) || []).length !== 1) problems.push("nhiều hơn một thẻ title");
+    // Counts title *elements*, not the string "<title>": a title carrying an
+    // attribute (the static pages now carry data-i18n so the language switch can
+    // reach them) must still count as exactly one.
+    if ((body.match(/<title[^>]*>/g) || []).length !== 1) problems.push("nhiều hơn một thẻ title");
     if (canonicalHere !== loc) problems.push(`canonical lệch (${canonicalHere || "thiếu"})`);
     if (!software) problems.push("thiếu SoftwareApplication");
     if (software && price !== undefined && Number(software.offers?.price) !== Number(price)) problems.push(`giá schema ${software.offers?.price} ≠ giá thật ${price}`);
