@@ -278,15 +278,27 @@ test('mọi trang đều đổi được tiêu đề tab', async () => {
 
   // The sticky header needs a fill or the page scrolls up behind it and the header
   // becomes a strip of half-readable copy. Reported as a scrolling bug on /about,
-  // which carries a product page's body class, so the rule that had position and
-  // z-index without a background is the one a reader actually hit.
+  // and the first fix only reached /about: the rule was scoped to a body class the
+  // About page happens to carry, so /terms and /lookup kept scrolling theirs away.
+  // The pin now lives on the shared .site-header rule, which is what this checks —
+  // one rule, every page, rather than a list of body classes to keep in sync.
   const css = read('styles.css');
-  const sticky = css.match(/^\.product-page \.site-header[^{]*\{([^}]*)\}/m);
-  assert.ok(sticky, 'product-page cần có header sticky');
-  assert.match(sticky[1], /background:/, 'header sticky phải có nền, nếu không chữ nội trang sẽ hiện lên xuyên qua nó khi cuộn');
-  assert.match(sticky[1], /position:sticky/, 'header sticky phải giữ position:sticky');
-  const notFound = css.match(/^\.page-404 \.site-header[^{]*\{([^}]*)\}/m);
-  if (notFound) assert.match(notFound[1], /background:/, '404 cũng cần nền cho header sticky');
+  const sticky = css.match(/^\.site-header\{([^}]*)\}/m);
+  assert.ok(sticky, 'cần có rule .site-header cơ bản');
+  assert.match(sticky[1], /position:sticky/, 'header phải được cố định (sticky) trên mọi trang');
+  assert.match(sticky[1], /background:/, 'header cố định phải có nền, nếu không chữ nội trang sẽ hiện lên xuyên qua nó khi cuộn');
+  assert.match(sticky[1], /z-index:/, 'header cố định phải nổi lên trên nội dung');
+  // And the pinned 78px bar must not swallow a jump target: the nav links are
+  // #products, #why and #faq, all below the fold.
+  const margins = [...css.matchAll(/^([^{}]+)\{[^}]*scroll-margin-top:(\d+)px/mg)];
+  assert.ok(margins.length > 0, 'phải có scroll-margin-top cho các đích nhảy tới bằng anchor');
+  for (const id of ['products', 'why', 'faq']) {
+    const covered = margins.some(([selector]) => new RegExp(`#${id}\\b`).test(selector));
+    assert.ok(covered, `#${id} phải có scroll-margin-top để không bị header cố định che`);
+  }
+  // The admin panel keeps its own height for its own header; the pin itself is
+  // shared, and that is the part a reader sees on every page.
+  assert.match(css, /\.admin-page \.site-header\{[^}]*height:58px/, 'admin giữ chiều cao header riêng');
 });
 
 
