@@ -713,6 +713,30 @@ test('mọi section của trang chủ nằm trên cùng một khung ngang', () =
   assert.match(measure[1], /max-width:\d+px/, 'đoạn văn pháp lý phải có giới hạn chiều rộng để đọc được');
 });
 
+// A document has to show what introduces what, and these pages showed nothing.
+//
+// The eyebrow, the h1, the bylines, the section headings, the paragraphs and the
+// bullets all started on the same vertical line, so the page read as one flat
+// list of equally important blocks — which is what a wall of legal text looks
+// like before it is laid out. Everything the h1 introduces now steps in one
+// level, and the title block above it stays on the parent line.
+test('nội dung trang pháp lý thụt vào so với khối tiêu đề', () => {
+  const css = read('styles.css');
+  const step = /\.legal h1 ~ \*\{([^}]*)\}/.exec(css);
+  assert.ok(step, 'phải có quy tắc thụt nội dung sau h1 — thẳng tuột thì trang pháp lý nhìn như một bức tường');
+  const px = Number(/padding-left:(\d+)px/.exec(step[1])[1]);
+  assert.ok(px >= 24 && px <= 64, `độ thụt phải vừa đủ thấy nhưng không độc quyền trang (24–64px), đang là ${px}px`);
+  // The bylines under the h1 stay on the parent line: they close the title block,
+  // and the hairline under them is the boundary a reader sees.
+  assert.match(css, /\.legal \.legal-updated,\.legal \.legal-entity\{[^}]*padding-left:0/,
+    'dòng "Updated" và dòng pháp nhân phải nằm cùng hàng với tiêu đề, không thụt theo phần thân');
+  // And the list steps in with the rest rather than keeping its own offset: the
+  // rule further down the file has the same specificity and would otherwise win
+  // by order, leaving the bullets hanging to the left of the heading above them.
+  assert.match(css, /\.legal h1 ~ ul\{[^}]*padding-left:40px/,
+    'danh sách phải thụt cùng mức với phần còn lại');
+});
+
 test('vùng cuộn phải có overflow và min-height:0 ngay ở rule cơ bản', () => {
   const css = read('styles.css');
   // These have to hold on a desktop too, where the 700px query never applies.
