@@ -705,12 +705,18 @@ test('mọi section của trang chủ nằm trên cùng một khung ngang', () =
   assert.match(legal[1], new RegExp(`width:min\\(${frameWidth.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\)`),
     '.legal phải dùng cùng khung ngang với .wrap, không phải một cột hẹp lặng lẽ giữa trang');
   assert.match(legal[1], /margin:0 auto/, '.legal phải căn giữa theo khung đó');
-  // A page of clauses is read, not scanned: the lines inside the frame stay at a
-  // measure, so widening the frame to join the grid did not turn the text into a
-  // 160-character scan.
-  const measure = /^\.legal-updated,\.legal h2,\.legal p,\.legal ul\{([^}]*)\}/m.exec(css);
-  assert.ok(measure, 'cần giới hạn chiều rộng đoạn văn pháp lý');
-  assert.match(measure[1], /max-width:\d+px/, 'đoạn văn pháp lý phải có giới hạn chiều rộng để đọc được');
+  // The lines take the whole frame and are justified, so the right edge is a
+  // straight line beside the full-width rule under the title block. A ragged
+  // edge next to that rule is what makes a typeset page look unfinished, and a
+  // narrow measure inside a wide frame wraps the same text early for the same
+  // reason.
+  assert.match(css, /\.legal p,\.legal li\{[^}]*text-align:justify/,
+    'đoạn văn và danh sách pháp lý phải căn đều hai bên (justify)');
+  assert.match(css, /\.legal p,\.legal li\{[^}]*hyphens:auto/,
+    'căn đều cần hyphens:auto để vỡ từ, nếu không dòng dài sẽ hở ra thành lỗ trống');
+  const capped = /\.legal[^{}]*\{[^}]*max-width:\d+px/.exec(css);
+  assert.equal(capped, null,
+    'đoạn văn pháp lý không được giới hạn chiều rộng hẹp hơn khung trang — dòng chữ sẽ bị cắt sớm');
 });
 
 // A document has to show what introduces what, and these pages showed nothing.
@@ -718,23 +724,32 @@ test('mọi section của trang chủ nằm trên cùng một khung ngang', () =
 // The eyebrow, the h1, the bylines, the section headings, the paragraphs and the
 // bullets all started on the same vertical line, so the page read as one flat
 // list of equally important blocks — which is what a wall of legal text looks
-// like before it is laid out. Everything the h1 introduces now steps in one
-// level, and the title block above it stays on the parent line.
-test('nội dung trang pháp lý thụt vào so với khối tiêu đề', () => {
+// like before it is laid out. The ladder is three steps now: the title block
+// introduces a numbered section, the section introduces its clause, and the
+// clause introduces its cases.
+test('nội dung trang pháp lý thụt vào theo từng cấp', () => {
   const css = read('styles.css');
-  const step = /\.legal h1 ~ \*\{([^}]*)\}/.exec(css);
-  assert.ok(step, 'phải có quy tắc thụt nội dung sau h1 — thẳng tuột thì trang pháp lý nhìn như một bức tường');
-  const px = Number(/padding-left:(\d+)px/.exec(step[1])[1]);
-  assert.ok(px >= 24 && px <= 64, `độ thụt phải vừa đủ thấy nhưng không độc quyền trang (24–64px), đang là ${px}px`);
+  const first = /\.legal h1 ~ \*\{([^}]*)\}/.exec(css);
+  assert.ok(first, 'phải có quy tắc thụt nội dung sau h1 — thẳng tuột thì trang pháp lý nhìn như một bức tường');
+  const step1 = Number(/padding-left:(\d+)px/.exec(first[1])[1]);
+  assert.ok(step1 >= 24 && step1 <= 64, `bậc đầu phải vừa đủ thấy (24–64px), đang là ${step1}px`);
+  // One more step for the children of a numbered section, and a third for the
+  // cases listed inside it. Read from the rules rather than assumed, because the
+  // ladder is three numbers that have to keep their distances.
+  const second = /\.legal h2 ~ \*\{([^}]*)\}/.exec(css);
+  assert.ok(second, 'nội dung của mục 1., 2. phải thụt sâu hơn tiêu đề mục');
+  const step2 = Number(/padding-left:(\d+)px/.exec(second[1])[1]);
+  assert.ok(step2 > step1, `bậc thứ hai (${step2}px) phải sâu hơn bậc đầu (${step1}px)`);
+  const third = /\.legal h2 ~ ul\{([^}]*)\}/.exec(css);
+  assert.ok(third, 'danh sách trong mục phải thụt sâu hơn đoạn văn của mục đó');
+  const step3 = Number(/padding-left:(\d+)px/.exec(third[1])[1]);
+  assert.ok(step3 > step2, `bậc thứ ba (${step3}px) phải sâu hơn bậc thứ hai (${step2}px)`);
+  assert.ok(step3 - step2 >= 16 && step3 - step2 <= 80,
+    `khoảng cách giữa bậc ba và bậc hai phải là một bậc rõ ràng, đang là ${step3 - step2}px`);
   // The bylines under the h1 stay on the parent line: they close the title block,
   // and the hairline under them is the boundary a reader sees.
   assert.match(css, /\.legal \.legal-updated,\.legal \.legal-entity\{[^}]*padding-left:0/,
     'dòng "Updated" và dòng pháp nhân phải nằm cùng hàng với tiêu đề, không thụt theo phần thân');
-  // And the list steps in with the rest rather than keeping its own offset: the
-  // rule further down the file has the same specificity and would otherwise win
-  // by order, leaving the bullets hanging to the left of the heading above them.
-  assert.match(css, /\.legal h1 ~ ul\{[^}]*padding-left:40px/,
-    'danh sách phải thụt cùng mức với phần còn lại');
 });
 
 test('vùng cuộn phải có overflow và min-height:0 ngay ở rule cơ bản', () => {
