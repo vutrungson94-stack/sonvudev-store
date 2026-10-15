@@ -713,7 +713,7 @@ app.get("/api/health", adminOrHealth, async (req, res) => {
     elapsedMs: Math.round(Number(process.hrtime.bigint() - startedAt) / 1e6),
     uptime: Math.round(process.uptime()),
     persistence: persistenceMode,
-    r2: isConfigured.r2, paypal: isConfigured.paypal, email: notifyMode(),
+    r2: isConfigured.r2, paypal: isConfigured.paypal, bank: isConfigured.bank, email: notifyMode(),
     orderWindowHours: env.orders?.paymentWindowHours ?? null,
     sweeper: sweeperRunning(),
     search: searchState,
