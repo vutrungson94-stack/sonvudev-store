@@ -393,7 +393,6 @@ const DICT = {
     // says "Vì sao" and "Câu hỏi", so the two keys there would have changed the
     // wording of a link that already had a translation. These are the ones the
     // page actually prints.
-    'about.crumbs.home': 'Trang chủ',
     // The h1 is two pieces because the brand name is a token the server
     // substitutes and <em> styles: the Vietnamese sentence is a span the switch
     // can reach, the brand is markup it must not touch.
@@ -851,7 +850,6 @@ const DICT = {
     'legal.updated': 'Updated: {{policyUpdatedDisplayEn}} · Applies to every transaction at',
 
     // ---- about ----
-    'about.crumbs.home': 'Home',
     'about.h1': 'Who stands behind',
     'about.lede': 'One person writes software for real work, then sells exactly what they use themselves. No company, no investors, no ads team.',
     'about.h2': 'What we build',
@@ -1234,4 +1232,5 @@ if (document.readyState === 'loading') document.addEventListener('DOMContentLoad
 else boot();
 
 window.I18N = I18N;
+
 
