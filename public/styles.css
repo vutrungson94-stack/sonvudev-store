@@ -656,3 +656,14 @@ body.modal-open{overflow:hidden}
    a second full-width row: the copyright joins the flow instead of being pushed
    onto its own line with a border. */
 @media(max-width:800px){.footer-links{justify-content:flex-start}.site-footer{gap:6px 16px}.site-footer small{flex:1 1 auto;border-top:0;padding-top:0;margin-top:0}}
+
+/* About page: align indentation with legal pages */
+.product-detail h1 ~ *{padding-left:24px}
+.product-detail h1 ~ ul{padding-left:24px}
+.product-detail h2 ~ *:not(h2){padding-left:48px}
+.product-detail h2 ~ ul{padding-left:72px}
+.product-detail p,.product-detail li{text-align:justify;hyphens:auto}
+
+
+.product-detail h3 ~ *:not(h3){padding-left:48px}
+.product-detail h3 ~ ul{padding-left:72px}
