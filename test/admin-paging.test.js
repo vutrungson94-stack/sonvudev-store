@@ -8,6 +8,7 @@ import { fileURLToPath } from 'node:url';
 // reads the environment once at load, so this has to come first and has to be
 // complete. See helpers/env.mjs for what a missing entry used to cost.
 import './helpers/env.mjs';
+import { closeTest } from './helpers/teardown.mjs';
 
 // Capping the order query at one page left the panel showing fifty orders and
 // nothing else, with no sign there were more. These cover the two halves of
@@ -50,7 +51,7 @@ test.before(async () => {
     body: JSON.stringify({ name: 'Paging Tester', price: 99000, currency: 'VND', fileKey: 'products/p/1.0.0/p.exe', status: 'active' }),
   })).json()).product;
 });
-test.after(async () => { server?.close(); await fs.rm(tempDir, { recursive: true, force: true }); });
+test.after(async () => { await closeTest(server, tempDir); });
 
 const orders = () => fetch(`${base}/api/admin/orders?limit=10&offset=0`, { headers: { 'x-admin-token': 'test-admin-token' } }).then((r) => r.json());
 const makeOrder = async () => {

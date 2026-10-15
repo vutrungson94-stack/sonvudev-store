@@ -34,6 +34,12 @@ const syncSource = read(path.join('scripts', 'sync-render.mjs'));
 // Every variable config.js reads, in all four of the accessor shapes it uses.
 const readKeys = new Set([
   ...[...configSource.matchAll(/(?:value|numberValue|liveRateValue|configured|hasSupabaseProjectUrl)\(\s*"([A-Z][A-Z0-9_]+)"/g)].map((m) => m[1]),
+  // Direct reads count too. DOTENV_OVERRIDE is read as process.env.DOTENV_OVERRIDE
+  // because it decides whether the file overrides anything at all — it has to be
+  // read before value() exists. An extractor that only understands the accessor
+  // shapes would report it as a key nobody reads, and the honest response to that
+  // would be to delete a switch that is in use.
+  ...[...configSource.matchAll(/process\.env\.([A-Z][A-Z0-9_]+)/g)].map((m) => m[1]),
 ]);
 const documentedKeys = new Set([...envExample.matchAll(/^#?\s*([A-Z][A-Z0-9_]+)=/gm)].map((m) => m[1]));
 const allowedKeys = new Set((syncSource.match(/const ALLOWED = \[([\s\S]*?)\];/)[1].match(/"([A-Z][A-Z0-9_]+)"/g) || []).map((x) => x.replace(/"/g, '')));
@@ -43,11 +49,13 @@ const allowedKeys = new Set((syncSource.match(/const ALLOWED = \[([\s\S]*?)\];/)
 // would be the bug rather than the fix: a Render service must not inherit a local
 // DATA_DIR, and ORDER_SWEEP_DISABLED is only ever set by a test or by an operator
 // who has a second sweeper. PORT and HOST belong to the platform; NODE_ENV is read
-// by Node and by the branches it selects.
-const platformOwned = new Set(['PORT', 'HOST', 'NODE_ENV', 'DATA_DIR', 'ORDER_SWEEP_DISABLED']);
+// by Node and by the branches it selects. DOTENV_OVERRIDE is in the same class and
+// for the same reason: its default is already right on a deployed host, so pushing
+// it would only give a stale value somewhere to hide.
+const platformOwned = new Set(['PORT', 'HOST', 'NODE_ENV', 'DATA_DIR', 'ORDER_SWEEP_DISABLED', 'DOTENV_OVERRIDE']);
 
 test('mọi biến mà config.js đọc đều được ghi trong .env.example', () => {
-  const missing = [...readKeys].filter((key) => !documentedKeys.has(key)).sort();
+  const missing = [...readKeys].filter((key) => !platformOwned.has(key) && !documentedKeys.has(key)).sort();
   assert.deepEqual(missing, [], `thiếu trong .env.example: ${missing.join(', ')}`);
 });
 
@@ -107,6 +115,34 @@ test('mọi file test dùng chung một môi trường', async () => {
   assert.deepEqual(without, [], `các file test chưa dùng môi trường chung: ${without.join(', ')}`);
 });
 
+// The one thing a shared helper must not do.
+//
+// Every test file sets DATA_DIR in its body, and every one of them imports
+// helpers/env.mjs first — the order is the whole mechanism. A helper that
+// statically imports anything from src/ is hoisted above that assignment, so
+// src/store.js resolves its data directory before DATA_DIR exists and falls back to
+// the repository's own data/. The suite then seeds it, overwrites products.json
+// and leaves real-shaped orders behind.
+//
+// It is not hypothetical: test/helpers/teardown.mjs did exactly this, and a run
+// left five test products and a dozen fake orders in data/. The symptom was a
+// wave of "409" product-creation failures that looked like a checkout bug.
+test('helper dùng chung không được import src/ ở đầu file', async () => {
+  const dir = new URL('./helpers/', import.meta.url);
+  const names = await fs.promises.readdir(dir);
+  const offenders = [];
+  for (const name of names) {
+    if (!name.endsWith('.mjs')) continue;
+    const source = await fs.promises.readFile(new URL(name, dir), 'utf8');
+    // A dynamic import inside a function runs when it is called, which is after the
+    // test has set its environment. A top-level `import` does not.
+    const staticImport = /^\s*import\s[^\n]*from\s+['"][^'"]*\/src\/[^'"]*['"]/m.test(source);
+    if (staticImport) offenders.push(name);
+  }
+  assert.deepEqual(offenders, [],
+    `helper import src/ ở đầu file sẽ chạy trước khi test đặt DATA_DIR, và cả suite sẽ ghi vào data/ thật: ${offenders.join(', ')}. Dùng await import() bên trong hàm.`);
+});
+
 test('môi trường test tự đủ, không phụ thuộc .env của máy', async () => {
   // Every value that would reach a real service has to be blanked, not merely absent:
   // dotenv is loaded with override, and a key the file does not mention survives that.
@@ -130,7 +166,7 @@ test('file env cho VPS được ship kèm, không phải tự đoán', async () 
   // rots the same way this one did.
   const template = read(path.join('deploy', 'sonvudev-store.env.example'));
   const templateKeys = new Set([...template.matchAll(/^#?\s*([A-Z][A-Z0-9_]+)=/gm)].map((m) => m[1]));
-  const missing = [...readKeys].filter((key) => !templateKeys.has(key)).sort();
+  const missing = [...readKeys].filter((key) => !platformOwned.has(key) && !templateKeys.has(key)).sort();
   assert.deepEqual(missing, [], `deploy/sonvudev-store.env.example thiếu: ${missing.join(', ')}`);
   // SITE_DOMAIN is not read by the application — it is read by the Caddyfile, which
   // is why the two are separate values. Checked here so the reason is written down.

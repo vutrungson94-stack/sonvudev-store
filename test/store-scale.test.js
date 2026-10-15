@@ -7,6 +7,7 @@ import path from 'node:path';
 // reads the environment once at load, so this has to come first and has to be
 // complete. See helpers/env.mjs for what a missing entry used to cost.
 import './helpers/env.mjs';
+import { closeTest } from './helpers/teardown.mjs';
 
 // The store grew past the shape it was written for. Four readers wanted the
 // order table and all four got all of it, including the ones on a timer and the
@@ -60,7 +61,7 @@ test.before(async () => {
     body: JSON.stringify({ name: 'Scale Tester', price: 99000, currency: 'VND', fileKey: 'products/s/1.0.0/s.exe', status: 'active' }),
   })).json()).product;
 });
-test.after(async () => { server?.close(); await fs.rm(tempDir, { recursive: true, force: true }); });
+test.after(async () => { await closeTest(server, tempDir); });
 
 test('quét hết hạn chỉ đọc đơn còn có thể cảnh báo hoặc huỷ', async () => {
   // History that can never be acted on: long settled, or a deadline days away.

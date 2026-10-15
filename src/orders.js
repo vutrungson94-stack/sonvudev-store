@@ -1,5 +1,5 @@
 import { env } from "./config.js";
-import { getOrder, isClosed, isUnpaid, listExpiringOrders, paymentDeadline, updateOrder } from "./store.js";
+import { getOrder, isClosed, isUnpaid, listExpiringOrders, paymentDeadline, recordOrderPaymentOnce, updateOrder } from "./store.js";
 import { notifyOrder } from "./notify.js";
 
 // A store has to answer two questions the raw status column cannot: when does an
@@ -67,9 +67,18 @@ const inWarningWindow = (order, now) => {
  * payment that lands after the sweep already cancelled the order has still
  * reached the wallet, so the order goes back to paid and the buyer is emailed
  * rather than being asked to pay a second time.
+ *
+ * The guard used to ask whether the *status* was paid, and that is the wrong
+ * question. Delivering an order puts it back to pending, so an order that has
+ * been paid and downloaded looks unpaid again — and PayPal retries a webhook for
+ * days, so a retry arriving the next morning re-counted a payment that had already
+ * been counted: paidCount 2, paidAmount doubled, a second confirmation mailed, and
+ * a revenue report that disagreed with the bank statement. Asking whether a
+ * payment has been *recorded* — paid_count, which the delivery reset does not
+ * touch — is the question that survives the whole lifecycle of the order.
  */
 export async function markOrderPaid(order, { source = "manual", providerAmount = 0, providerCurrency = null } = {}) {
-  if (!order || order.status === "paid") return order;
+  if (!order || hasPayment(order)) return order;
   const now = new Date().toISOString();
   const paidCount = Number(order.paidCount || 0) + 1;
   const update = {
@@ -88,16 +97,22 @@ export async function markOrderPaid(order, { source = "manual", providerAmount =
     update.paidProviderAmount = Number(order.paidProviderAmount || 0) + Number(providerAmount);
     update.paidProviderCurrency = providerCurrency || order.paidProviderCurrency || null;
   }
-  const updated = await updateOrder(order.id, update);
-  // Keyed by payment number so a second confirmed payment mails again, while a
-  // retry of the same one does not.
+  const updated = await recordOrderPaymentOnce(order.id, update);
+  // Null means the row had already recorded a payment by the time this write
+  // reached the database — a duplicate webhook, or the capture and the webhook
+  // racing each other. Both agree the money arrived, so neither counts it twice.
+  if (!updated) {
+    console.log(`[orders] ${order.id} already recorded a payment, ${source} not counted again`);
+    return order;
+  }
+  // Keyed by payment number so a repeat of one notification never sends twice.
   await notifyOrder(updated, "paid", `paid:${paidCount}`);
   console.log(`[orders] ${order.id} paid via ${source}`);
   return updated;
 }
 
 /**
- * Closes the order after the release has been handed over, returning it to the
+ * Records that the release has left the building, and returns the order to the
  * state a brand new order starts in. The revenue is not lost: paidCount and
  * paidAmount stay on the row and deliveredAt records when the file left.
  */

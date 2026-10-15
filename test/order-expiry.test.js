@@ -8,6 +8,7 @@ import { fileURLToPath } from 'node:url';
 // reads the environment once at load, so this has to come first and has to be
 // complete. See helpers/env.mjs for what a missing entry used to cost.
 import './helpers/env.mjs';
+import { closeTest } from './helpers/teardown.mjs';
 
 process.env.NODE_ENV = 'test';
 
@@ -55,7 +56,7 @@ test.before(async () => {
   });
   product = (await created.json()).product;
 });
-test.after(async () => { server?.close(); await fs.rm(tempDir, { recursive: true, force: true }); });
+test.after(async () => { await closeTest(server, tempDir); });
 
 let buyerSeq = 0;
 const checkout = async (overrides = {}) => {
@@ -158,6 +159,63 @@ test('markOrderPaid chạy lại nhiều lần chỉ gửi một mail', async ()
   const second = await markOrderPaid(first, { source: 'webhook' });
   assert.equal(second.paidCount, 1, 'thanh toán trùng không được tính lại');
   assert.equal(second.paidAt, first.paidAt, 'thời điểm thanh toán gốc phải giữ nguyên');
+});
+
+// PayPal redelivers a webhook for days, and delivering a file deliberately returns
+// the order to pending so it cannot be paid twice. Those two facts together were
+// enough to count one payment twice: the order looked unpaid again, the retry
+// landed, and paidAmount doubled while the bank statement did not.
+//
+// The guard is paid_count rather than status for exactly this reason, so the test
+// walks the whole sequence rather than calling markOrderPaid twice in a row.
+test('webhook lặp lại sau khi đã giao không tính doanh thu hai lần', async () => {
+  const { data } = await checkout();
+  const first = await markOrderPaid(await getOrder(data.order.id), { source: 'webhook' });
+  assert.equal(first.paidCount, 1);
+  await markOrderDelivered(await getOrder(data.order.id));
+  const delivered = await getOrder(data.order.id);
+  assert.equal(delivered.status, 'pending', 'giao xong thì đơn về trạng thái đơn mới');
+
+  const retry = await markOrderPaid(delivered, { source: 'webhook-retry' });
+  assert.equal(retry.paidCount, 1, 'một lần thanh toán chỉ được tính một lần');
+  assert.equal(Number(retry.paidAmount), Number(first.paidAmount),
+    'tiền đã thu không được nhân đôi khi PayPal gửi lại webhook');
+  const stored = await getOrder(data.order.id);
+  assert.equal(stored.paidCount, 1);
+  assert.equal(stored.paidAmount, first.paidAmount);
+});
+
+test('hai lần ghi nhận thanh toán chạy song song thì chỉ một lần được ghi', async () => {
+  const { data } = await checkout();
+  // The webhook and the capture call really do arrive together for one payment.
+  // Read once and fire both, which is the closest a test gets to the race.
+  const snapshot = await getOrder(data.order.id);
+  const [a, b] = await Promise.all([
+    markOrderPaid(snapshot, { source: 'webhook' }),
+    markOrderPaid(snapshot, { source: 'capture' }),
+  ]);
+  const stored = await getOrder(data.order.id);
+  assert.equal(stored.paidCount, 1, 'ghi đồng thời thì chỉ một lần được tính');
+  assert.equal(stored.paidAmount, snapshot.amount, 'tiền đã thu không được nhân đôi');
+  // Both callers agree the money arrived, so neither may report a failure.
+  assert.ok(a, 'caller thứ nhất phải nhận về một đơn');
+  assert.ok(b, 'caller thứ hai phải nhận về một đơn');
+});
+
+test('admin xác nhận đơn đã hoàn thì sửa trạng thái, không ghi thêm doanh thu', async () => {
+  const { data } = await checkout();
+  await markOrderPaid(await getOrder(data.order.id), { source: 'admin' });
+  const before = await getOrder(data.order.id);
+  const response = await fetch(`${base}/api/admin/orders/${data.order.id}`, {
+    method: 'PATCH', headers: jsonHeaders,
+    body: JSON.stringify({ status: 'paid' }),
+  });
+  assert.equal(response.status, 200);
+  const after = (await response.json()).order;
+  assert.equal(after.status, 'paid', 'đơn đã hoàn nhầm phải mở lại được');
+  const stored = await getOrder(data.order.id);
+  assert.equal(stored.paidCount, before.paidCount, 'sửa trạng thái không phải là thêm một lần thanh toán');
+  assert.equal(stored.paidAmount, before.paidAmount);
 });
 
 test('nút tải bị khoá trước khi thanh toán và sẽ mở khi đã thanh toán', async () => {

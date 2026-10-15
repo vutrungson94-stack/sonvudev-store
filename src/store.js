@@ -22,8 +22,59 @@ const root = projectRoot;
 export const dataDir = path.join(root, "data");
 const files = { products: path.join(dataDir, "products.json"), orders: path.join(dataDir, "orders.json") };
 let writeChain = Promise.resolve();
-const readJson = async (file, fallback) => { try { return JSON.parse(await fs.readFile(file, "utf8")); } catch { return fallback; } };
-const writeJson = (file, data) => { writeChain = writeChain.then(() => fs.writeFile(file, JSON.stringify(data, null, 2))); return writeChain; };
+
+/**
+ * Reads a JSON file, and says so when it cannot.
+ *
+ * This used to swallow every error into the fallback — a missing file and a
+ * truncated one were the same answer, which meant a half-written orders.json read
+ * as an empty ledger. Nothing was logged, so the next write rebuilt the file from
+ * that empty array and the whole ledger was gone with no trace and no error
+ * anywhere. An empty shop and an empty file have to be told apart, because only one
+ * of them is safe to carry on from.
+ *
+ * @returns {{data:*, recovered:boolean, error:Error|null}}
+ */
+const readJsonFile = async (file, fallback) => {
+  try {
+    return { data: JSON.parse(await fs.readFile(file, "utf8")), recovered: false, error: null };
+  } catch (error) {
+    if (error.code === "ENOENT") return { data: fallback, recovered: false, error: null };
+    console.error(`[store] ${path.basename(file)} is unreadable (${error.message}) — treating it as empty, and the next write will replace it`);
+    return { data: fallback, recovered: true, error };
+  }
+};
+
+const readJson = async (file, fallback) => (await readJsonFile(file, fallback)).data;
+
+/**
+ * Writes a file the way a database commits: nothing is ever half-written.
+ *
+ * fs.writeFile truncates first, so a crash, a full disk or a kill between the two
+ * leaves a file with a valid beginning and no ending. The reader above cannot tell
+ * that from corruption, which is the whole problem. Writing to a temporary file in
+ * the same directory and renaming over the target is the POSIX way to make the
+ * swap atomic, and rename is atomic within a filesystem — the ledger is either the
+ * old one or the new one, never a piece of either.
+ */
+const writeFileAtomic = async (file, contents) => {
+  const temp = `${file}.${process.pid}.tmp`;
+  const handle = await fs.open(temp, "w");
+  try {
+    await handle.writeFile(contents, "utf8");
+    // Flushed before the rename, or the rename can land before the bytes do and
+    // the "atomic" swap publishes an empty file.
+    await handle.sync();
+  } finally {
+    await handle.close();
+  }
+  await fs.rename(temp, file);
+};
+
+const writeJson = (file, data) => {
+  writeChain = writeChain.catch(() => {}).then(() => writeFileAtomic(file, JSON.stringify(data, null, 2)));
+  return writeChain;
+};
 
 /**
  * Read, change and write a JSON file as one indivisible step.
@@ -34,24 +85,54 @@ const writeJson = (file, data) => { writeChain = writeChain.then(() => fs.writeF
  * the first — which on this data means a lost payment count or a refund that never
  * reaches the ledger. Serialising the read inside the same queue is what makes the
  * local path behave the way Postgres already does.
+ *
+ * The queue recovers from a failed write. It did not: one ENOSPC left the chain
+ * permanently rejected, every later mutation skipped its change function without
+ * saying so, and every caller that checks only "did this throw?" read the result
+ * as success. A write that fails is reported; a write that fails once does not
+ * disable the ledger for the rest of the process's life.
  */
 const mutateJson = (file, change) => {
-  writeChain = writeChain.then(async () => {
-    const current = await readJson(file, []);
-    const next = await change(current);
-    await fs.writeFile(file, JSON.stringify(next, null, 2));
+  writeChain = writeChain.catch(() => {}).then(async () => {
+    const { data, recovered } = await readJsonFile(file, []);
+    const next = await change(data);
+    // A recovered read means the change function was handed an empty ledger and
+    // will hand back an empty ledger. Writing that over what was there would be
+    // the one outcome that loses data rather than preserving it, so the write is
+    // refused and the caller is told why.
+    if (recovered && Array.isArray(data) && data.length === 0) {
+      const error = new Error(`${path.basename(file)} could not be read and is not being overwritten`);
+      error.code = "ESTORECORRUPT";
+      throw error;
+    }
+    await writeFileAtomic(file, JSON.stringify(next, null, 2));
     return next;
   });
   return writeChain;
 };
 
+/**
+ * Waits for every queued write to finish.
+ *
+ * src/store.js writes through a promise chain so two updates cannot interleave,
+ * and that chain outlives any single caller. A test that removes the data
+ * directory without waiting is deleting files out from under a write that is
+ * still in flight: the temporary file appears while the directory walk is already
+ * past that name, and on Windows the removal fails with ENOTEMPTY. It is a race,
+ * so it passes on most runs and fails on a loaded machine — which is worse than a
+ * reliable failure, because the next person to see it blames the code under test.
+ *
+ * Call this before removing a directory the store is pointed at.
+ */
+export const flushWrites = async () => { await writeChain.catch(() => {}); };
+
 const seedProducts = [
-  { id: "sonvu-starter", slug: "sonvu-starter", name: "SonVu Starter", shortDescription: "Bộ công cụ nền cho người mới bắt đầu.", description: "Sản phẩm mẫu. Thay nội dung này bằng mô tả phần mềm thật của bạn.", category: "Công cụ", platform: "Windows", version: "1.0.0", price: 149000, currency: "VND", badge: "Phổ biến", features: ["Giao diện tiếng Việt", "Cập nhật miễn phí trong 12 tháng", "Hỗ trợ qua email"], requirements: "Windows 10/11, 4 GB RAM", status: "active", fileKey: "", featured: true, createdAt: new Date().toISOString() },
-  { id: "sonvu-pro", slug: "sonvu-pro", name: "SonVu Pro", shortDescription: "Bộ tính năng nâng cao cho người dùng chuyên nghiệp.", description: "Sản phẩm mẫu cho gói Pro.", category: "Công cụ", platform: "Windows", version: "2.0.0", price: 349000, currency: "VND", badge: "Chuyên nghiệp", features: ["Đầy đủ tính năng Pro", "Ưu tiên hỗ trợ", "Cập nhật lâu dài"], requirements: "Windows 10/11, 8 GB RAM", status: "active", fileKey: "", featured: true, createdAt: new Date().toISOString() },
-  { id: "sonvu-lifetime", slug: "sonvu-lifetime", name: "SonVu Lifetime", shortDescription: "Một lần mua, sử dụng lâu dài.", description: "Sản phẩm mẫu cho gói Lifetime.", category: "Bundle", platform: "Windows", version: "1.0.0", price: 699000, currency: "VND", badge: "Tiết kiệm", features: ["Tất cả gói hiện có", "License cá nhân", "Ưu tiên cập nhật"], requirements: "Windows 10/11, 4 GB RAM", status: "active", fileKey: "", featured: false, createdAt: new Date().toISOString() },
-  { id: "ramcleaner-personal", slug: "ramcleaner-personal", name: "RAMCleaner Personal", shortDescription: "Dọn dẹp bộ nhớ thông minh - bản cá nhân, 1 thiết bị, cập nhật trọn đời.", description: "RAMCleaner Personal giải phóng bộ nhớ RAM bị Windows giữ lại dưới dạng standby/modified, nén bộ nhớ và dọn dẹp file tạm sau phiên làm việc dài.\n\nChỉ cần tải về và chạy - không cài đặt, không cần quyền admin cho chế độ cơ bản. Hỗ trợ Windows 10/11 (x64), Linux (x64), macOS (Intel & Apple Silicon).", category: "Công cụ", platform: "Windows, Linux, macOS", version: "2.0.0", price: 299000, currency: "VND", badge: "Phổ biến", features: ["Dọn dẹp Standby/Modified/List memory tự động", "Nén bộ nhớ (Memory Compression) giảm RAM dùng", "Dọn file tạm User/Windows/Prefetch/Update Cache/Recycle Bin", "Giải phóng RAM bị standby giữ lại sau phiên làm việc dài", "Cập nhật trọn đời miễn phí", "Giao diện tiếng Việt / English", "Không cần cài đặt - portable exe đơn lẻ"], requirements: "Windows 10/11 (x64), Linux (glibc 2.31+), macOS 10.15+ | Cần admin/root cho chế độ aggressive", status: "active", fileKey: "", featured: true, createdAt: new Date().toISOString(), seoTitle: "RAMCleaner – Cách giải phóng RAM standby trên Windows 10/11", seoDescription: "RAM bị giữ lại dạng standby memory sau khi chơi game hay chạy máy ảo? RAMCleaner giải phóng, nén bộ nhớ, dọn file tạm. Portable. 299.000đ.", seoTitleEn: "RAMCleaner – Free Up Standby RAM on Windows 10/11", seoDescriptionEn: "Windows holding RAM as standby memory after gaming or a VM run? RAMCleaner frees standby and modified memory, compresses memory, cleans temp files. Portable. 299,000₫.", shortDescriptionEn: "Smart memory cleaner - personal license, 1 device, lifetime updates.", descriptionEn: "RAMCleaner Personal frees the RAM Windows holds back as standby and modified memory, compresses memory and cleans temp files after a long session. Runs portable - no install, no admin rights needed for basic mode. Supports Windows 10/11 (x64), Linux (x64) and macOS (Intel & Apple Silicon).", featuresEn: ["Auto cleanup Standby/Modified/List memory", "Memory Compression reduces RAM usage", "Clean User/Windows/Prefetch/Update Cache/Recycle Bin temp files", "Frees RAM held back as standby memory after long sessions", "Lifetime free updates", "Vietnamese/English interface", "Portable single exe - no installation"] },
-  { id: "ramcleaner-business", slug: "ramcleaner-business", name: "RAMCleaner Business", shortDescription: "Dọn dẹp bộ nhớ doanh nghiệp - 10 thiết bị, triển khai tập trung, hỗ trợ ưu tiên.", description: "RAMCleaner Business dành cho môi trường doanh nghiệp cần quản lý bộ nhớ trên nhiều máy tính. Bao gồm license 10 thiết bị, file cấu hình tập trung (RamCleaner.config.ini), script triển khai hàng loạt (PowerShell/Bash), systemd timer (Linux) và launchd plist (macOS) cho lịch tự động.\n\nHỗ trợ email ưu tiên trong 1 năm. Tương thích Windows, Linux (Ubuntu/Debian/Fedora/Arch), macOS (Intel & Apple Silicon).", category: "Công cụ", platform: "Windows, Linux, macOS", version: "2.0.0", price: 499000, currency: "VND", badge: "Doanh nghiệp", features: ["Tất cả tính năng Personal", "License 10 thiết bị", "File cấu hình tập trung (RamCleaner.config.ini)", "Script triển khai hàng loạt (PowerShell/Bash/Ansible)", "Systemd timer (Linux) & launchd plist (macOS) cho lịch tự động", "Hỗ trợ email ưu tiên 1 năm", "Chế độ aggressive (cần admin/root) dọn sâu hơn", "Báo cáo HTML/CSV chi tiết sau mỗi lần chạy"], requirements: "Windows 10/11 (x64), Linux (glibc 2.31+), macOS 10.15+ | Cần quyền admin/root cho chế độ aggressive", status: "active", fileKey: "", featured: true, createdAt: new Date().toISOString(), seoTitle: "RAMCleaner Business - Dọn dẹp RAM doanh nghiệp 10 thiết bị, triển khai tập trung", seoDescription: "RAMCleaner Business cho doanh nghiệp: license 10 thiết bị, config tập trung (RamCleaner.config.ini), script triển khai PowerShell/Bash/Ansible, systemd timer (Linux), launchd plist (macOS). Hỗ trợ ưu tiên 1 năm. Giá 499.000đ.", seoTitleEn: "RAMCleaner Business - Enterprise Memory Cleaner 10 Devices, Centralized Deploy", seoDescriptionEn: "Enterprise RAM cleaner: 10-device license, centralized config (RamCleaner.config.ini), mass deploy scripts (PowerShell/Bash/Ansible), systemd timer (Linux), launchd plist (macOS). Priority support 1 year. 499k VND.", shortDescriptionEn: "Enterprise memory cleaner - 10 devices, centralized deploy, priority support.", descriptionEn: "RAMCleaner Business for enterprises managing memory across multiple machines. Includes 10-device license, centralized config file (RamCleaner.config.ini), mass deployment scripts (PowerShell/Bash/Ansible), systemd timer (Linux) and launchd plist (macOS) for automated scheduling. Priority email support for 1 year. Cross-platform: Windows, Linux (Ubuntu/Debian/Fedora/Arch), macOS (Intel & Apple Silicon).", featuresEn: ["All Personal features", "10-device license", "Centralized config file (RamCleaner.config.ini)", "Mass deployment scripts (PowerShell/Bash/Ansible)", "Systemd timer (Linux) & launchd plist (macOS) for auto-scheduling", "Priority email support 1 year", "Aggressive mode (requires admin/root) for deeper cleanup", "Detailed HTML/CSV reports after each run"] },
-  { id: "ramcleaner-earlybird", slug: "ramcleaner-earlybird", name: "RAMCleaner Early Bird", shortDescription: "Ưu đãi sớm - chỉ 199.000đ (giảm 33%) cho 100 khách đầu tiên.", description: "Gói ưu đãi Early Bird cho 100 khách hàng đầu tiên. Bao gồm toàn bộ tính năng RAMCleaner Personal với giá chỉ 199.000đ thay vì 299.000đ.\n\nSau khi hết 100 gói, giá sẽ quay về mức tiêu chuẩn. Mua sớm để khóa giá ưu đãi trọn đời.", category: "Công cụ", platform: "Windows, Linux, macOS", version: "2.0.0", price: 199000, currency: "VND", badge: "Ưu đãi sớm", features: ["Toàn bộ tính năng RAMCleaner Personal", "Giá ưu đãi 199.000đ (giảm 33% so với giá tiêu chuẩn)", "Chỉ 100 gói - hết là hết", "Cập nhật trọn đời như bản tiêu chuẩn", "Hỗ trợ Windows 10/11 (x64), Linux (x64), macOS (Intel & Apple Silicon)"], requirements: "Windows 10/11 (x64), Linux (glibc 2.31+), macOS 10.15+ | Cần admin/root cho chế độ aggressive", status: "active", fileKey: "", featured: true, createdAt: new Date().toISOString(), seoTitle: "RAMCleaner Early Bird - Ưu đãi 199.000đ (giảm 33%) chỉ 100 gói đầu", seoDescription: "RAMCleaner Early Bird: toàn bộ tính năng Personal chỉ 199.000đ thay vì 299.000đ. Chỉ 100 gói ưu đãi sớm, hết là hết. Cập nhật trọn đời. Mua sớm khóa giá ưu đãi.", seoTitleEn: "RAMCleaner Early Bird - 199k VND (33% off) First 100 Customers Only", seoDescriptionEn: "Early Bird deal: all Personal features for 199k VND instead of 299k. Only 100 copies available. Lifetime updates included. Lock in early-bird price forever.", shortDescriptionEn: "Early bird deal - 199k VND (33% off) for first 100 customers.", descriptionEn: "Early Bird offer for the first 100 customers. Full RAMCleaner Personal features at 199,000đ (33% off standard 299,000đ). Once 100 copies sell out, price returns to standard. Lifetime updates included. Windows 10/11 (x64), Linux (x64), macOS (Intel & Apple Silicon).", featuresEn: ["All RAMCleaner Personal features", "Early bird price 199,000đ (33% off standard)", "Only 100 copies - first come first served", "Lifetime updates like standard edition", "Windows 10/11 (x64), Linux (x64), macOS (Intel & Apple Silicon) support"] },
+  { id: "sonvu-starter", slug: "sonvu-starter", name: "SonVu Starter", shortDescription: "Bộ công cụ nền cho người mới bắt đầu.", description: "Sản phẩm mẫu. Thay nội dung này bằng mô tả phần mềm thật của bạn.", category: "Công cụ", platform: "Windows", version: "1.0.0", price: 149000, currency: "VND", badge: "Phổ biến", features: ["Giao diện tiếng Việt", "Cập nhật miễn phí trong 12 tháng", "Hỗ trợ qua email"], requirements: "Windows 10/11, 4 GB RAM", status: "active", fileKey: "", createdAt: new Date().toISOString() },
+  { id: "sonvu-pro", slug: "sonvu-pro", name: "SonVu Pro", shortDescription: "Bộ tính năng nâng cao cho người dùng chuyên nghiệp.", description: "Sản phẩm mẫu cho gói Pro.", category: "Công cụ", platform: "Windows", version: "2.0.0", price: 349000, currency: "VND", badge: "Chuyên nghiệp", features: ["Đầy đủ tính năng Pro", "Ưu tiên hỗ trợ", "Cập nhật lâu dài"], requirements: "Windows 10/11, 8 GB RAM", status: "active", fileKey: "", createdAt: new Date().toISOString() },
+  { id: "sonvu-lifetime", slug: "sonvu-lifetime", name: "SonVu Lifetime", shortDescription: "Một lần mua, sử dụng lâu dài.", description: "Sản phẩm mẫu cho gói Lifetime.", category: "Bundle", platform: "Windows", version: "1.0.0", price: 699000, currency: "VND", badge: "Tiết kiệm", features: ["Tất cả gói hiện có", "License cá nhân", "Ưu tiên cập nhật"], requirements: "Windows 10/11, 4 GB RAM", status: "active", fileKey: "", createdAt: new Date().toISOString() },
+  { id: "ramcleaner-personal", slug: "ramcleaner-personal", name: "RAMCleaner Personal", shortDescription: "Dọn dẹp bộ nhớ thông minh - bản cá nhân, 1 thiết bị, cập nhật trọn đời.", description: "RAMCleaner Personal giải phóng bộ nhớ RAM bị Windows giữ lại dưới dạng standby/modified, nén bộ nhớ và dọn dẹp file tạm sau phiên làm việc dài.\n\nChỉ cần tải về và chạy - không cài đặt, không cần quyền admin cho chế độ cơ bản. Hỗ trợ Windows 10/11 (x64), Linux (x64), macOS (Intel & Apple Silicon).", category: "Công cụ", platform: "Windows, Linux, macOS", version: "2.0.0", price: 299000, currency: "VND", badge: "Phổ biến", features: ["Dọn dẹp Standby/Modified/List memory tự động", "Nén bộ nhớ (Memory Compression) giảm RAM dùng", "Dọn file tạm User/Windows/Prefetch/Update Cache/Recycle Bin", "Giải phóng RAM bị standby giữ lại sau phiên làm việc dài", "Cập nhật trọn đời miễn phí", "Giao diện tiếng Việt / English", "Không cần cài đặt - portable exe đơn lẻ"], requirements: "Windows 10/11 (x64), Linux (glibc 2.31+), macOS 10.15+ | Cần admin/root cho chế độ aggressive", status: "active", fileKey: "", createdAt: new Date().toISOString(), seoTitle: "RAMCleaner – Cách giải phóng RAM standby trên Windows 10/11", seoDescription: "RAM bị giữ lại dạng standby memory sau khi chơi game hay chạy máy ảo? RAMCleaner giải phóng, nén bộ nhớ, dọn file tạm. Portable. 299.000đ.", seoTitleEn: "RAMCleaner – Free Up Standby RAM on Windows 10/11", seoDescriptionEn: "Windows holding RAM as standby memory after gaming or a VM run? RAMCleaner frees standby and modified memory, compresses memory, cleans temp files. Portable. 299,000₫.", shortDescriptionEn: "Smart memory cleaner - personal license, 1 device, lifetime updates.", descriptionEn: "RAMCleaner Personal frees the RAM Windows holds back as standby and modified memory, compresses memory and cleans temp files after a long session. Runs portable - no install, no admin rights needed for basic mode. Supports Windows 10/11 (x64), Linux (x64) and macOS (Intel & Apple Silicon).", featuresEn: ["Auto cleanup Standby/Modified/List memory", "Memory Compression reduces RAM usage", "Clean User/Windows/Prefetch/Update Cache/Recycle Bin temp files", "Frees RAM held back as standby memory after long sessions", "Lifetime free updates", "Vietnamese/English interface", "Portable single exe - no installation"] },
+  { id: "ramcleaner-business", slug: "ramcleaner-business", name: "RAMCleaner Business", shortDescription: "Dọn dẹp bộ nhớ doanh nghiệp - 10 thiết bị, triển khai tập trung, hỗ trợ ưu tiên.", description: "RAMCleaner Business dành cho môi trường doanh nghiệp cần quản lý bộ nhớ trên nhiều máy tính. Bao gồm license 10 thiết bị, file cấu hình tập trung (RamCleaner.config.ini), script triển khai hàng loạt (PowerShell/Bash), systemd timer (Linux) và launchd plist (macOS) cho lịch tự động.\n\nHỗ trợ email ưu tiên trong 1 năm. Tương thích Windows, Linux (Ubuntu/Debian/Fedora/Arch), macOS (Intel & Apple Silicon).", category: "Công cụ", platform: "Windows, Linux, macOS", version: "2.0.0", price: 499000, currency: "VND", badge: "Doanh nghiệp", features: ["Tất cả tính năng Personal", "License 10 thiết bị", "File cấu hình tập trung (RamCleaner.config.ini)", "Script triển khai hàng loạt (PowerShell/Bash/Ansible)", "Systemd timer (Linux) & launchd plist (macOS) cho lịch tự động", "Hỗ trợ email ưu tiên 1 năm", "Chế độ aggressive (cần admin/root) dọn sâu hơn", "Báo cáo HTML/CSV chi tiết sau mỗi lần chạy"], requirements: "Windows 10/11 (x64), Linux (glibc 2.31+), macOS 10.15+ | Cần quyền admin/root cho chế độ aggressive", status: "active", fileKey: "", createdAt: new Date().toISOString(), seoTitle: "RAMCleaner Business - Dọn dẹp RAM doanh nghiệp 10 thiết bị, triển khai tập trung", seoDescription: "RAMCleaner Business cho doanh nghiệp: license 10 thiết bị, config tập trung (RamCleaner.config.ini), script triển khai PowerShell/Bash/Ansible, systemd timer (Linux), launchd plist (macOS). Hỗ trợ ưu tiên 1 năm. Giá 499.000đ.", seoTitleEn: "RAMCleaner Business - Enterprise Memory Cleaner 10 Devices, Centralized Deploy", seoDescriptionEn: "Enterprise RAM cleaner: 10-device license, centralized config (RamCleaner.config.ini), mass deploy scripts (PowerShell/Bash/Ansible), systemd timer (Linux), launchd plist (macOS). Priority support 1 year. 499k VND.", shortDescriptionEn: "Enterprise memory cleaner - 10 devices, centralized deploy, priority support.", descriptionEn: "RAMCleaner Business for enterprises managing memory across multiple machines. Includes 10-device license, centralized config file (RamCleaner.config.ini), mass deployment scripts (PowerShell/Bash/Ansible), systemd timer (Linux) and launchd plist (macOS) for automated scheduling. Priority email support for 1 year. Cross-platform: Windows, Linux (Ubuntu/Debian/Fedora/Arch), macOS (Intel & Apple Silicon).", featuresEn: ["All Personal features", "10-device license", "Centralized config file (RamCleaner.config.ini)", "Mass deployment scripts (PowerShell/Bash/Ansible)", "Systemd timer (Linux) & launchd plist (macOS) for auto-scheduling", "Priority email support 1 year", "Aggressive mode (requires admin/root) for deeper cleanup", "Detailed HTML/CSV reports after each run"] },
+  { id: "ramcleaner-earlybird", slug: "ramcleaner-earlybird", name: "RAMCleaner Early Bird", shortDescription: "Ưu đãi sớm - chỉ 199.000đ (giảm 33%) cho 100 khách đầu tiên.", description: "Gói ưu đãi Early Bird cho 100 khách hàng đầu tiên. Bao gồm toàn bộ tính năng RAMCleaner Personal với giá chỉ 199.000đ thay vì 299.000đ.\n\nSau khi hết 100 gói, giá sẽ quay về mức tiêu chuẩn. Mua sớm để khóa giá ưu đãi trọn đời.", category: "Công cụ", platform: "Windows, Linux, macOS", version: "2.0.0", price: 199000, currency: "VND", badge: "Ưu đãi sớm", features: ["Toàn bộ tính năng RAMCleaner Personal", "Giá ưu đãi 199.000đ (giảm 33% so với giá tiêu chuẩn)", "Chỉ 100 gói - hết là hết", "Cập nhật trọn đời như bản tiêu chuẩn", "Hỗ trợ Windows 10/11 (x64), Linux (x64), macOS (Intel & Apple Silicon)"], requirements: "Windows 10/11 (x64), Linux (glibc 2.31+), macOS 10.15+ | Cần admin/root cho chế độ aggressive", status: "active", fileKey: "", createdAt: new Date().toISOString(), seoTitle: "RAMCleaner Early Bird - Ưu đãi 199.000đ (giảm 33%) chỉ 100 gói đầu", seoDescription: "RAMCleaner Early Bird: toàn bộ tính năng Personal chỉ 199.000đ thay vì 299.000đ. Chỉ 100 gói ưu đãi sớm, hết là hết. Cập nhật trọn đời. Mua sớm khóa giá ưu đãi.", seoTitleEn: "RAMCleaner Early Bird - 199k VND (33% off) First 100 Customers Only", seoDescriptionEn: "Early Bird deal: all Personal features for 199k VND instead of 299k. Only 100 copies available. Lifetime updates included. Lock in early-bird price forever.", shortDescriptionEn: "Early bird deal - 199k VND (33% off) for first 100 customers.", descriptionEn: "Early Bird offer for the first 100 customers. Full RAMCleaner Personal features at 199,000đ (33% off standard 299,000đ). Once 100 copies sell out, price returns to standard. Lifetime updates included. Windows 10/11 (x64), Linux (x64), macOS (Intel & Apple Silicon).", featuresEn: ["All RAMCleaner Personal features", "Early bird price 199,000đ (33% off standard)", "Only 100 copies - first come first served", "Lifetime updates like standard edition", "Windows 10/11 (x64), Linux (x64), macOS (Intel & Apple Silicon) support"] },
 ];
 
 export async function ensureSeed() {
@@ -482,6 +563,47 @@ export async function createOrder(order) {
   return saved;
 }
 export async function updateOrder(id, patch) { if (!local) return fromOrder((await supabase(`orders?id=eq.${encodeURIComponent(id)}`, { method: "PATCH", body: JSON.stringify(toOrder(patch)) }))[0]); let saved = null; await mutateJson(files.orders, (orders) => { const order = orders.find((o) => o.id === id); if (!order) return orders; Object.assign(order, patch, { updatedAt: new Date().toISOString() }); saved = order; return orders; }); return saved; }
+
+/**
+ * A write that only lands on an order that has never recorded a payment.
+ *
+ * updateOrder reads nothing: it PATCHes by id and the last write wins. That is
+ * right for every ordinary edit and wrong for exactly one — recording a payment.
+ * Three entries into that write exist at once (the PayPal webhook, the capture
+ * call, and the admin panel), and nothing stopped two of them from both reading
+ * "no payment recorded", both computing paidCount + 1, and both writing. The order
+ * ends up paid, which is correct, with the revenue doubled and a second
+ * confirmation mailed, which is not.
+ *
+ * So the condition goes into the WHERE clause rather than into the caller's head.
+ * PostgREST turns this into one UPDATE with a predicate, and two concurrent
+ * statements cannot both satisfy it: the second matches nothing and is told so.
+ * The local file gets the same guarantee from the write queue, where the test and
+ * the write are one step.
+ *
+ * paid_count, not status: delivering an order deliberately returns it to pending,
+ * so a status predicate would re-open the door the delivery just closed and the
+ * retry would count again. paid_count is the money record and outlives that reset.
+ *
+ * @returns {object|null} the updated row, or null when a payment was already on it
+ */
+export async function recordOrderPaymentOnce(id, patch) {
+  if (!local) {
+    const rows = await supabase(`orders?id=eq.${encodeURIComponent(id)}&paid_count=eq.0`, {
+      method: "PATCH", body: JSON.stringify(toOrder(patch)),
+    });
+    return rows?.length ? fromOrder(rows[0]) : null;
+  }
+  let saved = null;
+  await mutateJson(files.orders, (orders) => {
+    const order = orders.find((o) => o.id === id);
+    if (!order || Number(order.paidCount || 0) > 0) return orders;
+    Object.assign(order, patch, { updatedAt: new Date().toISOString() });
+    saved = order;
+    return orders;
+  });
+  return saved;
+}
 /**
  * Orders whose file was actually handed over, with just enough on each to answer
  * "did this customer review this product, and what did they say".

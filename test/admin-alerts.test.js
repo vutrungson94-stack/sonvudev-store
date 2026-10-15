@@ -7,6 +7,7 @@ import path from 'node:path';
 // reads the environment once at load, so this has to come first and has to be
 // complete. See helpers/env.mjs for what a missing entry used to cost.
 import './helpers/env.mjs';
+import { closeTest } from './helpers/teardown.mjs';
 
 // The admin badge poll. Losing a paid order because nobody noticed it sitting in
 // a list is the failure this endpoint exists to prevent.
@@ -32,7 +33,7 @@ let server;
 let base;
 
 test.before(async () => { server = (await createApp()).listen(0); base = `http://127.0.0.1:${server.address().port}`; });
-test.after(async () => { server?.close(); await fs.rm(tempDir, { recursive: true, force: true }); });
+test.after(async () => { await closeTest(server, tempDir); });
 
 const auth = () => ({ 'x-admin-token': 'test-admin-token' });
 

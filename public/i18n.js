@@ -27,8 +27,6 @@ const supportAddress = () => document.body?.dataset?.support || '';
 
 const DICT = {
   vi: {
-    'lang.switch': 'EN',
-    'lang.switchAria': 'Chuyển sang tiếng Anh',
     // Địa chỉ hỗ trợ do máy chủ đưa vào data-support, không ghi tay ở đây.
     'brand.supportEmail': supportAddress(),
     'brand.tagline': 'Phần mềm tốt cho công việc tốt.',
@@ -83,6 +81,7 @@ const DICT = {
     'api.err.paypalMismatch': 'PayPal chưa xác nhận đúng đơn hàng hoặc số tiền',
     'api.err.notPaypalOrder': 'Đơn hàng không dùng PayPal',
     'api.err.paypalUnconfigured': 'PayPal chưa được cấu hình. Hãy chọn chuyển khoản hoặc cấu hình PayPal trên server.',
+    'api.err.rateLimited': 'Quá nhiều yêu cầu. Vui lòng thử lại sau.',
     'api.err.rateLimitedCreate': 'Bạn đã tạo quá nhiều đơn hàng. Vui lòng thử lại sau 15 phút.',
     'api.err.rateLimitedLookup': 'Bạn đã tra cứu quá nhiều lần. Vui lòng thử lại sau 15 phút.',
     'api.err.invalidProductInput': 'Tên hoặc giá sản phẩm không hợp lệ',
@@ -105,6 +104,7 @@ const DICT = {
     'api.err.productUpdate': 'Không thể cập nhật sản phẩm',
     'api.err.slugRequired': 'Tên sản phẩm không tạo được đường dẫn. Hãy nhập slug.',
     'api.err.slugTaken': 'Đường dẫn này đã có sản phẩm khác dùng rồi.',
+    'api.err.invalidPrice': 'Giá không hợp lệ',
     'api.err.reviewSave': 'Không thể lưu đánh giá',
     'api.err.revenue': 'Không tổng hợp được doanh thu',
     'api.err.orderCheck': 'Không kiểm tra được đơn hàng',
@@ -117,10 +117,13 @@ const DICT = {
     // buttons stayed Vietnamese on an English 404 — the page a visitor lands on
     // after a bad link. No gate caught it because the audit only looks for keys
     // nothing uses, never for keys a page uses and the dictionary is missing.
-    'nav.why': 'Vì sao chọn {brand}',
+    // nav.why and nav.store are gone, and so are about.nav.* below: the header and
+    // the footer are rendered by src/pages.js from one list of links (headerNav /
+    // footerLinks), so no page carries its own navigation any more. What the
+    // dictionary no longer names, the pages no longer print, and leaving the four
+    // here would be exactly the dead copy the audit is built to catch.
     'nav.faq': 'FAQ',
     'nav.buy': 'Mua ngay',
-    'nav.store': 'Cửa hàng',
     'nav.terms': 'Điều khoản',
     'nav.privacy': 'Bảo mật',
     'nav.refund': 'Hoàn tiền',
@@ -390,8 +393,6 @@ const DICT = {
     // says "Vì sao" and "Câu hỏi", so the two keys there would have changed the
     // wording of a link that already had a translation. These are the ones the
     // page actually prints.
-    'about.nav.why': 'Vì sao',
-    'about.nav.faq': 'Câu hỏi',
     'about.crumbs.home': 'Trang chủ',
     // The h1 is two pieces because the brand name is a token the server
     // substitutes and <em> styles: the Vietnamese sentence is a span the switch
@@ -558,8 +559,6 @@ const DICT = {
     'legal.refund.p10': 'Mọi yêu cầu hoàn tiền gửi tới <a href="mailto:{{support}}">{{support}}</a>. Vui lòng nêu mã đơn hàng để chúng tôi tra cứu nhanh. Chúng tôi không giải quyết khiếu nại qua mạng xã hội, vì không thể xác minh danh tính người gửi trên các kênh đó.',
   },
   en: {
-    'lang.switch': 'VI',
-    'lang.switchAria': 'Switch to Vietnamese',
     // The configured default. The server substitutes the live SUPPORT_EMAIL.
     'brand.supportEmail': supportAddress(),
     'brand.tagline': 'Good software for good work.',
@@ -605,6 +604,7 @@ const DICT = {
     'api.err.paypalMismatch': 'PayPal did not confirm this order or amount',
     'api.err.notPaypalOrder': 'This order was not paid with PayPal',
     'api.err.paypalUnconfigured': 'PayPal is not configured. Choose bank transfer, or configure PayPal on the server.',
+    'api.err.rateLimited': 'Too many requests. Please try again shortly.',
     'api.err.rateLimitedCreate': 'Too many orders placed. Please try again in 15 minutes.',
     'api.err.rateLimitedLookup': 'Too many lookups. Please try again in 15 minutes.',
     'api.err.invalidProductInput': 'That product name or price is not valid',
@@ -627,6 +627,7 @@ const DICT = {
     'api.err.productUpdate': 'Could not update the product',
     'api.err.slugRequired': 'That product name does not make a valid path. Enter a slug.',
     'api.err.slugTaken': 'That path already belongs to another product.',
+    'api.err.invalidPrice': 'That price is not a valid amount',
     'api.err.reviewSave': 'Could not save the review',
     'api.err.revenue': 'Could not total the revenue',
     'api.err.orderCheck': 'Could not verify the order',
@@ -634,10 +635,8 @@ const DICT = {
     'api.err.internal': 'Something went wrong on our side',
     'api.err.webhookRejected': 'Webhook rejected',
     'api.err.webhookSignature': 'Webhook signature is not valid',
-    'nav.why': 'Why {brand}',
     'nav.faq': 'FAQ',
     'nav.buy': 'Buy now',
-    'nav.store': 'Store',
     'nav.terms': 'Terms',
     'nav.privacy': 'Privacy',
     'nav.about': 'About us',
@@ -852,8 +851,6 @@ const DICT = {
     'legal.updated': 'Updated: {{policyUpdatedDisplayEn}} · Applies to every transaction at',
 
     // ---- about ----
-    'about.nav.why': 'Why us',
-    'about.nav.faq': 'Questions',
     'about.crumbs.home': 'Home',
     'about.h1': 'Who stands behind',
     'about.lede': 'One person writes software for real work, then sells exactly what they use themselves. No company, no investors, no ads team.',
@@ -1094,7 +1091,6 @@ const I18N = {
     markActiveLanguage();
     listeners.forEach((fn) => { try { fn(lang); } catch (e) { console.error(e); } });
   },
-  toggle() { I18N.set(current === 'vi' ? 'en' : 'vi'); },
   onChange(fn) { listeners.add(fn); return () => listeners.delete(fn); },
   get locale() { return current === 'en' ? 'en-US' : 'vi-VN'; },
   esc(value) {
@@ -1106,9 +1102,6 @@ const I18N = {
   date(value) {
     const at = value ? new Date(value) : new Date(NaN);
     return Number.isFinite(at.getTime()) ? at.toLocaleString(I18N.locale) : '';
-  },
-  statusKey(status) {
-    return (window.SVDFormat && window.SVDFormat.ORDER_STATUSES.indexOf(status) >= 0) ? status : 'pending';
   },
   status(status) {
     // The one table, read through the page's language. Falling back to the raw
@@ -1228,15 +1221,13 @@ function boot() {
       I18N.set(target);
     });
   });
-  // The single-button form - kept for compatibility but does client-side toggle
-  const button = document.querySelector('[data-lang-toggle]');
-  if (button) {
-    button.textContent = I18N.t('lang.switch');
-    button.setAttribute('aria-label', I18N.t('lang.switchAria'));
-    button.addEventListener('click', () => I18N.toggle());
-  }
   markActiveLanguage();
-  document.dispatchEvent(new CustomEvent('i18n:ready', { detail: { lang: current } }));
+  // On window, not document: app.js listens on window to repaint an open modal
+  // when the language flips, and a CustomEvent dispatched on document without
+  // `bubbles` stops at document. It was dispatched on document, so the listener
+  // there could never fire — a repaint path that had never run and read as one
+  // that worked.
+  window.dispatchEvent(new CustomEvent('i18n:ready', { detail: { lang: current } }));
 }
 
 if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', boot);

@@ -8,6 +8,7 @@ import { fileURLToPath } from 'node:url';
 // reads the environment once at load, so this has to come first and has to be
 // complete. See helpers/env.mjs for what a missing entry used to cost.
 import './helpers/env.mjs';
+import { closeTest } from './helpers/teardown.mjs';
 
 // The support address was written into five places by hand: the email templates,
 // the terms, the privacy policy, the refund policy, and the order page. Changing
@@ -40,7 +41,7 @@ const publicFile = (name) => read(path.join('public', name));
 let server;
 let base;
 test.before(async () => { server = (await createApp()).listen(0); base = `http://127.0.0.1:${server.address().port}`; });
-test.after(async () => { server?.close(); await fs.rm(tempDir, { recursive: true, force: true }); });
+test.after(async () => { await closeTest(server, tempDir); });
 
 const page = async (route) => (await fetch(`${base}${route}`)).text();
 

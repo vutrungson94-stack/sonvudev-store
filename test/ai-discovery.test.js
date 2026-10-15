@@ -9,6 +9,7 @@ import { fileURLToPath } from 'node:url';
 // reads the environment once at load, so this has to come first and has to be
 // complete. See helpers/env.mjs for what a missing entry used to cost.
 import './helpers/env.mjs';
+import { closeTest } from './helpers/teardown.mjs';
 
 // Resolved from the file's own location rather than from process.cwd(). These
 // checks read files inside the repository, and an IDE that runs a single test
@@ -84,7 +85,7 @@ test.before(async () => {
   assert.equal(created.status, 201);
   product = (await created.json()).product;
 });
-test.after(async () => { server?.close(); await fs.rm(tempDir, { recursive: true, force: true }); });
+test.after(async () => { await closeTest(server, tempDir); });
 
 const page = async (url) => {
   const response = await fetch(`${base}${url}`);

@@ -7,6 +7,7 @@ import path from 'node:path';
 // reads the environment once at load, so this has to come first and has to be
 // complete. See helpers/env.mjs for what a missing entry used to cost.
 import './helpers/env.mjs';
+import { closeTest } from './helpers/teardown.mjs';
 
 process.env.NODE_ENV = 'test';
 
@@ -48,7 +49,7 @@ test.before(async () => {
   });
   product = (await created.json()).product;
 });
-test.after(async () => { server?.close(); await fs.rm(tempDir, { recursive: true, force: true }); });
+test.after(async () => { await closeTest(server, tempDir); });
 
 let counter = 0;
 const buy = async () => {

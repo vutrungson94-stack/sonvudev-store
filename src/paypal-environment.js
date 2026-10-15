@@ -28,6 +28,27 @@ const LIVE = "https://api-m.paypal.com";
 const SANDBOX = "https://api-m.sandbox.paypal.com";
 
 /**
+ * What PayPal can charge in, and which of those have no minor unit.
+ *
+ * It lives here, beside the endpoints, because this is the module both sides of
+ * the question already import: src/config.js decides whether PayPal counts as
+ * configured, and src/paypal.js decides whether a charge is acceptable. They used
+ * to carry separate lists — seven currencies here-side against twenty-five
+ * there-side — so a shop configured with CHF was reported as unconfigured by one
+ * and allowed by the other, and neither answer was wrong about its own question.
+ * They are the same question, so they are one list.
+ *
+ * JPY, HUF and TWD are quoted in whole units: PayPal rejects "1200.00" for them
+ * and expects "1200", so the rounding rule belongs beside the list it applies to.
+ */
+export const PAYPAL_CURRENCIES = new Set([
+  "AUD", "BRL", "CAD", "CHF", "CNY", "CZK", "DKK", "EUR", "GBP", "HKD", "HUF",
+  "ILS", "JPY", "MXN", "MYR", "NOK", "NZD", "PHP", "PLN", "RUB", "SEK", "SGD",
+  "THB", "TWD", "USD",
+]);
+export const PAYPAL_ZERO_DECIMAL = new Set(["JPY", "HUF", "TWD"]);
+
+/**
  * @param {string|undefined|null} raw the value of PAYPAL_ENVIRONMENT
  * @returns {{environment: 'live'|'sandbox', isSet: boolean, apiBase: string, reason: string}}
  */

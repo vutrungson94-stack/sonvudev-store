@@ -179,9 +179,13 @@ const OG_IMAGE_PATH = "/og.png";
  */
 const OG_IMAGE = { path: OG_IMAGE_PATH, width: 1200, height: 630 };
 
-export const brand = () => env.brand.name;
+// brand, organization, brandWordmark and legalEntityLine were all exported. None of
+// them has an importer anywhere in src/, scripts/ or test/ — each is used only by
+// this module — and an export with no reader is an API nobody agreed to. They stay
+// here as functions, which is what they always were; the export was the orphan.
+const brand = () => env.brand.name;
 
-export const organization = () => ({
+const organization = () => ({
   "@type": "Organization",
   "@id": `${site()}/#organization`,
   name: brand(),
@@ -426,7 +430,7 @@ export const analyticsMeta = () => {
  * gives SonVu|Dev, "MyStore" gives My|Store, and a single-word name gives no split at
  * all — which is the right answer rather than a failure.
  */
-export const brandWordmark = () => {
+const brandWordmark = () => {
   const name = String(env.brand.name || "").trim();
   const mark = esc(name.slice(0, 1));
   let cut = -1;
@@ -449,6 +453,117 @@ export const brandWordmark = () => {
 };
 
 /**
+ * The header bar and the footer, written once.
+ *
+ * Both used to be a block of markup copied into ten files, and ten copies is nine
+ * chances to be the tenth one that is different. /about and /404 still carried the
+ * old one-line footer, /lookup and /paypal-return carried no bar at all, and the
+ * homepage carried a third navigation that no other page could afford to copy
+ * because it held the language switch. Nothing reported any of it: every file was
+ * internally correct, and no check asks whether two pages agree with each other.
+ *
+ * So the set of links is data here, and the one question a hand-written file
+ * cannot answer is answered by code — which of these links points back at the page
+ * the reader is already on. A footer offering "Terms" to someone reading the terms
+ * is a button that costs a click to arrive where they already are, and the answer
+ * depends on the route, which only the server knows. Excluding the current page is
+ * therefore not a thing each template may or may not do; it is the behaviour of
+ * every footer, written once, on every page including the ones generated in code.
+ *
+ * Two label sources, one list. The static pages are translated in the browser by
+ * public/i18n.js, so their anchors carry data-i18n and the Vietnamese inside them
+ * is only the pre-script fallback a crawler reads. The product page is rendered by
+ * this module in one language per URL and loads no dictionary, so it reads
+ * COPY_VI/COPY_EN. `vi` is therefore the one word that appears in both worlds — it
+ * is the fallback the server writes into the markup, and audit-web.mjs holds it
+ * against the dictionary's own Vietnamese, so the two cannot drift.
+ */
+
+/**
+ * A link, and the page it belongs to.
+ *
+ * `route` is what makes two links "the same page to a reader": the two homepage
+ * anchors share the route "/" because they are sections of it, and the footer
+ * drops both while the reader stands there. `page: true` marks a whole page, and
+ * only a whole page can be aria-current="page" — two anchors on the homepage would
+ * otherwise both claim to be the page the reader is on, and the announcement a
+ * screen reader makes would name a section as if it were the site.
+ */
+const HEADER_LINKS = [
+  { href: "/#products", route: "/", key: "nav.products", copy: "products", vi: "Sản phẩm" },
+  { href: "/#faq", route: "/", key: "nav.faq", copy: "faqNav", vi: "FAQ" },
+  { href: "/terms", route: "/terms", key: "nav.terms", copy: "terms", vi: "Điều khoản", page: true },
+];
+
+const FOOTER_LINKS = [
+  { href: "/#products", route: "/", key: "nav.products", copy: "products", vi: "Sản phẩm" },
+  { href: "/#faq", route: "/", key: "nav.faq", copy: "faqNav", vi: "FAQ" },
+  { href: "/terms", route: "/terms", key: "nav.terms", copy: "terms", vi: "Điều khoản", page: true },
+  { href: "/privacy", route: "/privacy", key: "nav.privacy", copy: "privacy", vi: "Bảo mật", page: true },
+  { href: "/refund", route: "/refund", key: "nav.refund", copy: "refund", vi: "Hoàn tiền", page: true },
+  { href: "/about", route: "/about", key: "nav.about", copy: "about", vi: "Về chúng tôi", page: true },
+  { href: "/lookup", route: "/lookup", key: "nav.lookup", copy: "lookup", vi: "Tra cứu đơn", page: true },
+  { mail: true, route: null, key: "nav.contact", copy: "contact", vi: "Liên hệ" },
+];
+
+/**
+ * The route a template answers on, from the file it lives in.
+ *
+ * The file name is the route because every page in public/ is registered under its
+ * own name by src/app.js — /terms.html answers /terms — so this reads the same
+ * table the router does rather than keeping a second list of addresses.
+ */
+export const routeForFile = (file) => {
+  const name = String(file || "").trim();
+  if (!name) return "";
+  if (name === "index.html") return "/";
+  return `/${name.replace(/\.html$/, "")}`;
+};
+
+const chromeLink = (link, route, copy) => {
+  // The support address is configuration, and it is already filled into these
+  // pages as {{support}} — the same value the mail templates and the terms use.
+  const href = link.mail ? `mailto:${esc(env.email.supportEmail)}` : link.href;
+  const label = copy ? copy[link.copy] : link.vi;
+  const current = link.page && link.route === route ? ' aria-current="page"' : "";
+  // The dictionary form keeps the switch working on a page that loads i18n.js;
+  // the copy form is the product page, which is written in one language already.
+  return copy
+    ? `<a href="${href}"${current}>${esc(label)}</a>`
+    : `<a href="${href}" data-i18n="${link.key}"${current}>${esc(label)}</a>`;
+};
+
+/**
+ * The navigation every page carries, wrapped in its own <nav>.
+ *
+ * @param {string} route the route being rendered, or "" when it is none of them
+ * @param {object} [copy] COPY_VI/COPY_EN when the server writes the words itself
+ */
+export const headerNav = (route, copy = null) =>
+  `<nav>${HEADER_LINKS.map((link) => chromeLink(link, route, copy)).join("")}</nav>`;
+
+/**
+ * The footer's links: every one of them, except the one that points at this page.
+ *
+ * @param {string} route the route being rendered, or "" when it is none of them
+ * @param {object} [copy] COPY_VI/COPY_EN when the server writes the words itself
+ */
+export const footerLinks = (route, copy = null) =>
+  FOOTER_LINKS.filter((link) => !link.route || link.route !== route)
+    .map((link) => chromeLink(link, route, copy)).join("");
+
+/**
+ * The footer as one element, for the page rendered in code rather than from a
+ * template. The template pages get their <footer> from their own file so the brand
+ * wordmark and the tagline stay in the markup; this is the same bar without the
+ * two strings that live only in the dictionary.
+ */
+export const footerBar = (route, copy) =>
+  `<footer class="site-footer wrap"><div class="brand">${brandWordmark()}</div>` +
+  `<div class="footer-links">${footerLinks(route, copy)}</div>` +
+  `<small>© ${new Date().getFullYear()} ${esc(brand())} · ${esc(copy.tagline)}</small></footer>`;
+
+/**
  * Every {{token}} a static page template is allowed to carry, in one place.
  *
  * This list used to exist three times — as eleven replaceAll calls in
@@ -469,7 +584,7 @@ export const brandWordmark = () => {
 export const PAGE_TOKENS = [
   "site", "brandName", "brandWordmark", "support", "paymentWindowHours",
   "reviewMinLength", "reviewMaxLength", "year", "legalEntityLine", "jsonLd", "iconLinks", "cssVersion",
-  "policyUpdated", "policyUpdatedDisplay",
+  "policyUpdated", "policyUpdatedDisplay", "headerNav", "footerLinks",
 ];
 /**
  * The date printed at the top of the refund policy.
@@ -514,8 +629,13 @@ export const KNOWN_TEMPLATE_TOKENS = [...PAGE_TOKENS, ...COPY_TOKENS];
  * The value of every page token for one render. reviewLimits travels as an
  * argument rather than an import so this module keeps its single dependency on
  * the store and never reaches into the review rules itself.
+ *
+ * `page` is the template being rendered, and it is the one thing the chrome needs
+ * to know: the footer is the same everywhere except that it does not offer a link
+ * back to the page it is printed on. See headerNav() and footerLinks().
  */
-export function pageTokenValues({ products = [], reviewLimits = null } = {}) {
+export function pageTokenValues({ products = [], reviewLimits = null, page = "" } = {}) {
+  const route = routeForFile(page);
   return {
     site: env.appUrl,
     brandName: esc(env.brand.name),
@@ -532,12 +652,20 @@ export function pageTokenValues({ products = [], reviewLimits = null } = {}) {
     // dispute; it lives here because every reader imports it from one module.
     policyUpdated: REFUND_POLICY_UPDATED,
     policyUpdatedDisplay: policyUpdatedFor(REFUND_POLICY_UPDATED, "vi"),
-    legalEntity: env.brand.legalEntity,
+    // Only legalEntityLine, not legalEntity. fillPageTokens fills the names in
+    // PAGE_TOKENS and "legalEntity" is not one of them, so the bare value below
+    // was an entry in this object that nothing could ever read — the legal entity
+    // reached the page through the line, which is what handles it being empty.
     legalEntityLine: legalEntityLine(),
     jsonLd: jsonLdGraph(products),
     // Rendered, not written into nine <head>s. The icon block is nine lines in ten
     // places otherwise, and the page that misses one is the page with no iOS icon.
     iconLinks: iconLinkMarkup().join("\n"),
+    // The same argument for the two bars, and one step further: the footer cannot
+    // be a block of text at all, because which of its links is missing depends on
+    // the route being rendered.
+    headerNav: headerNav(route),
+    footerLinks: footerLinks(route),
     cssVersion,
   };
 }
@@ -632,7 +760,7 @@ const productUrl = (slug, lang = "vi") => (lang === "en" ? `/en/product/${slug}`
  * artefact that only a person looking at the page would ever notice, whereas
  * omitting it is a decision the markup makes visible in review.
  */
-export const legalEntityLine = (className = 'legal-entity') => {
+const legalEntityLine = (className = 'legal-entity') => {
   const name = String(env.brand.legalEntity || '').trim();
   return name ? `<p class="${className}">${esc(name)}</p>` : '';
 };
@@ -813,9 +941,13 @@ export const renderStats = (products) => {
 export const COPY_VI = {
   home: "Trang chủ",
   products: "Sản phẩm",
-  why: "Vì sao",
   faqNav: "Câu hỏi",
   about: "Về chúng tôi",
+  // The footer on a product page is the same list as every other page's, so these
+  // two are not decoration on this page: without them the generated footer could
+  // not carry the last two links the shop has.
+  lookup: "Tra cứu đơn",
+  contact: "Liên hệ",
   breadcrumbLabel: "Đường dẫn",
   software: "Phần mềm",
   // Category and badge are free-text columns, so a Vietnamese product carries
@@ -860,9 +992,10 @@ export const COPY_VI = {
 export const COPY_EN = {
   home: "Home",
   products: "Products",
-  why: "Why us",
   faqNav: "FAQ",
   about: "About",
+  lookup: "Order lookup",
+  contact: "Contact",
   breadcrumbLabel: "Breadcrumb",
   software: "Software",
   // The Vietnamese values, translated. See the note on COPY_VI: the category and
@@ -1057,7 +1190,7 @@ ${analyticsMeta()}
 ${jsonLd([organization(), websiteSchema(), productSchema(product, lang), breadcrumbSchema(product, lang), faq])}
 </head>
 <body class="product-page">
-<header class="site-header"><a class="brand" href="/">${brandWordmark()}</a><nav><a href="/#products">${copy.products}</a><a href="/#why">${copy.why}</a><a href="/#faq">${copy.faqNav}</a></nav><a class="header-cta" href="#mua">${copy.buyNow} <span>↗</span></a></header>
+<header class="site-header"><a class="brand" href="/">${brandWordmark()}${headerNav("", copy)}<a class="header-cta" href="/#products"><span>${esc(copy.buyNow)}</span> <span>↗</span></a></header>
 <main class="wrap">
 <nav class="crumbs" aria-label="${copy.breadcrumbLabel}"><a href="/">${copy.home}</a> <span>/</span> <a href="/#products">${copy.products}</a> <span>/</span> <span aria-current="page">${esc(product.name)}</span></nav>
 <article class="product-detail">
@@ -1090,7 +1223,7 @@ ${reviews.length ? `<section class="detail-block reviews"><h2>${copy.reviewsHead
 </article>
 <section class="related"><h2>${copy.related}</h2><div id="related" class="related-grid">${copy.loading}</div></section>
 </main>
-<footer class="site-footer wrap"><p>© ${new Date().getFullYear()} ${esc(brand())} · <a href="/terms">${copy.terms}</a> · <a href="/refund">${copy.refund}</a> · <a href="/privacy">${copy.privacy}</a> · <a href="/about">${copy.about}</a></p></footer>
+${footerBar("", copy)}
 <!--
   The related-products loader lives in /related.js rather than inline. The server
   sends script-src 'self' with no 'unsafe-inline' and no nonce, so an inline block
@@ -1099,7 +1232,7 @@ ${reviews.length ? `<section class="detail-block reviews"><h2>${copy.reviewsHead
   strict and the script moves.
 -->
 <script src="/format.js"></script>
-<script src="/related.js" data-slug="${esc(product.slug)}" data-self="${esc(product.id)}"></script>
+<script src="/related.js" data-self="${esc(product.id)}"></script>
 </body>
 </html>`;
 }

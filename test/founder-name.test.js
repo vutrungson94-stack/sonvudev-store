@@ -8,6 +8,7 @@ import { fileURLToPath } from 'node:url';
 // reads the environment once at load, so this has to come first and has to be
 // complete. See helpers/env.mjs for what a missing entry used to cost.
 import './helpers/env.mjs';
+import { closeTest } from './helpers/teardown.mjs';
 
 // The walk below reads files inside the repository. Resolving them against
 // process.cwd() would make this test fail on any machine that runs it from
@@ -50,7 +51,7 @@ const { fillCopy, localize, renderProductPage, productSummary } = await import('
 const { createApp } = await import('../src/app.js');
 const { createProduct } = await import('../src/store.js');
 
-test.after(async () => { await fs.rm(tempDir, { recursive: true, force: true }); });
+test.after(async () => { await closeTest(undefined, tempDir); });
 
 const product = {
   id: 'p1',

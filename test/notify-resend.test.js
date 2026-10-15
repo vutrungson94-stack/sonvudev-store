@@ -7,6 +7,7 @@ import path from 'node:path';
 // reads the environment once at load, so this has to come first and has to be
 // complete. See helpers/env.mjs for what a missing entry used to cost.
 import './helpers/env.mjs';
+import { closeTest } from './helpers/teardown.mjs';
 
 process.env.NODE_ENV = 'test';
 
@@ -42,7 +43,7 @@ const order = (overrides = {}) => ({
   items: [{ name: 'Sản phẩm Test', version: '1.0.0' }], notifications: {}, ...overrides,
 });
 
-test.after(async () => { globalThis.fetch = realFetch; await fs.rm(tempDir, { recursive: true, force: true }); });
+test.after(async () => { globalThis.fetch = realFetch; await closeTest(undefined, tempDir); });
 test.beforeEach(() => { sent.length = 0; });
 
 test('có key thì gửi qua Resend chứ không ghi ra outbox', () => {

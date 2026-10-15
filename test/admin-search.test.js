@@ -8,6 +8,7 @@ import { fileURLToPath } from 'node:url';
 // reads the environment once at load, so this has to come first and has to be
 // complete. See helpers/env.mjs for what a missing entry used to cost.
 import './helpers/env.mjs';
+import { closeTest } from './helpers/teardown.mjs';
 
 // A shop with a hundred products and a few thousand orders is the case the admin
 // panel was built for. Finding one order meant scrolling to it, and the "Tải thêm"
@@ -69,7 +70,7 @@ test.before(async () => {
   const paid = await makeOrder('le.van.c@gmail.com', 'Lê Văn C');
   await setStatus(paid.id, 'paid');
 });
-test.after(async () => { server?.close(); await fs.rm(tempDir, { recursive: true, force: true }); });
+test.after(async () => { await closeTest(server, tempDir); });
 
 test('tìm đơn theo email và theo tên, chỉ trả đơn khớp', async () => {
   const byEmail = await orders('?q=' + encodeURIComponent('tran.thi.b'));
@@ -171,10 +172,20 @@ test('xoá và tìm đều cần token, không có thì 401', async () => {
 
 test('panel có ô tìm và ô lọc, và dùng chúng đúng cách', async () => {
   const html = await fs.readFile(path.join(root, 'public', 'admin.html'), 'utf8');
-  for (const id of ['order-search', 'order-status', 'product-search', 'product-status']) {
+  for (const id of ['order-search', 'order-status', 'product-search', 'product-status-filter']) {
     assert.ok(html.includes(`id="${id}"`), `thiếu ô ${id}`);
   }
   assert.ok(html.includes('placeholder="Tìm mã đơn, email, tên khách…'), 'ô tìm đơn phải nói được tìm theo gì');
+
+  // One id, once. The product filter and the product form's result message were
+  // both id="product-status", and getElementById returns the first one in the
+  // document — the <select>. So saving a product wrote the message onto the filter:
+  // its className was replaced, its <option> list was overwritten with a sentence,
+  // and the outcome of the save was never shown at all. A duplicate id is
+  // invisible in review and catastrophic at runtime, so it is checked here.
+  const ids = [...html.matchAll(/\sid="([^"]+)"/g)].map((m) => m[1]);
+  const duplicated = [...new Set(ids.filter((id) => ids.filter((other) => other === id).length > 1))];
+  assert.deepEqual(duplicated, [], `id bị trùng trong admin.html: ${duplicated.join(', ')}`);
   const source = await fs.readFile(path.join(root, 'public', 'admin.js'), 'utf8');
   // One request per pause: typing an email address must not fire a query per
   // character against a shop with thousands of orders.

@@ -1,5 +1,5 @@
 <!doctype html><html lang="vi"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex,nofollow"><title>{{brandName}} Admin</title><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet"><link rel="stylesheet" href="styles.css">{{iconLinks}}
-</head><body class="admin-page"><header class="site-header"><a class="brand" href="/">{{brandWordmark}}</a><a class="header-cta" href="/">Về cửa hàng <span>↗</span></a></header><main class="admin-shell">
+</head><body class="admin-page"><header class="site-header"><a class="brand" href="/">{{brandWordmark}}</a>{{headerNav}}<a class="header-cta" href="/">Về cửa hàng <span>↗</span></a></header><main class="admin-shell">
 <div class="admin-alert" id="admin-alert" hidden role="alert">
 <span class="admin-alert-dot"></span>
 <div><b id="admin-alert-title">Có đơn mới</b><small id="admin-alert-text"></small></div>
@@ -70,7 +70,7 @@
 </div>
 <div class="admin-tools product-tools">
 <input class="admin-search" id="product-search" type="search" autocomplete="off" placeholder="Tìm sản phẩm theo tên hoặc mã…" aria-label="Tìm sản phẩm">
-<select class="admin-filter" id="product-status" aria-label="Lọc theo trạng thái sản phẩm">
+<select class="admin-filter" id="product-status-filter" aria-label="Lọc theo trạng thái sản phẩm">
 <option value="">Tất cả trạng thái</option>
 <option value="active">Đang bán</option>
 <option value="draft">Bản nháp</option>
@@ -119,7 +119,7 @@
 <label class="file-field">File phát hành (.zip/.exe/.msi)<input name="releaseFile" type="file" accept=".zip,.exe,.msi,.7z"></label>
 <div class="form-actions">
 <button class="button button-primary" type="submit" id="save-product">Tạo sản phẩm &amp; upload <span>→</span></button>
-<p id="product-status" class="form-message"></p>
+<p id="product-status" class="form-message" role="status"></p>
 </div>
 </div>
 </form>

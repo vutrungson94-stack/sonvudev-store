@@ -28,7 +28,7 @@
   catalogue answers.
 -->
 <body class="page-404">
-<header class="site-header"><a class="brand" href="/">{{brandWordmark}}</a><a class="header-cta" href="/"><span data-i18n="nav.home">Về trang chủ</span> <span>↗</span></a></header>
+<header class="site-header"><a class="brand" href="/">{{brandWordmark}}</a>{{headerNav}}<a class="header-cta" href="/#products"><span data-i18n="nav.buy">Mua ngay</span> <span>↗</span></a></header>
 <main class="wrap">
 <div class="notfound">
 <p class="eyebrow" data-i18n="notfound.eyebrow">Lỗi 404</p>
@@ -38,7 +38,7 @@
 <div class="notfound-actions"><a class="button button-primary" href="/"><span data-i18n="nav.home">Về trang chủ</span> <span>→</span></a><a class="button button-secondary" href="/lookup" data-i18n="nav.lookup">Tra cứu đơn hàng</a></div>
 </div>
 </main>
-<footer class="site-footer wrap"><p>© {{year}} {{brandName}} · <a href="/terms" data-i18n="nav.terms">Điều khoản</a> · <a href="/refund" data-i18n="nav.refund">Hoàn tiền</a> · <a href="/privacy" data-i18n="nav.privacy">Bảo mật</a> · <a href="/about" data-i18n="nav.about">Về chúng tôi</a></p></footer>
+<footer class="site-footer wrap"><div class="brand">{{brandWordmark}}</div><p data-i18n="brand.tagline">Phần mềm tốt cho công việc tốt.</p><div class="footer-links">{{footerLinks}}</div><small data-i18n="brand.rights">© {{year}} · Đồng sở hữu</small></footer>
 <!--
   Same loader as a product page. It used to be an inline block, and the server's
   script-src 'self' with no 'unsafe-inline' refused to run it, so every 404 showed

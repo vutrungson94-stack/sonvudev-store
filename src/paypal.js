@@ -1,7 +1,7 @@
 import crypto from "node:crypto";
 import { env, isConfigured } from "./config.js";
 import { rateForCharge, vndPerUsd } from "./rates.js";
-import { resolvePaypalEnvironment } from "./paypal-environment.js";
+import { PAYPAL_CURRENCIES, PAYPAL_ZERO_DECIMAL, resolvePaypalEnvironment } from "./paypal-environment.js";
 
 // One resolver, not two literals written out again. This function existed here as
 // a second copy of the endpoint list in src/paypal-environment.js, which is the
@@ -16,22 +16,48 @@ import { resolvePaypalEnvironment } from "./paypal-environment.js";
 const base = () => resolvePaypalEnvironment(env.paypal.environment).apiBase;
 const authHeader = () => `Basic ${Buffer.from(`${env.paypal.clientId}:${env.paypal.clientSecret}`).toString("base64")}`;
 
+// How long any one call to PayPal may take.
+//
+// Node's fetch has no timeout of its own: a request that is accepted and then
+// stalls holds the socket until the platform gives up, which on Render is minutes
+// and on a single free instance is long enough for every concurrent buyer to be
+// stuck behind it. Every other outbound call in this codebase already sets one —
+// supabase-http.js, rates.js, geo.js, indexnow.js, notify.js — and this file was
+// the only one that did not, on the one integration where the buyer's money is
+// involved and the order row is already written.
+//
+// Ten seconds for the token and the reads, twenty for creating and capturing an
+// order: those two are the slow ones on PayPal's side, and a caller that times out
+// here can still reconcile from readOrder() rather than being stuck on a hung
+// socket.
+const TOKEN_TIMEOUT_MS = 10000;
+const ORDER_TIMEOUT_MS = 20000;
+const call = (url, options, timeoutMs = ORDER_TIMEOUT_MS) =>
+  fetch(url, { ...options, signal: AbortSignal.timeout(timeoutMs) });
+
+// JPY, HUF and TWD are quoted in whole units: "1200.00" is a rejected amount and
+// "1200" is the one PayPal expects. The rule sits next to the list it applies to.
+const amountFor = (amount, currency = "USD") => {
+  const numeric = Number(amount);
+  if (!Number.isFinite(numeric) || numeric <= 0) throw new Error("PayPal amount is invalid");
+  if (PAYPAL_ZERO_DECIMAL.has(currency)) return String(Math.ceil(numeric));
+  return new Intl.NumberFormat("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(numeric);
+};
+
 async function token() {
   if (!isConfigured.paypal) throw new Error("PayPal chưa được cấu hình");
-  const response = await fetch(`${base()}/v1/oauth2/token`, { method: "POST", headers: { Authorization: authHeader(), "Content-Type": "application/x-www-form-urlencoded" }, body: "grant_type=client_credentials" });
+  const response = await call(`${base()}/v1/oauth2/token`, { method: "POST", headers: { Authorization: authHeader(), "Content-Type": "application/x-www-form-urlencoded" }, body: "grant_type=client_credentials" }, TOKEN_TIMEOUT_MS);
   if (!response.ok) throw new Error(`PayPal OAuth ${response.status}`);
   return (await response.json()).access_token;
 }
 
-const supportedCurrencies = new Set(["AUD", "BRL", "CAD", "CNY", "CZK", "DKK", "EUR", "HKD", "HUF", "ILS", "JPY", "MYR", "MXN", "TWD", "NZD", "NOK", "PHP", "PLN", "GBP", "RUB", "SGD", "SEK", "CHF", "THB", "USD"]);
-const amountFor = (amount, currency = "USD") => {
-  const numeric = Number(amount);
-  if (!Number.isFinite(numeric) || numeric <= 0) throw new Error("PayPal amount is invalid");
-  const value = new Intl.NumberFormat("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(numeric);
-  return currency === "JPY" || currency === "HUF" || currency === "TWD" ? String(Math.ceil(numeric)) : value;
-};
+/**
+ * The currencies PayPal can charge in, and the ones with no minor unit, come from
+ * src/paypal-environment.js — the one list. They used to be written out here, and
+ * config.js had a third, shorter copy of its own; see the comment there.
+ */
 const validateCurrency = (currency) => {
-  if (!supportedCurrencies.has(currency)) throw new Error(`PayPal currency is not supported: ${currency}`);
+  if (!PAYPAL_CURRENCIES.has(currency)) throw new Error(`PayPal currency is not supported: ${currency}`);
 };
 
 export function paypalChargeFor(product, vndPerUsd = env.paypal.vndToUsdRate) {
@@ -76,7 +102,7 @@ export function paymentMatchesOrder(resource, order) {
 export async function createOrder({ orderId, product, customerEmail, returnUrl, cancelUrl, amount, currency = env.paypal.currency }) {
   validateCurrency(currency);
   const accessToken = await token();
-  const response = await fetch(`${base()}/v2/checkout/orders`, {
+  const response = await call(`${base()}/v2/checkout/orders`, {
     method: "POST",
     headers: { Authorization: `Bearer ${accessToken}`, "Content-Type": "application/json", "PayPal-Request-Id": orderId },
     body: JSON.stringify({
@@ -92,7 +118,7 @@ export async function createOrder({ orderId, product, customerEmail, returnUrl, 
 
 export async function captureOrder(providerOrderId) {
   const accessToken = await token();
-  const response = await fetch(`${base()}/v2/checkout/orders/${encodeURIComponent(providerOrderId)}/capture`, { method: "POST", headers: { Authorization: `Bearer ${accessToken}`, "Content-Type": "application/json" } });
+  const response = await call(`${base()}/v2/checkout/orders/${encodeURIComponent(providerOrderId)}/capture`, { method: "POST", headers: { Authorization: `Bearer ${accessToken}`, "Content-Type": "application/json" } });
   const data = await response.json();
   if (!response.ok) {
     const error = new Error(data.message || `PayPal capture ${response.status}`);
@@ -113,7 +139,7 @@ export async function captureOrder(providerOrderId) {
  */
 export async function readOrder(providerOrderId) {
   const accessToken = await token();
-  const response = await fetch(`${base()}/v2/checkout/orders/${encodeURIComponent(providerOrderId)}`, { headers: { Authorization: `Bearer ${accessToken}` } });
+  const response = await call(`${base()}/v2/checkout/orders/${encodeURIComponent(providerOrderId)}`, { headers: { Authorization: `Bearer ${accessToken}` } }, TOKEN_TIMEOUT_MS);
   const data = await response.json().catch(() => ({}));
   if (!response.ok) throw new Error(data.message || `PayPal order ${response.status}`);
   return data;
@@ -122,7 +148,7 @@ export async function readOrder(providerOrderId) {
 export async function verifyWebhook(rawBody, headers) {
   if (!isConfigured.paypalWebhook) throw new Error("PAYPAL_WEBHOOK_ID chưa được cấu hình");
   const accessToken = await token();
-  const response = await fetch(`${base()}/v1/notifications/verify-webhook-signature`, { method: "POST", headers: { Authorization: `Bearer ${accessToken}`, "Content-Type": "application/json" }, body: JSON.stringify({ auth_algo: headers["paypal-auth-algo"], cert_url: headers["paypal-cert-url"], transmission_id: headers["paypal-transmission-id"], transmission_sig: headers["paypal-transmission-sig"], transmission_time: headers["paypal-transmission-time"], webhook_id: env.paypal.webhookId, webhook_event: JSON.parse(rawBody.toString("utf8")) }) });
+  const response = await call(`${base()}/v1/notifications/verify-webhook-signature`, { method: "POST", headers: { Authorization: `Bearer ${accessToken}`, "Content-Type": "application/json" }, body: JSON.stringify({ auth_algo: headers["paypal-auth-algo"], cert_url: headers["paypal-cert-url"], transmission_id: headers["paypal-transmission-id"], transmission_sig: headers["paypal-transmission-sig"], transmission_time: headers["paypal-transmission-time"], webhook_id: env.paypal.webhookId, webhook_event: JSON.parse(rawBody.toString("utf8")) }) }, TOKEN_TIMEOUT_MS);
   const data = await response.json();
   return response.ok && data.verification_status === "SUCCESS";
 }

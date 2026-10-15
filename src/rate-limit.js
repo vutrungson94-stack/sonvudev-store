@@ -20,7 +20,15 @@ export function createRateLimiter({ windowMs = WINDOW_MS, maxKeys = MAX_KEYS } =
     const recent = (attempts.get(key) || []).filter((time) => now - time < windowMs);
     recent.push(now);
     attempts.set(key, recent);
-    if (attempts.size > maxKeys) attempts.clear();
+    // Evicting the oldest key when the table is full, rather than clearing all of
+    // it. Clearing meant that one caller spraying 20,001 distinct keys reset every
+    // window in the shop at once — the limiter's whole answer to an attack on the
+    // limiter being "give up". Dropping the oldest entry costs the memory it has
+    // to cost and nothing else, and a flood now buys an attacker nothing.
+    if (attempts.size > maxKeys) {
+      const oldest = attempts.keys().next();
+      if (!oldest.done) attempts.delete(oldest.value);
+    }
     return recent.length > limit;
   };
   const reset = () => attempts.clear();
@@ -29,9 +37,22 @@ export function createRateLimiter({ windowMs = WINDOW_MS, maxKeys = MAX_KEYS } =
 }
 
 // Singleton dùng bởi app.js — cùng một cửa sổ cho mọi route trong process.
-export const limiter = createRateLimiter();
-export const tooMany = (key, limit) => limiter.tooMany(key, limit);
+// Không export: không có file nào import nó, và app.js chỉ cần hai hàm bên dưới.
+const limiter = createRateLimiter();
+const tooMany = (key, limit) => limiter.tooMany(key, limit);
 export const tooManyAttempts = (req) => tooMany(`ip:${req.ip || 'unknown'}`, 10);
+// Admin routes are authenticated by a 192-bit token, so a limit here is not about
+// guessing it — brute force over that key space is hopeless either way. It is about
+// the cost of a wrong guess: an unauthenticated request must not be able to make
+// the server read a table. Exported because src/app.js needs it and a single
+// limiter for every route is the thing this module exists to provide.
+export const adminThrottled = (req) => tooMany(`admin:${req.ip || 'unknown'}`, 30);
+// The health probe is public — a monitor cannot hold an admin token — and it is
+// the most expensive unauthenticated route in the shop: it reaches the database and
+// the FX rate on every call, and /api/health is a name every scanner already has.
+// Sixty a minute is far above any real monitor (Render, UptimeRobot and the
+// keep-awake worker all poll every few minutes) and far below anything worth doing.
+export const healthThrottled = (req) => tooMany(`health:${req.ip || 'unknown'}`, 60);
 export function checkoutThrottled(req, email) {
   return tooMany(`checkout-ip:${req.ip || 'unknown'}`, 30)
     || (Boolean(email) && tooMany(`checkout-email:${email}`, 12));

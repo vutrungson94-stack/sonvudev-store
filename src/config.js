@@ -1,11 +1,31 @@
 import dotenv from "dotenv";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { resolvePaypalEnvironment } from "./paypal-environment.js";
+import { PAYPAL_CURRENCIES, resolvePaypalEnvironment } from "./paypal-environment.js";
 
 const projectRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
+// Which side of a disagreement between the file and the environment wins.
+//
+// It used to be `override: true`, unconditionally: the file beat the environment
+// every time. That is the right answer on a laptop — where the shell rarely has
+// these variables at all — and the wrong answer everywhere else. Render, Docker,
+// systemd and every other host inject secrets through the environment, and a
+// checkout that happens to carry a stale .env would silently outrank them: rotate
+// SUPABASE_SERVICE_ROLE_KEY in the dashboard, restart, and the old key keeps being
+// used, with /api/health reporting the old value as authoritative.
+//
+// So the environment wins whenever there is one, and the file is the fallback for
+// development. A deploy that really must pin a value in a file has to say so with
+// DOTENV_OVERRIDE, which is opt-in and therefore never set by accident.
+//
+// NODE_ENV=test keeps the original behaviour of not overriding, because
+// test/helpers/env.mjs blanks a list of keys precisely so a real .env on the
+// developer's machine cannot fill them back in.
 if (process.env.NODE_ENV !== "test") {
-  dotenv.config({ path: path.join(projectRoot, ".env"), override: true });
+  dotenv.config({
+    path: path.join(projectRoot, ".env"),
+    override: /^(1|true|yes)$/i.test(String(process.env.DOTENV_OVERRIDE || "")),
+  });
 } else {
   dotenv.config({ path: path.join(projectRoot, ".env") });
 }
@@ -265,7 +285,12 @@ export const isConfigured = {
   admin: configured("ADMIN_API_TOKEN"),
   r2: configured("R2_ACCOUNT_ID") && configured("R2_ACCESS_KEY_ID") && configured("R2_SECRET_ACCESS_KEY") && configured("R2_BUCKET_NAME"),
   supabase: hasSupabaseProjectUrl() && configured("SUPABASE_SERVICE_ROLE_KEY"),
-  paypal: paypalEnv.isSet && configured("PAYPAL_CLIENT_ID") && configured("PAYPAL_CLIENT_SECRET") && ["USD", "EUR", "GBP", "AUD", "CAD", "SGD", "JPY"].includes(env.paypal.currency),
+  // The currency list is PAYPAL_CURRENCIES from src/paypal-environment.js, beside
+  // the endpoints, rather than a second list written out here. It used to be one of
+  // seven entries against PayPal's twenty-five, so a shop configured with CHF was
+  // told here that PayPal was not configured and would have been allowed to charge
+  // by the module that actually calls PayPal. They are the same question.
+  paypal: paypalEnv.isSet && configured("PAYPAL_CLIENT_ID") && configured("PAYPAL_CLIENT_SECRET") && PAYPAL_CURRENCIES.has(env.paypal.currency),
   paypalWebhook: configured("PAYPAL_WEBHOOK_ID"),
   // Without a key the mailer falls back to writing each message to
   // data/outbox, so the flow is testable end to end before an account exists.

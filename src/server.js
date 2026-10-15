@@ -7,6 +7,32 @@ import { notifyMode } from "./notify.js";
 
 const mailMode = notifyMode();
 
+// The last thing between a bad Tuesday and a shop that is simply gone.
+//
+// Express 4 attaches no .catch() to an async route handler, so a rejected promise
+// inside one is not a failed request — it is an unhandled rejection, and Node's
+// default for one is to terminate the process. Four public routes reach the store
+// without a try/catch, and a search engine visits /sitemap.xml on its own schedule:
+// one slow query, one timeout, one malformed row, and the whole storefront goes
+// down because a crawler asked for a file. Every other route in the file wraps
+// itself; these two handlers are what the ones that were missed had.
+//
+// Log and keep serving, rather than exit. A request that failed is already a
+// failure the caller can see; taking the process with it turns one failed request
+// into a failed shop, which is strictly worse than the error we started with.
+process.on("unhandledRejection", (reason) => {
+  console.error("[unhandledRejection]", reason instanceof Error ? reason.stack : reason);
+});
+process.on("uncaughtException", (error) => {
+  // Unlike the rejection case, the process state after this is unknown: something
+  // threw outside a promise and the program may be mid-write. Log, then leave —
+  // the orchestrator restarts on a non-zero exit, and doing it ourselves while a
+  // request is in flight would cut the response off mid-sentence.
+  console.error("[uncaughtException]", error instanceof Error ? error.stack : error);
+  process.exitCode = 1;
+  setTimeout(() => process.exit(1), 1000).unref();
+});
+
 const app = await createApp();
 const server = app.listen(env.port, env.host, () => {
   console.log(`${env.brand.name} store running at ${env.appUrl}`);

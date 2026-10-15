@@ -65,8 +65,10 @@ test('/api/health chỉ probe storage khi host này thật sự là nơi lưu tr
 
   // The probe itself must still be tested. The 503 contract is covered for real in
   // observability.test.js, which breaks the data directory on purpose.
-  assert.match(source, /fs\.mkdir\(dataDir, \{ recursive: true \}\)/,
-    'probe storage local vẫn phải tạo và kiểm tra thư mục — nó là thứ bắt được DATA_DIR sai');
+  assert.match(source, /fs\.access\(dataDir, fs\.constants\.W_OK\)/,
+    'probe storage local phai hoi xem thu muc co ghi duoc khong, khong tao no');
+  assert.match(source, /isDirectory/, 'probe storage phai kiem tra directory, khong chi permission');
+  assert.equal(/fs\.mkdir\(dataDir/.test(source), false, 'storage probe khong duoc goi mkdir tren moi lan poll');
 });
 
 test('ghi outbox thất bại không được làm hỏng đơn hàng', async () => {

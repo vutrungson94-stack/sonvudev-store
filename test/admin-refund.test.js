@@ -8,6 +8,7 @@ import { fileURLToPath } from 'node:url';
 // reads the environment once at load, so this has to come first and has to be
 // complete. See helpers/env.mjs for what a missing entry used to cost.
 import './helpers/env.mjs';
+import { closeTest } from './helpers/teardown.mjs';
 
 // The refund path a shop cannot survive: a buyer pays, takes the file, then asks
 // for their money back and keeps it. Nothing here refuses the refund — the policy
@@ -54,7 +55,7 @@ test.before(async () => {
     body: JSON.stringify({ name: 'Refund Tester', price: 200000, currency: 'VND', fileKey: 'products/refund-tester/1.0.0/p.exe', status: 'active' }),
   }))).product;
 });
-test.after(async () => { server?.close(); await fs.rm(tempDir, { recursive: true, force: true }); });
+test.after(async () => { await closeTest(server, tempDir); });
 
 test('không đồng ý điều khoản thì không nhận thanh toán', async () => {
   const before = await json(await fetch(`${base}/api/admin/orders?limit=1`, { headers: { 'x-admin-token': 'test-admin-token' } })).total;

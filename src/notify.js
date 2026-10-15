@@ -216,23 +216,30 @@ async function deliver(to, message, order, key) {
   //
   // A store that cannot send mail is already in trouble; it is not in so much
   // trouble that it should also refuse to take the money. So the failure is
-  // reported and swallowed, loudly, in one place.
+  // reported, and it is reported as a failure.
+  //
+  // This used to return { via: "outbox-unavailable" }, which notifyOrder read as a
+  // successful delivery and recorded on the order as status "sent". The retry
+  // ladder never engaged, /api/health still said the mailer was healthy, and a
+  // buyer who had been charged got no confirmation, no expiry warning and no paid
+  // notice — with the order row asserting that every one of them had been sent.
+  // Returning the reason instead of a via lets the caller record what happened.
   try {
     await fs.mkdir(outboxDir, { recursive: true });
+    // The order id is in the name so a folder of outbox files can be read as a
+    // list of what the store tried to tell buyers.
+    const safe = (value) => String(value || "").replace(/[^\w.@-]/g, "_").slice(0, 60);
+    const name = `${new Date().toISOString().replace(/[:.]/g, "-")}-${safe(order.id)}-${safe(key)}`;
+    await fs.writeFile(path.join(outboxDir, `${name}.html`), message.html);
+    await fs.writeFile(path.join(outboxDir, `${name}.txt`), message.text);
+    return { via: "outbox" };
   } catch (error) {
     console.error(
       `[notify] Không ghi được outbox (${error.code || error.message}). `
       + "Dat RESEND_API_KEY de gui email that; neu khong, don hàng se khong co email nao gui cho khach.",
     );
-    return { via: "outbox-unavailable" };
+    throw error;
   }
-  // The order id is in the name so a folder of outbox files can be read as a
-  // list of what the store tried to tell buyers.
-  const safe = (value) => String(value || "").replace(/[^\w.@-]/g, "_").slice(0, 60);
-  const name = `${new Date().toISOString().replace(/[:.]/g, "-")}-${safe(order.id)}-${safe(key)}`;
-  await fs.writeFile(path.join(outboxDir, `${name}.html`), message.html);
-  await fs.writeFile(path.join(outboxDir, `${name}.txt`), message.text);
-  return { via: "outbox" };
 }
 
 const readNotes = (order) => (order && order.notifications && typeof order.notifications === "object") ? order.notifications : {};
@@ -252,6 +259,30 @@ const readNotes = (order) => (order && order.notifications && typeof order.notif
  */
 export const previewMessage = (order, template) => body(order, template);
 
+/**
+ * Writes the delivery record, and never throws.
+ *
+ * Recording is bookkeeping: it decides whether a message is retried later, not
+ * whether the order stands. Every call to it sits either before or inside the
+ * failure path of a send, and the one in the catch used to be able to throw — the
+ * database being unavailable is exactly when a send fails — which turned a
+ * delivered-with-failure into an exception. That exception travelled out through
+ * markOrderPaid to the PayPal capture route, which answered 502 to a buyer whose
+ * money had already been captured.
+ *
+ * A record that could not be written is a lost retry, not a lost order, and it is
+ * said out loud rather than swallowed.
+ */
+const record = async (order, notes, key, entry) => {
+  try {
+    await updateOrder(order.id, { notifications: { ...notes, [key]: entry } });
+    return true;
+  } catch (error) {
+    console.error(`[notify] could not record "${key}" on ${order.id}: ${text(error)}`);
+    return false;
+  }
+};
+
 export async function notifyOrder(order, template, key = template) {
   if (!order || !TEMPLATES[template] || !order.customerEmail) return { sent: false, reason: "not-applicable" };
   const notes = readNotes(order);
@@ -266,14 +297,14 @@ export async function notifyOrder(order, template, key = template) {
   const stampIso = new Date().toISOString();
   // Recorded before the send, not after: a provider that accepts the request
   // and then times out the response would otherwise be retried forever.
-  await updateOrder(order.id, { notifications: { ...notes, [key]: { at: stampIso, status: "sending", attempts } } });
+  await record(order, notes, key, { at: stampIso, status: "sending", attempts });
   try {
     const { via } = await deliver(order.customerEmail, body(order, template), order, key);
-    await updateOrder(order.id, { notifications: { ...notes, [key]: { at: stampIso, status: "sent", attempts } } });
+    await record(order, notes, key, { at: stampIso, status: "sent", attempts });
     console.log(`[notify] ${template} -> ${order.id} (${via})`);
     return { sent: true, via };
   } catch (error) {
-    await updateOrder(order.id, { notifications: { ...notes, [key]: { at: stampIso, status: "failed", attempts, error: text(error) } } });
+    await record(order, notes, key, { at: stampIso, status: "failed", attempts, error: text(error) });
     console.error(`[notify] ${template} failed for ${order.id} (attempt ${attempts}/${MAX_ATTEMPTS}): ${error.message}`);
     return { sent: false, reason: "failed" };
   }

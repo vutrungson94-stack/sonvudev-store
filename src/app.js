@@ -20,7 +20,7 @@ import { vndPerUsd } from "./rates.js";
 import { createReview, listReviewsForProduct, reviewLimits } from "./reviews.js";
 import { refuse } from "./refuse.js";
 import { renderRobotsTxt } from "./robots.js";
-import { tooMany, tooManyAttempts, checkoutThrottled } from "./rate-limit.js";
+import { adminThrottled, healthThrottled, tooManyAttempts, checkoutThrottled } from "./rate-limit.js";
 import { parseAdminTokens, matchAdminToken } from "./admin-auth.js";
 
 const app = express();
@@ -105,12 +105,29 @@ const adminEntryFor = (req) => {
 // GET cho phép viewer + admin, ghi (POST/PATCH/PUT/DELETE) chỉ admin.
 // Token cũ không role mặc định admin nên mọi test/caller hiện tại giữ nguyên.
 const admin = (req, res, next) => {
+  if (adminThrottled(req)) {
+    return res.status(429).json(refuse("api.err.rateLimited", "Quá nhiều yêu cầu. Vui lòng thử lại sau.", 429));
+  }
   const entry = adminEntryFor(req);
   if (!entry) return res.status(401).json(refuse("api.err.unauthorized", "Không có quyền.", 401));
   req.admin = { name: entry.name, role: entry.role };
   if (req.method !== "GET" && req.method !== "HEAD" && req.method !== "OPTIONS" && entry.role !== "admin") {
     return res.status(403).json(refuse("api.err.forbidden", "Vai trò viewer chỉ được đọc.", 403));
   }
+  next();
+};
+
+// The health probe, open to anybody and limited like any other public route.
+//
+// A monitor has no admin token and cannot be given one, so this cannot simply be
+// an admin route. It sets req.owner rather than refusing, so the route can answer
+// an anonymous caller with the liveness facts and the owner with the whole
+// configuration. The limit itself lives in src/rate-limit.js with every other one.
+const adminOrHealth = (req, res, next) => {
+  if (healthThrottled(req)) {
+    return res.status(429).json(refuse("api.err.rateLimited", "Quá nhiều yêu cầu. Vui lòng thử lại sau.", 429));
+  }
+  req.owner = Boolean(adminEntryFor(req));
   next();
 };
 
@@ -248,7 +265,7 @@ app.get(["/admin", "/admin.html", "/admin.js"], async (_req, res) => {
   if (_req.path === "/admin.js") return res.sendFile(path.join(publicDir, "admin.js"));
   try {
     const html = await fs.readFile(path.join(publicDir, "admin.html"), "utf8");
-    res.type("html").send(fillPageTokens(html, pageTokenValues()));
+    res.type("html").send(fillPageTokens(html, pageTokenValues({ page: "admin.html" })));
   } catch (error) {
     console.error(error);
     res.sendFile(path.join(publicDir, "admin.html"));
@@ -319,7 +336,7 @@ async function renderPage(file) {
   // the byte-level tests again. What follows the tokens is structure, not values:
   // verification tags, the catalogue and the counts, each derived from the same
   // product list the tokens describe.
-  const html = fillPageTokens(template, pageTokenValues({ products, reviewLimits }))
+  const html = fillPageTokens(template, pageTokenValues({ products, reviewLimits, page: file }))
     .replace("</head>", `${tokenMeta()}\n${verificationMeta()}\n${brandMeta()}\n${analyticsMeta()}\n</head>`)
     .replace(/(<span[^>]*class="product-count"[^>]*id="product-count"[^>]*>)[\s\S]*?(<\/span>)/, `$1${esc(renderIndexCount(products))}$2`)
     .replace(/<!--filters:start-->[\s\S]*?<!--filters:end-->/, `<!--filters:start-->${renderIndexFilters(products)}<!--filters:end-->`)
@@ -369,8 +386,11 @@ for (const file of Object.keys(served)) {
   // where a person could paste the address bar they were given and get a different
   // page from the one they were looking at.
   if (file === "index.html") {
-    // Single homepage - language switching handled client-side
-    app.get(["/", "/index.html"], sendPage(file, "vi"));
+    // One homepage, one language at a time: i18n.js switches it in the browser and
+    // reads the stored choice before the first paint. The second argument this call
+    // used to pass ("vi") named nothing — sendPage takes one parameter — so it
+    // implied a server-side language that does not exist and would only ever be vi.
+    app.get(["/", "/index.html"], sendPage(file));
     continue;
   }
   app.get(`/${file}`, sendPage(file));
@@ -411,14 +431,18 @@ const cachedText = async (key, build) => {
   return value;
 };
 
-app.get("/llms.txt", async (_req, res) => {
-  res.set("Cache-Control", "public, max-age=3600").type("text/plain; charset=utf-8")
-    .send(await cachedText("llms", renderLlmsTxt));
+app.get("/llms.txt", async (_req, res, next) => {
+  try {
+    res.set("Cache-Control", "public, max-age=3600").type("text/plain; charset=utf-8")
+      .send(await cachedText("llms", renderLlmsTxt));
+  } catch (error) { next(error); }
 });
 
-app.get("/feed.json", async (_req, res) => {
-  res.set("Cache-Control", "public, max-age=3600").type("application/json")
-    .send(await cachedText("feed", renderFeed));
+app.get("/feed.json", async (_req, res, next) => {
+  try {
+    res.set("Cache-Control", "public, max-age=3600").type("application/json")
+      .send(await cachedText("feed", renderFeed));
+  } catch (error) { next(error); }
 });
 
 /**
@@ -475,7 +499,8 @@ const productPage = (lang) => async (req, res) => {
 app.get("/product/:slug", productPage("vi"));
 app.get("/en/product/:slug", productPage("en"));
 
-app.get("/og/:slug.svg", async (req, res) => {
+app.get("/og/:slug.svg", async (req, res, next) => {
+  try {
   // A clean site-wide card, so a link shared without a product still previews.
   // The price used to be written into this line as "Từ 99.000₫" and the platform
   // and version as literals, so a shop that changed either kept publishing the
@@ -499,9 +524,11 @@ app.get("/og/:slug.svg", async (req, res) => {
   if (!isSellable(product)) return res.status(404).type("text/plain").send("Not found");
   res.set("Cache-Control", "public, max-age=3600");
   res.type("image/svg+xml").send(renderOgImage(product, req.query.lang === "en" ? "en" : "vi"));
+  } catch (error) { next(error); }
 });
 
-app.get("/sitemap.xml", async (_req, res) => {
+app.get("/sitemap.xml", async (_req, res, next) => {
+  try {
   const base = env.appUrl.replace(/\/$/, "");
   const pages = await fs.readdir(publicDir);
   const urls = pages
@@ -526,6 +553,7 @@ app.get("/sitemap.xml", async (_req, res) => {
     if (hasEnglish) urls.push(`<url><loc>${en}</loc>${lastmod}<changefreq>weekly</changefreq><priority>0.7</priority><xhtml:link rel="alternate" hreflang="vi" href="${vi}"/><xhtml:link rel="alternate" hreflang="en" href="${en}"/><xhtml:link rel="alternate" hreflang="x-default" href="${vi}"/></url>`);
   }
   res.type("application/xml").send(`<?xml version="1.0" encoding="UTF-8"?><urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9" xmlns:xhtml="http://www.w3.org/1999/xhtml">${urls.join("")}</urlset>`);
+  } catch (error) { next(error); }
 });
 
 // One line per request, with an id that also comes back on the error.
@@ -546,7 +574,12 @@ app.get("/sitemap.xml", async (_req, res) => {
 // humans and their crawlers, and the log is read by a person.
 app.use((req, res, next) => {
   const startedAt = process.hrtime.bigint();
-  const requestId = String(req.headers["x-request-id"] || "").slice(0, 64) || crypto.randomUUID();
+  // The header is client-controlled and it is about to be written into the access
+  // log and sent back on the response, so it is trimmed to the characters an id
+  // is made of. Slicing alone left a caller free to put spaces and punctuation in
+  // the one field every log line is searched by.
+  const supplied = String(req.headers["x-request-id"] || "").trim();
+  const requestId = /^[A-Za-z0-9._:-]{1,64}$/.test(supplied) ? supplied : crypto.randomUUID();
   req.requestId = requestId;
   res.setHeader("X-Request-Id", requestId);
   res.on("finish", () => {
@@ -618,7 +651,23 @@ app.use(express.static(publicDir, { maxAge: "5m", index: false }));
 //
 // The probes are the cheapest honest ones. Nothing here writes an order, confirms a
 // payment, or sends a mail.
-app.get("/api/health", async (req, res) => {
+//
+// Four things this endpoint used to do that it had no business doing, all of them
+// paid for by whoever calls it:
+//
+//  - it had no rate limit, while probing the database and the FX rate on every
+//    request. An unauthenticated GET that reaches Supabase is a free amplifier, and
+//    /api/health is a name every scanner already knows;
+//  - the storage probe called fs.mkdir on every request, so an unauthenticated GET
+//    wrote to the filesystem;
+//  - it printed the absolute path of the data directory, and the raw text of a
+//    PostgREST error, to anybody who asked;
+//  - it printed the PayPal webhook id, on the grounds that it is not a secret.
+//    It is not, but it is also not needed by anything except the owner, who already
+//    has the dashboard.
+//
+// The detail is still here for the owner; it now has to say who it is.
+app.get("/api/health", adminOrHealth, async (req, res) => {
   const checks = {};
   const startedAt = process.hrtime.bigint();
   // One row, no columns: enough to prove the network path, the service key and the
@@ -634,16 +683,45 @@ app.get("/api/health", async (req, res) => {
   // here concludes the database is unreachable when the database probe above it
   // says "ok". The two lines sit next to each other in the same JSON object and
   // disagree.
+  //
+  // mkdir is out, and so is asking only about permissions: a health check that
+  // creates what it inspects is a write on every poll, and a path that is not a
+  // directory at all is writable in the access(2) sense while being useless as a
+  // place to keep orders. Both are checked, neither is created — and a directory
+  // that does not exist is reported as the failure it is, because ensureSeed()
+  // makes it at boot and nothing after that removes it.
   if (isConfigured.supabase) checks.storage = "skipped (supabase)";
-  else checks.storage = await probe(async () => { await fs.mkdir(dataDir, { recursive: true }); await fs.access(dataDir, fs.constants.W_OK); return "ok"; }, `${dataDir} not writable`);
+  else checks.storage = await probe(async () => {
+    await fs.access(dataDir, fs.constants.W_OK);
+    if (!(await fs.stat(dataDir)).isDirectory()) throw new Error("not a directory");
+    return "ok";
+  }, "data directory not writable");
   const rate = await vndPerUsd().catch(() => null);
   const ok = !Object.values(checks).some((value) => typeof value !== "string" || value.startsWith("!"));
-  res.status(ok ? 200 : 503).json({
-    ok, requestId: req.requestId,
-    checks,
+  // What an anonymous caller gets. Enough to answer "is it up", which is what a
+  // load balancer or a public uptime page needs, and nothing else.
+  // These booleans are configuration, not secrets - see the test that named that
+  // trade: a dashboard or a probe can see at a glance whether the site is claimed
+  // with the search engines. The actual verification tokens never travel.
+  const searchState = {
+    google: Boolean(env.site.googleVerification),
+    bing: Boolean(env.site.bingVerification),
+    indexNow: Boolean(env.site.indexNowKey),
+  };
+  const publicView = {
+    ok, requestId: req.requestId, checks,
     elapsedMs: Math.round(Number(process.hrtime.bigint() - startedAt) / 1e6),
     uptime: Math.round(process.uptime()),
-    appUrl: env.appUrl, persistence: persistenceMode,
+    persistence: persistenceMode,
+    r2: isConfigured.r2, paypal: isConfigured.paypal, email: notifyMode(),
+    orderWindowHours: env.orders?.paymentWindowHours ?? null,
+    sweeper: sweeperRunning(),
+    search: searchState,
+  };
+  if (!req.owner) return res.status(ok ? 200 : 503).json(publicView);
+  res.status(ok ? 200 : 503).json({
+    ...publicView,
+    appUrl: env.appUrl,
     r2: isConfigured.r2, paypal: isConfigured.paypal, paypalWebhook: isConfigured.paypalWebhook,
     // Which PayPal this host is actually talking to, and whether that was decided or
     // assumed. A host that has never been told falls back to sandbox, and sandbox
@@ -1047,15 +1125,48 @@ app.post("/api/admin/products", admin, json, async (req, res) => {
 });
 app.patch("/api/admin/products/:id", admin, json, async (req, res) => {
   try {
-    // The admin's SEO editor sends only these fields. Passing the body
-    // through as-is is deliberate: toProduct() sends only the keys it was
-    // given, so a partial edit cannot blank out the description or features.
-    // The exception is the four SEO fields, which are trimmed and capped
-    // here so no caller can store a title longer than a search result shows.
-    const patch = { ...req.body, updatedAt: new Date().toISOString() };
-    for (const field of ["seoTitle", "seoDescription", "seoTitleEn", "seoDescriptionEn"]) {
-      if (req.body[field] !== undefined) patch[field] = text(req.body[field], field.startsWith("seoTitle") ? 70 : 175);
+    // The allow-list, because the body is not the editor's to trust.
+    //
+    // This spread the whole request body into the row. The claim above it — that
+    // "the admin's SEO editor sends only these fields" — is a statement about the
+    // client, and a client is not a boundary: a bug in the panel, a stale tab, or
+    // anybody holding an admin token could write id, status, fileKey, price,
+    // createdAt or any column the database happens to have. toProduct() sends the
+    // keys it was given and drops nothing.
+    //
+    // So the server decides what may change, and the panel's form is free to send
+    // whatever it likes: an unknown field is ignored rather than obeyed. The one
+    // thing that needs care is slug — POST checks uniqueness and this route did not,
+    // so two products could end up answering at the same address.
+    const caps = {
+      name: 120, slug: 80, shortDescription: 180, description: 2000, shortDescriptionEn: 180,
+      descriptionEn: 4000, category: 50, platform: 50, version: 30, currency: 8,
+      badge: 40, requirements: 240, fileKey: 500, seoTitle: 70, seoDescription: 175,
+      seoTitleEn: 70, seoDescriptionEn: 175,
+    };
+    const patch = {};
+    for (const [field, cap] of Object.entries(caps)) {
+      if (req.body[field] !== undefined) patch[field] = text(req.body[field], cap);
     }
+    for (const field of ["features", "featuresEn"]) {
+      if (req.body[field] !== undefined) {
+        patch[field] = Array.isArray(req.body[field])
+          ? req.body[field].map((v) => text(v, field === "features" ? 120 : 200)).filter(Boolean) : [];
+      }
+    }
+    if (req.body.price !== undefined) {
+      const price = Number(req.body.price);
+      if (!Number.isFinite(price) || price < 0) return res.status(400).json(refuse("api.err.invalidPrice", "Giá không hợp lệ", 400));
+      patch.price = price;
+    }
+    if (req.body.status !== undefined) patch.status = req.body.status === "archived" ? "archived" : (req.body.status === "draft" ? "draft" : "active");
+    // A partial edit must not blank a field the caller never mentioned, which is
+    // why every key above is guarded on `!== undefined` rather than defaulted.
+    if (req.body.slug !== undefined && patch.slug) {
+      const clash = await getProductBySlug(patch.slug);
+      if (clash && clash.id !== req.params.id) return res.status(409).json(refuse("api.err.slugTaken", "Đường dẫn này đã có sản phẩm khác dùng rồi.", 409));
+    }
+    patch.updatedAt = new Date().toISOString();
     const item = await updateProduct(req.params.id, patch);
     if (!item) return res.status(404).json(refuse("api.err.productNotFound", "Không tìm thấy sản phẩm", 404));
     // Price and description are what a search result shows, so an edit here is
@@ -1249,9 +1360,25 @@ app.patch("/api/admin/orders/:id", admin, json, async (req, res) => {
       return res.json({ order: publicOrder(await voidPayment(existing, { reason, category, amount })) });
     }
     if (!ORDER_STATUSES.includes(status)) return res.status(400).json(refuse("api.err.invalidStatus", "Trạng thái không hợp lệ", 400));
-    // Confirming by hand goes through the same path as a webhook, so the buyer
-    // still gets the mail and paid_count still reflects the real revenue.
-    if (status === "paid") { acted("confirm-paid", { amount: existing.amount, currency: existing.currency }); return res.json({ order: publicOrder(await markOrderPaid(existing, { source: "admin" })) }); }
+    if (status === "paid") {
+      // An order that already recorded a payment is not receiving a second one. It
+      // is an operator correcting the state — a refund issued by mistake, most
+      // often. Recording a payment again would double the revenue figure and mail
+      // the buyer a second confirmation for money that only arrived once, so this
+      // path restores the state and leaves the money record exactly as it is.
+      if (hasPayment(existing)) {
+        acted("restore-paid");
+        const restored = new Date().toISOString();
+        return res.json({ order: publicOrder(await updateOrder(existing.id, {
+          status: "paid", paidAt: existing.paidAt || restored, updatedAt: restored,
+        })) });
+      }
+      // No payment on it yet: this is a confirmation, and it goes through the same
+      // path a webhook takes so the buyer is emailed and paid_count reflects the
+      // revenue that really arrived.
+      acted("confirm-paid", { amount: existing.amount, currency: existing.currency });
+      return res.json({ order: publicOrder(await markOrderPaid(existing, { source: "admin" })) });
+    }
     acted("status", { to: status });
     const item = await updateOrder(req.params.id, { status, paidAt: null, updatedAt: new Date().toISOString() });
     res.json({ order: publicOrder(item) });
@@ -1268,7 +1395,30 @@ app.use((req, res) => {
   return notFound(req, res);
 });
 
-app.use((error, _req, res, _next) => { console.error(error); res.status(500).json(refuse("api.err.internal", "Lỗi máy chủ", 500)); });
+// The one place an error becomes a response.
+//
+// Three things it did not do, all of which turn a diagnosable failure into an
+// undiagnosable one:
+//
+//  - it never checked headersSent, so an error raised after a response had begun
+//    made this handler throw ERR_HTTP_HEADERS_SENT on top of the real error;
+//  - it logged the error with no request id, which is the one field that ties a
+//    line in the log to the buyer who reported it — the access line carries the
+//    id and this line did not, so the two halves of one request never met;
+//  - it answered every route with JSON, so a person whose page failed to render
+//    was shown {"code":"api.err.internal"} where a page should have been.
+app.use((error, req, res, next) => {
+  if (res.headersSent) return next(error);
+  console.error(`[error] ${req.requestId || "-"} ${req.method} ${req.path}:`, error);
+  const wantsHtml = !req.path.startsWith("/api/") && String(req.accepts(["html", "json"]) || "").startsWith("html");
+  if (wantsHtml && !res.statusCode) {
+    // The rendered 404 is the page that already exists for "this did not work",
+    // and it still carries the shop's own navigation. A JSON body in a browser
+    // tab is not a recovery path; it is a dead end with a status code on it.
+    return notFound(req, res);
+  }
+  res.status(res.statusCode || 500).json(refuse("api.err.internal", "Lỗi máy chủ", 500));
+});
 export async function createApp() { await ensureSeed(); return app; }
 export default app;
 

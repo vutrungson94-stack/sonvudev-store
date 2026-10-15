@@ -7,6 +7,7 @@ import path from 'node:path';
 // reads the environment once at load, so this has to come first and has to be
 // complete. See helpers/env.mjs for what a missing entry used to cost.
 import './helpers/env.mjs';
+import { closeTest } from './helpers/teardown.mjs';
 
 // Order recovery by order id + email. This is what replaces sending the access
 // token by email, so it decides whether a buyer can still reach their download
@@ -44,7 +45,7 @@ test.before(async () => {
   const created = await fetch(`${base}/api/admin/products`, { method: 'POST', headers, body: JSON.stringify({ name: 'Lookup Tester', category: 'Công cụ', platform: 'Windows', version: '1.0.0', price: 99000, currency: 'VND', fileKey: 'products/lookup/1.0.0/test.exe', status: 'active', shortDescriptionEn: 'Finds an order fast.', descriptionEn: 'Looks up an order and recovers its download link.', features: ['Tra cứu nhanh'], featuresEn: ['Finds an order fast'] }) });
   product = (await created.json()).product;
 });
-test.after(async () => { server?.close(); await fs.rm(tempDir, { recursive: true, force: true }); });
+test.after(async () => { await closeTest(server, tempDir); });
 
 // Places an order against the shared product and returns the checkout response.
 async function placeOrder(email) {

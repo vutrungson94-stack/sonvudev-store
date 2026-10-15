@@ -90,6 +90,13 @@ const isRealTarget = (href) => {
   return candidates.some((item) => existsSync(path.join(publicDir, item)));
 };
 
+// The two link lists the server renders every page's navigation from.
+//
+// They used to be markup in ten files, which is why this is worth naming: a set of
+// links that no file on disk holds cannot be read by any check that walks files.
+const chromeLinkLists = (source) =>
+  [...source.matchAll(/(?:HEADER_LINKS|FOOTER_LINKS) = \[([\s\S]*?)\];/g)].map((match) => match[1]);
+
 for (const name of htmlFiles) {
   const source = await read(path.join("public", name));
   for (const match of source.matchAll(/(?:href|src)\s*=\s*"([^"]+)"/g)) {
@@ -104,6 +111,17 @@ for (const match of pagesSource.matchAll(/(?:absolute|LOGO_PATH\s*=)\(\s*"(\/[^"
   const href = match[1];
   if (href.includes(":") || isRealTarget(href) || dynamicRoute.test(href)) continue;
   fail("link gãy", "src/pages.js", `absolute("${href}") trỏ tới file không có trong public/`);
+}
+// The navigation moved out of the templates and into one list in src/pages.js, so
+// the links the shop offers are no longer in any file this loop above reads. Without
+// this they would be exactly the blind spot section 5c documents for the header: a
+// link to a page that was renamed is invisible to every check above.
+for (const block of chromeLinkLists(pagesSource)) {
+  for (const match of block.matchAll(/href:\s*"([^"]+)"/g)) {
+    const href = match[1];
+    if (href.includes(":") || isRealTarget(href) || dynamicRoute.test(href)) continue;
+    fail("link gãy", "src/pages.js", `link "${href}" trong thanh điều hướng trỏ tới trang không có trong public/`);
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -127,7 +145,8 @@ for (const [route, count] of routeTally) {
 //    silently precisely because both files still agree with each other.
 // ---------------------------------------------------------------------------
 const keysOf = (section) => new Set([...section.matchAll(/'([\w.]+)':/g)].map((m) => m[1]));
-const viKeys = keysOf(i18nSource.slice(i18nSource.indexOf("vi: {"), i18nSource.indexOf("en: {")));
+const viTable = i18nSource.slice(i18nSource.indexOf("vi: {"), i18nSource.indexOf("en: {"));
+const viKeys = keysOf(viTable);
 const enKeys = keysOf(i18nSource.slice(i18nSource.indexOf("en: {")));
 for (const key of viKeys) if (!enKeys.has(key)) fail("thiếu bản dịch", "public/i18n.js", `"${key}" có tiếng Việt, thiếu tiếng Anh`);
 for (const key of enKeys) if (!viKeys.has(key)) fail("thiếu bản dịch", "public/i18n.js", `"${key}" có tiếng Anh, thiếu tiếng Việt`);
@@ -186,8 +205,14 @@ const usedKeys = new Set([
 //     a worked example — `refuse("api.err.rateLimited", …)` — and a name that
 //     appears only in prose is not a key anybody sends. Including it reported
 //     thirty-eight phantom usages of a string that does not exist.
+//
+//     src/pages.js is in it because it now names the navigation: the header and the
+//     footer are rendered from one list of links, and each of those links is
+//     `data-i18n="nav.…"` in the markup it writes. Excluded, every key the chrome
+//     uses read as dead copy — which is the same failure the comment above this
+//     list describes, in the opposite direction.
 const keyProducers = [];
-for (const name of ["payments.js", "reviews.js", "app.js"]) {
+for (const name of ["payments.js", "reviews.js", "app.js", "pages.js"]) {
   const file = path.join("src", name);
   if (existsSync(file)) keyProducers.push([`src/${name}`, await read(file)]);
 }
@@ -234,6 +259,39 @@ const undefinedKeys = [...requested].filter((key) => !declared.has(key)).sort();
 if (undefinedKeys.length) {
   fail("khoá i18n chưa định nghĩa", "public/*.html",
     `${undefinedKeys.length} khoá trang dùng mà từ điển không có: ${undefinedKeys.join(", ")} — trang sẽ không đổi được ngữ`);
+}
+
+// ---------------------------------------------------------------------------
+// 3e. The one word the server and the dictionary both write.
+//
+//     Every link in the header and the footer carries two copies of its label: the
+//     `vi` string next to the key in src/pages.js, which is the Vietnamese a
+//     crawler reads out of the bytes, and the data-i18n key, which the browser
+//     resolves on a page that loads i18n.js. Nothing joined them, so "Điều khoản"
+//     could be spelled one way in the dictionary and another there: the page would
+//     switch language correctly and the pre-script fallback would quietly not
+//     match it.
+//
+//     Both directions are visible to a reader. A key named there that the
+//     dictionary does not have leaves the label showing as the raw key name; a
+//     value that differs leaves the Vietnamese they saw first disagreeing with the
+//     English they chose, which is the one failure a two-language site cannot have.
+// ---------------------------------------------------------------------------
+for (const block of chromeLinkLists(pagesSource)) {
+  for (const link of block.matchAll(/key:\s*"([\w.]+)"[^}]*?vi:\s*"([^"]*)"/g)) {
+    const [, key, value] = link;
+    if (!declared.has(key)) {
+      fail("khoá i18n chưa định nghĩa", "src/pages.js",
+        `thanh điều hướng trỏ tới khoá "${key}" mà public/i18n.js không có`);
+      continue;
+    }
+    const found = new RegExp(`'${key}':\\s*'((?:[^'\\\\]|\\\\.)*)'`).exec(viTable);
+    const expected = found ? found[1].replace(/\\'/g, "'") : "";
+    if (expected !== value) {
+      fail("dịch lệch", "src/pages.js",
+        `"${key}": "${value}" trong thanh điều hướng, "${expected}" ở từ điển`);
+    }
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -1181,6 +1239,17 @@ const reachable = new Set();
 for (const name of htmlFiles) {
   const source = await read(path.join("public", name));
   for (const match of source.matchAll(/href="\/([^"#?]*)/g)) {
+    const target = match[1].replace(/\/$/, "");
+    if (target) reachable.add(target.endsWith(".html") ? target : `${target}.html`);
+  }
+}
+// Every page links to every other page through the footer, and the footer is
+// rendered by src/pages.js rather than written into any file — so a page that is
+// only reachable from the footer reads as an orphan here. That is the check
+// reporting its own blind spot, not a page nobody links to, and it fires the first
+// time the navigation is moved rather than every time a link is dropped.
+for (const block of chromeLinkLists(pagesSource)) {
+  for (const match of block.matchAll(/href:\s*"\/([^"#?]*)"/g)) {
     const target = match[1].replace(/\/$/, "");
     if (target) reachable.add(target.endsWith(".html") ? target : `${target}.html`);
   }
