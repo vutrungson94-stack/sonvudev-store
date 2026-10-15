@@ -439,7 +439,7 @@ body.modal-open{overflow:hidden}
 .crumbs a{color:var(--muted);text-decoration:none}
 .crumbs a:hover{color:var(--green)}
 .crumbs span[aria-current]{color:#3d514a}
-.product-detail{padding-bottom:60px;padding-inline:24px}
+.product-detail{padding-top:70px;padding-bottom:60px;padding-inline:24px}
 .product-hero{display:grid;grid-template-columns:minmax(0,1fr) 340px;gap:44px;align-items:start;padding:24px 0 46px}
 .product-hero h1{font:600 clamp(30px,4.4vw,46px)/1.14 'Space Grotesk';letter-spacing:-.035em;margin:10px 0 18px}
 .product-hero h1 em{font-style:normal;color:var(--green)}
