@@ -15,17 +15,17 @@ import { readFile, readdir } from "node:fs/promises";
 import { readFileSync, existsSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import dotenv from "dotenv";
 import { corsDiff, isFixtureHost } from "./lib/cors.mjs";
 import { walkProjectFiles } from "./lib/files.mjs";
 import { stripComments } from "./lib/source.mjs";
 
+import { env } from "../src/config.js";
+
 const rootFlag = process.argv.indexOf("--root");
 const root = rootFlag > -1
   ? path.resolve(process.argv[rootFlag + 1])
-  : path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
-dotenv.config({ path: path.join(root, ".env") });
-const env = (key) => (process.env[key] || "").trim();
+   : path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
+// dotenv.config({ path: path.join(root, ".env") });
 
 const findings = [];
 const fail = (check, file, detail) => findings.push({ check, file, detail });
@@ -437,8 +437,12 @@ for (const [name, label] of [["vi", "tiếng Việt"], ["en", "tiếng Anh"]]) {
 // files against a constant, found the constant in index.html's own JSON-LD, and
 // passed. The mechanism reported itself healthy precisely when it was not
 // configured. Now a missing value fails, loudly, naming itself.
-const appUrl = env("APP_URL");
-const supportEmail = (env("SUPPORT_EMAIL") || "").toLowerCase();
+const appUrlRaw = (process.env.APP_URL || "").trim();
+const appUrl = (env.appUrl ?? "").trim();
+const supportEmailRaw = (process.env.SUPPORT_EMAIL || "").trim();
+const supportEmail = ((env.email.supportEmail ?? "").toLowerCase());
+const appHost = appUrl ? new URL(appUrl).hostname.toLowerCase() : "";
+const appHostRaw = appUrlRaw ? new URL(appUrlRaw).hostname.toLowerCase() : "";
 // These two are what make the domain and address checks meaningful: without them the
 // audit cannot tell the shop's own domain from a third party's, so it would either
 // compare against a guess or skip the checks that matter.
@@ -458,9 +462,9 @@ const supportEmail = (env("SUPPORT_EMAIL") || "").toLowerCase();
 // that was skipped — and the R2 CORS check below adds a third reason, so a reader
 // comparing the two numbers would have been told three groups ran when four did not.
 const skipped = [];
-if (!appUrl) skipped.push("domain gõ tay (cần APP_URL)");
-if (!supportEmail) skipped.push("địa chỉ hỗ trợ gõ tay (cần SUPPORT_EMAIL)");
-const appHost = appUrl ? new URL(appUrl).hostname.toLowerCase() : "";
+if (!appUrlRaw) skipped.push("domain gõ tay (cần APP_URL)");
+if (!supportEmailRaw) skipped.push("địa chỉ hỗ trợ gõ tay (cần SUPPORT_EMAIL)");
+
 const thirdParty = new Set(["www.w3.org", "schema.org", "www.sitemaps.org", "localhost", "img.vietqr.io", "fonts.googleapis.com", "fonts.gstatic.com", "resend.com", "supabase.com", "supabase.co", "paypal.com", "google.com", "cloudflare.com", "render.com", "ipapi.co", "ipwho.is", "er-api.com", "exchangerate-api.com", "indexnow.org",
   // Cloudflare Web Analytics. Both hosts are named because the match above is
   // exact rather than by suffix, and they are two different hosts: the first
@@ -516,11 +520,11 @@ for (const name of testFiles) {
   if (name === "checks-workflow.test.js" || name === "env-contract.test.js") continue;
   // With no APP_URL there is no host to look for, and an empty pattern matches at
   // every position in every file. The missing-configuration failure is already
-  // reported above; adding one finding per character on top of it buried the report
-  // in output until the process was killed for writing too much, which is a much
-  // worse way to be told the environment is unset.
-  if (!appHost) continue;
-  const relative = path.join("test", name);
+   // reported above; adding one finding per character on top of it buried the report
+   // in output until the process was killed for writing too much, which is a much
+   // worse way to be told the environment is unset.
+   if (!appHostRaw) continue;
+   const relative = path.join("test", name);
   const source = await read(relative);
   for (const match of domainHits(source, appHost)) {
     const line = source.slice(0, match.index).split("\n").length;
@@ -629,11 +633,11 @@ const DOMAIN_EXEMPT = new Map([
 for (const relative of infraFiles) {
   if (DOMAIN_EXEMPT.has(relative)) continue;
   // Skipped by name rather than by shape, because a shape recogniser eventually
-  // matches a real hardcode written the same way.
-  if (path.basename(relative) === "audit-web.mjs") continue;
-  const source = await read(relative);
-  if (!appHost) continue;
-  for (const match of domainHits(source, appHost)) {
+   // matches a real hardcode written the same way.
+   if (path.basename(relative) === "audit-web.mjs") continue;
+   const source = await read(relative);
+   if (!appHostRaw) continue;
+   for (const match of domainHits(source, appHost)) {
     const line = source.slice(0, match.index).split("\n").length;
     fail("domain gõ tay", `${relative}:${line}`, `${match[0]} — APP_URL là ${appUrl}. Dùng biến môi trường thay vì ghi tên miền.`);
   }
@@ -661,7 +665,7 @@ for (const relative of infraFiles) {
 //     would report a false failure on every push. The real comparison happens on a
 //     machine with a real .env, and again in check:production before a deploy.
 // ---------------------------------------------------------------------------
-if (appUrl && isFixtureHost(appUrl)) {
+if (!appHostRaw || (appUrl && isFixtureHost(appUrl))) {
   skipped.push("R2 CORS khớp APP_URL (APP_URL là giá trị giả)");
 } else if (appUrl) {
   let corsRules = [];

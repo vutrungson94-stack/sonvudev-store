@@ -16,34 +16,24 @@
 import dns from "node:dns/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import dotenv from "dotenv";
 import { AI_CRAWLERS, ROBOTS_DISALLOW } from "../src/robots.js";
+import { env } from "../src/config.js";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
-dotenv.config({ path: path.join(root, ".env") });
-
 // No fallback domain. The old one was the shop's own address, so a run with no
 // APP_URL and no argument quietly audited production from a machine that may not
 // have been pointed at it — and reported the result as if it had been asked for.
-const base = String(process.argv[2] || process.env.APP_URL || "").replace(/\/$/, "");
-if (!base) {
-  // Nothing to check is not the same as a check that failed, and treating them the
-  // same is what put six red runs in a row before anybody asked why: the
-  // deployed-site job has no .env and no APP_URL secret, so this ran, printed one
-  // line and exited 1 on every single push. A permanently red job is a job nobody
-  // reads, which makes the one push where the site really is broken invisible too.
-  //
-  // So an unconfigured run skips and says so. It stays distinguishable from a pass:
-  // a real audit prints a line per check and a count, and this prints neither.
-  //
-  // The boundary is deliberately narrow. A URL that was given and does not answer is
-  // still a failure — that is the case this script exists for, and skipping it would
-  // mean a dead site passes because the workflow forgot to configure itself.
+const argRaw = process.argv[2];
+const arg = argRaw ? String(argRaw).trim().replace(/\/$/, "") : "";
+
+if (!arg && !process.env.APP_URL) {
+  // No APP_URL and no argument -> skip
   console.log("[seo:check] Bỏ qua: không có APP_URL và không có địa chỉ nào truyền vào.");
   console.log("[seo:check] Để chạy thật: npm run seo:check -- https://ten-mien-cua-ban");
   process.exit(0);
 }
-const expectedToken = (process.env.GOOGLE_SITE_VERIFICATION || "").trim();
+const base = String(arg || env.appUrl || "").replace(/\/$/, "");
+const expectedToken = (env.site.googleVerification || "").trim();
 const TIMEOUT_MS = 12000;
 
 const results = [];

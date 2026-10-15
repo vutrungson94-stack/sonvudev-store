@@ -17,19 +17,17 @@
 import { readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import dotenv from "dotenv";
 import { requiredOrigins, corsDiff, hostOf } from "./lib/cors.mjs";
+import { env } from "../src/config.js";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
-dotenv.config({ path: path.join(root, ".env") });
 
 const file = path.join(root, "cloudflare", "r2-cors.json");
 const args = process.argv.slice(2);
 const write = args.includes("--write");
 const commandOnly = args.includes("--command");
-const bucket = (process.env.R2_BUCKET_NAME || "").trim();
-
-const appUrl = (process.env.APP_URL || "").trim();
+const bucket = env.r2.bucket.trim();
+const appUrl = env.appUrl.trim();
 if (!hostOf(appUrl)) {
   // No trailing argument to type. This script has never read one — the flags below
   // are the only arguments it looks at, and the origin comes from APP_URL — so the

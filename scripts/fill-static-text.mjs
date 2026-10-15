@@ -7,16 +7,14 @@
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { readFile, writeFile } from "node:fs/promises";
-import dotenv from "dotenv";
 import { esc } from "../src/format.js";
+import { env } from "../src/config.js";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
-dotenv.config({ path: path.join(root, ".env") });
 // The brand the static copy is filled with. {brand} in the dictionary resolves at
 // runtime from the x-brand meta tag; the crawler-facing markup written here has
 // no runtime, so the same configured name is substituted at fill time instead of
 // leaking the literal braces to a search engine.
-const brand = (process.env.BRAND_NAME || "SonVuDev").trim() || "SonVuDev";
 const html = await readFile(path.join(root, "public", "index.html"), "utf8");
 const source = await readFile(path.join(root, "public", "i18n.js"), "utf8");
 
@@ -31,7 +29,7 @@ for (const match of vi.matchAll(/'([\w.]+)':\s*'((?:[^'\\]|\\.)*)'/g)) {
 // real one about quotes. {brand} is substituted after escaping — the brand name
 // is configuration, not user input, and escaping it first would corrupt nothing
 // but would also protect nothing.
-const escapeText = (value) => esc(value).replace(/\{brand\}/g, brand);
+const escapeText = (value) => esc(value).replace(/\{brand\}/g, env.brand.name);
 
 let filled = 0;
 let missing = [];

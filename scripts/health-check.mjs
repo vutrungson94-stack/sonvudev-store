@@ -24,9 +24,9 @@
 
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
-import dotenv from 'dotenv';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
+import { env } from '../src/config.js';
 
 /**
  * Every integration the shop can have, how to tell, and what its absence means.
@@ -179,27 +179,12 @@ export function report(body) {
 /**
  * Where to look when nothing is passed.
  *
- * Read from .env so the command works with no argument on a developer machine, and
- * resolves to a URL that is obvious when it guesses wrong.
+ * Uses the shared configuration so the command works with no argument on a developer
+ * machine, and resolves to a URL that is obvious when it guesses wrong.
  *
  * @returns {Promise<string>} a base URL, without a trailing slash
  */
-const defaultBase = async () => {
-  // Read through the shared configuration rather than by regex over the file. The
-  // hand-rolled `^APP_URL=(.*)$` could not see a quoted value, and — worse for a
-  // check — it fell back to http://localhost:3000 when .env was absent, so a
-  // misconfigured developer machine got a green report about a server that was
-  // never running. It is the exact "no fallback" rule audit-web.mjs:292 enforces
-  // on public/: guessing what to audit is worse than declining to.
-  dotenv.config({ path: path.join(root, '.env') });
-  const configured = (process.env.APP_URL || '').trim().replace(/\/$/, '');
-  if (configured) return configured;
-  try {
-    return await import('../src/config.js').then((m) => m.env.appUrl);
-  } catch {
-    return '';
-  }
-};
+const defaultBase = async () => env.appUrl;
 
 /**
  * Fetches a health payload and prints the checklist.

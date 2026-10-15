@@ -5,16 +5,15 @@
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { spawnSync } from "node:child_process";
-import dotenv from "dotenv";
+import { env } from "../src/config.js";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
-dotenv.config({ path: path.join(root, ".env"), override: true });
+// dotenv.config({ path: path.join(root, ".env"), override: true });
 
 const args = process.argv.slice(2);
 const apply = args.includes("--apply");
 const redeploy = args.includes("--deploy");
-const env = (key) => (process.env[key] || "").trim();
-const token = env("RENDER_API_KEY");
+const token = (process.env.RENDER_API_KEY || "").trim();
 const api = "https://api.render.com/v1";
 
 // Render assigns PORT and injects its own RENDER_* vars, so neither the Render
@@ -84,14 +83,14 @@ async function call(method, url, body) {
 }
 
 async function findService() {
-  const explicit = env("RENDER_SERVICE_ID");
+   const explicit = (process.env.RENDER_SERVICE_ID || "").trim();
   if (explicit) return { service: { id: explicit }, name: explicit };
   // The name used to fall back to a literal typed into this file. A service
   // name belongs to the Render account, not to the script: renaming the service
   // on the dashboard would fail with a message pointing at a name that no
   // longer exists, instead of naming the variable that decides it. So the
   // variable is required and its absence says what to set.
-  const wanted = env("RENDER_SERVICE");
+   const wanted = (process.env.RENDER_SERVICE || "").trim();
   if (!wanted) {
     console.error("Thieu RENDER_SERVICE hoac RENDER_SERVICE_ID trong .env.");
     console.error("Dat mot trong hai: RENDER_SERVICE_ID (id cua service) hoac RENDER_SERVICE (ten service).");
@@ -182,7 +181,7 @@ async function main() {
   const wanted = new Map();
   const missing = [];
   for (const key of ALLOWED) {
-    const value = env(key);
+     const value = (env[key] ?? "").trim();
     if (!value) { missing.push(key); continue; }
     wanted.set(key, OVERRIDE[key] || value);
   }
