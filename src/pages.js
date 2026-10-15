@@ -513,7 +513,7 @@ const FOOTER_LINKS = [
  * own name by src/app.js — /terms.html answers /terms — so this reads the same
  * table the router does rather than keeping a second list of addresses.
  */
-export const routeForFile = (file) => {
+const routeForFile = (file) => {
   const name = String(file || "").trim();
   if (!name) return "";
   if (name === "index.html") return "/";
