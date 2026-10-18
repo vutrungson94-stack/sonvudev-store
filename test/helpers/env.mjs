@@ -39,6 +39,8 @@ export const TEST_ENV = {
   R2_ACCESS_KEY_ID: 'test-access-key',
   R2_SECRET_ACCESS_KEY: 'test-secret-key',
   R2_BUCKET_NAME: 'test-private-bucket',
+  BRAND_NAME: 'SonVuDev',
+  BRAND_DESCRIPTION: 'Công cụ và tiện ích phần mềm cho doanh nghiệp và cá nhân tại Việt Nam.',
   BANK_NAME: 'Test Bank',
   BANK_ACCOUNT_NAME: 'SonVuDev Test',
   BANK_ACCOUNT_NUMBER: '0123456789',

@@ -47,7 +47,9 @@ const value = (name, fallback = "") => (process.env[name] || fallback).trim();
  * Exported so that isConfigured, the production check and anything else asking the
  * same question read the same value.
  */
-const NOT_SET = "Chưa cập nhật";
+// No sentinel string: an empty value means "not set". The old literal had to be
+// recognised in three places and drifted; treating absence as absence removes
+// that class of bug entirely.
 
 /**
  * Whether a value is a placeholder rather than something somebody filled in.
@@ -74,7 +76,6 @@ const NOT_SET = "Chưa cập nhật";
  * still a template. Nothing a buyer would genuinely supply contains these tokens.
  */
 const PLACEHOLDER_TOKENS = [
-  NOT_SET.toLowerCase(),
   "not configured",
   "replace-with",
   "replace_with",
@@ -135,12 +136,12 @@ export const env = {
   // shop meant editing four files and forgetting one. Everything that speaks to
   // a person or to a crawler now reads it from here.
   brand: {
-    name: value("BRAND_NAME", "SonVuDev"),
+    name: value("BRAND_NAME"),
     // One line about what the shop is. Read by the Organization schema and
     // /llms.txt — the two places a crawler or an assistant learns the shop
     // from — instead of being typed into the markup. A reword in one place
     // reaches both.
-    description: value("BRAND_DESCRIPTION", "Công cụ và tiện ích phần mềm cho doanh nghiệp và cá nhân tại Việt Nam."),
+    description: value("BRAND_DESCRIPTION"),
     // Shown on the legal pages, so a buyer has something to hold the shop to.
     legalEntity: value("BRAND_LEGAL_ENTITY", ""),
     // The person behind the shop. Models weight a named human far more heavily
@@ -216,8 +217,8 @@ export const env = {
   email: {
     // Resend is a plain REST API, so no dependency and no SMTP server is needed.
     resendKey: value("RESEND_API_KEY"),
-    from: value("EMAIL_FROM", `${value("BRAND_NAME", "SonVuDev")} <no-reply@sonvudev.com>`),
-    supportEmail: value("SUPPORT_EMAIL", "hello@sonvudev.com"),
+    from: value("EMAIL_FROM"),
+    supportEmail: value("SUPPORT_EMAIL"),
   },
   paypal: {
     environment: resolvePaypalEnvironment(value("PAYPAL_ENVIRONMENT")).environment,
@@ -232,11 +233,11 @@ export const env = {
     accountEmail: value("PAYPAL_ACCOUNT_EMAIL"),
   },
   bank: {
-    name: value("BANK_NAME", NOT_SET),
-    accountName: value("BANK_ACCOUNT_NAME", value("BRAND_NAME", "SonVuDev")),
-    accountNumber: value("BANK_ACCOUNT_NUMBER", NOT_SET),
-    notePrefix: value("BANK_TRANSFER_NOTE_PREFIX", value("BRAND_NAME", "SonVuDev")),
-    bin: value("BANK_BIN", "970436"),
+    name: value("BANK_NAME"),
+    accountName: value("BANK_ACCOUNT_NAME", value("BRAND_NAME")),
+    accountNumber: value("BANK_ACCOUNT_NUMBER"),
+    notePrefix: value("BANK_TRANSFER_NOTE_PREFIX", value("BRAND_NAME")),
+    bin: value("BANK_BIN"),
     momo: value("MOMO_ACCOUNT_NUMBER"),
     momoQr: value("MOMO_QR_IMAGE"),
     momoQrAmount: value("MOMO_QR_AMOUNT_IMAGE"),

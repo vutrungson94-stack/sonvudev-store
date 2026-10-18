@@ -51,6 +51,10 @@ jobs:
       NODE_ENV: test
       APP_URL: https://ci-fixture.example
       SUPPORT_EMAIL: support@ci-fixture.example
+      BRAND_NAME: SonVuDev
+      BRAND_DESCRIPTION: Công cụ và tiện ích phần mềm cho doanh nghiệp và cá nhân tại Việt Nam.
+      BANK_BIN: '970436'
+      EMAIL_FROM: 'SonVuDev <no-reply@ci-fixture.example>'
       # Secrets are never available to a pull request from a fork, and no check
       # here may reach the network with one. These exist so a stray default can
       # never turn a lint run into a real email or a real IndexNow ping.
@@ -74,6 +78,9 @@ jobs:
       # passing build should depend on.
       - name: install
         run: npm ci
+
+      - name: dependency audit
+        run: npm audit --audit-level=high
 
       - name: lint
         run: npm run lint
