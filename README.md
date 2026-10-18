@@ -718,3 +718,5 @@ Hai việc cần làm khi vẫn ở gói free:
 Chưa làm vì cần chi phí hoặc tài khoản: gửi email tự động (SMTP), code signing cho tệp
 `.exe`, nâng cấp Render. Ba việc này nên để lại cho khi có thu nhập.
 
+
+<!-- ai-commit-test -->
