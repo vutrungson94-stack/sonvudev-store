@@ -228,7 +228,9 @@ function localized(p) {
     badge: mapValue(BADGES, BADGES_NORM, p.badge) || undefined,
     shortDescription: p.shortDescriptionEn || p.shortDescription,
     description: p.descriptionEn,
-    requirements: p.requirementsEn || p.requirements,
+    requirements: (p.requirementsEn && String(p.requirementsEn).trim())
+      ? p.requirementsEn
+      : (/[^\x00-\x7F]/.test(String(p.requirements || '')) ? T('product.seeGuide') : p.requirements),
     features: (p.featuresEn && p.featuresEn.length ? p.featuresEn : p.features) || [],
   };
 }

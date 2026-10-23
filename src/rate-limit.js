@@ -46,7 +46,11 @@ export async function createSupabaseStore() {
 
 export function resolveRateLimitStore() {
   const mode = String(process.env.RATE_LIMIT_STORE || "").toLowerCase();
-  if (mode === "supabase" && isConfigured.supabase) return createSupabaseStore();
+  if (mode === "memory") return createMemoryStore();
+  if (mode === "supabase") return createSupabaseStore();
+  // Default to the shared store when Supabase is configured, so a multi-instance
+  // production host does not silently fall back to per-process memory.
+  if (isConfigured.supabase) return createSupabaseStore();
   return createMemoryStore();
 }
 

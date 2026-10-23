@@ -23,6 +23,7 @@ import { renderRobotsTxt } from "./robots.js";
 import { adminThrottled, healthThrottled, tooManyAttempts, checkoutThrottled } from "./rate-limit.js";
 import { parseAdminTokens, matchAdminToken } from "./admin-auth.js";
 import { isEnabled } from "./feature-flags.js";
+import { otelEnabled, exportSpan } from "./otel.js";
 
 const app = express();
 const publicDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "public");
@@ -595,6 +596,20 @@ app.use((req, res, next) => {
     // every stylesheet is noise that buries the one line that mattered.
     const query = req.originalUrl.includes("?") ? `${req.originalUrl.split("?")[0]}?…` : req.originalUrl;
     console.log(`${requestId} trace=${traceId} ${res.statusCode} ${req.method} ${query} ${ms.toFixed(1)}ms`);
+    if (otelEnabled()) {
+      exportSpan({
+        traceId,
+        spanId: crypto.randomUUID().replace(/-/g, "").slice(0, 16),
+        name: `${req.method} ${req.path}`,
+        startTimeUnixNano: String(startedAt),
+        endTimeUnixNano: String(process.hrtime.bigint()),
+        attributes: [
+          { key: "http.method", value: { stringValue: req.method } },
+          { key: "http.target", value: { stringValue: req.path } },
+          { key: "http.status_code", value: { intValue: res.statusCode } },
+        ],
+      }).catch(() => {});
+    }
   });
 
 // Canary routing. A small, deterministic slice of traffic can be marked as
@@ -1129,7 +1144,7 @@ app.post("/api/admin/products", admin, json, async (req, res) => {
     const item = await createProduct({
       slug, name,
       shortDescription: text(req.body.shortDescription, 180), description: text(req.body.description, 2000), category: text(req.body.category, 50) || "Khác", platform: text(req.body.platform, 50) || "Windows", version: text(req.body.version, 30) || "1.0.0", price, currency: text(req.body.currency, 8) || "VND",
-      features: Array.isArray(req.body.features) ? req.body.features.map((v) => text(v, 120)).filter(Boolean) : [], featuresEn: Array.isArray(req.body.featuresEn) ? req.body.featuresEn.map((v) => text(v, 200)).filter(Boolean) : [], shortDescriptionEn: text(req.body.shortDescriptionEn, 180), descriptionEn: text(req.body.descriptionEn, 4000), requirements: text(req.body.requirements, 240), seoTitle: text(req.body.seoTitle, 70), seoDescription: text(req.body.seoDescription, 175), seoTitleEn: text(req.body.seoTitleEn, 70), seoDescriptionEn: text(req.body.seoDescriptionEn, 175), status: text(req.body.fileKey, 500) ? (req.body.status === "draft" ? "draft" : "active") : "draft", fileKey: text(req.body.fileKey, 500), badge: text(req.body.badge, 40) || null,
+      features: Array.isArray(req.body.features) ? req.body.features.map((v) => text(v, 120)).filter(Boolean) : [], featuresEn: Array.isArray(req.body.featuresEn) ? req.body.featuresEn.map((v) => text(v, 200)).filter(Boolean) : [], shortDescriptionEn: text(req.body.shortDescriptionEn, 180), descriptionEn: text(req.body.descriptionEn, 4000), requirements: text(req.body.requirements, 240), requirementsEn: text(req.body.requirementsEn, 240), seoTitle: text(req.body.seoTitle, 70), seoDescription: text(req.body.seoDescription, 175), seoTitleEn: text(req.body.seoTitleEn, 70), seoDescriptionEn: text(req.body.seoDescriptionEn, 175), status: text(req.body.fileKey, 500) ? (req.body.status === "draft" ? "draft" : "active") : "draft", fileKey: text(req.body.fileKey, 500), badge: text(req.body.badge, 40) || null,
     });
     // Publishing a product is the one event a crawler cannot guess at: the
     // sitemap is only re-read on its own schedule, so without this a new page
@@ -1161,7 +1176,7 @@ app.patch("/api/admin/products/:id", admin, json, async (req, res) => {
     const caps = {
       name: 120, slug: 80, shortDescription: 180, description: 2000, shortDescriptionEn: 180,
       descriptionEn: 4000, category: 50, platform: 50, version: 30, currency: 8,
-      badge: 40, requirements: 240, fileKey: 500, seoTitle: 70, seoDescription: 175,
+      badge: 40, requirements: 240, requirementsEn: 240, fileKey: 500, seoTitle: 70, seoDescription: 175,
       seoTitleEn: 70, seoDescriptionEn: 175,
     };
     const patch = {};
