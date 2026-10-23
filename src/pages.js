@@ -1079,6 +1079,7 @@ function localizeToEnglish(product) {
     ...product,
     shortDescription: pick(product.shortDescriptionEn, product.shortDescription),
     description: pick(product.descriptionEn, product.description),
+    requirements: pick(product.requirementsEn, product.requirements),
     features: featuresEn.length ? featuresEn : product.features,
     // SEO copy is the one pair that does NOT fall back to Vietnamese.
     //

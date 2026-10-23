@@ -82,6 +82,7 @@ $$;
 -- new ones work without a backfill.
 alter table public.products add column if not exists short_description_en text not null default '';
 alter table public.products add column if not exists description_en text not null default '';
+alter table public.products add column if not exists requirements_en text not null default '';
 alter table public.products add column if not exists features_en jsonb not null default '[]'::jsonb;
 -- How the product should read in a search result. Left blank, the page falls
 -- back to the product name, which nobody outside this site is searching for.

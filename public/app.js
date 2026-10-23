@@ -228,6 +228,7 @@ function localized(p) {
     badge: mapValue(BADGES, BADGES_NORM, p.badge) || undefined,
     shortDescription: p.shortDescriptionEn || p.shortDescription,
     description: p.descriptionEn,
+    requirements: p.requirementsEn || p.requirements,
     features: (p.featuresEn && p.featuresEn.length ? p.featuresEn : p.features) || [],
   };
 }

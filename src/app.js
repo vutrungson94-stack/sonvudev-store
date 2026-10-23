@@ -22,6 +22,7 @@ import { refuse } from "./refuse.js";
 import { renderRobotsTxt } from "./robots.js";
 import { adminThrottled, healthThrottled, tooManyAttempts, checkoutThrottled } from "./rate-limit.js";
 import { parseAdminTokens, matchAdminToken } from "./admin-auth.js";
+import { isEnabled } from "./feature-flags.js";
 
 const app = express();
 const publicDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "public");
@@ -1387,18 +1388,22 @@ app.patch("/api/admin/orders/:id", admin, json, async (req, res) => {
 
 // Runtime metrics for operators. Admin-gated and read-only: no secrets, no
 // mutation, only process-level facts that help diagnose a running host.
-app.get("/api/metrics", admin, (_req, res) => {
-  res.json({
-    uptime: Math.round(process.uptime()),
-    memory: process.memoryUsage(),
-    pid: process.pid,
-    node: process.version,
-    platform: process.platform,
-    arch: process.arch,
-    persistence: persistenceMode,
-    timestamp: new Date().toISOString(),
+// Exposed only when FEATURE_RUNTIME_METRICS is on, so a host can disable the
+// endpoint without a redeploy.
+if (isEnabled("runtime_metrics", true)) {
+  app.get("/api/metrics", admin, (_req, res) => {
+    res.json({
+      uptime: Math.round(process.uptime()),
+      memory: process.memoryUsage(),
+      pid: process.pid,
+      node: process.version,
+      platform: process.platform,
+      arch: process.arch,
+      persistence: persistenceMode,
+      timestamp: new Date().toISOString(),
+    });
   });
-});
+}
 
 // Anything that fell through is the 404 page, not Express's bare error. It is
 // declared noindex, so broken links a crawler discovers do not become thin
