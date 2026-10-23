@@ -1,0 +1,52 @@
+# Caddy configuration for a canary rollout.
+#
+# This is deploy/Caddyfile plus one extra route: a visitor carrying the cookie
+# svd_canary=1 is sent to the candidate instance on CANARY_PORT, everyone else
+# stays on the stable instance. deploy/canary.sh installs this file for the
+# duration of a rollout and puts the normal Caddyfile back on promote or rollback.
+#
+# Why a cookie instead of a percentage here: Caddy's random load-balancing
+# policies choose from the upstream list by load, not by weight, so "10% of
+# traffic" written in this file would be a guess that changes on every request.
+# The application is the only component that can make a stable, per-visitor
+# decision, and it does: src/canary.js assigns a deterministic bucket and sets
+# the cookie, and this proxy simply honours it. A visitor therefore stays on one
+# build for the whole rollout instead of flipping between them.
+#
+# CANARY_PORT and PORT come from the same environment as the stable Caddyfile.
+# A missing SITE_DOMAIN is still a configuration error, not a default.
+{$SITE_DOMAIN}, www.{$SITE_DOMAIN} {
+  encode zstd gzip
+
+  @canary cookie svd_canary 1
+  handle @canary {
+    reverse_proxy 127.0.0.1:{$CANARY_PORT:3001} {
+      health_uri /api/health
+      health_interval 10s
+      health_timeout 2s
+      # If the candidate dies, retry the stable instance rather than returning
+      # 502 to the one group of visitors who agreed to test it.
+      lb_try_duration 3s
+      lb_try_interval 250ms
+    }
+  }
+
+  handle {
+    reverse_proxy 127.0.0.1:{$PORT:3000} {
+      health_uri /api/health
+      health_interval 10s
+      health_timeout 2s
+      lb_try_duration 3s
+      lb_try_interval 250ms
+    }
+  }
+
+  header {
+    -Server
+  }
+
+  log {
+    output file /var/log/caddy/sonvudev-access.log
+    format json
+  }
+}

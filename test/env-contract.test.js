@@ -188,6 +188,21 @@ test('template deploy không chứa biến không ai đọc', () => {
   const templateKeys = new Set([...template.matchAll(/^#?\s*([A-Z][A-Z0-9_]+)=/gm)].map((m) => m[1]));
   const infraReaders = {
     SITE_DOMAIN: path.join('deploy', 'Caddyfile'),
+    // Canary and tracing are deployment switches, read by their own modules
+    // rather than by config.js: putting them in config.js would force them into
+    // render.yaml and sync-render.mjs, where a VPS-only rolling deployment has no
+    // meaning. The reader is named so this stays a deliberate exception.
+    CANARY_PORT: path.join('deploy', 'Caddyfile.canary'),
+    CANARY_PERCENT: path.join('src', 'canary.js'),
+    CANARY_FILE: path.join('src', 'canary.js'),
+    RATE_LIMIT_STORE: path.join('src', 'rate-limit.js'),
+    OTEL_EXPORTER_OTLP_ENDPOINT: path.join('src', 'otel.js'),
+    OTEL_EXPORTER_OTLP_HEADERS: path.join('src', 'otel.js'),
+    OTEL_EXPORTER_OTLP_TIMEOUT: path.join('src', 'otel.js'),
+    OTEL_TRACES_PATH: path.join('src', 'otel.js'),
+    OTEL_BATCH_SIZE: path.join('src', 'otel.js'),
+    OTEL_FLUSH_MS: path.join('src', 'otel.js'),
+    OTEL_SERVICE_NAME: path.join('src', 'otel.js'),
     RENDER_API_KEY: path.join('scripts', 'sync-render.mjs'),
     RENDER_SERVICE: path.join('scripts', 'sync-render.mjs'),
     RENDER_SERVICE_ID: path.join('scripts', 'sync-render.mjs'),

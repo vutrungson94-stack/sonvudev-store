@@ -42,6 +42,7 @@
     "logs:prune": "node scripts/prune-logs.mjs",
     "backup": "node scripts/backup.mjs",
     "provenance": "node scripts/provenance.mjs",
+    "benchmark": "node scripts/benchmark.mjs",
     "trust:virustotal": "node scripts/set-virus-scan.mjs"
   },
   "files": [

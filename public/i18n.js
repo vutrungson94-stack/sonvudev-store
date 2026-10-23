@@ -1017,22 +1017,61 @@ const DICT = {
 // So there are no order.status.* keys left to resolve, and adding one back
 // here is the mistake to watch for.
 
-// The language a label table is asked for. Anything that is not English is
-// Vietnamese, which is the same rule the rest of this file falls back on.
-const langOf = (lang) => (String(lang) === 'en' ? 'en' : 'vi');
+// The language a label table is asked for. Label tables exist as vi/en pairs;
+// other locales (ja, zh-CN) read the English table rather than dropping back to
+// Vietnamese, because an English fallback is readable to those readers and
+// Vietnamese is not.
+const langOf = (lang) => (String(lang) === 'vi' ? 'vi' : 'en');
 
+// Locales whose dictionary is fetched on demand from /locales/<code>.json.
+// Vietnamese and English stay bundled because they are the source language and
+// the fallback language; a third language is an asset, not a code change.
+const BUNDLED = ['vi', 'en'];
+const EXTRA_LOCALES = ['ja', 'zh-CN'];
 const SUPPORTED = (Array.isArray(window.SVD_LOCALES) && window.SVD_LOCALES.length)
-  ? window.SVD_LOCALES
-  : ['vi', 'en'];
+  ? [...window.SVD_LOCALES]
+  : [...BUNDLED, ...EXTRA_LOCALES];
+const LANG_LABELS = { vi: 'VI', en: 'EN', ja: 'JA', 'zh-CN': '中文' };
+const LOCALE_TAGS = { vi: 'vi-VN', en: 'en-US', ja: 'ja-JP', 'zh-CN': 'zh-CN' };
 const STORAGE_KEY = 'sonvudev_lang';
 const listeners = new Set();
+const loadedLocales = new Set(BUNDLED);
+const loadingLocales = new Map();
+
+/**
+ * Fetches a locale dictionary once and merges it into the tables.
+ *
+ * A missing or malformed asset is not an error the reader should see: the page
+ * keeps rendering with the English fallback and the button still works. That is
+ * the difference between a translation gap and a broken storefront.
+ */
+function loadLocale(lang) {
+  if (loadedLocales.has(lang)) return Promise.resolve();
+  if (loadingLocales.has(lang)) return loadingLocales.get(lang);
+  if (typeof fetch !== 'function') return Promise.resolve();
+  const request = fetch(`/locales/${encodeURIComponent(lang)}.json`, { headers: { accept: 'application/json' } })
+    .then((response) => (response && response.ok ? response.json() : Promise.reject(new Error('locale missing'))))
+    .then((dict) => {
+      if (dict && typeof dict === 'object' && !Array.isArray(dict)) {
+        DICT[lang] = Object.assign({}, DICT[lang] || {}, dict);
+        loadedLocales.add(lang);
+      }
+    })
+    .catch(() => { /* fallback chain stays in place */ })
+    .finally(() => { loadingLocales.delete(lang); });
+  loadingLocales.set(lang, request);
+  return request;
+}
 
 function readStored() {
   try {
     const saved = localStorage.getItem(STORAGE_KEY);
     if (saved && SUPPORTED.includes(saved)) return saved;
   } catch (_) { /* private mode: fall through to the browser default */ }
-  return (navigator.language || 'vi').toLowerCase().startsWith('en') ? 'en' : 'vi';
+  const browser = String(navigator.language || '').toLowerCase();
+  if (browser.startsWith('ja')) return 'ja';
+  if (browser.startsWith('zh')) return 'zh-CN';
+  return browser.startsWith('en') ? 'en' : 'vi';
 }
 
 let current = readStored();
@@ -1073,7 +1112,6 @@ const TOKENS = (() => {
 const I18N = {
   get lang() { return current; },
   t(key, fallback, vars) {
-    const table = DICT[current] || DICT.vi;
     const fill = (text) => String(text)
       .replace(/\{\{(\w+)\}\}/g, (match, name) => {
         if (vars && vars[name] !== undefined) return vars[name];
@@ -1086,27 +1124,45 @@ const I18N = {
         if (name === "brand") return host();
         return match;
       });
-    if (table[key] !== undefined) return fill(table[key]);
-    if (DICT.vi[key] !== undefined) return fill(DICT.vi[key]);
+    // Current language first, then English, then Vietnamese. An untranslated key
+    // in Japanese used to fall straight to Vietnamese; English is the better
+    // fallback for a reader who chose neither source language.
+    const chain = current === 'vi' ? ['vi'] : current === 'en' ? ['en', 'vi'] : [current, 'en', 'vi'];
+    for (const code of chain) {
+      const table = DICT[code];
+      if (table && table[key] !== undefined) return fill(table[key]);
+    }
     return fill(fallback !== undefined ? fallback : key);
   },
   set(lang) {
-    if (!SUPPORTED.includes(lang) || lang === current) return;
+    if (!SUPPORTED.includes(lang)) return;
+    if (lang === current) return;
     current = lang;
     try { localStorage.setItem(STORAGE_KEY, lang); } catch (_) { /* ignore */ }
     apply();
     markActiveLanguage();
     listeners.forEach((fn) => { try { fn(lang); } catch (e) { console.error(e); } });
+    // A locale asset arrives after the switch, so the UI is usable immediately
+    // with the English fallback and upgrades in place when the dictionary lands.
+    if (!loadedLocales.has(lang)) {
+      loadLocale(lang).then(() => {
+        if (current !== lang) return; // switched again while the request was in flight
+        apply();
+        markActiveLanguage();
+        listeners.forEach((fn) => { try { fn(lang); } catch (e) { console.error(e); } });
+      });
+    }
   },
   onChange(fn) { listeners.add(fn); return () => listeners.delete(fn); },
   register(locale, dict) {
     if (!locale) return this;
     DICT[locale] = Object.assign({}, DICT[locale] || {}, dict || {});
+    loadedLocales.add(locale);
     if (!SUPPORTED.includes(locale)) SUPPORTED.push(locale);
     return this;
   },
   get supported() { return [...SUPPORTED]; },
-  get locale() { return current === 'en' ? 'en-US' : 'vi-VN'; },
+  get locale() { return LOCALE_TAGS[current] || LOCALE_TAGS.en; },
   esc(value) {
     return window.SVDFormat.esc(value);
   },
@@ -1226,8 +1282,26 @@ function markActiveLanguage() {
   });
 }
 
+// Adds a button for every supported locale the markup does not already have, so
+// enabling a language is a dictionary asset plus one entry in SVD_LOCALES - not
+// an HTML edit. The bundled VI/EN buttons keep their order and their labels.
+function renderLanguageButtons() {
+  document.querySelectorAll('[data-lang-switch]').forEach((group) => {
+    for (const code of SUPPORTED) {
+      if (group.querySelector(`[data-lang-set="${code}"]`)) continue;
+      const button = document.createElement('button');
+      button.type = 'button';
+      button.dataset.langSet = code;
+      button.textContent = LANG_LABELS[code] || code.toUpperCase();
+      button.setAttribute('aria-pressed', code === current ? 'true' : 'false');
+      group.appendChild(button);
+    }
+  });
+}
+
 function boot() {
   apply();
+  renderLanguageButtons();
   // Language switch buttons - client-side toggle only (no navigation)
   document.querySelectorAll('[data-lang-switch] [data-lang-set]').forEach((button) => {
     button.addEventListener('click', () => {
@@ -1236,6 +1310,15 @@ function boot() {
     });
   });
   markActiveLanguage();
+  // A stored third language boots before its asset exists; swap it in as soon as
+  // it arrives, and tell app.js to repaint the catalogue and any open modal.
+  if (!loadedLocales.has(current)) {
+    loadLocale(current).then(() => {
+      apply();
+      markActiveLanguage();
+      window.dispatchEvent(new CustomEvent('i18n:ready', { detail: { lang: current } }));
+    });
+  }
   // On window, not document: app.js listens on window to repaint an open modal
   // when the language flips, and a CustomEvent dispatched on document without
   // `bubbles` stops at document. It was dispatched on document, so the listener

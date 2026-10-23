@@ -1,0 +1,40 @@
+[Unit]
+# The candidate instance behind deploy/Caddyfile.canary. It runs the same code,
+# the same environment file and the same data directory as the stable unit, and
+# differs in two ways only: the port it binds and DEPLOY_CHANNEL, which makes the
+# instance identify itself in X-Deployment-Channel.
+#
+# __CANARY_PORT__ is replaced by deploy/canary.sh, which reads CANARY_PORT from
+# /etc/sonvudev-store.env. A template is used because systemd cannot read one
+# environment variable into another directive: parsing the file inside the unit
+# would be a second, weaker implementation of EnvironmentFile.
+Description=SonVuDev Store canary instance
+After=network-online.target caddy.service
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=sonvudev
+Group=sonvudev
+WorkingDirectory=/opt/sonvudev-store/canary
+Environment=NODE_ENV=production
+# Reported on every response as X-Deployment-Channel, so a dashboard can compare
+# the candidate with the stable instance without guessing from the host.
+Environment=DEPLOY_CHANNEL=canary
+EnvironmentFile=/etc/sonvudev-store.env
+# After EnvironmentFile on purpose: a later assignment wins, so the shared file
+# keeps PORT=3000 for the stable unit and this line moves only the candidate.
+Environment=PORT=__CANARY_PORT__
+ExecStart=/usr/bin/node src/server.js
+Restart=on-failure
+RestartSec=5
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/opt/sonvudev-store/shared
+StandardOutput=append:/var/log/sonvudev-store-canary.log
+StandardError=append:/var/log/sonvudev-store-canary.error.log
+
+[Install]
+WantedBy=multi-user.target

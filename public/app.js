@@ -210,7 +210,10 @@ const mapValue = (exact, tolerant, raw) => {
   return exact[value] || tolerant[foldDiacritics(value)] || value;
 };
 function localized(p) {
-  if (window.I18N.lang !== 'en') {
+  // Only the Vietnamese page repairs/strips Vietnamese. Japanese and Chinese
+  // readers get the English product copy (with the same safe requirements
+  // fallback), never a Vietnamese body under a translated heading.
+  if (window.I18N.lang === 'vi') {
     // Unaccented Vietnamese coming from the catalogue is repaired to the accented
     // form; an already-English value is translated back to its Vietnamese word.
     const cat = CATEGORIES_VI_FIX[foldDiacritics(p.category)]

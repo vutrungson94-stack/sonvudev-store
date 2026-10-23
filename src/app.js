@@ -24,6 +24,7 @@ import { adminThrottled, healthThrottled, tooManyAttempts, checkoutThrottled } f
 import { parseAdminTokens, matchAdminToken } from "./admin-auth.js";
 import { isEnabled } from "./feature-flags.js";
 import { otelEnabled, exportSpan } from "./otel.js";
+import { canaryAssignment, canaryCookie, canaryClearCookie } from "./canary.js";
 
 const app = express();
 const publicDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "public");
@@ -611,21 +612,28 @@ app.use((req, res, next) => {
       }).catch(() => {});
     }
   });
-
-// Canary routing. A small, deterministic slice of traffic can be marked as
-// canary via CANARY_PERCENT without a separate deployment, so a new build can be
-// exercised before it is promoted. The channel is reported on the response for
-// observability; routing decisions live in the deployment layer.
-const canaryPercent = Math.max(0, Math.min(100, Number(process.env.CANARY_PERCENT || 0)));
-app.use((req, res, next) => {
-  const ip = String(req.ip || "unknown");
-  const hash = crypto.createHash("sha256").update(ip).digest();
-  const bucket = (hash[0] / 255) * 100;
-  const channel = bucket < canaryPercent ? "canary" : "stable";
-  res.setHeader("X-Deployment-Channel", channel);
-  req.deploymentChannel = channel;
   next();
-});  next();
+});
+
+// Canary routing. A deterministic slice of traffic is tagged as canary and, from
+// the next request on, Caddy routes that visitor to a second instance running the
+// candidate build (deploy/Caddyfile.canary). The cookie is the contract between
+// this middleware and the proxy; the percentage is read through src/canary.js so
+// deploy/canary.sh can widen or roll back a rollout without a restart.
+//
+// This middleware must stay registered once, at startup. It used to sit inside
+// the request logger above - every request appended another copy to the Express
+// stack, so the router grew for as long as the process lived.
+const deploymentChannel = process.env.DEPLOY_CHANNEL === "canary" ? "canary" : "stable";
+app.use((req, res, next) => {
+  const assignment = canaryAssignment(req);
+  res.setHeader("X-Deployment-Channel", deploymentChannel);
+  res.setHeader("X-Canary-Assignment", assignment.assignment);
+  if (assignment.assign) res.append("Set-Cookie", canaryCookie());
+  else if (assignment.clear) res.append("Set-Cookie", canaryClearCookie());
+  req.deploymentChannel = deploymentChannel;
+  req.canaryAssignment = assignment.assignment;
+  next();
 });
 
 app.use((req, res, next) => {

@@ -169,6 +169,36 @@ test('yêu cầu hệ thống chưa dịch không được để tiếng Việt 
     'tiếng Việt phải giữ nguyên yêu cầu hệ thống gốc');
 });
 
+// The N-locale path: a dictionary that is not bundled ships under public/locales
+// and is fetched on demand. A missing key inside a partial dictionary falls back
+// to English, not Vietnamese, because the reader chose neither source language.
+test('nạp từ điển ngôn ngữ mới theo yêu cầu và dự phòng về tiếng Anh', async () => {
+  const { document } = createDom(IDS);
+  const calls = [];
+  const fetchStub = async (url) => {
+    calls.push(String(url));
+    if (String(url).includes('/locales/ja.json')) {
+      return { ok: true, json: async () => ({ 'nav.products': '製品', 'product.requirements': '動作環境' }) };
+    }
+    throw new Error(`unexpected fetch: ${url}`);
+  };
+  const res = await runScript(read('i18n.js'), {
+    document,
+    window: {},
+    fetch: fetchStub,
+    localStorage: { _v: {}, getItem: () => null, setItem() {}, removeItem() {} },
+  });
+  const I18N = res.window.I18N;
+  assert.ok(I18N.supported.includes('ja'), 'tiếng Nhật phải nằm trong danh sách hỗ trợ');
+  I18N.set('ja');
+  await new Promise((resolve) => setTimeout(resolve, 10));
+  assert.ok(calls.some((url) => url.includes('/locales/ja.json')), 'phải tải /locales/ja.json');
+  assert.equal(I18N.lang, 'ja');
+  assert.equal(I18N.t('nav.products'), '製品', 'khóa đã dịch phải dùng bản tiếng Nhật');
+  assert.equal(I18N.t('hero.title1'), 'Good tools.', 'khóa chưa dịch phải rơi về tiếng Anh');
+  assert.equal(document.documentElement.lang, 'ja');
+});
+
 test('mọi khoá i18n tồn tại ở cả hai ngôn ngữ', async () => {
   const { document } = createDom(IDS);
   const res = await runScript(read('i18n.js'), {

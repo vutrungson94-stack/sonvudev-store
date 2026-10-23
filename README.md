@@ -4,6 +4,17 @@ Cửa hàng phần mềm SonVuDev: catalog, đơn hàng, PayPal/chuyển khoản
 
 Production dùng domain `https://sonvudev.com`. Toàn bộ cấu hình thật nằm trong `D:\SonVuDev-Upload\.env`; `.env.example` chỉ là mẫu và không chứa secret.
 
+## Tài liệu vận hành
+
+- `docs/RUNBOOK.md` — deploy, canary, rollback, log, sự cố thường gặp, sao lưu, checklist trực ca.
+- `docs/SLO.md` — chỉ số, mục tiêu 30 ngày, ngân sách lỗi, cách đo bằng log và benchmark.
+- `docs/INCIDENT-TEMPLATE.md` — mẫu incident/RCA, điền trong 48 giờ sau sự cố.
+- `deploy/canary.sh` — canary trên VPS: `start`, `split`, `promote`, `rollback`, `status`.
+- `public/locales/` — từ điển tiếng Nhật và tiếng Trung, tải theo yêu cầu; thêm ngôn ngữ
+  mới chỉ cần thêm tệp JSON và một mục trong `window.SVD_LOCALES`.
+- `npm run benchmark` — đo p50/p95/p99 trên một instance đang chạy và ghi baseline vào
+  `build-reports/perf-baseline.json`.
+
 ## Chạy local
 
 ```powershell
