@@ -220,17 +220,30 @@ function localized(p) {
     if (cat === p.category && badge === p.badge) return p;
     return { ...p, category: cat, badge };
   }
+  // The requirements block is field-driven, not product-driven: a product without
+  // an English description still gets this one line localised, because a labelled
+  // "System requirements" heading above Vietnamese body copy is exactly the leak
+  // an English reader sees first. Missing English copy is the Vietnamese sentence;
+  // Vietnamese *characters* in an otherwise-English UI are a bug.
+  const reqSource = (p.requirementsEn && String(p.requirementsEn).trim())
+    ? p.requirementsEn
+    : String(p.requirements || '');
+  const requirements = /[^\x00-\x7F]/.test(reqSource) ? T('product.requirementsViOnly') : reqSource;
+  // When no English copy exists at all, an English page keeps the Vietnamese
+  // description (a hole is worse), but the requirements line above is replaced by
+  // the honest notice - it names the guide the buyer must read anyway.
   const hasEn = typeof p.descriptionEn === 'string' && p.descriptionEn.trim();
-  if (!hasEn) return p;
+  if (!hasEn) {
+    if (requirements === String(p.requirements || '')) return p;
+    return { ...p, requirements };
+  }
   return {
     ...p,
     category: mapValue(CATEGORIES, CATEGORIES_NORM, p.category),
     badge: mapValue(BADGES, BADGES_NORM, p.badge) || undefined,
     shortDescription: p.shortDescriptionEn || p.shortDescription,
     description: p.descriptionEn,
-    requirements: (p.requirementsEn && String(p.requirementsEn).trim())
-      ? p.requirementsEn
-      : (/[^\x00-\x7F]/.test(String(p.requirements || '')) ? T('product.seeGuide') : p.requirements),
+    requirements,
     features: (p.featuresEn && p.featuresEn.length ? p.featuresEn : p.features) || [],
   };
 }

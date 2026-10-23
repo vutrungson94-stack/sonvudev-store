@@ -268,6 +268,9 @@ const DICT = {
     'geo.domestic': 'Bạn đang ở Việt Nam. Chuyển khoản nội địa là nhanh nhất; bạn vẫn có thể chọn PayPal nếu thích.',
     'product.priceOnce': 'Giá một lần',
     'product.seeGuide': 'Xem hướng dẫn kèm theo',
+    // Chỉ hiện ở giao diện tiếng Anh khi sản phẩm chưa có bản dịch yêu cầu hệ
+    // thống: nói thật với người đọc thay vì để câu tiếng Việt đè lên nhãn Anh.
+    'product.requirementsViOnly': 'Yêu cầu hệ thống được ghi trong hướng dẫn kèm theo (hướng dẫn viết bằng tiếng Việt).',
     'cart.back': 'Quay lại',
     'cart.secureTitle': 'Thanh toán an toàn',
     'cart.buyTitle': 'Mua',
@@ -761,6 +764,10 @@ const DICT = {
     'geo.domestic': 'You are in Vietnam. A domestic bank transfer is the fastest option; you can still pick PayPal if you prefer.',
     'product.priceOnce': 'One-time price',
     'product.seeGuide': 'See the guide included',
+    // Shown in the English UI for a product whose system-requirements text was
+    // never translated: says what to do instead of leaving Vietnamese copy under
+    // an English heading. The honest note beats a silent half-translation.
+    'product.requirementsViOnly': 'Full system requirements are listed in the included guide (the guide is written in Vietnamese).',
     'cart.back': 'Go back',
     'cart.secureTitle': 'Secure checkout',
     'cart.buyTitle': 'Buy',

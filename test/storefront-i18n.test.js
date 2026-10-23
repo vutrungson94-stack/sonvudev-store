@@ -19,7 +19,7 @@ const IDS = [
 
 const products = [
   { id: 'p1', slug: 'p1', name: 'Sản phẩm A', shortDescription: 'Mô tả ngắn', description: 'Mô tả dài tiếng Việt', shortDescriptionEn: 'Short EN', descriptionEn: 'Long English description', features: ['Tính năng 1'], featuresEn: ['Feature 1 EN'], category: 'Công cụ', platform: 'Windows', version: '1.0.0', price: 99000, currency: 'VND', badge: 'Mới' },
-  { id: 'p2', slug: 'p2', name: 'Product B', shortDescription: 'Mô tả ngắn', description: 'Mô tả dài', category: 'Bundle', platform: 'Windows', version: '2.0.0', price: 149000, currency: 'VND' },
+  { id: 'p2', slug: 'p2', name: 'Product B', shortDescription: 'Mô tả ngắn', description: 'Mô tả dài', requirements: 'Cần .NET Framework 4.8. Chạy ở phạm vi người dùng.', category: 'Bundle', platform: 'Windows', version: '2.0.0', price: 149000, currency: 'VND' },
 ];
 
 // Long-form copy arrives with blank lines between paragraphs. A customer
@@ -134,6 +134,39 @@ test('tiếng Anh dùng bản EN, thiếu thì fallback về tiếng Việt', as
   assert.ok(!grid.innerHTML.includes('Mô tả dài tiếng Việt'), 'san pham co ban EN khong duoc dung ban tieng Viet');
   // p2 has no English copy at all: its original Vietnamese short text must stay.
   assert.ok(grid.innerHTML.includes('Mô tả ngắn'), 'sản phẩm chưa có bản EN phải giữ nguyên bản tiếng Việt');
+});
+
+// A product whose system-requirements text was never translated used to leak raw
+// Vietnamese right under an English "System requirements" heading, even though the
+// heading itself translated. The block is now field-driven: English override when
+// the product has requirementsEn, otherwise the honest notice - never Vietnamese
+// body copy in the English UI.
+test('yêu cầu hệ thống chưa dịch không được để tiếng Việt dưới nhãn Anh', async () => {
+  const openIn = async (lang) => {
+    const { document, nodes } = createDom(IDS);
+    const cache = new Map();
+    for (const id of ['modal-title', 'buy-product']) cache.set(id, new El('div', id));
+    const base = document.getElementById.bind(document);
+    document.getElementById = (id) => base(id) || cache.get(id) || null;
+    const fetchStub = async (url) => (String(url).includes('/api/products')
+      ? { ok: true, json: async () => ({ products }) }
+      : { ok: true, json: async () => ({ country: 'VN', options: [] }) });
+    const ls = { _v: lang ? { sonvudev_lang: lang } : {}, getItem() { return this._v.sonvudev_lang ?? null; }, setItem() {}, removeItem() {} };
+    const i18n = await runScript(read('i18n.js'), { document, window: {}, fetch: fetchStub, localStorage: ls });
+    const run = await runScript(`${read('order-client.js')}\n${read('app.js')}`, { document, window: { I18N: i18n.window.I18N }, fetch: fetchStub, localStorage: ls });
+    run.window.I18N.set(lang);
+    run.window.openProduct('p2');
+    return nodes.get('modal-content').innerHTML;
+  };
+  const enModal = await openIn('en');
+  assert.ok(enModal.includes('guide is written in Vietnamese'),
+    'tiếng Anh phải thay yêu cầu chưa dịch bằng thông báo hướng dẫn');
+  assert.ok(!enModal.includes('phạm vi người dùng') && !enModal.includes('.NET Framework'),
+    'tiếng Anh không được để lại thân viết tiếng Việt');
+
+  const viModal = await openIn('vi');
+  assert.ok(viModal.includes('phạm vi người dùng') && viModal.includes('.NET Framework'),
+    'tiếng Việt phải giữ nguyên yêu cầu hệ thống gốc');
 });
 
 test('mọi khoá i18n tồn tại ở cả hai ngôn ngữ', async () => {

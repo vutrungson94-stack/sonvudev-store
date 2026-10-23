@@ -1079,7 +1079,7 @@ function localizeToEnglish(product) {
     ...product,
     shortDescription: pick(product.shortDescriptionEn, product.shortDescription),
     description: pick(product.descriptionEn, product.description),
-    requirements: pick(product.requirementsEn, /[^\x00-\x7F]/.test(String(product.requirements || '')) ? "See the product guide for system requirements." : product.requirements),
+    requirements: pick(product.requirementsEn, /[^\x00-\x7F]/.test(String(product.requirements || '')) ? "Full system requirements are listed in the included guide (the guide is written in Vietnamese)." : product.requirements),
     features: featuresEn.length ? featuresEn : product.features,
     // SEO copy is the one pair that does NOT fall back to Vietnamese.
     //
