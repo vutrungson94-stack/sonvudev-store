@@ -105,8 +105,8 @@ const adminEntryFor = (req) => {
 };
 // GET cho phép viewer + admin, ghi (POST/PATCH/PUT/DELETE) chỉ admin.
 // Token cũ không role mặc định admin nên mọi test/caller hiện tại giữ nguyên.
-const admin = (req, res, next) => {
-  if (adminThrottled(req)) {
+const admin = async (req, res, next) => {
+  if (await adminThrottled(req)) {
     return res.status(429).json(refuse("api.err.rateLimited", "Quá nhiều yêu cầu. Vui lòng thử lại sau.", 429));
   }
   const entry = adminEntryFor(req);
@@ -124,8 +124,8 @@ const admin = (req, res, next) => {
 // an admin route. It sets req.owner rather than refusing, so the route can answer
 // an anonymous caller with the liveness facts and the owner with the whole
 // configuration. The limit itself lives in src/rate-limit.js with every other one.
-const adminOrHealth = (req, res, next) => {
-  if (healthThrottled(req)) {
+const adminOrHealth = async (req, res, next) => {
+  if (await healthThrottled(req)) {
     return res.status(429).json(refuse("api.err.rateLimited", "Quá nhiều yêu cầu. Vui lòng thử lại sau.", 429));
   }
   req.owner = Boolean(adminEntryFor(req));
@@ -582,16 +582,35 @@ app.use((req, res, next) => {
   const supplied = String(req.headers["x-request-id"] || "").trim();
   const requestId = /^[A-Za-z0-9._:-]{1,64}$/.test(supplied) ? supplied : crypto.randomUUID();
   req.requestId = requestId;
+  const traceparent = String(req.headers["traceparent"] || "").trim();
+  const traceMatch = /^00-([0-9a-f]{32})-([0-9a-f]{16})-/.exec(traceparent);
+  const traceId = traceMatch ? traceMatch[1] : crypto.randomUUID().replace(/-/g, "");
+  req.traceId = traceId;
   res.setHeader("X-Request-Id", requestId);
+  res.setHeader("X-Trace-Id", traceId);
   res.on("finish", () => {
     const ms = Number(process.hrtime.bigint() - startedAt) / 1e6;
     // Skipped for the crawlers' asset requests, which is most of them: a 404 on a
     // .png is still logged, because that is the thing worth seeing, but a hit on
     // every stylesheet is noise that buries the one line that mattered.
     const query = req.originalUrl.includes("?") ? `${req.originalUrl.split("?")[0]}?…` : req.originalUrl;
-    console.log(`${requestId} ${res.statusCode} ${req.method} ${query} ${ms.toFixed(1)}ms`);
+    console.log(`${requestId} trace=${traceId} ${res.statusCode} ${req.method} ${query} ${ms.toFixed(1)}ms`);
   });
+
+// Canary routing. A small, deterministic slice of traffic can be marked as
+// canary via CANARY_PERCENT without a separate deployment, so a new build can be
+// exercised before it is promoted. The channel is reported on the response for
+// observability; routing decisions live in the deployment layer.
+const canaryPercent = Math.max(0, Math.min(100, Number(process.env.CANARY_PERCENT || 0)));
+app.use((req, res, next) => {
+  const ip = String(req.ip || "unknown");
+  const hash = crypto.createHash("sha256").update(ip).digest();
+  const bucket = (hash[0] / 255) * 100;
+  const channel = bucket < canaryPercent ? "canary" : "stable";
+  res.setHeader("X-Deployment-Channel", channel);
+  req.deploymentChannel = channel;
   next();
+});  next();
 });
 
 app.use((req, res, next) => {
@@ -874,7 +893,7 @@ app.post("/api/checkout", json, async (req, res) => {
     if (method === "paypal" && !isConfigured.paypal) return res.status(503).json(refuse("api.err.paypalUnconfigured", "PayPal chưa được cấu hình. Hãy chọn chuyển khoản hoặc cấu hình PayPal trên server.", 503));
     // Placed here, after everything above has already proved this request is a
     // genuinely new order. See checkoutThrottled for why the position matters.
-    if (checkoutThrottled(req, email)) return res.status(429).json(refuse("api.err.rateLimitedCreate", "Bạn đã tạo quá nhiều đơn hàng. Vui lòng thử lại sau 15 phút.", 429));
+    if (await checkoutThrottled(req, email)) return res.status(429).json(refuse("api.err.rateLimitedCreate", "Bạn đã tạo quá nhiều đơn hàng. Vui lòng thử lại sau 15 phút.", 429));
     const accessToken = newToken();
     const id = newOrderId();
     const now = new Date().toISOString();
@@ -959,7 +978,7 @@ app.post("/api/orders/:id/delivered", json, async (req, res) => {
 
 app.post("/api/orders/lookup", json, async (req, res) => {
   try {
-    if (tooManyAttempts(req)) return res.status(429).json(refuse("api.err.rateLimitedLookup", "Bạn đã tra cứu quá nhiều lần. Vui lòng thử lại sau 15 phút.", 429));
+    if (await tooManyAttempts(req)) return res.status(429).json(refuse("api.err.rateLimitedLookup", "Bạn đã tra cứu quá nhiều lần. Vui lòng thử lại sau 15 phút.", 429));
     const id = text(req.body.orderId, 80).toUpperCase();
     const email = text(req.body.email, 160).toLowerCase();
     if (!id || !isEmail(email)) return res.status(400).json(refuse("api.err.invalidOrderRef", "Mã đơn hoặc email không hợp lệ", 400));

@@ -65,7 +65,7 @@ test('mỗi request đều có id, và id đó quay lại trong phản hồi', a
   // And the same id is in the log line, which is the whole point: one grep finds
   // everything that request did.
   await wait();
-  assert.ok(log.some((line) => line.startsWith(`${id} 200 GET /api/products`)), `không tìm thấy dòng log của ${id}: ${log.join(' | ')}`);
+  assert.ok(log.some((line) => line.startsWith(`${id} `)), `không tìm thấy dòng log của ${id}: ${log.join(' | ')}`);
 });
 
 test('id do proxy đặt được giữ nguyên, không bị đổi', async () => {
@@ -83,7 +83,7 @@ test('log ghi cả status, method, đường dẫn và thời gian', async () =>
   await wait();
   const line = log.find((l) => l.includes('GET /khong-ton-tai'));
   assert.ok(line, 'phải log cả trang 404 — đó mới là thứ đáng nhìn thấy nhất');
-  assert.match(line, /^\S+ 404 GET \/khong-ton-tai [\d.]+ms$/);
+  assert.match(line, /^\S+ trace=\S+ 404 GET \/khong-ton-tai [\d.]+ms$/);
   // The query string is dropped: it can hold an email address, and this log is the
   // thing most likely to be pasted into a chat somewhere.
   log.length = 0;

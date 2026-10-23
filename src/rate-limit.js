@@ -1,70 +1,83 @@
-// Bộ giới hạn tần suất dùng chung cho mọi route.
+// Rate limiter with a pluggable store.
 //
-// Tách từ src/app.js để có một định nghĩa duy nhất: trước đây `attempts` Map và
-// `tooMany()` nằm inline trong app.js, không test trực tiếp được và không tái
-// dùng được. Hành vi giữ nguyên 100% để không làm hỏng các test 429 hiện có
-// (lookup 10, checkout-ip 30, checkout-email 12 trên cửa sổ 15 phút).
-//
-// Giới hạn single-process được ghi rõ: Map sống trong RAM của 1 tiến trình.
-// Với 1 instance (Render Free, VPS systemd hiện tại) đây là đúng và đủ. Khi
-// chạy nhiều instance sau này, cần sticky-session hoặc store ngoài (Redis /
-// Supabase) — lúc đó thay `createRateLimiter` bằng backend chung, các caller
-// `tooMany*` không phải sửa vì đã đi qua module này.
+// `tooMany` is async so a store can be remote (Supabase, Redis) without
+// changing the callers' shape beyond an `await`. The default store is in-memory
+// and is used unless RATE_LIMIT_STORE=supabase with Supabase configured.
+import { env, isConfigured } from "./config.js";
+import { supabaseRequest } from "./supabase-http.js";
+
 const WINDOW_MS = 15 * 60 * 1000;
 const MAX_KEYS = 20000;
 
+export function createMemoryStore() {
+  const map = new Map();
+  return {
+    get: (key) => map.get(key),
+    set: (key, value) => { map.set(key, value); },
+    delete: (key) => { map.delete(key); },
+    keys: () => map.keys(),
+    clear: () => { map.clear(); },
+    size: () => map.size,
+  };
+}
+
+export async function createSupabaseStore() {
+  const table = "rate_limit_hits";
+  return {
+    get: async (key) => {
+      try {
+        const rows = await supabaseRequest(`${table}?key=eq.${encodeURIComponent(key)}&select=hits&limit=1`);
+        return Array.isArray(rows) && rows[0] ? rows[0].hits : undefined;
+      } catch { return undefined; }
+    },
+    set: async (key, value) => {
+      try {
+        await supabaseRequest(table, { method: "POST", body: JSON.stringify({ key, hits: value, updated_at: new Date().toISOString() }), headers: { Prefer: "resolution=merge-duplicates" } });
+      } catch { /* best effort */ }
+    },
+    delete: async (key) => {
+      try { await supabaseRequest(`${table}?key=eq.${encodeURIComponent(key)}`, { method: "DELETE" }); } catch { /* best effort */ }
+    },
+    keys: () => [],
+    clear: () => {},
+    size: () => 0,
+  };
+}
+
+export function resolveRateLimitStore() {
+  const mode = String(process.env.RATE_LIMIT_STORE || "").toLowerCase();
+  if (mode === "supabase" && isConfigured.supabase) return createSupabaseStore();
+  return createMemoryStore();
+}
+
 export function createRateLimiter({ windowMs = WINDOW_MS, maxKeys = MAX_KEYS, store = null } = {}) {
-  // A pluggable store. The default keeps the original in-memory Map so every
-  // existing caller and test keeps working unchanged; a host that runs more than
-  // one process can pass its own store (Redis, Supabase, ...) without touching
-  // the limiter's callers. The contract is small: get(key) -> number[] | undefined,
-  // set(key, number[]), delete(key), keys() -> iterable, clear(), size() -> number.
-  const backing = store || (() => {
-    const map = new Map();
-    return {
-      get: (key) => map.get(key),
-      set: (key, value) => { map.set(key, value); },
-      delete: (key) => { map.delete(key); },
-      keys: () => map.keys(),
-      clear: () => { map.clear(); },
-      size: () => map.size,
-    };
-  })();
-  const attempts = backing;
-  const tooMany = (key, limit) => {
+  const attempts = store || resolveRateLimitStore();
+  const tooMany = async (key, limit) => {
     const now = Date.now();
-    const recent = (attempts.get(key) || []).filter((time) => now - time < windowMs);
+    const stored = await Promise.resolve(attempts.get(key));
+    const recent = (Array.isArray(stored) ? stored : []).filter((time) => now - time < windowMs);
     recent.push(now);
-    attempts.set(key, recent);
-    if (attempts.size() > maxKeys) {
-      const oldest = attempts.keys().next();
-      if (!oldest.done) attempts.delete(oldest.value);
+    await Promise.resolve(attempts.set(key, recent));
+    const size = await Promise.resolve(attempts.size());
+    if (size > maxKeys) {
+      const keys = await Promise.resolve(attempts.keys());
+      const it = typeof keys?.next === "function" ? keys : null;
+      const oldest = it ? it.next() : { done: true };
+      if (!oldest.done) await Promise.resolve(attempts.delete(oldest.value));
     }
     return recent.length > limit;
   };
-  const reset = () => attempts.clear();
+  const reset = () => { try { attempts.clear(); } catch {} };
   const size = () => attempts.size();
   return { tooMany, reset, size, windowMs, store: attempts };
 }
 
-// Singleton dùng bởi app.js — cùng một cửa sổ cho mọi route trong process.
-// Không export: không có file nào import nó, và app.js chỉ cần hai hàm bên dưới.
 const limiter = createRateLimiter();
 const tooMany = (key, limit) => limiter.tooMany(key, limit);
 export const tooManyAttempts = (req) => tooMany(`ip:${req.ip || 'unknown'}`, 10);
-// Admin routes are authenticated by a 192-bit token, so a limit here is not about
-// guessing it — brute force over that key space is hopeless either way. It is about
-// the cost of a wrong guess: an unauthenticated request must not be able to make
-// the server read a table. Exported because src/app.js needs it and a single
-// limiter for every route is the thing this module exists to provide.
 export const adminThrottled = (req) => tooMany(`admin:${req.ip || 'unknown'}`, 30);
-// The health probe is public — a monitor cannot hold an admin token — and it is
-// the most expensive unauthenticated route in the shop: it reaches the database and
-// the FX rate on every call, and /api/health is a name every scanner already has.
-// Sixty a minute is far above any real monitor (Render, UptimeRobot and the
-// keep-awake worker all poll every few minutes) and far below anything worth doing.
 export const healthThrottled = (req) => tooMany(`health:${req.ip || 'unknown'}`, 60);
-export function checkoutThrottled(req, email) {
-  return tooMany(`checkout-ip:${req.ip || 'unknown'}`, 30)
-    || (Boolean(email) && tooMany(`checkout-email:${email}`, 12));
+export async function checkoutThrottled(req, email) {
+  return await tooMany(`checkout-ip:${req.ip || 'unknown'}`, 30)
+    || (Boolean(email) && await tooMany(`checkout-email:${email}`, 12));
 }

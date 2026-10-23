@@ -1014,7 +1014,9 @@ const DICT = {
 // Vietnamese, which is the same rule the rest of this file falls back on.
 const langOf = (lang) => (String(lang) === 'en' ? 'en' : 'vi');
 
-const SUPPORTED = ['vi', 'en'];
+const SUPPORTED = (Array.isArray(window.SVD_LOCALES) && window.SVD_LOCALES.length)
+  ? window.SVD_LOCALES
+  : ['vi', 'en'];
 const STORAGE_KEY = 'sonvudev_lang';
 const listeners = new Set();
 
@@ -1090,6 +1092,13 @@ const I18N = {
     listeners.forEach((fn) => { try { fn(lang); } catch (e) { console.error(e); } });
   },
   onChange(fn) { listeners.add(fn); return () => listeners.delete(fn); },
+  register(locale, dict) {
+    if (!locale) return this;
+    DICT[locale] = Object.assign({}, DICT[locale] || {}, dict || {});
+    if (!SUPPORTED.includes(locale)) SUPPORTED.push(locale);
+    return this;
+  },
+  get supported() { return [...SUPPORTED]; },
   get locale() { return current === 'en' ? 'en-US' : 'vi-VN'; },
   esc(value) {
     return window.SVDFormat.esc(value);

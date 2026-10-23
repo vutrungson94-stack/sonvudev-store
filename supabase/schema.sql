@@ -100,7 +100,13 @@ alter table public.products add column if not exists seo_description_en text not
 -- yet renders no claim, which is the only honest state for a product nobody has
 -- scanned. The page whose job is to assert safety is not the place to guess at it.
 alter table public.products add column if not exists virus_scan_url text not null default '';
-alter table public.products add column if not exists file_size bigint not null default 0;
+-- Shared rate-limit state for multi-instance hosts. Optional: when empty the
+-- limiter falls back to its in-process memory store.
+create table if not exists public.rate_limit_hits (
+  key text primary key,
+  hits jsonb not null default '[]'::jsonb,
+  updated_at timestamptz not null default now()
+);
 
 -- Order lifecycle. An unpaid order stops being payable at expires_at and is
 -- cancelled by the background sweep; a proven payment sets paid_at and bumps
