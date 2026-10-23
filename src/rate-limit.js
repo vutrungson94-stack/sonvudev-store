@@ -13,27 +13,38 @@
 const WINDOW_MS = 15 * 60 * 1000;
 const MAX_KEYS = 20000;
 
-export function createRateLimiter({ windowMs = WINDOW_MS, maxKeys = MAX_KEYS } = {}) {
-  const attempts = new Map();
+export function createRateLimiter({ windowMs = WINDOW_MS, maxKeys = MAX_KEYS, store = null } = {}) {
+  // A pluggable store. The default keeps the original in-memory Map so every
+  // existing caller and test keeps working unchanged; a host that runs more than
+  // one process can pass its own store (Redis, Supabase, ...) without touching
+  // the limiter's callers. The contract is small: get(key) -> number[] | undefined,
+  // set(key, number[]), delete(key), keys() -> iterable, clear(), size() -> number.
+  const backing = store || (() => {
+    const map = new Map();
+    return {
+      get: (key) => map.get(key),
+      set: (key, value) => { map.set(key, value); },
+      delete: (key) => { map.delete(key); },
+      keys: () => map.keys(),
+      clear: () => { map.clear(); },
+      size: () => map.size,
+    };
+  })();
+  const attempts = backing;
   const tooMany = (key, limit) => {
     const now = Date.now();
     const recent = (attempts.get(key) || []).filter((time) => now - time < windowMs);
     recent.push(now);
     attempts.set(key, recent);
-    // Evicting the oldest key when the table is full, rather than clearing all of
-    // it. Clearing meant that one caller spraying 20,001 distinct keys reset every
-    // window in the shop at once — the limiter's whole answer to an attack on the
-    // limiter being "give up". Dropping the oldest entry costs the memory it has
-    // to cost and nothing else, and a flood now buys an attacker nothing.
-    if (attempts.size > maxKeys) {
+    if (attempts.size() > maxKeys) {
       const oldest = attempts.keys().next();
       if (!oldest.done) attempts.delete(oldest.value);
     }
     return recent.length > limit;
   };
   const reset = () => attempts.clear();
-  const size = () => attempts.size;
-  return { tooMany, reset, size, windowMs };
+  const size = () => attempts.size();
+  return { tooMany, reset, size, windowMs, store: attempts };
 }
 
 // Singleton dùng bởi app.js — cùng một cửa sổ cho mọi route trong process.

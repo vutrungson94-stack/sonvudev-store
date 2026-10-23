@@ -62,3 +62,22 @@ ssh_id
 .vs/
 *.apk
 *.aab
+
+# Auto-added by gbuild (project gitignore patterns)
+.gbuild/
+*.gbuildstate
+.gbuild-circuitbreaker.gbuildstate
+*.lock
+distributed-report/
+reports/
+Tests/TestResults/
+test-results*.xml
+testResults.xml
+suite-progress-*.log
+Tests/suite-progress-*.log
+vault.key
+*.vault.key
+*.vault.salt
+*.salt
+gbuild-standalone-*/
+nul*
