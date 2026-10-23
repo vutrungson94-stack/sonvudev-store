@@ -44,3 +44,21 @@ Thumbs.db
 # reports to build-reports/ (ignored) and tests to logs/ (ignored); a loose
 # *-results.txt at the root is a stale copy nobody reads.
 *-results.txt
+
+# Auto-added by gtest (project gitignore patterns)
+_Build/
+_Sync/
+_Tests/
+bin/
+obj/
+TestResults/
+*.log
+*.tmp
+
+# --- added by gsync security gate ---
+# === SECURITY ===
+ssh_id
+*.pfx
+.vs/
+*.apk
+*.aab
