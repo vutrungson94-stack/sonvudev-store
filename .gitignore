@@ -1,4 +1,4 @@
-# Dependencies
+﻿# Dependencies
 node_modules/
 node_modules_stale_*/
 
@@ -12,15 +12,10 @@ node_modules_stale_*/
 build-reports/
 publish-output/
 .gbuild-state.gbuildstate
-# The build tool takes a lock beside its state file. Left out of the first
-# pattern it shows up as a new untracked file after every build, and an
-# untracked file nobody ignores is one commit away from being committed.
 .gbuild-state.gbuildstate.lock
 --help/
 
-# Generated at build time from build-reports/ and served from public/. Committing
-# it would freeze a claim about the current build into a file that only talks
-# about the build it was committed with.
+# Generated at build time
 public/build-report.json
 
 # Local runtime scratch
@@ -35,17 +30,13 @@ Thumbs.db
 .vscode/
 .idea/
 
-# wrangler's scratch directory: a temp copy of the Worker per deploy, plus
-# its source map. Not source, and committing it means the repo contains a second
-# copy of the Worker that can drift from the one that runs.
+# wrangler
 .wrangler/
 
-# Command output pasted at the repo root by hand. The build writes its real
-# reports to build-reports/ (ignored) and tests to logs/ (ignored); a loose
-# *-results.txt at the root is a stale copy nobody reads.
+# Command output
 *-results.txt
 
-# Auto-added by gtest (project gitignore patterns)
+# Auto-added by gtest
 _Build/
 _Sync/
 _Tests/
@@ -55,16 +46,22 @@ TestResults/
 *.log
 *.tmp
 
-# --- added by gsync security gate ---
-<<<<<<< Updated upstream
-# === SECURITY ===
+# Security
 ssh_id
 *.pfx
+*.p12
+*.key
+*.pem
+*.secret
+secrets.*
+*.env
 .vs/
 *.apk
 *.aab
+.gsyc.state
+sync-outputs/
 
-# Auto-added by gbuild (project gitignore patterns)
+# Build tool artifacts
 .gbuild/
 *.gbuildstate
 .gbuild-circuitbreaker.gbuildstate
@@ -82,43 +79,31 @@ vault.key
 *.salt
 gbuild-standalone-*/
 nul*
-=======
-*.pfx
-ssh_id
-*.p12
-*.key
-dist/
-build/
-.env.local
-.env.development.local
-.env.test.local
-.env.production.local
+
+# Node/npm
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
-package-lock.json
 .pnp.*
 *.swp
 *~
 *.orig
 *.rej
 .cache/
-# === SECURITY ===
-.vs/
-*.apk
-*.aab
-.gsync.state
-sync-outputs/
->>>>>>> Stashed changes
-
-# --- added by gsync security gate ---
-*.env
-secrets.*
-*.secret
-*.pem
 
 # Test/scratch output (auto)
 test-*.txt
 test-out*.txt
 *-output.txt
 test-final.txt
+
+# --- added by gsync security gate ---
+dist/
+build/
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+package-lock.json
+# === SECURITY ===
+.gsync.state
