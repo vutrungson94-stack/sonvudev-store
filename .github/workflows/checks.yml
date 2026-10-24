@@ -44,8 +44,8 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        node-version: ['20', '22', '24']
-    runs-on: ubuntu-latest
+node-version: ["22", "24"]
+node-version: ["22", "24"]
     timeout-minutes: 10
     env:
       NODE_ENV: test
@@ -211,3 +211,5 @@ jobs:
             echo "::error::Dat no trong Settings > Secrets and variables > Actions > Repository secrets, ten APP_URL, gia tri https://<domain-cua-ban>"
             exit 1
           fi
+                n o d e - v e r s i o n :   [ " 2 2 " ,   " 2 4 " ]  
+ 
