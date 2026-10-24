@@ -21,6 +21,7 @@ import { createReview, listReviewsForProduct, reviewLimits } from "./reviews.js"
 import { refuse } from "./refuse.js";
 import { renderRobotsTxt } from "./robots.js";
 import { adminThrottled, healthThrottled, tooManyAttempts, checkoutThrottled } from "./rate-limit.js";
+import { isConfigured as tIsConfigured, translateText, translateMissingKeys } from "./translate-service.mjs";
 import { parseAdminTokens, matchAdminToken } from "./admin-auth.js";
 import { isEnabled } from "./feature-flags.js";
 import { otelEnabled, exportSpan } from "./otel.js";
@@ -1093,6 +1094,45 @@ app.post("/api/paypal/capture", json, async (req, res) => {
     res.json({ order: publicOrder(updated), ...deadlinePayload(updated) });
   } catch (error) { console.error(error); res.status(502).json(refuse("api.err.paypalConfirm", "Không thể xác nhận thanh toán PayPal", 502)); }
 });
+
+  // --- Translation (DeepL Free + local cache) ---
+  // Requires DEEPL_API_KEY set in the environment. Missing keys are translated
+  // on demand and written into public/locales/<lang>.json so the next read is
+  // served from cache without calling the API again.
+  app.post("/api/translate", json, async (req, res) => {
+    if (!tIsConfigured()) {
+      return res.status(503).json(refuse("api.err.paypalUnconfigured", "Dịch vụ dịch chưa được cấu hình (DEEPL_API_KEY)", 503));
+    }
+    const { text, target = "en", source = "vi" } = req.body || {};
+    if (!text || !target) {
+      return res.status(400).json(refuse("api.err.invalidEmail", "Thiếu text hoặc target ngôn ngữ", 400));
+    }
+    try {
+      const translated = await translateText(text, target, source);
+      res.json({ translated });
+    } catch (error) {
+      console.error("[translate]", error.message);
+      res.status(502).json(refuse("api.err.paypalConfirm", "Dịch vụ dịch không khả dụng", 502));
+    }
+  });
+
+  // Translate every key still missing for a language and persist the cache.
+  app.post("/api/translate/batch", json, async (req, res) => {
+    if (!tIsConfigured()) {
+      return res.status(503).json(refuse("api.err.paypalUnconfigured", "Dịch vụ dịch chưa được cấu hình (DEEPL_API_KEY)", 503));
+    }
+    const { target } = req.body || {};
+    if (!target) {
+      return res.status(400).json(refuse("api.err.invalidEmail", "Thiếu target ngôn ngữ", 400));
+    }
+    try {
+      const result = await translateMissingKeys(target);
+      res.json(result);
+    } catch (error) {
+      console.error("[translate batch]", error.message);
+      res.status(502).json(refuse("api.err.paypalConfirm", "Dịch batch thất bại", 502));
+    }
+  });
 
 // Poll target for the admin badge. It used to read the whole order table every
 // few seconds just to work out how many were waiting: the cost grew with the shop

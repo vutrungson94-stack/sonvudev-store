@@ -1285,6 +1285,48 @@ function markActiveLanguage() {
 // Adds a button for every supported locale the markup does not already have, so
 // enabling a language is a dictionary asset plus one entry in SVD_LOCALES - not
 // an HTML edit. The bundled VI/EN buttons keep their order and their labels.
+// Translate keys still missing for the current language through the server's
+// /api/translate endpoint (DeepL Free + local file cache). Results are written
+// into DICT[current] so the next apply() shows them. Each missing key is fetched
+// at most once per page load. If the API is not configured or unreachable, the
+// English fallback stays visible — the storefront is never broken by a missing key.
+let translating = false;
+async function ensureTranslations() {
+  if (translating) return;
+  translating = true;
+  try {
+    const collect = (attr) => {
+      const out = [];
+      document.querySelectorAll(`[${attr}]`).forEach((el) => {
+        const key = el.getAttribute(attr);
+        const table = DICT[current];
+        if (key && (!table || table[key] === undefined)) out.push(key);
+      });
+      return out;
+    };
+    const keys = [...new Set([...collect('data-i18n'), ...collect('data-i18n-html')])];
+    for (const key of keys) {
+      try {
+        const res = await fetch('/api/translate', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ text: DICT.vi?.[key] || key, target: current, source: 'vi' }),
+        });
+        if (res.ok) {
+          const { translated } = await res.json();
+          if (!DICT[current]) DICT[current] = {};
+          DICT[current][key] = translated;
+        }
+      } catch (e) {
+        // API not configured or network error: leave English fallback visible.
+      }
+    }
+    if (keys.length) apply();
+  } finally {
+    translating = false;
+  }
+}
+
 function renderLanguageButtons() {
   document.querySelectorAll('[data-lang-switch]').forEach((group) => {
     for (const code of SUPPORTED) {
@@ -1310,12 +1352,16 @@ function boot() {
     });
   });
   markActiveLanguage();
+  // Translate any keys still missing for the current language (JA, zh-CN, ...).
+  // The page shows the English fallback first, then upgrades in place.
+  ensureTranslations();
   // A stored third language boots before its asset exists; swap it in as soon as
   // it arrives, and tell app.js to repaint the catalogue and any open modal.
   if (!loadedLocales.has(current)) {
     loadLocale(current).then(() => {
       apply();
       markActiveLanguage();
+      ensureTranslations();
       window.dispatchEvent(new CustomEvent('i18n:ready', { detail: { lang: current } }));
     });
   }
