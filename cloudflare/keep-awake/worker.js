@@ -147,7 +147,12 @@ export default {
       return { skipped: 'no-shop-url' };
     }
 
-    const fromHour = Number(env.AWAKEN_FROM ?? 5);
+    // Default to 24/7 so a sleeping instance is woken on the very next minute
+    // instead of waiting for the next day's window. Render free gives 750
+    // instance-hours a month; a 24/7 service uses ~744, leaving ~6 hours of
+    // margin. If that margin is too tight, raise AWAKEN_FROM / AWAKEN_TO in the
+    // Worker env vars to a narrower window (e.g. 5 to 24).
+    const fromHour = Number(env.AWAKEN_FROM ?? 0);
     const toHour = Number(env.AWAKEN_TO ?? 24);
     const at = event?.scheduledTime ?? Date.now();
     if (!withinWindow(at, fromHour, toHour)) {
