@@ -1,0 +1,305 @@
+5eb58378-b30b-48c0-be56-842a17b2080c trace=2027eabef3e84426b4ffde1c3849d264 401 GET /api/admin/orders/pending 4.2ms
+✔ the pending poll refuses callers without the admin token (43.2489ms)
+e8ad9eb1-bede-46a6-a7cb-0b080fada351 trace=c3401f4da2a1464386081365f95dc27b 200 GET /api/admin/orders/pending 2.1ms
+✔ the pending poll reports no orders on an empty store (7.0828ms)
+9ca4b5e5-7fa6-48db-adaa-bcc144c99cf6 trace=1c267270ce374ea7b174ed7368379c93 200 GET /api/admin/orders/pending 1.2ms
+7f9bae6f-459f-4e91-b2dc-aba2e0335aa0 trace=25228a1711f840a7be0384e305394991 201 POST /api/admin/products 14.2ms
+[notify] created -> SVD-MVM2ACC8-2A3012 (outbox)
+dbbb581b-6562-4daa-b85f-b8453516f7d2 trace=69c78bd3cd6545e8bb762006301d2be3 200 POST /api/checkout 38.3ms
+84e7d24f-65b9-404e-abd4-c301dc026428 trace=38a3d0c8de3e43659054b5c23b18efd1 200 GET /api/admin/orders/pending 1.9ms
+✔ a bank transfer order is counted as waiting and raises the latest stamp (66.3914ms)
+19ca85a3-34af-40a6-a6c0-dfbeedc3e3f2 trace=0dff62c00ac746e4986596aef053355b 200 GET /api/admin/orders/pending 2.1ms
+58050b45-82f2-48ca-8763-465232ed977a admin confirm-paid SVD-MVM2ACC8-2A3012 {"amount":99000,"currency":"VND"}
+[notify] paid -> SVD-MVM2ACC8-2A3012 (outbox)
+[orders] SVD-MVM2ACC8-2A3012 paid via admin
+58050b45-82f2-48ca-8763-465232ed977a trace=2633913ec7cb4dce8785af45496aad4f 200 PATCH /api/admin/orders/SVD-MVM2ACC8-2A3012 12.0ms
+e84ad037-5abc-4419-a051-550e688bbad2 trace=9784d32b16fd411ea5a01aff7215add7 200 GET /api/admin/orders/pending 1.7ms
+✔ confirming the order clears the waiting count (21.352ms)
+✔ the admin page ships the alert banner the poll drives (7.6285ms)
+✔ token đơn cũ vẫn là admin full quyền, không expiry (0.7374ms)
+✔ token phụ hỗ trợ role viewer và expiry (0.2572ms)
+✔ sai token không lọt dù có nhiều token (0.1234ms)
+e82fafc5-820e-4baa-9177-87161185d11f trace=60cee8dba17e42d09de6405ff6b8271d 201 POST /api/admin/products 14.2ms
+[notify] created -> SVD-MVM2ACBT-D26D39 (outbox)
+f7ba4fe2-e383-4bb8-96d9-d0070640fb09 trace=ecd84b576bac4f4780ee410e6c1e097d 200 POST /api/checkout 35.8ms
+[notify] created -> SVD-MVM2ACCU-BBF163 (outbox)
+8c4f9948-0ee6-4dda-b9ad-38428f4eeda8 trace=9bda2a99e2454d878d9ff55525dce4fa 200 POST /api/checkout 13.7ms
+[notify] created -> SVD-MVM2ACD9-70674F (outbox)
+9a5265c4-5abd-4ec2-87de-5d6e62abfec9 trace=2d4f4f4323e84de586a756870986e516 200 POST /api/checkout 14.5ms
+[notify] created -> SVD-MVM2ACDP-26849D (outbox)
+e56a2fb6-489d-44d5-a958-acb381788719 trace=faf386b11f054dcf8db7ca458adb0d73 200 POST /api/checkout 13.7ms
+[notify] created -> SVD-MVM2ACE4-9FADE5 (outbox)
+e6150c00-3056-4b2d-936a-d89daf5d3d94 trace=d7950647f86342dab97f29dc361ee4a4 200 POST /api/checkout 13.4ms
+[notify] created -> SVD-MVM2ACEJ-9C9E2A (outbox)
+a355665e-f5a6-4c9d-b554-6164cfbf52aa trace=94136929b72d4e42bf11130dd9271b5e 200 POST /api/checkout 11.8ms
+[notify] created -> SVD-MVM2ACEW-6DB47D (outbox)
+9b1067b0-daba-4ff0-8f3b-1d723bdf7c5c trace=a54b286defc548e1aab322f802d824c2 200 POST /api/checkout 12.2ms
+[notify] created -> SVD-MVM2ACFA-EAA3EC (outbox)
+62e95de4-ba54-4840-aafa-1d858c53ba3e trace=d21162941bd84f219391f10abc4f8510 200 POST /api/checkout 11.1ms
+[notify] created -> SVD-MVM2ACFO-C523E6 (outbox)
+36bd16f1-95e0-4a1a-a21e-3ecf2aeb35bb trace=b35157d970fc49f8a88ef1b0fdabe935 200 POST /api/checkout 15.2ms
+[notify] created -> SVD-MVM2ACG4-C05215 (outbox)
+a38783bc-ef9b-47a8-8406-be957fb310f8 trace=11b275a4db234649a5a3a0c19d5b7195 200 POST /api/checkout 12.3ms
+[notify] created -> SVD-MVM2ACGH-BF9BFA (outbox)
+2d98ca38-96e9-4cb3-8b49-4f678b4e04c6 trace=e402d3ac5a234e85968b11d83e99ce48 200 POST /api/checkout 11.9ms
+[notify] created -> SVD-MVM2ACGU-56E624 (outbox)
+6d8c5ca5-30d5-409f-b05f-95f7e0937c15 trace=a5d8e3bd5171402987011b078d3d6fe0 200 POST /api/checkout 11.9ms
+[notify] created -> SVD-MVM2ACH7-37A6FF (outbox)
+0bcc18ae-042c-4f67-9994-588dbd55fba9 trace=28a1c6121d5d4d8d80e5ffecd584b0ee 200 POST /api/checkout 11.5ms
+[notify] created -> SVD-MVM2ACHK-355073 (outbox)
+6a461668-9e33-4e95-be67-17dbe75f4cc3 trace=b71c26d0baa54717899b969b0d6d0b14 200 POST /api/checkout 12.3ms
+[notify] created -> SVD-MVM2ACHX-D850F9 (outbox)
+81d37b7c-fa69-454e-a302-521dc6af9110 trace=1562d44798cb454289cd87a5715fa705 200 POST /api/checkout 12.1ms
+[notify] created -> SVD-MVM2ACIA-79A66C (outbox)
+3fc086e1-6302-4128-bf4f-5237cc64ccc5 trace=120c673e3ba64b8393b184b5ba86593f 200 POST /api/checkout 10.8ms
+[notify] created -> SVD-MVM2ACIN-C2161A (outbox)
+43303723-bd91-4135-b6c3-79f733cb7022 trace=a39d372030174eef8f77a05c4d2011cd 200 POST /api/checkout 12.8ms
+[notify] created -> SVD-MVM2ACJ2-3E779E (outbox)
+5f5fab51-80fa-407a-9fe2-09df533b7b6b trace=4bd9108588364c97b29678676054073d 200 POST /api/checkout 12.6ms
+[notify] created -> SVD-MVM2ACJG-4573AF (outbox)
+fafada89-8fd3-4cd7-b80e-2a8e8509eb2e trace=bed738b7a0f94c82a2333c1ef6e235fb 200 POST /api/checkout 12.6ms
+[notify] created -> SVD-MVM2ACJT-37F07F (outbox)
+6e474543-961f-4b51-9cbf-617a020af15f trace=518b5806677f49e5803a5e9986f5ddb6 200 POST /api/checkout 11.8ms
+[notify] created -> SVD-MVM2ACK6-03B5FD (outbox)
+f2ff4523-3c70-4d02-9da0-b242c489af40 trace=7766c8a92fb44f3b96952e3b7aea01a2 200 POST /api/checkout 13.7ms
+[notify] created -> SVD-MVM2ACKL-5D85E1 (outbox)
+2e167e0d-0ab2-4633-8c20-91ac2f957398 trace=296724d752a748ee83939e60b77e106c 200 POST /api/checkout 14.0ms
+[notify] created -> SVD-MVM2ACL0-86CD5F (outbox)
+6bf649e3-93f7-45f3-8f19-f695ced855ca trace=ab8b4bae2a6e4e81b8804069e952ec0b 200 POST /api/checkout 13.6ms
+[notify] created -> SVD-MVM2ACLF-4DD98C (outbox)
+339fec25-13e6-4bf9-812c-cc11528768ce trace=1e1e7d03265e40b6b749ce3fa44c6480 200 POST /api/checkout 13.8ms
+[notify] created -> SVD-MVM2ACLU-FDDB81 (outbox)
+cc4db03b-0a02-4fd2-b4d5-77833856cbda trace=6349e5ca02d8447c950dff6aa64825db 200 POST /api/checkout 13.4ms
+994886ad-f46a-49d5-b644-030087745803 trace=70805be646fb4f28bb849d6ed3e2e24b 200 GET /api/admin/orders?… 6.4ms
+fdc2ee99-2ebd-43b1-b677-6a63ac4a6533 trace=fa5edd963c134a4b88122258ec530642 200 GET /api/admin/orders?… 3.3ms
+✔ trang sau khác trang trước, và báo rõ còn bao nhiêu (445.1831ms)
+0da353e1-fc7f-4568-9c8c-3e67503100a2 trace=0e38379d6f4a49aca2b07a8221ba2d28 200 GET /api/admin/orders?… 3.4ms
+✔ trang cuối cùng bắt buộc báo hết, không báo gì còn trang sau (4.8017ms)
+68109636-f307-45e3-80d5-c030d35e1275 trace=66818ad0c72743e0ac762225b682d639 200 GET /api/admin/orders?… 2.8ms
+✔ số đơn đang mở được đếm trên cả shop, không phải trên trang hiện lên (4.0898ms)
+✔ panel có nút tải thêm, và chỉ nút đó mới thêm tiếp (1.0441ms)
+✔ panel nội bộ không được lưu trong bộ đếm trình duyệt (7.2902ms)
+45267ced-b927-4a63-9f67-322bcda9dfad trace=7a3c9581acd14dbf9a13250cf237b9c3 201 POST /api/admin/products 14.3ms
+97160636-b6c0-449a-aa8d-93402d912481 trace=09a8172db85b4dbbbdf5142dec792f18 200 GET /api/admin/orders?… 3.0ms
+3ac59195-27a0-492c-a4c0-58c7f57da1a3 trace=0b215488726540dfb141cc03f2e760ae 400 POST /api/checkout 1.6ms
+7b513fe4-c911-46a9-9dbd-9e151e48ba21 trace=5573ab79d6e6479d896378c848539628 200 GET /api/admin/orders?… 1.3ms
+✔ không đồng ý điều khoản thì không nhận thanh toán (69.6839ms)
+[notify] created -> SVD-MVM2ACCE-B27105 (outbox)
+9646c138-371b-4095-aebc-8e7dbb8a5e35 trace=32310733526a483bbcd17351fa5aef2d 200 POST /api/checkout 32.3ms
+✔ đơn lưu lại đồng ý điều khoản: lúc nào, từ đâu, bản nào (34.812ms)
+[notify] created -> SVD-MVM2ACDD-B24A8C (outbox)
+de9c2a6f-3de4-40ba-bbba-e006f98f790f trace=a044a9f907934fa79de9923336a2a495 200 POST /api/checkout 15.6ms
+43324258-a394-4d43-8fd3-91cedcf6cb79 trace=2fa9074fc223480e9002e6890c2bf684 200 POST /api/checkout 3.8ms
+✔ đơn được mở lại khi mạng đứt, không bị hỏi đồng ý thêm lần nữa (23.1253ms)
+[notify] created -> SVD-MVM2ACDZ-FC3E45 (outbox)
+7aeec1aa-c3b7-4d11-a321-73d5466741c0 trace=2ae94e0420af45b9a4d6437eb6b6671f 200 POST /api/checkout 12.9ms
+ff441a0c-db5b-49af-b44e-099f4efb3e9b admin confirm-paid SVD-MVM2ACDZ-FC3E45 {"amount":200000,"currency":"VND"}
+[notify] paid -> SVD-MVM2ACDZ-FC3E45 (outbox)
+[orders] SVD-MVM2ACDZ-FC3E45 paid via admin
+ff441a0c-db5b-49af-b44e-099f4efb3e9b trace=4edc861035a64c5aa69946c23433b36f 200 PATCH /api/admin/orders/SVD-MVM2ACDZ-FC3E45 10.8ms
+c5ff0a7c-307e-492d-98aa-2ccc7cb52506 trace=edb9ace7141d42618a19905511d391c5 200 GET /api/orders/SVD-MVM2ACDZ-FC3E45/download?… 19.5ms
+3d60ae5b-fe16-4718-961e-987839425af8 trace=f82ae47a89c84631b5c93b5ce456d7ff 200 GET /api/orders/SVD-MVM2ACDZ-FC3E45/download?… 5.1ms
+d90ce416-7f5a-4cfc-a360-caa0b5b4fd13 trace=f2b168f9ffa34f699fd81cbf72f9a60e 200 GET /api/admin/orders?… 2.5ms
+✔ mỗi lần tải file được đếm lại trên đơn (58.0268ms)
+[notify] created -> SVD-MVM2ACFM-C47B21 (outbox)
+c616f7b0-d25b-4d50-a2cd-3bd78769b11b trace=92d6599d444f490ab0e9336d29d323d1 200 POST /api/checkout 12.1ms
+252718a8-e757-4c7e-b4d9-cb2210aeace3 admin confirm-paid SVD-MVM2ACFM-C47B21 {"amount":200000,"currency":"VND"}
+[notify] paid -> SVD-MVM2ACFM-C47B21 (outbox)
+[orders] SVD-MVM2ACFM-C47B21 paid via admin
+252718a8-e757-4c7e-b4d9-cb2210aeace3 trace=f71e426479a94b7aa0f6495b6884e853 200 PATCH /api/admin/orders/SVD-MVM2ACFM-C47B21 9.8ms
+a77b2607-9037-4ddd-a5b3-b69b48eef948 trace=343d1d5ad37f4646a0462039b94d810c 400 PATCH /api/admin/orders/SVD-MVM2ACFM-C47B21 1.5ms
+1af89951-5fb7-46ce-bb01-f234dddf550a trace=df726e06ed2a41eb862b258ff30d8889 400 PATCH /api/admin/orders/SVD-MVM2ACFM-C47B21 1.1ms
+743ae7d8-38af-4a2b-b789-d37e122699f5 trace=455adae6f2f641b2ae5e5484443f9805 400 PATCH /api/admin/orders/SVD-MVM2ACFM-C47B21 1.0ms
+✔ hoàn tiền phải chọn loại lý do, không gõ tự do được (32.4142ms)
+[notify] created -> SVD-MVM2ACGH-7C526E (outbox)
+45d9e01e-6350-4008-8597-6197694a30c0 trace=1ae9471dfa1a40519a493dc59a4c11bf 200 POST /api/checkout 11.7ms
+5bb0cd0a-8974-46db-a344-8b6459222f33 admin confirm-paid SVD-MVM2ACGH-7C526E {"amount":200000,"currency":"VND"}
+[notify] paid -> SVD-MVM2ACGH-7C526E (outbox)
+[orders] SVD-MVM2ACGH-7C526E paid via admin
+5bb0cd0a-8974-46db-a344-8b6459222f33 trace=df3e7db1db0341f6aeea09565a196d57 200 PATCH /api/admin/orders/SVD-MVM2ACGH-7C526E 10.0ms
+6f15bc75-5e53-41b4-a6cc-5594f68f6bd1 admin refund SVD-MVM2ACGH-7C526E {"amount":200000,"currency":"VND","reason":"file thiếu DLL, có ảnh từ khách","category":"defect"}
+[notify] refunded -> SVD-MVM2ACGH-7C526E (outbox)
+[orders] SVD-MVM2ACGH-7C526E refunded via admin [defect] file thiếu DLL, có ảnh từ khách
+6f15bc75-5e53-41b4-a6cc-5594f68f6bd1 trace=2a3e06afdfc045258de2b1610534bb3b 200 PATCH /api/admin/orders/SVD-MVM2ACGH-7C526E 10.5ms
+✔ phần mềm lỗi hoặc trừ nhầm thì hoàn toàn bộ (35.9664ms)
+[notify] created -> SVD-MVM2ACHH-6B707A (outbox)
+6e387935-cff2-474e-880b-31ccc2b5065d trace=dec8c813808645f1ac4c842e1ddc57aa 200 POST /api/checkout 12.4ms
+b0694401-51f7-464a-b04a-3e3ec7f3d455 admin confirm-paid SVD-MVM2ACHH-6B707A {"amount":200000,"currency":"VND"}
+[notify] paid -> SVD-MVM2ACHH-6B707A (outbox)
+[orders] SVD-MVM2ACHH-6B707A paid via admin
+b0694401-51f7-464a-b04a-3e3ec7f3d455 trace=b44effe09dd94574bc5db00df09c0a5e 200 PATCH /api/admin/orders/SVD-MVM2ACHH-6B707A 9.6ms
+e1e72799-b827-453e-bcc9-0410d84a0819 trace=59d21c8e89c64de4971177c91c688f64 400 PATCH /api/admin/orders/SVD-MVM2ACHH-6B707A 1.3ms
+4741ace0-7274-4386-ad0d-0d82264502fa trace=8091b2465e274d4eb8d30e1acb4e843e 400 PATCH /api/admin/orders/SVD-MVM2ACHH-6B707A 1.1ms
+6fc40d7a-2c28-4c14-9ea0-05c603cb0097 trace=b9e5c953f11a47c3a36260be690c08ca 400 PATCH /api/admin/orders/SVD-MVM2ACHH-6B707A 1.3ms
+4317e085-082c-459a-bca3-c235e077299e admin refund SVD-MVM2ACHH-6B707A {"amount":200000,"currency":"VND","reason":"thỏa thuận hoàn một phần vì đổi ý","category":"changed_mind"}
+[notify] refunded -> SVD-MVM2ACHH-6B707A (outbox)
+[orders] SVD-MVM2ACHH-6B707A refunded via admin [changed_mind] thỏa thuận hoàn một phần vì đổi ý
+4317e085-082c-459a-bca3-c235e077299e trace=36ae66684db245bd9c163ea558a0ec42 200 PATCH /api/admin/orders/SVD-MVM2ACHH-6B707A 8.8ms
+✔ khách đổi ý sau khi có file chỉ hoàn được một phần có giới hạn (40.8928ms)
+913e241d-222a-40f5-a88d-f74e4cdf327d trace=f48e0947e5ce49f6b367816f4702a7ef 200 GET /api/admin/orders?… 3.1ms
+[notify] created -> SVD-MVM2ACIQ-0B70BC (outbox)
+59b36330-9e99-47f1-b821-42185be3bea5 trace=0e20367e883245e1a9f592bd8a077da4 200 POST /api/checkout 11.9ms
+4e2b452c-ee9c-492b-8687-e1d0974aee23 trace=c08c237c021147de96a89ed34d331bd6 200 GET /api/admin/orders?… 3.3ms
+✔ danh sách đơn chỉ ra những email đã từng được hoàn tiền (22.0083ms)
+✔ bảng điều khiển có ô tìm, lọc trạng thái và hộp hoàn tiền ba lựa chọn (1.1567ms)
+✔ trang thanh toán bắt tích đồng ý, và từ điển nói đúng điều đó (1.2062ms)
+935b7333-68d1-4bb2-9cc2-52ad07446a2a trace=7a155b14482045989b5230567429d91f 200 GET /api/admin/revenue 1.5ms
+[notify] created -> SVD-MVM2ACJD-DA3BD2 (outbox)
+e4d9a661-5283-4bae-b153-626e79331c2a trace=f40dba8563644c6bba9c3a6c2785818b 200 POST /api/checkout 11.9ms
+cef897a2-f49c-4b01-b8a0-576382a82471 admin confirm-paid SVD-MVM2ACJD-DA3BD2 {"amount":200000,"currency":"VND"}
+[notify] paid -> SVD-MVM2ACJD-DA3BD2 (outbox)
+[orders] SVD-MVM2ACJD-DA3BD2 paid via admin
+cef897a2-f49c-4b01-b8a0-576382a82471 trace=697f01cd6d684d5a820b95472151a480 200 PATCH /api/admin/orders/SVD-MVM2ACJD-DA3BD2 9.8ms
+590d9b34-32a4-4746-ad8b-83cd489bdca9 admin refund SVD-MVM2ACJD-DA3BD2 {"amount":200000,"currency":"VND","reason":"thỏa thuận","category":"changed_mind"}
+[notify] refunded -> SVD-MVM2ACJD-DA3BD2 (outbox)
+[orders] SVD-MVM2ACJD-DA3BD2 refunded via admin [changed_mind] thỏa thuận
+590d9b34-32a4-4746-ad8b-83cd489bdca9 trace=2588b50abb724cb5ad93b1c25fd0ff71 200 PATCH /api/admin/orders/SVD-MVM2ACJD-DA3BD2 11.3ms
+cc17b7e1-f938-461a-926b-9c71206f2399 trace=5cdac6af646546d4b2f3f3621e0e7ad5 200 GET /api/admin/revenue 1.8ms
+✔ đổi ý mất tiền vẫn hoàn một phần, và số liệu doanh thu không bị trừ oan (41.3349ms)
+60905b48-c7b4-4311-8169-5ba5befa67e5 trace=6059d896a48248bb92030a85e3af6983 201 POST /api/admin/products 14.0ms
+40a0655d-cbeb-42d9-8737-20712ba37d8c trace=8af7e859cc1c4293aae329591453691c 201 POST /api/admin/products 4.4ms
+[notify] created -> SVD-MVM2ACDS-E60EF7 (outbox)
+dbd4c5a4-14d5-488f-a9f2-d6acf860f675 trace=959ea441b2424ded8a8755e568b54b0c 200 POST /api/checkout 31.1ms
+[notify] created -> SVD-MVM2ACEP-E27D15 (outbox)
+6101bd72-7188-4940-abad-15574b907df6 trace=11e6cee4bfd44a6792bd8a27b08dc397 200 POST /api/checkout 12.3ms
+[notify] created -> SVD-MVM2ACF2-34D912 (outbox)
+41540926-0846-4323-b851-1ce97155666f trace=5f8c45ae1a6a44eeab8aebef8a275c2a 200 POST /api/checkout 13.3ms
+e6d1e2bb-462d-496e-ae3a-a56693e77f22 admin confirm-paid SVD-MVM2ACF2-34D912 {"amount":99000,"currency":"VND"}
+[notify] paid -> SVD-MVM2ACF2-34D912 (outbox)
+[orders] SVD-MVM2ACF2-34D912 paid via admin
+e6d1e2bb-462d-496e-ae3a-a56693e77f22 trace=8d9749ca05154adca81fa175d9fe9ece 200 PATCH /api/admin/orders/SVD-MVM2ACF2-34D912 11.1ms
+89c7a8e7-c127-467e-afe0-6c6b70b6cde1 trace=63984297f9c8457396f2f6dbd6809060 200 GET /api/admin/orders?… 3.5ms
+31212e96-1fcf-4ef9-821f-5ee899405f88 trace=a7381ef3cf824b98ada1e33b5e2aaa95 200 GET /api/admin/orders?… 3.2ms
+✔ tìm đơn theo email và theo tên, chỉ trả đơn khớp (154.4383ms)
+[notify] created -> SVD-MVM2ACG5-985CB3 (outbox)
+29734dda-2be5-4e30-bec4-a70d8791723e trace=424e338341ff4e26be3c2b00e3a09e08 200 POST /api/checkout 12.1ms
+d473becd-34a1-4e5b-be08-ca4f40f8a673 trace=2300acc125c74552a132affc59b866f6 200 GET /api/admin/orders?… 3.1ms
+✔ tìm đơn theo mã đơn, không phân biệt hoa thường (18.8013ms)
+13fb221d-9e55-4da2-b1ff-ad9ef45ba49a trace=3be8de0ae0254f37acf7e1ab941b7bec 200 GET /api/admin/orders?… 2.4ms
+f3a98fb0-d14d-4f47-b063-cfcdd546d829 trace=75ef5ad6551f46118dc5c46e574cf296 200 GET /api/admin/orders?… 2.3ms
+✔ lọc theo trạng thái chỉ giữ đơn ở trạng thái đó (7.6755ms)
+f09e8a64-9834-4512-9383-34d3b795547b trace=bc3893196a0a408081523ee79b20a18a 200 GET /api/admin/orders?… 3.4ms
+c33279d4-c58d-4f30-a823-e87e55c0c3ae trace=51e4231e47eb4ace9a7bbc9aecf88c78 200 GET /api/admin/orders 2.6ms
+✔ trạng thái lạ trong URL không được làm cạn bảng (8.2133ms)
+935109a3-4cfe-4d7f-be2c-ebf26f136f25 trace=11be14180df748618dbaa8e492a1296f 200 GET /api/admin/orders?… 2.2ms
+8c3002d7-a1fc-4716-88fb-3dfe89ebb7bc trace=1ac89452479d4f4498e71c6d2b5ae7a6 200 GET /api/admin/orders?… 2.3ms
+✔ tìm kiếm và phân trang đi cùng nhau (6.9917ms)
+946756fc-e9c7-420d-a0ee-77479cffe285 trace=04c592bf2d5b43aab2c4f4be85b410d0 200 GET /api/admin/products?… 1.3ms
+0dee8276-6058-4890-bb33-e95843a0242d trace=b7c027b2d9864da78848d003d0e2e0c2 200 GET /api/admin/products?… 1.4ms
+✔ tìm sản phẩm theo tên và theo mã (4.7327ms)
+6ceb25c7-cdc8-485a-bf7a-dbd660f017f1 trace=e40dbd989a57442eb9e7b5fadc7d9eef 200 PATCH /api/admin/products/099bd0f1-1727-435a-b752-eb9a6b0cfee6 2.9ms
+99f5183a-719b-412e-b5fb-b8f9cbac4b5e trace=f96218d449714b509bc3fd7379eb8307 200 PATCH /api/admin/products/c3f5e3bc-40ae-4b52-95b0-c71d24f39c8e 2.6ms
+556b4080-c7e6-45b8-bb5d-ddf59b974fb3 trace=b4dca951627048e285af0c2e3e380c24 200 GET /api/admin/products?… 1.2ms
+4bff292d-3b0b-49f2-a64c-a2e22889ce2f trace=f81b85919b644867acc68d7769d7d8c2 200 GET /api/admin/products?… 1.1ms
+5cdffd3b-6edc-4320-8d3b-98939b631844 trace=7f0326421dc24464abbaf6c24fc0ee60 200 GET /api/products 1.1ms
+3fbbf28e-bc6a-42a7-9004-346f8c07be8c trace=e278054d730a48c08fcc4c45a18d159d 200 PATCH /api/admin/products/099bd0f1-1727-435a-b752-eb9a6b0cfee6 2.9ms
+6212585d-e538-4e67-a3b2-f0252beb0546 trace=d309bb8d99904ab68cdce6240524214b 200 PATCH /api/admin/products/c3f5e3bc-40ae-4b52-95b0-c71d24f39c8e 2.4ms
+✔ lọc sản phẩm theo trạng thái, và cửa hàng chỉ thấy đang bán (21.5514ms)
+0ff676a7-db8c-4164-80c2-f944ccad7acc trace=e9ea107e5c6a49ec97d8db131701eb72 409 DELETE /api/admin/products/c3f5e3bc-40ae-4b52-95b0-c71d24f39c8e 2.3ms
+55502e5f-b1f6-4602-88ea-9cd54a551b03 trace=9f3e3c97d61c4f16832c30df985ea419 200 GET /api/admin/products?… 1.5ms
+✔ xoá sản phẩm đã có đơn bị từ chối, và nói rõ vì sao (6.0807ms)
+dc7729fc-91b1-4668-8496-9a70d7b6841d trace=9e79be5a448744ff8dedb8dbe93f3c70 200 GET /api/admin/orders 2.2ms
+3ed93be5-4226-46f6-9c10-f2779671cd4d trace=e243cf08d60342feb21caf45abd181a2 200 DELETE /api/admin/products/099bd0f1-1727-435a-b752-eb9a6b0cfee6 4.1ms
+03c680ff-8ad0-4d9f-89ee-d29e3862481c trace=625ac5729f3e495aa480f50afb692fc9 200 GET /api/admin/products 1.3ms
+826e6f31-21bf-4ec8-b7f9-8e75861c852b trace=a1856cd38d1a485abc39714d8514c2a5 200 GET /api/admin/orders 2.2ms
+1a3cd89a-1f25-4c25-af6d-f13bdd302bdf trace=8ad751d9903f4e05964fbb5a1d47c9c0 404 DELETE /api/admin/products/099bd0f1-1727-435a-b752-eb9a6b0cfee6 1.2ms
+✔ xoá sản phẩm chưa bán thì bay, và không đụng tới đơn đã có (15.5099ms)
+d1925145-13e6-4752-9bd3-9bd5439e0435 trace=f16ce30e72794ddb8b64cff7f60a849f 401 GET /api/admin/products?… 0.5ms
+5ba8f89a-db9b-407d-b0b1-2c850b614998 trace=a6ed9c31593846ecbac059adcec4f5ad 401 GET /api/admin/orders?… 0.4ms
+1af8a545-2e92-455e-97b8-23261ba39fe6 trace=e942cf8063f246169085d5eaf6557259 401 DELETE /api/admin/products/c3f5e3bc-40ae-4b52-95b0-c71d24f39c8e 0.3ms
+✔ xoá và tìm đều cần token, không có thì 401 (3.8818ms)
+✔ panel có ô tìm và ô lọc, và dùng chúng đúng cách (3.3252ms)
+✔ nút lưu xám khi mở form mà chưa sửa gì (0.896ms)
+✔ nút sáng lên khi sửa tiêu đề (0.1686ms)
+✔ nút sáng lên khi sửa cả hai ô (0.1182ms)
+✔ sửa xong bỏ lại chữ thì nút xám trở lại (0.1238ms)
+✔ khoảng trắng thừa được bỏ qua khi so sánh (0.1066ms)
+✔ bộ đếm cảnh báo khi chữ bị cắt ở ngưỡng search result (0.2117ms)
+✔ form sửa SEO ghi lại giá trị lúc mở, và đó là nơi so sánh (0.1667ms)
+✔ sau khi lưu, nút phải theo đúng quy tắc so sánh chữ, không được ai bắt (0.2637ms)
+✔ nút kiểm tra chỉ đổ bằng màu, không phải chỉ biến mất (5.0374ms)
+✔ bam Luu SEO that thi nut khoa lai va form bao "Đã lưu" (1.6492ms)
+✔ lưu thất bại thì nút phải mở lại để thử lại được (0.844ms)
+✔ trang quản trị có ô nhập SEO title và mô tả (12.0931ms)
+✔ trang quản trị mở được sản phẩm để sửa SEO, không phải chỉ thêm mới (0.7619ms)
+✔ form sửa SEO báo lỗi khi vượt giới hạn search result cắt (0.9455ms)
+✔ có đường dẫn CSS cho form sửa SEO (1.5301ms)
+c9700e97-2c17-4bba-9719-12cda3d2eaf3 trace=1d1814f593324b538898eb0da1f56e4d 201 POST /api/admin/products 13.5ms
+✔ tạo sản phẩm có giữ nguyên SEO title và mô tả (66.842ms)
+✔ sau khi luu, nut khoa lai va form bao "Đã lưu" (2.8235ms)
+a67e285a-5887-474a-a4f7-e22d38a339ac trace=97a8c76c02d94cdca474059b3f242ee5 201 POST /api/admin/products 5.1ms
+✔ trang /en/ không được mượn tiêu đề tiếng Việt — đó là trùng nội dung (233.2571ms)
+8447925d-dd9a-40a5-8052-480c6a3f6831 trace=66ad8b6439ed4b51b30207b79330f83a 201 POST /api/admin/products 4.0ms
+13b57811-30b8-4596-adac-0b0e69fae6bd trace=9ae5fede0705415690c8e0994be23b8a 200 PATCH /api/admin/products/eb1c8bd3-e78c-4cbd-9a9b-30622592b20a 3.0ms
+✔ SEO tiếng Anh lưu được và lên đúng trang /en/ (13.2269ms)
+5f141b54-4fc2-42b6-9c43-5db8ec0dc796 trace=d300df790d3b41129266777fed30860e 201 POST /api/admin/products 3.7ms
+248b909a-6ce5-4048-ace4-ed95d9858fce trace=4dc58480751a4fd8a0f2a48e84d9b0d8 200 PATCH /api/admin/products/bdd7bb85-d320-4a38-b1d0-4bd0ffbd6899 3.3ms
+✔ SEO tiếng Anh bị cắt ở tầng máy chủ, không đưa vào database (10.5444ms)
+✔ trang quản trị có ô nhập SEO tiếng Anh, cả khi thêm mới lẫn khi sửa (1.0164ms)
+ea8dd46f-f26e-4812-b283-5e6fdc18b58c trace=d35a3765c24a44d5a5c4a0a43be996e6 201 POST /api/admin/products 3.7ms
+ad181bb3-2cc8-4bb8-ae3c-b722eeee7c81 trace=2ed3701b9e4e414a8efda22e4155580d 200 PATCH /api/admin/products/07205f35-ef0d-4240-b13e-59642b18ae5e 3.0ms
+✔ sửa SEO không được xoá mô tả và tính năng (9.961ms)
+e272cb64-7a96-43eb-882f-f17987e58352 trace=0e06a836c0b047989d7fd37dad625c71 201 POST /api/admin/products 4.7ms
+12d04882-25e4-4b07-aa03-901e67ba1396 trace=a87c67aef19c411d84594adae2400d5f 200 PATCH /api/admin/products/c1944e07-97e8-41e0-8ca1-503ef53605b5 2.5ms
+✔ mức độ dài SEO bị cắt ở tầng máy chủ, không đưa vào database (9.6537ms)
+3bba73b8-4676-4e55-b65a-79896551ee38 trace=8a85a1a96ee1411a8fda1f928e34ebdb 404 PATCH /api/admin/products/does-not-exist 1.2ms
+✔ sửa sản phẩm không tồn tại trả 404 chứ không phải lỗi 500 (2.319ms)
+b7b1ae98-c896-4fa9-ae66-ac8bdada5e21 trace=ff3164d4ea08415dadb8b6f17abd034a 201 POST /api/admin/products 3.2ms
+95ab516d-cecb-4834-a2b6-6479b7b22869 trace=1426609a7a6f45ffb7070cbf9e03d0f5 401 PATCH /api/admin/products/a1bc2aae-b557-4c6a-a9c7-6de5bdef5d44 0.3ms
+169fd482-a7cf-4344-bfbb-f7a72e2519cb trace=47934a4d7d2f45e9b56774982d0ce26d 200 GET /api/admin/products 2.1ms
+✔ sửa SEO không được bỏ qua khi thiếu token (8.9956ms)
+63bee969-7d61-4fdb-a530-03e175bfdb4a trace=5dc21b9d0c5a4663bb4c32f509c0527c 201 POST /api/admin/products 12.8ms
+59f8336d-7d94-4dc7-871b-6156b8e7f8ba trace=0f7eb202739547b894299a3140aa294b 200 GET /og.png 3.3ms
+✔ og:image là ảnh raster thật, đúng kích thước khai báo (78.1889ms)
+✔ ảnh share nằm trong bản build, không được sinh lúc chạy (0.6437ms)
+✔ mọi trang index được trỏ tới cùng một ảnh raster (170.4886ms)
+753f6030-6f9f-42d7-8391-ead533950f89 trace=0ac6d589313b4c3a86ae84f26c60a2d4 404 GET /khong-ton-tai 2.4ms
+✔ CSP chặn script inline, và không trang nào còn script inline (20.2464ms)
+8947f20f-ecb7-42ff-9599-413fc8165825 trace=7947f5e688fe49a4a6e619596ac3f621 200 GET /related.js 0.7ms
+b46f1bd4-8aa0-40f7-938b-86dc97275625 trace=fa3197c5d63e496cab886434f5026cfb 200 GET /related.js 0.6ms
+4bf7b4f0-bc88-4302-863a-167813d44db5 trace=aba8cdbfc590447e80af21985e017e74 200 GET /format.js 0.4ms
+✔ script ngoài phải được phép chạy theo chính CSP đó (6.4545ms)
+✔ trang sản phẩm tiếng Anh dùng bản dịch trong database, không phải bản Việt (5.0758ms)
+✔ hai bản trỏ qua lại bằng hreflang và og:locale:alternate (5.6292ms)
+✔ sitemap liệt kê cả hai bản, nối qua hreflang (3.2873ms)
+✔ schema mô tả đủ để trả lời "chạy được trên máy nào" (3.305ms)
+✔ trang sản phẩm có FAQPage lấy từ dữ liệu thật (3.0127ms)
+✔ organization có sameAs và founder khi cấu hình, và bỏ trống khi không (1.5545ms)
+✔ trang chủ và trang sản phẩm mô tả cửa hàng giống hệt nhau (6.2225ms)
+✔ /llms.txt là chữ thuần, nêu tên và liệt kê sản phẩm (2.2593ms)
+✔ /feed.json là JSON đúng và lấy từ danh mục sống (2.0274ms)
+✔ /llms.txt và /feed.json trả đúng cả khi cache còn nóng (6.0083ms)
+bd110d73-d3e3-4eb8-96fd-3555c0cfff8f trace=acef6d809c7c49d1856204dc7239c6bf 200 PATCH /api/admin/products/449053ac-e6c0-4cec-82a3-29b4348ca064 3.4ms
+✔ /llms.txt và /feed.json không báo sản phẩm đã ngừng bán (10.3007ms)
+✔ robots.txt nói rõ quyết định với các trình thu thập AI (1.4111ms)
+✔ trang about tồn tại, index được, và nói ai làm ra (6.378ms)
+✔ thời gian thanh toán trong điều khoản lấy từ biến môi trường (6.0154ms)
+1f7a7752-f3e5-419a-8883-a375a0eb07f8 trace=2aef8aa1e61e4342a6d9e503c5c63dfe 404 GET /404-not-found 0.5ms
+✔ năm bản quyền đọc từ đồng hồ, không phải viết cứng (6.9569ms)
+✔ pháp nhân hiển thị trên trang pháp lý, và biến trống thì không in gì (5.7258ms)
+✔ mỗi refusal của API có một câu tiếng Việt khớp với từ điển (5.6196ms)
+✔ PayPal converts VND prices to configured USD (10.4075ms)
+✔ payment verification uses the amount frozen on the order (0.2392ms)
+✔ fixed rate config bypasses the network entirely (0.1597ms)
+39df5719-a25d-4d18-8a27-3f46f1298194 trace=b38a016474954926a90a5ca909c748d9 200 GET /api/health 4.3ms
+✔ health endpoint reports local persistence (27.5373ms)
+775d0f03-4efb-4b63-9fa5-11a27ec452d4 trace=ece269b10d79464181e9ed539b005c69 200 GET /api/products 2.1ms
+✔ public catalog hides products without a release file (5.9083ms)
+1ceb368d-5939-4e04-9d42-cc54b9480233 trace=e13989ce098d4529a23a8a9436def78e 503 POST /api/checkout 8.3ms
+✔ checkout rejects a product without a release file (12.1404ms)
+89f4b11e-fb2b-4d07-8c6e-e49dc83d52c1 trace=a9b9c0cce5854068af89ffece8a0345d 401 GET /api/admin/orders 1.0ms
+✔ admin API rejects missing token (2.5201ms)
+248176be-a0a0-4c70-8c93-7729b62fbfb9 trace=a592e328d7b6460da18986826d4d1589 200 GET /img/momo-qrcode-receving-money.png 3.0ms
+f195e042-07c3-4e04-8d6c-9ec85bf101bb trace=83ea88e0a3b34bb5826df3c4960a966e 200 GET /img/zalopay-qrcode-receving-money.png 2.2ms
+✔ wallet QR images are served from public/img as PNG (8.3269ms)
+1c852d3a-e208-43ba-a3b0-a582ec50b4b0 trace=5f17346c9b084a92976c2e9659de1136 201 POST /api/admin/products 6.1ms
+[notify] created -> SVD-MVM2ACV9-343EC3 (outbox)
+dede2d75-1c8a-4111-af1d-620efaa3ae6d trace=9e9df3023d6242989eb902b0f731f382 200 POST /api/checkout 27.1ms
+077d69d1-d871-49fb-b653-7cdf5039b0c9 trace=be62a86bc09848feb859d04e92bf7068 200 GET /api/orders/SVD-MVM2ACV9-343EC3 1.6ms
+✔ admin can publish a product and checkout creates a private order (40.5987ms)
+✔ package.json "files" và danh sách đóng gói của build là một (4.4251ms)
+✔ deploy.sh chỉ deploy thư mục build tạo ra, không deploy cả cây nguồn (1.4864ms)
+✔ deploy/.env.example đặt DATA_DIR vào thư mục systemd cho phép ghi (1.7854ms)
+✔ build loại scratch (.wrangler/.gbuildcache/log) khỏi artifact (0.8899ms)
+✔ audit chạy sạch trên chính dự án này (4911.1432ms)
+✔ audit chặn được từng loại lỗi nó sinh ra để bắt (92354.1281ms)

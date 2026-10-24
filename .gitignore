@@ -110,3 +110,9 @@ package-lock.json
 .gsync.state
 sync-outputs/
 >>>>>>> Stashed changes
+
+# --- added by gsync security gate ---
+*.env
+secrets.*
+*.secret
+*.pem
