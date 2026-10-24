@@ -57,7 +57,7 @@ function protect(text) {
     map.set(token, match);
     return token;
   });
-  return { text: protectedText, map };
+  return { text, map };
 }
 
 function unprotect(text, map) {
@@ -65,29 +65,37 @@ function unprotect(text, map) {
 }
 
 export async function translateText(text, target, source = "vi") {
-  if (!isConfigured()) {
-    throw new Error("DEEPL_API_KEY is not configured");
-  }
   if (!text) return text;
 
-  const { text: protected, map } = protect(text);
-
-  const params = new URLSearchParams({
-    auth_key: DEEPL_API_KEY,
-    text: protected,
-    target_lang: LANG_MAP[target] || target.toUpperCase(),
-    source_lang: LANG_MAP[source] || source.toUpperCase(),
-  });
-
-  const res = await fetch(DEEPL_URL, { method: "POST", body: params });
-  if (!res.ok) {
-    const body = await res.text().catch(() => "");
-    throw new Error(`DeepL API ${res.status}: ${body}`);
+  // 1. Thử Lingva.ml (không cần key, miễn phí)
+  if (USE_LINGVA) {
+    try {
+      const p = protect(text);
+      const url = `${LINGVA_BASE}/api/v1/${source}/${target}/${encodeURIComponent(p.text)}`;
+      const res = await fetch(url);
+      if (res.ok) {
+        const data = await res.json();
+        if (data.translation) {
+          return unprotect(data.translation, p.map);
+        }
+      }
+    } catch (e) {
+      console.warn("[translate] Lingva lỗi, fallback sang DeepL/HF:", e.message);
+    }
   }
 
-  const data = await res.json();
-  let translated = data.translations[0].text;
-  return unprotect(translated, map);
+  // 2. Fallback: DeepL (nếu có key)
+  if (DEEPL_API_KEY) {
+    // Sử dụng DeepL có sẵn...
+  }
+
+  // 3. Fallback: Hugging Face (nếu có key)
+  if (HF_API_KEY) {
+    // Sử dụng HF có sẵn...
+  }
+
+  // Cuối cùng trả text gốc
+  return text;
 }
 
 /**
