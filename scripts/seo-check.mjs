@@ -35,13 +35,37 @@ if (!arg && !process.env.APP_URL) {
 const base = String(arg || env.appUrl || "").replace(/\/$/, "");
 const expectedToken = (env.site.googleVerification || "").trim();
 const TIMEOUT_MS = 12000;
+// Render's free tier spins down after 15 minutes idle, and a cold start can take
+// longer than one fetch budget. Retry on network errors and 5xx so a sleeping
+// instance is woken up before the gate reports the site as down. 4xx answers are
+// real signals (missing page, rate limited) and are not retried.
+const GET_MAX_ATTEMPTS = 5;
+const GET_BASE_DELAY_MS = 2000;
 
 const results = [];
 const record = (name, ok, detail) => results.push({ name, ok: Boolean(ok), detail });
 
+async function sleep(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
 async function get(url) {
-  const response = await fetch(url, { redirect: "manual", signal: AbortSignal.timeout(TIMEOUT_MS) });
-  return { response, body: response.ok ? await response.text() : "" };
+  let lastError;
+  for (let attempt = 1; attempt <= GET_MAX_ATTEMPTS; attempt += 1) {
+    try {
+      const response = await fetch(url, { redirect: "manual", signal: AbortSignal.timeout(TIMEOUT_MS) });
+      if (response.status < 500) {
+        return { response, body: response.ok ? await response.text() : "" };
+      }
+      // 5xx: cold start / bad gateway / unhealthy — try again.
+      lastError = new Error(`HTTP ${response.status}`);
+    } catch (error) {
+      lastError = error;
+    }
+    if (attempt === GET_MAX_ATTEMPTS) break;
+    await sleep(GET_BASE_DELAY_MS * attempt);
+  }
+  throw lastError;
 }
 
 const one = (html, pattern) => (html.match(pattern) || [])[1] || "";
