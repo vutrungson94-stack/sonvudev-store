@@ -21,7 +21,7 @@ export function createMemoryStore() {
   };
 }
 
-export async function createSupabaseStore() {
+export function createSupabaseStore() {
   const table = "rate_limit_hits";
   return {
     get: async (key) => {
