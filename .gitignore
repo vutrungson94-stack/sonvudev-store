@@ -116,3 +116,9 @@ sync-outputs/
 secrets.*
 *.secret
 *.pem
+
+# Test/scratch output (auto)
+test-*.txt
+test-out*.txt
+*-output.txt
+test-final.txt
