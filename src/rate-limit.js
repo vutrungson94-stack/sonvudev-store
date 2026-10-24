@@ -80,7 +80,7 @@ const limiter = createRateLimiter();
 const tooMany = (key, limit) => limiter.tooMany(key, limit);
 export const tooManyAttempts = (req) => tooMany(`ip:${req.ip || 'unknown'}`, 10);
 export const adminThrottled = (req) => tooMany(`admin:${req.ip || 'unknown'}`, 30);
-export const healthThrottled = (req) => tooMany(`health:${req.ip || 'unknown'}`, 60);
+export const healthThrottled = (req) => tooMany(`health:${req.ip || 'unknown'}`, 10000);
 export async function checkoutThrottled(req, email) {
   return await tooMany(`checkout-ip:${req.ip || 'unknown'}`, 30)
     || (Boolean(email) && await tooMany(`checkout-email:${email}`, 12));
