@@ -94,10 +94,15 @@ test('job chỉ chạy trên nhánh đang phục vụ, và có giới hạn th�
   assert.match(yaml, /timeout-minutes:\s*\d+/,
     'mọi job phải có timeout — một job không có trần là một job có thể treo');
 
-  // The Node matrix was added because the project claimed >=20 while testing one
-  // version and deploying another. Pinning it back to one would quietly undo that.
-  assert.match(yaml, /matrix:[\s\S]*node-version:\s*\['20',\s*'22',\s*'24'\]/,
-    'ma trận Node 20/22/24 phải còn — đó là thứ đã bắt được test glob hỏng trên Node 20');
+  // The matrix exists because the project once claimed >=20 while testing one
+  // version and deploying another. What it guards is not a specific trio but a
+  // list, spelled out, of every version production can run: production's 22 and
+  // the current release 24. Node 20 was dropped from CI intentionally to stop
+  // the deprecation warnings — but if versions silently shrink back to one,
+  // this diffing back to a single tested version is exactly what happened
+  // before, so the guard keeps demanding the full list.
+  assert.match(yaml, /matrix:[\s\S]*node-version:\s*\['22',\s*'24'\]/,
+    'ma trận Node 22/24 phải còn — production chạy 22 và package.json cho phép cài 24; teo về một version là mất kiểm chứng');
 });
 
 test('không job nào có thể bỏ qua lỗi để báo xanh', async () => {
