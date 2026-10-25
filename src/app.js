@@ -1101,36 +1101,36 @@ app.post("/api/paypal/capture", json, async (req, res) => {
   // served from cache without calling the API again.
   app.post("/api/translate", json, async (req, res) => {
     if (!tIsConfigured()) {
-      return res.status(503).json(refuse("api.err.paypalUnconfigured", "Dịch vụ dịch chưa được cấu hình (DEEPL_API_KEY)", 503));
+      return res.status(503).json(refuse("api.err.translateUnconfigured", "Dịch vụ dịch chưa được cấu hình (DEEPL_API_KEY)", 503));
     }
     const { text, target = "en", source = "vi" } = req.body || {};
     if (!text || !target) {
-      return res.status(400).json(refuse("api.err.invalidEmail", "Thiếu text hoặc target ngôn ngữ", 400));
+      return res.status(400).json(refuse("api.err.translateInputMissing", "Thiếu text hoặc target ngôn ngữ", 400));
     }
     try {
       const translated = await translateText(text, target, source);
       res.json({ translated });
     } catch (error) {
       console.error("[translate]", error.message);
-      res.status(502).json(refuse("api.err.paypalConfirm", "Dịch vụ dịch không khả dụng", 502));
+      res.status(502).json(refuse("api.err.translateUnavailable", "Dịch vụ dịch không khả dụng", 502));
     }
   });
 
   // Translate every key still missing for a language and persist the cache.
   app.post("/api/translate/batch", json, async (req, res) => {
     if (!tIsConfigured()) {
-      return res.status(503).json(refuse("api.err.paypalUnconfigured", "Dịch vụ dịch chưa được cấu hình (DEEPL_API_KEY)", 503));
+      return res.status(503).json(refuse("api.err.translateUnconfigured", "Dịch vụ dịch chưa được cấu hình (DEEPL_API_KEY)", 503));
     }
     const { target } = req.body || {};
     if (!target) {
-      return res.status(400).json(refuse("api.err.invalidEmail", "Thiếu target ngôn ngữ", 400));
+      return res.status(400).json(refuse("api.err.translateTargetMissing", "Thiếu target ngôn ngữ", 400));
     }
     try {
       const result = await translateMissingKeys(target);
       res.json(result);
     } catch (error) {
       console.error("[translate batch]", error.message);
-      res.status(502).json(refuse("api.err.paypalConfirm", "Dịch batch thất bại", 502));
+      res.status(502).json(refuse("api.err.translateBatchFailed", "Dịch batch thất bại", 502));
     }
   });
 
