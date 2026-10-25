@@ -33,19 +33,20 @@ concurrency:
 
 jobs:
   checks:
-    # Three Node versions, because three is where the project's support claim
-    # comes from. package.json allows >=20, CI tested exactly one, and production
-    # installs 22 — so version 20 was verified and version 24, which the same
-    # package.json invites an operator to install, was not tested at all.
+    # Two Node versions: what production runs (22) and the current release
+    # (24). package.json invites an operator to install either, so both have
+    # to pass here rather than on a user's machine. Node 20 was the original
+    # floor and was dropped from CI to silence the deprecation warnings;
+    # removing it from the matrix is the last gate that still says so.
     #
-    # The three that matter are the floor (20), what production runs (22), and the
-    # current release (24). A change that breaks on one of them has to say so here
-    # rather than on a user's machine.
+    # A matrix line lost its indentation once and closed this workflow for
+    # every Node version at once: two identical keys at column 0, and GitHub
+    # refused to start a run. Keep the eight spaces.
     strategy:
       fail-fast: false
       matrix:
-node-version: ["22", "24"]
-node-version: ["22", "24"]
+        node-version: ['22', '24']
+    runs-on: ubuntu-latest
     timeout-minutes: 10
     env:
       NODE_ENV: test
@@ -211,5 +212,3 @@ node-version: ["22", "24"]
             echo "::error::Dat no trong Settings > Secrets and variables > Actions > Repository secrets, ten APP_URL, gia tri https://<domain-cua-ban>"
             exit 1
           fi
-                n o d e - v e r s i o n :   [ " 2 2 " ,   " 2 4 " ]  
- 
