@@ -1364,7 +1364,11 @@ function boot() {
   markActiveLanguage();
   // Translate any keys still missing for the current language (JA, zh-CN, ...).
   // The page shows the English fallback first, then upgrades in place.
-  ensureTranslations();
+  // Only run once the locale asset has landed for a non-bundled language, so the
+  // in-memory dictionary is not overwritten by the late-arriving partial file.
+  if (loadedLocales.has(current)) {
+    ensureTranslations();
+  }
   // A stored third language boots before its asset exists; swap it in as soon as
   // it arrives, and tell app.js to repaint the catalogue and any open modal.
   if (!loadedLocales.has(current)) {

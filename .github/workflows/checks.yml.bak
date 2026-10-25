@@ -1,0 +1,213 @@
+# Runs the checks on every push and pull request.
+#
+# This exists because the whole project was previously verifiable only by opening a
+# terminal on the developer's machine. Everything in this file already ran by hand;
+# the change is that it now runs for everyone, every time, and a failure is
+# something a pull request cannot merge past.
+#
+# Three gates, in the order they should fail:
+#   1. lint        every file parses
+#   2. audit       the rules this project has already been bitten by
+#   3. test        the behaviour, including the two that no amount of reading
+#                  would have caught: the CSP blocking its own pages, and an
+#                  og:image that is not an image most platforms can display
+#
+# The audit and the tests need APP_URL and SUPPORT_EMAIL to mean anything — the
+# audit compares files against those values and refuses to run without them, on
+# purpose. They are given fixture values here rather than read from a developer's
+# .env, so a fresh clone and this machine run exactly the same checks.
+name: checks
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: checks-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  checks:
+    # Three Node versions, because three is where the project's support claim
+    # comes from. package.json allows >=20, CI tested exactly one, and production
+    # installs 22 — so version 20 was verified and version 24, which the same
+    # package.json invites an operator to install, was not tested at all.
+    #
+    # The three that matter are the floor (20), what production runs (22), and the
+    # current release (24). A change that breaks on one of them has to say so here
+    # rather than on a user's machine.
+    strategy:
+      fail-fast: false
+      matrix:
+        node-version: ['20', '22', '24']
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      NODE_ENV: test
+      APP_URL: https://ci-fixture.example
+      SUPPORT_EMAIL: support@ci-fixture.example
+      BRAND_NAME: SonVuDev
+      BRAND_DESCRIPTION: Công cụ và tiện ích phần mềm cho doanh nghiệp và cá nhân tại Việt Nam.
+      BANK_BIN: '970436'
+      EMAIL_FROM: 'SonVuDev <no-reply@ci-fixture.example>'
+      # Secrets are never available to a pull request from a fork, and no check
+      # here may reach the network with one. These exist so a stray default can
+      # never turn a lint run into a real email or a real IndexNow ping.
+      RESEND_API_KEY: ''
+      INDEXNOW_KEY: ''
+      SUPABASE_URL: ''
+      SUPABASE_SERVICE_ROLE_KEY: ''
+
+    name: node ${{ matrix.node-version }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node-version }}
+          cache: npm
+
+      # The lockfile is committed and npm ci is the install. A range in package.json
+      # that resolved differently this week than last week is not something a
+      # passing build should depend on.
+      - name: install
+        run: npm ci
+
+      - name: dependency audit
+        run: npm audit --audit-level=high
+
+      - name: lint
+        run: npm run lint
+
+      - name: audit
+        run: npm run audit
+
+      # Case-sensitive imports: Windows không thấy, Linux (CI/deploy) mới chết.
+      - name: case
+        run: npm run case
+
+      # A workflow that does not parse starts zero jobs: the run ends "failure"
+      # with no jobs and no logs to read, which looks exactly like a red build.
+      # This is the only gate that reads .github/workflows/ as YAML — the audit
+      # reads it as text, and the guard tests regex it, so both stayed green on a
+      # file that could not start a job.
+      - name: workflows
+        run: npm run workflow
+
+      - name: metrics
+        run: npm run metrics
+
+      - name: test
+        run: npm test
+
+      # The build runs the audit again on purpose: it is what actually ships, and
+      # the packaging step is the last moment a missing required file is cheap to
+      # notice.
+      - name: build
+        run: npm run build
+
+      # The build report is written into the job summary rather than uploaded as
+      # an artifact, and that is not a convenience choice.
+      #
+      # GitHub's artifact quota is an account-wide allowance, not a per-repository
+      # one. A full bucket anywhere on the account fails this upload with "Artifact
+      # storage quota has been hit", and there is nothing in this file that can
+      # free it — no amount of trimming this repo's 69 artifacts, which together
+      # total 0.3 MB, will help. The result was three red runs on a build that had
+      # passed every gate, for a report of three small files.
+      #
+      # `$GITHUB_STEP_SUMMARY` renders on the run page itself, beside the logs
+      # that made you want the report in the first place. Same content, no storage,
+      # no quota, no download step. It also removes the temptation this repository
+      # already guards against: the two ways a pipeline reports success for work
+      # that failed — the YAML flag and the shell fallback — are both banned here,
+      # and the guard greps the whole file for them, comments included. A gate that
+      # swallows its own failure is worse than a loud one. There is now nothing
+      # left to swallow.
+      #
+      # Still gated to the live branch and one Node version: the report is
+      # byte-identical across the three legs, and a pull request has nothing to
+      # deploy and so nothing to trace.
+      - name: publish build report to the job summary
+        if: always() && github.ref == 'refs/heads/main' && matrix.node-version == '24'
+        run: |
+          {
+            echo "### Báo cáo build"
+            echo
+            echo "Commit: ${GITHUB_SHA}"
+            echo
+            for f in build-reports/*.json; do
+              [ -e "$f" ] || continue
+              echo "<details><summary>$(basename "$f")</summary>"
+              echo
+              echo '```json'
+              cat "$f"
+              echo '```'
+              echo "</details>"
+              echo
+            done
+            echo "### File được đóng gói"
+            echo
+            echo '```'
+            find publish-output/node -type f | sed "s|^publish-output/node/||" | sort | head -100
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+  # The live site, checked the way a crawler sees it. Separate from the checks
+  # above because it needs the deployed host and the network, and because it is
+  # the only job that can catch a sitemap listing a 404 or a share card that
+  # stopped rendering.
+  deployed-site:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    # Only on the branch that is live. Every other run would report against a URL
+    # that is not the one people visit.
+    if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master'
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+
+      - run: npm ci
+
+      # Reads APP_URL from the repository secret rather than a workflow variable,
+      # so the same value the server is configured with is the one audited.
+      - name: check the live site
+        run: npm run seo:check -- "${{ secrets.APP_URL }}"
+        env:
+          GOOGLE_SITE_VERIFICATION: ${{ secrets.GOOGLE_SITE_VERIFICATION }}
+
+      # The step above is the last line of defence and it is not a good one.
+      #
+      # seo:check exits 0 with a "skipped" message when it has no URL, which is
+      # right when someone runs it locally and has not got a .env — but inside a
+      # job whose entire purpose is to check the live site, an absent secret
+      # produces a green run that verified nothing. That is the worst shape a
+      # check can have: it reports the thing it exists to report, without having
+      # looked at it.
+      #
+      # So the absence is made explicit and fatal here. A skipped run is never
+      # mistaken for a passing one, and the fix is written on the log: the
+      # secret is not set, in this repository, under this name.
+      #
+      # NOTE: the `secrets` context is NOT available in an `if:` expression
+      # (startup failure: "Unrecognized named-value: 'secrets'", 0 jobs run).
+      # So the secret is passed via `env` and tested inside `run` instead.
+      - name: fail if the URL was not configured
+        env:
+          CHECK_URL: ${{ secrets.APP_URL }}
+        run: |
+          if [ -z "$CHECK_URL" ]; then
+            echo "::error::secrets.APP_URL chua duoc dat, nen bo deploy nay KHONG kiem tra gi ca."
+            echo "::error::Dat no trong Settings > Secrets and variables > Actions > Repository secrets, ten APP_URL, gia tri https://<domain-cua-ban>"
+            exit 1
+          fi

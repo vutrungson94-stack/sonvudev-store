@@ -1,0 +1,7 @@
+
+> sonvudev-store@1.0.0 audit
+> node scripts/audit-web.mjs
+
+
+[audit] 32 nhóm kiểm tra, 0 vấn đề.
+[audit] PASS: không có domain gõ tay, route trùng, link gãy, tiếng Việt mất dấu hay khoá i18n mồ côi.

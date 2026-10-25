@@ -12,6 +12,13 @@ import { join } from "node:path";
 
 const DEEPL_API_KEY = process.env.DEEPL_API_KEY;
 const DEEPL_URL = "https://api-free.deepl.com/v2/translate";
+const USE_LINGVA = true;
+const LINGVA_BASE = process.env.LINGVA_BASE || "https://lingva.ml";
+const USE_MYMEMORY = true;
+const MYMEMORY_BASE = process.env.MYMEMORY_BASE || "https://api.mymemory.translated.net/get";
+const HF_API_KEY = process.env.HF_API_KEY || "";
+// DeepL-style language codes (uppercase) for the DeepL API.
+const LINGVA_LANG = { vi: "vi", en: "en", ja: "ja", "zh-CN": "zh", "zh-TW": "zh", ko: "ko" };
 
 // i18n language code -> DeepL language code
 const LANG_MAP = {
@@ -25,7 +32,8 @@ const LOCALES_DIR = join(process.cwd(), "public", "locales");
 mkdirSync(LOCALES_DIR, { recursive: true });
 
 export function isConfigured() {
-  return Boolean(DEEPL_API_KEY);
+  // Lingva.ml needs no API key, so the service is always available.
+  return true;
 }
 
 export function getCachePath(lang) {
@@ -57,7 +65,7 @@ function protect(text) {
     map.set(token, match);
     return token;
   });
-  return { text, map };
+  return { text: protectedText, map };
 }
 
 function unprotect(text, map) {
@@ -67,35 +75,73 @@ function unprotect(text, map) {
 export async function translateText(text, target, source = "vi") {
   if (!text) return text;
 
-  // 1. Thử Lingva.ml (không cần key, miễn phí)
+  const srcCode = LINGVA_LANG[source] || String(source).toLowerCase();
+  const tgtCode = LINGVA_LANG[target] || String(target).toLowerCase();
+  if (!srcCode || !tgtCode || srcCode === tgtCode) return text;
+
+  const p = protect(text);
+
+  // 1. Lingva.ml (no API key required)
   if (USE_LINGVA) {
     try {
-      const p = protect(text);
-      const url = `${LINGVA_BASE}/api/v1/${source}/${target}/${encodeURIComponent(p.text)}`;
+      const url = `${LINGVA_BASE}/api/v1/${srcCode}/${tgtCode}/${encodeURIComponent(p.text)}`;
       const res = await fetch(url);
       if (res.ok) {
         const data = await res.json();
-        if (data.translation) {
+        if (data && data.translation) {
           return unprotect(data.translation, p.map);
         }
       }
     } catch (e) {
-      console.warn("[translate] Lingva lỗi, fallback sang DeepL/HF:", e.message);
+      console.warn("[translate] Lingva lỗi:", e.message);
     }
   }
 
-  // 2. Fallback: DeepL (nếu có key)
+  // 2. MyMemory (no API key required)
+  if (USE_MYMEMORY) {
+    try {
+      const url = `${MYMEMORY_BASE}?q=${encodeURIComponent(p.text)}&langpair=${encodeURIComponent(srcCode)}|${encodeURIComponent(tgtCode)}`;
+      const res = await fetch(url);
+      if (res.ok) {
+        const data = await res.json();
+        const out = data?.responseData?.translatedText;
+        if (out && !/^MYMEMORY WARNING/i.test(out)) {
+          return unprotect(out, p.map);
+        }
+      }
+    } catch (e) {
+      console.warn("[translate] MyMemory lỗi:", e.message);
+    }
+  }
+
+  // 3. DeepL (if configured)
   if (DEEPL_API_KEY) {
-    // Sử dụng DeepL có sẵn...
+    try {
+      const res = await fetch(DEEPL_URL, {
+        method: "POST",
+        headers: {
+          Authorization: `DeepL-Auth-Key ${DEEPL_API_KEY}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          text: [p.text],
+          target_lang: (LANG_MAP[target] || String(target).toUpperCase()),
+          source_lang: (LANG_MAP[source] || String(source).toUpperCase()),
+        }),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        const out = data?.translations?.[0]?.text;
+        if (out) return unprotect(out, p.map);
+      }
+    } catch (e) {
+      console.warn("[translate] DeepL lỗi:", e.message);
+    }
   }
 
-  // 3. Fallback: Hugging Face (nếu có key)
-  if (HF_API_KEY) {
-    // Sử dụng HF có sẵn...
-  }
-
-  // Cuối cùng trả text gốc
-  return text;
+  // Do not return the source text: that would write Vietnamese into a foreign
+  // locale and show up as a "Vietnamese fallback" in that language.
+  throw new Error("translation unavailable");
 }
 
 /**
@@ -131,11 +177,14 @@ export async function translateMissingKeys(targetLang) {
   let done = 0;
   for (const [key, value] of missing) {
     try {
-      cache[key] = await translateText(value, targetLang, "vi");
+      const translated = await translateText(value, targetLang, "vi");
+      cache[key] = translated;
       done += 1;
     } catch (err) {
       console.error(`Failed to translate ${key}:`, err.message);
-      cache[key] = ""; // mark as attempted so we don't retry endlessly
+      // Leave the key absent so the client keeps its English fallback instead
+      // of storing an empty/Vietnamese value.
+      delete cache[key];
     }
   }
 
