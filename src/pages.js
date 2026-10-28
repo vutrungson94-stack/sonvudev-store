@@ -835,7 +835,7 @@ export function renderIndexGrid(products) {
     const badgeVi = badgeFilled || "Mới";
     const badgeEn = COPY_EN.badges[badgeVi] || badgeVi;
     const categoryRaw = String(product.category || "").trim();
-    const categoryVi = categoryRaw || COPY_VI.software;
+    const categoryVi = normaliseCategory(categoryRaw) || COPY_VI.software;
     const categoryEn = COPY_EN.categories[categoryVi] || categoryVi;
     const nameVi = esc(fillCopy(product.name));
     const nameEn = product.nameEn ? esc(fillCopy(product.nameEn)) : nameVi;
@@ -882,19 +882,29 @@ export const renderIndexCount = (products) => {
  * The homepage's category filter row, built from what is actually for sale.
  * Rendered in Vietnamese with data-vi/data-en attributes for client-side translation.
  */
+// The catalogue may store the category in either Vietnamese or English.
+// Normalise to Vietnamese so downstream renderers always have the same anchor
+// for both the button text and the data-en attribute.
+function normaliseCategory(raw) {
+  if (COPY_EN.categories[raw]) return raw;
+  const viEntry = Object.entries(COPY_EN.categories).find(([vi, en]) => en === raw);
+  if (viEntry) return viEntry[0];
+  return raw;
+}
+
 export const renderIndexFilters = (products) => {
   const counts = new Map();
   for (const product of products || []) {
-    const category = String(product.category || "").trim();
-    if (!category) continue;
-    counts.set(category, (counts.get(category) || 0) + 1);
+    const raw = String(product.category || "").trim();
+    if (!raw) continue;
+    counts.set(raw, (counts.get(raw) || 0) + 1);
   }
   const buttons = [...counts.entries()]
     .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0], "vi"))
-    .map(([category, count]) => {
-      const categoryVi = category;
+    .map(([raw, count]) => {
+      const categoryVi = normaliseCategory(raw);
       const categoryEn = COPY_EN.categories[categoryVi] || categoryVi;
-      return `<button class="filter" data-filter="${esc(category)}" data-count="${count}" data-vi="${esc(categoryVi)}" data-en="${esc(categoryEn)}">${esc(categoryVi)}</button>`;
+      return `<button class="filter" data-filter="${esc(raw)}" data-count="${count}" data-vi="${esc(categoryVi)}" data-en="${esc(categoryEn)}">${esc(categoryVi)}</button>`;
     })
     .join("");
   return `<button class="filter active" data-filter="all" data-i18n="products.all" data-vi="Tất cả" data-en="All">Tất cả</button>${buttons}`;
@@ -1197,7 +1207,7 @@ ${jsonLd([organization(), websiteSchema(), productSchema(product, lang), breadcr
 <article class="product-detail">
 <header class="product-hero">
 <div>
-<p class="eyebrow">${esc(localised(product.category, copy.categories, copy.software))} · ${esc(product.platform || "Windows")}${product.badge ? ` · ${esc(localised(product.badge, copy.badges))}` : ""}</p>
+<p class="eyebrow">${esc(localised(normaliseCategory(product.category), copy.categories, copy.software))} · ${esc(product.platform || "Windows")}${product.badge ? ` · ${esc(localised(product.badge, copy.badges))}` : ""}</p>
 <h1>${esc(product.name)} <em>v${esc(product.version)}</em></h1>
 <p class="product-lede">${esc(product.short_description || product.shortDescription || "")}</p>
 </div>
