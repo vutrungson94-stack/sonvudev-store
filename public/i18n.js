@@ -1047,7 +1047,11 @@ const DICT = {
 // other locales (ja, zh-CN) read the English table rather than dropping back to
 // Vietnamese, because an English fallback is readable to those readers and
 // Vietnamese is not.
-const langOf = (lang) => (String(lang) === 'vi' ? 'vi' : 'en');
+const langOf = (lang) => {
+  if (String(lang) === 'vi') return 'vi';
+  if (DICT && DICT[lang]) return lang;
+  return 'en';
+};
 
 // Locales whose dictionary is fetched on demand from /locales/<code>.json.
 // Vietnamese and English stay bundled because they are the source language and
@@ -1055,12 +1059,12 @@ const langOf = (lang) => (String(lang) === 'vi' ? 'vi' : 'en');
 // Bundled languages are those included in the DICT object inside this file.
 // Others are loaded from /public/locales/*.json.
 const BUNDLED = ['vi', 'en'];
-const EXTRA_LOCALES = ['de', 'es', 'fr', 'ja', 'zh']; 
+const EXTRA_LOCALES = ['de', 'es', 'fr', 'ja', 'zh-CN']; 
 const SUPPORTED = (Array.isArray(window.SVD_LOCALES) && window.SVD_LOCALES.length)
   ? [...window.SVD_LOCALES]
   : [...BUNDLED, ...EXTRA_LOCALES];
-const LANG_LABELS = { vi: 'VI', en: 'EN', de: 'DE', es: 'ES', fr: 'FR', ja: 'JA', zh: '中文' };
-const LOCALE_TAGS = { vi: 'vi-VN', en: 'en-US', de: 'de-DE', es: 'es-ES', fr: 'fr-FR', ja: 'ja-JP', zh: 'zh-CN' };
+const LANG_LABELS = { vi: 'VI', en: 'EN', de: 'DE', es: 'ES', fr: 'FR', ja: 'JA', 'zh-CN': '中文' };
+const LOCALE_TAGS = { vi: 'vi-VN', en: 'en-US', de: 'de-DE', es: 'es-ES', fr: 'fr-FR', ja: 'ja-JP', 'zh-CN': 'zh-CN' };
 const STORAGE_KEY = 'sonvudev_lang';
 const listeners = new Set();
 const loadedLocales = new Set(BUNDLED);
@@ -1355,7 +1359,21 @@ function apply(root = document) {
       if (attr && key) el.setAttribute(attr, I18N.t(key, el.getAttribute(attr)));
     });
   });
-  // Translate dynamic filter labels (Enterprise Level 5: Dynamic Content Translation)
+  // Legacy data-vi/data-en fallback: Only apply for VI or EN.
+  // For other languages, we let the dynamic translation below handle it.
+  if (current === 'vi' || current === 'en') {
+    root.querySelectorAll('[data-vi],[data-en]').forEach((el) => {
+      const vi = el.dataset.vi;
+      const en = el.dataset.en;
+      if (!vi && !en) return;
+      if (current === 'vi') {
+        if (vi && el.textContent !== vi) el.textContent = vi;
+      } else {
+        if (en && el.textContent !== en) el.textContent = en;
+      }
+    });
+  }
+  // Enterprise Level 5: Dynamic Filter Translation (must come AFTER legacy fallback)
   root.querySelectorAll('.filter').forEach((btn) => {
     const filter = btn.dataset.filter;
     if (!filter) return;
@@ -1366,16 +1384,6 @@ function apply(root = document) {
                        || I18N.productLabel('platform', filter) 
                        || filter;
       btn.textContent = translated;
-    }
-  });
-  root.querySelectorAll('[data-vi],[data-en]').forEach((el) => {
-    const vi = el.dataset.vi;
-    const en = el.dataset.en;
-    if (!vi && !en) return;
-    if (current === 'vi') {
-      if (vi && el.textContent !== vi) el.textContent = vi;
-    } else {
-      if (en && el.textContent !== en) el.textContent = en;
     }
   });
   document.documentElement.lang = current;
