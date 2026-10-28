@@ -139,7 +139,10 @@ const DICT = {
     'hero.title1': 'Công cụ tốt.',
     'hero.title2': 'Cuộc sống',
     'hero.title3': 'gọn hơn.',
-    'hero.text': 'Những chương trình {brand} tự viết cho người dùng Việt — dễ cài đặt, minh bạch và luôn được cập nhật.',
+    // Replaced Vietnam-only phrasing with global wording so the same copy works
+    // for every locale. Next pass: review hero.trust2 and any other marketing
+    // strings that still assume a Vietnamese-only audience.
+    'hero.text': 'Những chương trình {brand} tự viết cho mọi người — dễ cài đặt, minh bạch và luôn được cập nhật.',
     'hero.cta1': 'Xem sản phẩm',
     'hero.cta2': 'Tại sao {brand}?',
     'hero.trust1': 'Bảo mật',
