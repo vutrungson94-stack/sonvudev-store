@@ -144,10 +144,65 @@ for (const [route, count] of routeTally) {
 //    that was renamed once and left behind; the two languages drift apart
 //    silently precisely because both files still agree with each other.
 // ---------------------------------------------------------------------------
+// Reads the object literal that starts at a marker, by counting braces and
+// ignoring anything inside a string. The obvious version of this — from
+// "vi: {" to the next "};" — runs straight past the end of the vi block, because
+// a dictionary is written `{ vi: {…}, en: {…} };` and the first thing that looks
+// like its end belongs to the whole DICT two hundred keys later. Every key then
+// appeared to be declared twice, and the check reported the entire file.
+//
+// The same rule applies at the end of the English table. Slicing from `en: {` to
+// the end of the file was correct only while the dictionary was the last thing in
+// i18n.js; a table declared after it is then read as English keys, and every key
+// in it is reported as a key the Vietnamese half is missing.
+const objectLiteralAt = (source, marker) => {
+  const markerAt = source.indexOf(marker);
+  if (markerAt < 0) return "";
+  const open = source.indexOf("{", markerAt);
+  let depth = 0;
+  let quote = "";
+  for (let i = open; i < source.length; i += 1) {
+    const char = source[i];
+    // Comments have to be skipped, and this is not a refinement. The loop tracks
+    // whether it is inside a string so that a brace inside one does not count,
+    // but a `//` comment is not a string — so a single double quote in a comment
+    // opened a "string" that ran until the next quote hundreds of lines later,
+    // swallowing the real braces and desynchronising the depth count. The
+    // consequence is not a missed duplicate key: the parser reads past the end
+    // of the block it was asked for, and then reports every key in the file as
+    // declared twice. 209 findings, one of them an apostrophe in a Vietnamese
+    // comment, and the gate that exists to prevent confusion became the thing
+    // producing it.
+    if (!quote && char === "/" && source[i + 1] === "/") {
+      while (i < source.length && source[i] !== "\n") i += 1;
+      continue;
+    }
+    if (!quote && char === "/" && source[i + 1] === "*") {
+      i += 2;
+      while (i < source.length && !(source[i] === "*" && source[i + 1] === "/")) i += 1;
+      i += 1;
+      continue;
+    }
+    if (quote) {
+      if (char === "\\") { i += 1; continue; }
+      if (char === quote) quote = "";
+      continue;
+    }
+    if (char === "'" || char === '"' || char === "`") { quote = char; continue; }
+    if (char === "{") depth += 1;
+    else if (char === "}" && (depth -= 1) === 0) return source.slice(open, i + 1);
+  }
+  return "";
+};
+
 const keysOf = (section) => new Set([...section.matchAll(/'([\w.]+)':/g)].map((m) => m[1]));
-const viTable = i18nSource.slice(i18nSource.indexOf("vi: {"), i18nSource.indexOf("en: {"));
+const viTable = objectLiteralAt(i18nSource, "vi: {");
+const enTable = objectLiteralAt(i18nSource, "en: {");
+if (!viTable || !enTable) {
+  fail("thiếu bản dịch", "public/i18n.js", "không đọc được hai bảng ngôn ngữ — có lẽ tên vi: { hoặc en: { đã đổi");
+}
 const viKeys = keysOf(viTable);
-const enKeys = keysOf(i18nSource.slice(i18nSource.indexOf("en: {")));
+const enKeys = keysOf(enTable);
 for (const key of viKeys) if (!enKeys.has(key)) fail("thiếu bản dịch", "public/i18n.js", `"${key}" có tiếng Việt, thiếu tiếng Anh`);
 for (const key of enKeys) if (!viKeys.has(key)) fail("thiếu bản dịch", "public/i18n.js", `"${key}" có tiếng Anh, thiếu tiếng Việt`);
 
@@ -304,52 +359,6 @@ for (const block of chromeLinkLists(pagesSource)) {
 //     disagreeing with each other is the same failure as a key missing from one
 //     language, and it gets the same treatment.
 // ---------------------------------------------------------------------------
-// Reads the object literal that starts at a marker, by counting braces and
-// ignoring anything inside a string. The obvious version of this — from
-// "vi: {" to the next "};" — runs straight past the end of the vi block, because
-// a dictionary is written `{ vi: {…}, en: {…} };` and the first thing that looks
-// like its end belongs to the whole DICT two hundred keys later. Every key then
-// appeared to be declared twice, and the check reported the entire file.
-const objectLiteralAt = (source, marker) => {
-  const markerAt = source.indexOf(marker);
-  if (markerAt < 0) return "";
-  const open = source.indexOf("{", markerAt);
-  let depth = 0;
-  let quote = "";
-  for (let i = open; i < source.length; i += 1) {
-    const char = source[i];
-    // Comments have to be skipped, and this is not a refinement. The loop tracks
-    // whether it is inside a string so that a brace inside one does not count,
-    // but a `//` comment is not a string — so a single double quote in a comment
-    // opened a "string" that ran until the next quote hundreds of lines later,
-    // swallowing the real braces and desynchronising the depth count. The
-    // consequence is not a missed duplicate key: the parser reads past the end
-    // of the block it was asked for, and then reports every key in the file as
-    // declared twice. 209 findings, one of them an apostrophe in a Vietnamese
-    // comment, and the gate that exists to prevent confusion became the thing
-    // producing it.
-    if (!quote && char === "/" && source[i + 1] === "/") {
-      while (i < source.length && source[i] !== "\n") i += 1;
-      continue;
-    }
-    if (!quote && char === "/" && source[i + 1] === "*") {
-      i += 2;
-      while (i < source.length && !(source[i] === "*" && source[i + 1] === "/")) i += 1;
-      i += 1;
-      continue;
-    }
-    if (quote) {
-      if (char === "\\") { i += 1; continue; }
-      if (char === quote) quote = "";
-      continue;
-    }
-    if (char === "'" || char === '"' || char === "`") { quote = char; continue; }
-    if (char === "{") depth += 1;
-    else if (char === "}" && (depth -= 1) === 0) return source.slice(open, i + 1);
-  }
-  return "";
-};
-
 for (const [name, label] of [["vi", "tiếng Việt"], ["en", "tiếng Anh"]]) {
   const block = objectLiteralAt(i18nSource, `${name}: {`);
   if (!block) {
@@ -388,13 +397,31 @@ for (const [name, label] of [["vi", "tiếng Việt"], ["en", "tiếng Anh"]]) {
 {
   // "key": "value" pairs from an object-literal block. The value is what two
   // places have to agree on, so it is captured rather than inferred from the key.
+  // Both quote styles count: the storefront tables are written with single quotes
+  // and the page copy with double quotes, and a parser that only saw one of them
+  // would read half a comparison as empty.
   const pairs = (block) => {
     const map = new Map();
-    for (const match of block.matchAll(/"([^"]+)"\s*:\s*"([^"]*)"/g)) map.set(match[1], match[2]);
+    for (const match of block.matchAll(/["']([^"']+)["']\s*:\s*["']([^"']*)["']/g)) map.set(match[1], match[2]);
     return map;
   };
-  const compare = (label, storefrontBlock, pageBlocks) => {
-    const onCard = pairs(storefrontBlock);
+  // The storefront's half of the translation. It used to be two tables
+  // (const CATEGORIES / const BADGES) declared inside public/app.js; the card now
+  // derives its key from the value and looks it up in the dictionary, and the only
+  // place a Vietnamese label is mapped to English is REPAIR_MAPS in i18n.js. That
+  // is the table this check has to read, or it compares the product page against
+  // nothing and passes on an empty map.
+  const repairBlock = objectLiteralAt(i18nSource, "const REPAIR_MAPS");
+  if (!repairBlock) {
+    fail("dịch thiếu", "public/i18n.js", "không đọc được REPAIR_MAPS — không thể so sánh hai nơi dịch nhãn danh mục và badge");
+  }
+  const repairEn = (kind) => {
+    const at = repairBlock.indexOf(`${kind}: {`);
+    if (at < 0) return "";
+    return objectLiteralAt(repairBlock.slice(at), "en: {");
+  };
+  const compare = (label, kind, pageBlocks) => {
+    const onCard = pairs(repairEn(kind));
     const onPage = new Map();
     for (const block of pageBlocks) for (const [key, value] of pairs(block)) onPage.set(key, value);
     if (!onCard.size || !onPage.size) {
@@ -415,11 +442,9 @@ for (const [name, label] of [["vi", "tiếng Việt"], ["en", "tiếng Anh"]]) {
     }
   };
 
-  compare("badge",
-    storefrontSource.match(/const BADGES\s*=\s*\{([\s\S]*?)\};/)?.[1] || "",
+  compare("badge", "badge",
     [...pagesSource.matchAll(/badges:\s*\{([\s\S]*?)\}/g)].map((match) => match[1]));
-  compare("danh mục",
-    storefrontSource.match(/const CATEGORIES\s*=\s*\{([\s\S]*?)\};/)?.[1] || "",
+  compare("danh mục", "category",
     [...pagesSource.matchAll(/categories:\s*\{([\s\S]*?)\}/g)].map((match) => match[1]));
 }
 
