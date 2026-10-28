@@ -16,19 +16,12 @@
 // reported itself healthy precisely when it was not configured. Both now come
 // from what the server already substituted into the page.
 //
-// Enterprise Level 5: Repair maps for inconsistent catalogue data.
-// These are used to fix unaccented Vietnamese or map common terms to standard ones.
-const REPAIR_MAPS = {
-  category: {
-    vi: { 'cong cu': 'Công cụ', 'tien ich': 'Tiện ích', 'phan mem': 'Phần mềm', 'khac': 'Khác' },
-    en: { 'Công cụ': 'Tools', 'Tiện ích': 'Utilities', 'Phần mềm': 'Software', 'Khác': 'Other' }
-  },
-  badge: {
-    vi: { 'moi': 'Mới', 'ban chay': 'Bán chạy', 'cap nhat': 'Cập nhật', 'phat hanh': 'Phát hành', 'pho bien': 'Phổ biến', 'chuyen nghiep': 'Chuyên nghiệp', 'tiet kiem': 'Tiết kiệm', 'doanh nghiep': 'Doanh nghiệp', 'uu dai som': 'Ưu đãi sớm' },
-    en: { 'Mới': 'New', 'Bán chạy': 'Best seller', 'Cập nhật': 'Updated', 'Phát hành': 'Release', 'Phổ biến': 'Popular', 'Chuyên nghiệp': 'Professional', 'Tiết kiệm': 'Value', 'Doanh nghiệp': 'Enterprise', 'Ưu đãi sớm': 'Early Bird' }
-  }
-};
-
+// The catalogue repair maps live below the dictionary, and that position is
+// load-bearing: the audit and two tests find the two language tables by taking
+// the first Vietnamese table and the first English table in this file and
+// everything between them. A second pair of tables declared above DICT makes
+// those slices read the repair map instead of the dictionary, and every key then
+// looks as if it exists in only one language.
 const YEAR = new Date().getFullYear();
 // The brand, as the server injected it. It was a literal here for a while, and then
 // briefly the part of SUPPORT_EMAIL after the "@" — which printed the bare domain
@@ -1034,6 +1027,27 @@ const DICT = {
 };
 
 // ---------------------------------------------------------------------------
+// Repair maps for inconsistent catalogue data.
+//
+// Category and badge are free-text columns in the catalogue, not enums, so a row
+// can arrive as "cong cu", "Cong cu" or "Công cụ" and all three mean the same
+// shelf. The Vietnamese half repairs an unaccented row to its proper spelling; the
+// English half maps a value already in Vietnamese to the English label used to
+// derive a translation key. They sit below DICT on purpose — see the note at the
+// top of the file about which `vi:` block the audit reads.
+// ---------------------------------------------------------------------------
+const REPAIR_MAPS = {
+  category: {
+    vi: { 'cong cu': 'Công cụ', 'tien ich': 'Tiện ích', 'phan mem': 'Phần mềm', 'khac': 'Khác' },
+    en: { 'Công cụ': 'Tools', 'Tiện ích': 'Utilities', 'Phần mềm': 'Software', 'Khác': 'Other' }
+  },
+  badge: {
+    vi: { 'moi': 'Mới', 'ban chay': 'Bán chạy', 'cap nhat': 'Cập nhật', 'phat hanh': 'Phát hành', 'pho bien': 'Phổ biến', 'chuyen nghiep': 'Chuyên nghiệp', 'tiet kiem': 'Tiết kiệm', 'doanh nghiep': 'Doanh nghiệp', 'uu dai som': 'Ưu đãi sớm' },
+    en: { 'Mới': 'New', 'Bán chạy': 'Best seller', 'Cập nhật': 'Updated', 'Phát hành': 'Release', 'Phổ biến': 'Popular', 'Chuyên nghiệp': 'Professional', 'Tiết kiệm': 'Value', 'Doanh nghiệp': 'Enterprise', 'Ưu đãi sớm': 'Early Bird', 'Safe Edition v4.3': 'Safe Edition v4.3', 'Phát hành 1.4.0': 'Release 1.4.0' }
+  }
+};
+
+// ---------------------------------------------------------------------------
 // The order status table is not here. It lives in format.js, which every page
 // loads before this file, and the admin panel — which does not load this file
 // at all — reads the same table. It used to be a mapping here plus a Vietnamese
@@ -1233,8 +1247,13 @@ const I18N = {
     // 4. Mapping Fallback (for English/Other when translation is missing)
     const mapped = REPAIR_MAPS[kind]?.en?.[raw] || REPAIR_MAPS[kind]?.en?.[folded];
     if (mapped) return mapped;
-    
-    return raw;
+
+    // Nothing matched. null rather than the raw value, so a caller can tell "there
+    // is no translation" apart from "the translation happens to be the Vietnamese
+    // word" and fall back to the catalogue value itself. Returning `raw` here made
+    // every unknown label look translated, which is why the Japanese page could
+    // print a Vietnamese category under a Japanese heading and nothing noticed.
+    return null;
   },
   labelSlug(value) {
     return String(value || '').toLowerCase().normalize('NFD')

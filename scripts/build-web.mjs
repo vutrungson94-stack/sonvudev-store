@@ -1,10 +1,18 @@
-import { access, cp, mkdir, readFile, rm, writeFile } from 'node:fs/promises';
+import { access, cp, mkdir, readdir, readFile, rm, writeFile } from 'node:fs/promises';
 import { constants } from 'node:fs';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { walkProjectFiles, JS_EXTENSIONS } from './lib/files.mjs';
-import { ARTIFACT_DIRECTORIES, ARTIFACT_FILES, ARTIFACT_EXCLUDE_DIRS, ARTIFACT_EXCLUDE_SUFFIXES } from './lib/artifact.mjs';
+import {
+  ARTIFACT_DIRECTORIES,
+  ARTIFACT_EXCLUDE_DIRS,
+  ARTIFACT_EXCLUDE_SUFFIXES,
+  ARTIFACT_FILES,
+  ARTIFACT_PATH,
+  ARTIFACT_ROOT,
+  ARTIFACT_SUBDIR,
+} from './lib/artifact.mjs';
 import { commitHash } from '../src/lib/git.mjs';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
@@ -45,9 +53,9 @@ const audit = spawnSync(process.execPath, [path.join(root, 'scripts', 'audit-web
 if (audit.status !== 0) throw new Error(`Audit failed:\n${audit.stdout}${audit.stderr}`);
 const auditSummary = (audit.stdout.match(/\[audit\] .*/g) || []).pop() || '';
 
-// Chữ hoa/thường chỉ chết trên Linux (nơi deploy), Windows không thấy.
-// Chạy ở đây chứ không để CI mới báo, vì import sai mà lọt vào artifact
-// thì bản deploy đó hỏng toàn bộ route liên quan.
+// Uppercase/lowercase imports only break on Linux, where the deploy runs; Windows
+// cannot see it. It runs here rather than being left to CI because a bad import
+// that reaches the artifact breaks every route that touches it.
 const caseCheck = spawnSync(process.execPath, [path.join(root, 'scripts', 'case-check.mjs')], { encoding: 'utf8' });
 if (caseCheck.status !== 0) throw new Error(`Case check failed:\n${caseCheck.stdout}${caseCheck.stderr}`);
 const caseSummary = (caseCheck.stdout.match(/\[case\].*/g) || []).pop() || '';
@@ -60,8 +68,9 @@ const caseSummary = (caseCheck.stdout.match(/\[case\].*/g) || []).pop() || '';
 const metrics = spawnSync(process.execPath, [path.join(root, 'scripts', 'metrics.mjs')], { encoding: 'utf8' });
 if (metrics.status !== 0) throw new Error(`Metrics regressed:\n${metrics.stdout}${metrics.stderr}`);
 const metricsSummary = (metrics.stdout.match(/\[metrics\].*/g) || []).pop() || '';
-// Provenance + SBOM nội bộ: ai build cái gì bằng gì. Chạy trước khi đóng gói để
-// build-reports/provenance.json nói về đúng cây nguồn vừa pass audit/metrics.
+// Provenance + SBOM, generated locally: who built what, with what. It runs before
+// packaging so build-reports/provenance.json describes the same source tree that
+// just passed the audit and the metrics gate.
 const provenance = spawnSync(process.execPath, [path.join(root, 'scripts', 'provenance.mjs')], { encoding: 'utf8' });
 if (provenance.status !== 0) throw new Error(`Provenance failed:\n${provenance.stdout}${provenance.stderr}`);
 const provenanceSummary = (provenance.stdout.match(/\[provenance\].*/g) || []).pop() || '';
@@ -125,7 +134,7 @@ try {
 //
 // What is copied is read from scripts/lib/artifact.mjs, the same module
 // test/artifact.test.js checks package.json "files" against.
-const publishRoot = path.join(root, 'publish-output', 'node');
+const publishRoot = path.join(root, ARTIFACT_ROOT, ARTIFACT_SUBDIR);
 
 await rm(publishRoot, { recursive: true, force: true });
 await mkdir(publishRoot, { recursive: true });
@@ -136,14 +145,23 @@ for (const file of ARTIFACT_FILES) {
   await cp(path.join(root, file), path.join(publishRoot, file), { force: true });
 }
 // Prune tool scratch that lives inside artifact directories (notably
-// cloudflare/keep-awake/.wrangler). cp is recursive over whole directories,
-// so without this a local `wrangler deploy` or gbuild run ships its cache.
-for (const dir of ARTIFACT_EXCLUDE_DIRS) {
-  await rm(path.join(publishRoot, 'cloudflare', 'keep-awake', dir), { recursive: true, force: true });
-  for (const top of ARTIFACT_DIRECTORIES) {
-    await rm(path.join(publishRoot, top, dir), { recursive: true, force: true });
-}
+// cloudflare/keep-awake/.wrangler). cp is recursive over whole directories, so
+// without this a local `wrangler deploy` or a gbuild run ships its cache.
+//
+// Walked rather than named, and that is the fix rather than a tidy-up: the previous
+// version pruned one hardcoded path (cloudflare/keep-awake) plus one level under each
+// top directory, so a cache two levels down — or in any directory added later —
+// shipped. The suffix gate below then had to exist as a second answer to the same
+// question. One walk over the artifact prunes every excluded name wherever it sits.
+const pruneScratch = async (dir) => {
+  for (const entry of await readdir(dir, { withFileTypes: true })) {
+    if (!entry.isDirectory()) continue;
+    const target = path.join(dir, entry.name);
+    if (ARTIFACT_EXCLUDE_DIRS.includes(entry.name)) await rm(target, { recursive: true, force: true });
+    else await pruneScratch(target);
   }
+};
+await pruneScratch(publishRoot);
 
 await mkdir(path.join(root, 'build-reports'), { recursive: true });
 const artifactFiles = (await walkProjectFiles(publishRoot)).map((file) => path.relative(root, file).replaceAll('\\', '/'));
@@ -189,6 +207,6 @@ if (shippedEnv.length) {
 // scripts/provenance.mjs writes its report from. It used to be a literal here,
 // so the two reports describing one build could name two different shops, and
 // neither would have failed a gate.
-const report = { application: manifest.name, mode: 'web-node', generatedAt: new Date().toISOString(), javascriptFilesChecked: jsFiles.length, requiredFilesChecked: required.length, audit: auditSummary, caseCheck: caseSummary, metrics: metricsSummary, provenance: provenanceSummary, artifactFiles: artifactFiles.length, artifactPath: 'publish-output/node', status: 'passed' };
+const report = { application: manifest.name, mode: 'web-node', generatedAt: new Date().toISOString(), javascriptFilesChecked: jsFiles.length, requiredFilesChecked: required.length, audit: auditSummary, caseCheck: caseSummary, metrics: metricsSummary, provenance: provenanceSummary, artifactFiles: artifactFiles.length, artifactPath: ARTIFACT_PATH, status: 'passed' };
 await writeFile(path.join(root, 'build-reports', 'web-build.json'), JSON.stringify(report, null, 2));
-console.log(`[build] PASS: ${required.length} required files, ${jsFiles.length} JavaScript files checked, ${auditSummary}, ${caseSummary}, ${metricsSummary}, ${provenanceSummary}, ${artifactFiles.length} deploy files packaged into publish-output/node.`);
+console.log(`[build] PASS: ${required.length} required files, ${jsFiles.length} JavaScript files checked, ${auditSummary}, ${caseSummary}, ${metricsSummary}, ${provenanceSummary}, ${artifactFiles.length} deploy files packaged into ${ARTIFACT_PATH}.`);

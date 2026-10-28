@@ -180,8 +180,11 @@ function visibleProducts() {
 // product that has not been translated yet never shows an empty description.
 function localized(p) {
   const lang = window.I18N.lang;
-  const category = window.I18N.productLabel('category', p.category);
-  const badge = window.I18N.productLabel('badge', p.badge);
+  // productLabel returns null when the catalogue value has no translation, so the
+  // catalogue's own wording is the fallback here rather than an untranslated label
+  // that looks translated.
+  const category = window.I18N.productLabel('category', p.category) || p.category || '';
+  const badge = window.I18N.productLabel('badge', p.badge) || p.badge || '';
   
   if (lang === 'vi' && category === p.category && badge === p.badge) return p;
 
@@ -205,12 +208,19 @@ function localized(p) {
     return vi;
   };
 
+  // Requirements are the one field where the source copy may not be shown at all.
+  // The catalogue stores them in Vietnamese only, so an English or Japanese page
+  // that printed them would put Vietnamese body text under a translated heading;
+  // the honest notice is shown instead until the locale asset carries a translation.
+  // Vietnamese is the source language and always sees its own text.
   const reqSource = (p.requirementsEn && String(p.requirementsEn).trim())
     ? p.requirementsEn
     : String(p.requirements || '');
-  const requirements = hasText(overlay.requirements)
-    ? overlay.requirements
-    : (/[^\x00-\x7F]/.test(reqSource) ? T('product.requirementsViOnly') : reqSource);
+  const requirements = lang === 'vi'
+    ? String(p.requirements || '')
+    : (hasText(overlay.requirements)
+      ? overlay.requirements
+      : (/[^\x00-\x7F]/.test(reqSource) ? T('product.requirementsViOnly') : reqSource));
 
   return {
     ...p,
