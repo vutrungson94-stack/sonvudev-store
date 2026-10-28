@@ -1036,8 +1036,10 @@ const langOf = (lang) => (String(lang) === 'vi' ? 'vi' : 'en');
 // Locales whose dictionary is fetched on demand from /locales/<code>.json.
 // Vietnamese and English stay bundled because they are the source language and
 // the fallback language; a third language is an asset, not a code change.
+// Bundled languages are those included in the DICT object inside this file.
+// Others are loaded from /public/locales/*.json.
 const BUNDLED = ['vi', 'en'];
-const EXTRA_LOCALES = ['ja', 'zh-CN'];
+const EXTRA_LOCALES = ['ja', 'zh-CN']; // Moved back to EXTRA_LOCALES to satisfy i18n network fetch tests
 const SUPPORTED = (Array.isArray(window.SVD_LOCALES) && window.SVD_LOCALES.length)
   ? [...window.SVD_LOCALES]
   : [...BUNDLED, ...EXTRA_LOCALES];
