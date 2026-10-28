@@ -1,0 +1,87 @@
+{
+    "_readme":  "gsync config",
+    "version":  "2.1.0",
+    "git":  {
+                "remoteName":  "origin",
+                "defaultBranchFallback":  "main",
+                "pullConflictPolicy":  "ask",
+                "stashWhenWorkingTreeDirty":  true,
+                "retryCount":  3,
+                "minVersion":  "2.20.0"
+            },
+    "gitignore":  {
+                      "enabled":  true,
+                      "rulesToAdd":  [
+                                         "# === SECURITY ===",
+                                         "ssh_id",
+                                         "*.pfx",
+                                         ".env",
+                                         "bin/",
+                                         "obj/",
+                                         "node_modules/",
+                                         ".vs/",
+                                         "*.apk",
+                                         "*.aab",
+                                         "publish-output/"
+                                     ]
+                  },
+    "sensitive":  {
+                      "enabled":  true,
+                      "allowedPatterns":  [
+                                              "\\.env\\.example$"
+                                          ],
+                      "blockedPatterns":  [
+                                              "\\.keystore$",
+                                              "\\.env$",
+                                              "secrets\\.json$"
+                                          ]
+                  },
+    "junkCleanup":  {
+                        "enabled":  true,
+                        "patterns":  [
+                                         "*.tmp",
+                                         "Thumbs.db"
+                                     ],
+                        "restrictToDirs":  [
+                                               "."
+                                           ],
+                        "confirmBeforeDelete":  false
+                    },
+    "largeFiles":  {
+                       "enabled":  true,
+                       "excludeDirs":  [
+                                           ".git",
+                                           "node_modules"
+                                       ]
+                   },
+    "artifactUnstage":  {
+                            "enabled":  true,
+                            "patterns":  [
+                                             "\\.(apk|aab|ipa|msix)$"
+                                         ],
+                            "extraPatterns":  [
+                                                  "publish-output/"
+                                              ]
+                        },
+    "ui":  {
+               "largeFileThresholdMB":  90
+           },
+    "webhook":  {
+                    "enabled":  false,
+                    "url":  "",
+                    "onSuccess":  true,
+                    "onFailure":  true
+                },
+    "logging":  {
+                    "level":  "Info",
+                    "enableFile":  true,
+                    "enableConsoleColor":  true,
+                    "enableJsonLog":  true,
+                    "maxLogFiles":  10,
+                    "maxLogSizeMB":  50
+                },
+    "security":  {
+                     "enabled":  true,
+                     "blockOnMatch":  true
+                 }
+}

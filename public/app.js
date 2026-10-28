@@ -281,22 +281,23 @@ function priceFor(p) {
 }
 
 function card(p) {
-  const art = esc(p.category.toLowerCase().replace(/\s+/g, '-'));
-  return `<article class="product-card" data-id="${esc(p.id)}">
+  const lp = localized(p);
+  const art = esc(lp.category.toLowerCase().replace(/\s+/g, '-'));
+  return `<article class="product-card" data-id="${esc(lp.id)}">
     <div class="product-art art-${art}">
-      <span class="product-badge">${esc(p.badge || T('products.new'))}</span>
-      <div class="product-logo">${initials(p.name)}</div>
+      <span class="product-badge">${esc(lp.badge || T('products.new'))}</span>
+      <div class="product-logo">${initials(lp.name)}</div>
       <div class="art-grid"></div>
       <span class="art-spark">✦</span>
     </div>
     <div class="product-info">
-      <div class="product-meta"><span>${esc(p.platform)} · v${esc(p.version)}</span><span>${esc(p.category)}</span></div>
-      <h3>${esc(p.name)}</h3>
-      <p>${esc(p.shortDescription || p.description || '')}</p>
-      <ul>${(p.features || []).slice(0, 2).map((f) => `<li>✓ ${esc(f)}</li>`).join('')}</ul>
+      <div class="product-meta"><span>${esc(lp.platform)} · v${esc(lp.version)}</span><span>${esc(lp.category)}</span></div>
+      <h3>${esc(lp.name)}</h3>
+      <p>${esc(lp.shortDescription || lp.description || '')}</p>
+      <ul>${(lp.features || []).slice(0, 2).map((f) => `<li>✓ ${esc(f)}</li>`).join('')}</ul>
       <div class="product-buy">
-        <strong>${priceFor(p)}</strong>
-        <button class="round-arrow" aria-label="${esc(T('products.buyAria'))} ${esc(p.name)}">↗</button>
+        <strong>${priceFor(lp)}</strong>
+        <button class="round-arrow" aria-label="${esc(T('products.buyAria'))} ${esc(lp.name)}">↗</button>
       </div>
     </div>
   </article>`;
