@@ -107,3 +107,6 @@ build/
 package-lock.json
 # === SECURITY ===
 .gsync.state
+
+# Auto-added by gsync (project gitignore patterns)
+coverage.xml
