@@ -1146,6 +1146,58 @@ const I18N = {
     }
     return fill(fallback !== undefined ? fallback : key);
   },
+  // Product copy for languages the catalogue has no columns for.
+  //
+  // The `products` table stores Vietnamese plus one English pair, so a shopper
+  // who switched to Japanese or Chinese used to get English (or Vietnamese)
+  // product text under a fully translated heading - the "for sale" section read
+  // as half-translated. The per-locale asset now carries that copy as
+  // `product.copy.<slug>.<field>`; these helpers expose it without changing the
+  // catalogue schema. Only the fields the asset actually has are returned, so
+  // every caller keeps its own per-field fallback chain.
+  productSlug(product) {
+    const raw = product && (product.slug || product.id);
+    return String(raw || '').trim();
+  },
+  productCopy(product) {
+    // Vietnamese is the catalogue's source language: its rows are already the
+    // copy we want, so an overlay could only make them stale.
+    if (current === 'vi') return null;
+    const table = DICT[current];
+    const slug = this.productSlug(product);
+    if (!table || !slug) return null;
+    const read = (field) => {
+      const value = table[`product.copy.${slug}.${field}`];
+      return value === undefined || value === null || value === '' ? undefined : value;
+    };
+    const copy = {
+      name: read('name'),
+      shortDescription: read('shortDescription'),
+      description: read('description'),
+      requirements: read('requirements'),
+      features: read('features'),
+    };
+    return Object.values(copy).some((value) => value !== undefined) ? copy : null;
+  },
+  // Category and badge are free-text catalogue columns, so they cannot be looked
+  // up by a fixed key. The label key is derived from the value itself
+  // ("Release 1.4.0" -> product.label.badge.release-1.4.0) after folding
+  // diacritics and case, which also matches rows typed without accents.
+  // Returns null when no translation exists, so the caller can fall back instead
+  // of printing an untranslated label it cannot detect.
+  productLabel(kind, value) {
+    const raw = String(value || '').trim();
+    if (!raw || current === 'vi' || current === 'en') return raw;
+    const table = DICT[current] || {};
+    const key = `product.label.${kind}.${this.labelSlug(raw)}`;
+    const translated = table[key];
+    return translated === undefined || translated === '' ? null : translated;
+  },
+  labelSlug(value) {
+    return String(value || '').toLowerCase().normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '').replace(/đ/g, 'd')
+      .trim().replace(/[^a-z0-9.]+/g, '-').replace(/^-+|-+$/g, '');
+  },
   set(lang) {
     if (!SUPPORTED.includes(lang)) return;
     if (lang === current) return;

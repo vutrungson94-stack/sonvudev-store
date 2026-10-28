@@ -11,7 +11,12 @@ Production dùng domain `https://sonvudev.com`. Toàn bộ cấu hình thật n�
 - `docs/INCIDENT-TEMPLATE.md` — mẫu incident/RCA, điền trong 48 giờ sau sự cố.
 - `deploy/canary.sh` — canary trên VPS: `start`, `split`, `promote`, `rollback`, `status`.
 - `public/locales/` — từ điển tiếng Nhật và tiếng Trung, tải theo yêu cầu; thêm ngôn ngữ
-  mới chỉ cần thêm tệp JSON và một mục trong `window.SVD_LOCALES`.
+  mới chỉ cần thêm tệp JSON và một mục trong `window.SVD_LOCALES`. Tệp này còn chứa
+  **bản dịch nội dung sản phẩm** cho JA/ZH (`product.copy.<slug>.*` cho tên, mô tả,
+  tính năng, yêu cầu hệ thống; `product.label.category.*` / `product.label.badge.*` cho
+  nhãn danh mục và badge) — vì bảng `products` chỉ có cột tiếng Việt và tiếng Anh.
+  Tên, mô tả ngắn và tính năng nên viết tay để giữ chất lượng; `npm run i18n:products`
+  dịch phần mô tả dài còn thiếu, không bao giờ ghi đè khoá đã có.
 - `npm run benchmark` — đo p50/p95/p99 trên một instance đang chạy và ghi baseline vào
   `build-reports/perf-baseline.json`.
 

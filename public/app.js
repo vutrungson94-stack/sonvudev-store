@@ -162,7 +162,12 @@ const foldDiacritics = (value) => String(value).toLowerCase().normalize('NFD').r
 function matchesSearch(p) {
   if (!searchTerm) return true;
   const local = localized(p);
-  const haystack = [p.name, p.shortDescription, p.shortDescriptionEn, p.description, p.descriptionEn, p.category, p.platform, ...(p.features || []), ...(p.featuresEn || [])];
+  // The localised copy is searched as well, so a Japanese visitor can find a
+  // product by the Japanese name or description the card is actually showing,
+  // instead of only by the Latin catalogue text.
+  const haystack = [p.name, p.shortDescription, p.shortDescriptionEn, p.description, p.descriptionEn, p.category, p.platform,
+    ...(p.features || []), ...(p.featuresEn || []),
+    local.name, local.shortDescription, local.description, local.category, ...(local.features || [])];
   return foldDiacritics(haystack.filter(Boolean).join(' ')).includes(searchTerm);
 }
 
@@ -225,32 +230,61 @@ function localized(p) {
   }
 
   const lang = window.I18N.lang;
+  // Per-locale product copy from the dictionary asset (JA/ZH). The catalogue has
+  // no columns for those languages, so without this the grid fell back to the
+  // English pair and the shop looked half-translated on a Japanese page. The
+  // overlay is only consulted for a field the record itself cannot supply.
+  const overlay = window.I18N.productCopy(p) || {};
+  const hasText = (value) => value !== undefined && value !== null && String(value).trim() !== '';
+  const hasList = (value) => Array.isArray(value) && value.length > 0;
+  // Precedence: localised column (if one ever exists) -> dictionary overlay ->
+  // English column -> Vietnamese source. English wins over the overlay for the
+  // English page so a database edit is never masked by an older cache file.
+  const pickText = (ja, zh, en, vi, field) => {
+    const localised = lang === 'ja' ? ja : lang === 'zh-CN' ? zh : null;
+    if (hasText(localised)) return localised;
+    if (lang === 'en' && hasText(en)) return en;
+    if (hasText(overlay[field])) return overlay[field];
+    if (hasText(en)) return en;
+    return vi;
+  };
+  const pickList = (ja, zh, en, vi, field) => {
+    const localised = lang === 'ja' ? ja : lang === 'zh-CN' ? zh : null;
+    if (hasList(localised)) return localised;
+    if (lang === 'en' && hasList(en)) return en;
+    if (hasList(overlay[field])) return overlay[field];
+    if (hasList(en)) return en;
+    return vi;
+  };
+
+  // Requirements are the one field whose Vietnamese text is deliberately not
+  // shown: a translated notice pointing at the printed guide is honest, while a
+  // Vietnamese paragraph under an English/Japanese heading is not.
   const reqSource = (p.requirementsEn && String(p.requirementsEn).trim())
     ? p.requirementsEn
     : String(p.requirements || '');
-  const requirements = /[^\x00-\x7F]/.test(reqSource) ? T('product.requirementsViOnly') : reqSource;
-
-  const getVal = (vi, en, ja, zh) => {
-    if (lang === 'ja') return ja || en || vi;
-    if (lang === 'zh-CN') return zh || en || vi;
-    return en || vi;
-  };
-
-  const getList = (vi, en, ja, zh) => {
-    if (lang === 'ja') return ja || en || vi;
-    if (lang === 'zh-CN') return zh || en || vi;
-    return en || vi;
-  };
+  const requirements = hasText(overlay.requirements)
+    ? overlay.requirements
+    : (/[^\x00-\x7F]/.test(reqSource) ? T('product.requirementsViOnly') : reqSource);
 
   return {
     ...p,
-    category: mapValue(CATEGORIES, CATEGORIES_NORM, p.category),
-    badge: mapValue(BADGES, BADGES_NORM, p.badge) || undefined,
-    name: getVal(p.name, p.nameEn, p.nameJa, p.nameZh),
-    shortDescription: getVal(p.shortDescription, p.shortDescriptionEn, p.shortDescriptionJa, p.shortDescriptionZh),
-    description: getVal(p.description, p.descriptionEn, p.descriptionJa, p.descriptionZh),
+    // The catalogue stores Vietnamese; the English pair comes from the shared
+    // table first, then the per-locale label asset (JA/ZH) overrides it.
+    category: (() => {
+      const categoryEn = mapValue(CATEGORIES, CATEGORIES_NORM, p.category);
+      return window.I18N.productLabel('category', categoryEn) || categoryEn;
+    })(),
+    badge: (() => {
+      const badgeEn = mapValue(BADGES, BADGES_NORM, p.badge);
+      if (!badgeEn) return undefined;
+      return window.I18N.productLabel('badge', badgeEn) || badgeEn;
+    })(),
+    name: pickText(p.nameJa, p.nameZh, p.nameEn, p.name, 'name'),
+    shortDescription: pickText(p.shortDescriptionJa, p.shortDescriptionZh, p.shortDescriptionEn, p.shortDescription, 'shortDescription'),
+    description: pickText(p.descriptionJa, p.descriptionZh, p.descriptionEn, p.description, 'description'),
     requirements,
-    features: getList(p.features, p.featuresEn, p.featuresJa, p.featuresZh),
+    features: pickList(p.featuresJa, p.featuresZh, p.featuresEn, p.features, 'features'),
   };
 }
 
