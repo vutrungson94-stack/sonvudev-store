@@ -223,31 +223,34 @@ function localized(p) {
     if (cat === p.category && badge === p.badge) return p;
     return { ...p, category: cat, badge };
   }
-  // The requirements block is field-driven, not product-driven: a product without
-  // an English description still gets this one line localised, because a labelled
-  // "System requirements" heading above Vietnamese body copy is exactly the leak
-  // an English reader sees first. Missing English copy is the Vietnamese sentence;
-  // Vietnamese *characters* in an otherwise-English UI are a bug.
+
+  const lang = window.I18N.lang;
   const reqSource = (p.requirementsEn && String(p.requirementsEn).trim())
     ? p.requirementsEn
     : String(p.requirements || '');
   const requirements = /[^\x00-\x7F]/.test(reqSource) ? T('product.requirementsViOnly') : reqSource;
-  // When no English copy exists at all, an English page keeps the Vietnamese
-  // description (a hole is worse), but the requirements line above is replaced by
-  // the honest notice - it names the guide the buyer must read anyway.
-  const hasEn = typeof p.descriptionEn === 'string' && p.descriptionEn.trim();
-  if (!hasEn) {
-    if (requirements === String(p.requirements || '')) return p;
-    return { ...p, requirements };
-  }
+
+  const getVal = (vi, en, ja, zh) => {
+    if (lang === 'ja') return ja || en || vi;
+    if (lang === 'zh-CN') return zh || en || vi;
+    return en || vi;
+  };
+
+  const getList = (vi, en, ja, zh) => {
+    if (lang === 'ja') return ja || en || vi;
+    if (lang === 'zh-CN') return zh || en || vi;
+    return en || vi;
+  };
+
   return {
     ...p,
     category: mapValue(CATEGORIES, CATEGORIES_NORM, p.category),
     badge: mapValue(BADGES, BADGES_NORM, p.badge) || undefined,
-    shortDescription: p.shortDescriptionEn || p.shortDescription,
-    description: p.descriptionEn,
+    name: getVal(p.name, p.nameEn, p.nameJa, p.nameZh),
+    shortDescription: getVal(p.shortDescription, p.shortDescriptionEn, p.shortDescriptionJa, p.shortDescriptionZh),
+    description: getVal(p.description, p.descriptionEn, p.descriptionJa, p.descriptionZh),
     requirements,
-    features: (p.featuresEn && p.featuresEn.length ? p.featuresEn : p.features) || [],
+    features: getList(p.features, p.featuresEn, p.featuresJa, p.featuresZh),
   };
 }
 
@@ -271,7 +274,7 @@ function render() {
 // step. Without priceUsd the shelf price is shown: wrong for the language, but
 // never a number the buyer is not charged.
 function priceFor(p) {
-  if (window.I18N && window.I18N.lang === 'en' && p.priceUsd !== undefined && p.priceUsd !== null) {
+  if (window.I18N && window.I18N.lang !== 'vi' && p.priceUsd !== undefined && p.priceUsd !== null) {
     return money(p.priceUsd, 'USD');
   }
   return money(p.price, p.currency);
