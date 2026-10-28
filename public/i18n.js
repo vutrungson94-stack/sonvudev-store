@@ -16,6 +16,19 @@
 // reported itself healthy precisely when it was not configured. Both now come
 // from what the server already substituted into the page.
 //
+// Enterprise Level 5: Repair maps for inconsistent catalogue data.
+// These are used to fix unaccented Vietnamese or map common terms to standard ones.
+const REPAIR_MAPS = {
+  category: {
+    vi: { 'cong cu': 'Công cụ', 'tien ich': 'Tiện ích', 'phan mem': 'Phần mềm', 'khac': 'Khác' },
+    en: { 'Công cụ': 'Tools', 'Tiện ích': 'Utilities', 'Phần mềm': 'Software', 'Khác': 'Other' }
+  },
+  badge: {
+    vi: { 'moi': 'Mới', 'ban chay': 'Bán chạy', 'cap nhat': 'Cập nhật', 'phat hanh': 'Phát hành', 'pho bien': 'Phổ biến', 'chuyen nghiep': 'Chuyên nghiệp', 'tiet kiem': 'Tiết kiệm', 'doanh nghiep': 'Doanh nghiệp', 'uu dai som': 'Ưu đãi sớm' },
+    en: { 'Mới': 'New', 'Bán chạy': 'Best seller', 'Cập nhật': 'Updated', 'Phát hành': 'Release', 'Phổ biến': 'Popular', 'Chuyên nghiệp': 'Professional', 'Tiết kiệm': 'Value', 'Doanh nghiệp': 'Enterprise', 'Ưu đãi sớm': 'Early Bird' }
+  }
+};
+
 const YEAR = new Date().getFullYear();
 // The brand, as the server injected it. It was a literal here for a while, and then
 // briefly the part of SUPPORT_EMAIL after the "@" — which printed the bare domain
@@ -1042,12 +1055,12 @@ const langOf = (lang) => (String(lang) === 'vi' ? 'vi' : 'en');
 // Bundled languages are those included in the DICT object inside this file.
 // Others are loaded from /public/locales/*.json.
 const BUNDLED = ['vi', 'en'];
-const EXTRA_LOCALES = ['ja', 'zh-CN']; // Moved back to EXTRA_LOCALES to satisfy i18n network fetch tests
+const EXTRA_LOCALES = ['de', 'es', 'fr', 'ja', 'zh']; 
 const SUPPORTED = (Array.isArray(window.SVD_LOCALES) && window.SVD_LOCALES.length)
   ? [...window.SVD_LOCALES]
   : [...BUNDLED, ...EXTRA_LOCALES];
-const LANG_LABELS = { vi: 'VI', en: 'EN', ja: 'JA', 'zh-CN': '中文' };
-const LOCALE_TAGS = { vi: 'vi-VN', en: 'en-US', ja: 'ja-JP', 'zh-CN': 'zh-CN' };
+const LANG_LABELS = { vi: 'VI', en: 'EN', de: 'DE', es: 'ES', fr: 'FR', ja: 'JA', zh: '中文' };
+const LOCALE_TAGS = { vi: 'vi-VN', en: 'en-US', de: 'de-DE', es: 'es-ES', fr: 'fr-FR', ja: 'ja-JP', zh: 'zh-CN' };
 const STORAGE_KEY = 'sonvudev_lang';
 const listeners = new Set();
 const loadedLocales = new Set(BUNDLED);
@@ -1190,11 +1203,34 @@ const I18N = {
   // of printing an untranslated label it cannot detect.
   productLabel(kind, value) {
     const raw = String(value || '').trim();
-    if (!raw || current === 'vi' || current === 'en') return raw;
+    if (!raw) return raw;
+    
+    const folded = this.labelSlug(raw);
+    
+    // 1. Vietnamese Repair (Enterprise Level 5: Data Sanitization)
+    if (current === 'vi') {
+      const repair = REPAIR_MAPS[kind]?.vi?.[folded];
+      return repair || raw;
+    }
+    
+    // 2. Translation Pass
     const table = DICT[current] || {};
-    const key = `product.label.${kind}.${this.labelSlug(raw)}`;
+    const key = `product.label.${kind}.${folded}`;
     const translated = table[key];
-    return translated === undefined || translated === '' ? null : translated;
+    if (translated !== undefined && translated !== '') return translated;
+    
+    // 3. English Fallback
+    if (current !== 'en') {
+      const enTable = DICT['en'] || {};
+      const enTranslated = enTable[key];
+      if (enTranslated !== undefined && enTranslated !== '') return enTranslated;
+    }
+    
+    // 4. Mapping Fallback (for English/Other when translation is missing)
+    const mapped = REPAIR_MAPS[kind]?.en?.[raw] || REPAIR_MAPS[kind]?.en?.[folded];
+    if (mapped) return mapped;
+    
+    return raw;
   },
   labelSlug(value) {
     return String(value || '').toLowerCase().normalize('NFD')
@@ -1318,6 +1354,19 @@ function apply(root = document) {
       const [attr, key] = pair.split(':').map((s) => s.trim());
       if (attr && key) el.setAttribute(attr, I18N.t(key, el.getAttribute(attr)));
     });
+  });
+  // Translate dynamic filter labels (Enterprise Level 5: Dynamic Content Translation)
+  root.querySelectorAll('.filter').forEach((btn) => {
+    const filter = btn.dataset.filter;
+    if (!filter) return;
+    if (filter === 'all') {
+      btn.textContent = I18N.t('products.all', btn.textContent);
+    } else {
+      const translated = I18N.productLabel('category', filter) 
+                       || I18N.productLabel('platform', filter) 
+                       || filter;
+      btn.textContent = translated;
+    }
   });
   root.querySelectorAll('[data-vi],[data-en]').forEach((el) => {
     const vi = el.dataset.vi;

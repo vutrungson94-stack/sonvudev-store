@@ -178,68 +178,16 @@ function visibleProducts() {
 // Products carry an optional English copy. When the visitor switches to English
 // we prefer those fields but always fall back to the Vietnamese text, so a
 // product that has not been translated yet never shows an empty description.
-const CATEGORIES = { "Công cụ": "Tools", "Tiện ích": "Utilities", "Phần mềm": "Software", "Khác": "Other" };
-const CATEGORIES_VI = Object.fromEntries(Object.entries(CATEGORIES).map(([k, v]) => [v, k]));
-const BADGES = { "Mới": "New", "Bán chạy": "Best seller", "Cập nhật": "Updated", "Phát hành": "Release", "Phổ biến": "Popular", "Chuyên nghiệp": "Professional", "Tiết kiệm": "Value", "Doanh nghiệp": "Enterprise", "Ưu đãi sớm": "Early Bird", "Safe Edition v4.3": "Safe Edition v4.3", "Phát hành 1.4.0": "Release 1.4.0" };
-const BADGES_VI = Object.fromEntries(Object.entries(BADGES).map(([k, v]) => [v, k]));
-// A diacritic-tolerant map so a "con co" or "CON CO" in the catalogue still
-// maps to Tools instead of leaking raw Vietnamese text on the English page.
-const CATEGORIES_NORM = Object.fromEntries(
-  Object.entries(CATEGORIES).map(([k, v]) => [foldDiacritics(k), v])
-);
-const CATEGORIES_VI_NORM = Object.fromEntries(
-  Object.entries(CATEGORIES).map(([k, v]) => [foldDiacritics(v), k])
-);
-// Same treatment for badges, including badges that carry a trailing version
-// such as "Phat hanh 1.4.0" so the map key is the badge alone.
-const BADGES_NORM = Object.fromEntries(
-  Object.entries(BADGES).map(([k, v]) => [foldDiacritics(k), v])
-);
-const BADGES_VI_NORM = Object.fromEntries(
-  Object.entries(BADGES).map(([k, v]) => [foldDiacritics(v), k])
-);
-// Repairs a Vietnamese value that was typed without diacritics. "Phat hanh 1.4.0"
-// stored in a catalogue row is the same label as "Phát hành 1.4.0"; without this
-// the Vietnamese page printed the column text verbatim while the English page
-// translated it, so the same badge read correctly in one language and as an
-// unaccented typo in the other.
-const BADGES_VI_FIX = Object.fromEntries(
-  Object.entries(BADGES).map(([vi]) => [foldDiacritics(vi), vi])
-);
-const CATEGORIES_VI_FIX = Object.fromEntries(
-  Object.entries(CATEGORIES).map(([vi]) => [foldDiacritics(vi), vi])
-);
-const mapValue = (exact, tolerant, raw) => {
-  const value = String(raw || "").trim();
-  if (!value) return value;
-  return exact[value] || tolerant[foldDiacritics(value)] || value;
-};
 function localized(p) {
-  // Only the Vietnamese page repairs/strips Vietnamese. Japanese and Chinese
-  // readers get the English product copy (with the same safe requirements
-  // fallback), never a Vietnamese body under a translated heading.
-  if (window.I18N.lang === 'vi') {
-    // Unaccented Vietnamese coming from the catalogue is repaired to the accented
-    // form; an already-English value is translated back to its Vietnamese word.
-    const cat = CATEGORIES_VI_FIX[foldDiacritics(p.category)]
-      || mapValue(CATEGORIES_VI, CATEGORIES_VI_NORM, p.category);
-    const badge = BADGES_VI_FIX[foldDiacritics(p.badge)]
-      || mapValue(BADGES_VI, BADGES_VI_NORM, p.badge);
-    if (cat === p.category && badge === p.badge) return p;
-    return { ...p, category: cat, badge };
-  }
-
   const lang = window.I18N.lang;
-  // Per-locale product copy from the dictionary asset (JA/ZH). The catalogue has
-  // no columns for those languages, so without this the grid fell back to the
-  // English pair and the shop looked half-translated on a Japanese page. The
-  // overlay is only consulted for a field the record itself cannot supply.
+  const category = window.I18N.productLabel('category', p.category);
+  const badge = window.I18N.productLabel('badge', p.badge);
+  
+  if (lang === 'vi' && category === p.category && badge === p.badge) return p;
+
   const overlay = window.I18N.productCopy(p) || {};
   const hasText = (value) => value !== undefined && value !== null && String(value).trim() !== '';
   const hasList = (value) => Array.isArray(value) && value.length > 0;
-  // Precedence: localised column (if one ever exists) -> dictionary overlay ->
-  // English column -> Vietnamese source. English wins over the overlay for the
-  // English page so a database edit is never masked by an older cache file.
   const pickText = (ja, zh, en, vi, field) => {
     const localised = lang === 'ja' ? ja : lang === 'zh-CN' ? zh : null;
     if (hasText(localised)) return localised;
@@ -257,9 +205,6 @@ function localized(p) {
     return vi;
   };
 
-  // Requirements are the one field whose Vietnamese text is deliberately not
-  // shown: a translated notice pointing at the printed guide is honest, while a
-  // Vietnamese paragraph under an English/Japanese heading is not.
   const reqSource = (p.requirementsEn && String(p.requirementsEn).trim())
     ? p.requirementsEn
     : String(p.requirements || '');
@@ -269,17 +214,8 @@ function localized(p) {
 
   return {
     ...p,
-    // The catalogue stores Vietnamese; the English pair comes from the shared
-    // table first, then the per-locale label asset (JA/ZH) overrides it.
-    category: (() => {
-      const categoryEn = mapValue(CATEGORIES, CATEGORIES_NORM, p.category);
-      return window.I18N.productLabel('category', categoryEn) || categoryEn;
-    })(),
-    badge: (() => {
-      const badgeEn = mapValue(BADGES, BADGES_NORM, p.badge);
-      if (!badgeEn) return undefined;
-      return window.I18N.productLabel('badge', badgeEn) || badgeEn;
-    })(),
+    category,
+    badge,
     name: pickText(p.nameJa, p.nameZh, p.nameEn, p.name, 'name'),
     shortDescription: pickText(p.shortDescriptionJa, p.shortDescriptionZh, p.shortDescriptionEn, p.shortDescription, 'shortDescription'),
     description: pickText(p.descriptionJa, p.descriptionZh, p.descriptionEn, p.description, 'description'),
