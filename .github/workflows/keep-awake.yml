@@ -81,7 +81,7 @@ jobs:
     # orders.
     permissions:
       contents: read
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 5
     env:
       # No default on purpose. The run step carries a fallback for the case where this
