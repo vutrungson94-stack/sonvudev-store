@@ -535,5 +535,22 @@
   "why.more": "Erfahren Sie mehr",
   "why.text": "Wir glauben, dass gute Software nicht kompliziert sein muss. Jedes Feature hat seine Existenzberechtigung.",
   "why.title1": "Nur wenige Gräben abgenutzt.",
-  "why.title2": "Viele Effekte."
+  "why.title2": "Viele Effekte.",
+  "product.label.badge.best-seller": "Bestseller",
+  "product.label.badge.early-bird": "Frühaufsteher",
+  "product.label.badge.enterprise": "Unternehmen",
+  "product.label.badge.new": "Neu",
+  "product.label.badge.popular": "Beliebt",
+  "product.label.badge.professional": "Professional",
+  "product.label.badge.release": "Freigeben",
+  "product.label.badge.release-1.4.0": "Version 1.4.0",
+  "product.label.badge.safe-edition-v4.3": "Safe Edition v4.3",
+  "product.label.badge.updated": "Aktualisiert",
+  "product.label.badge.value": "Wert",
+  "product.label.category.bundle": "Bündeln",
+  "product.label.category.other": "Andere",
+  "product.label.category.software": "Software",
+  "product.label.category.tools": "Werkzeuge",
+  "product.label.category.utilities": "Dienstprogramme",
+  "product.label.category.utility": "Dienstprogramm"
 }

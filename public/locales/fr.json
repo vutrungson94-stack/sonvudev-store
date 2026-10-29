@@ -535,5 +535,22 @@
   "why.more": "Apprendre encore plus",
   "why.text": "Nous pensons qu'un bon logiciel n'a pas besoin d'être compliqué. Chaque fonctionnalité a une raison d’exister.",
   "why.title1": "Quelques tranchées usées.",
-  "why.title2": "De nombreux effets."
+  "why.title2": "De nombreux effets.",
+  "product.label.badge.best-seller": "Meilleur vendeur",
+  "product.label.badge.early-bird": "Lève-tôt",
+  "product.label.badge.enterprise": "Entreprise",
+  "product.label.badge.new": "Nouveau",
+  "product.label.badge.popular": "Populaire",
+  "product.label.badge.professional": "Professionnel",
+  "product.label.badge.release": "Libérer",
+  "product.label.badge.release-1.4.0": "Version 1.4.0",
+  "product.label.badge.safe-edition-v4.3": "Édition sécurisée v4.3",
+  "product.label.badge.updated": "Mis à jour",
+  "product.label.badge.value": "Valeur",
+  "product.label.category.bundle": "Paquet",
+  "product.label.category.other": "Autre",
+  "product.label.category.software": "Logiciel",
+  "product.label.category.tools": "Outils",
+  "product.label.category.utilities": "Utilitaires",
+  "product.label.category.utility": "Utilitaire"
 }

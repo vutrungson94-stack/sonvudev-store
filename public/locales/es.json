@@ -535,5 +535,22 @@
   "why.more": "Más información",
   "why.text": "Creemos que un buen software no tiene por qué ser complicado. Cada característica tiene una razón de existir.",
   "why.title1": "Pocas trincheras desgastadas.",
-  "why.title2": "Muchos efectos."
+  "why.title2": "Muchos efectos.",
+  "product.label.badge.best-seller": "Mejor vendido",
+  "product.label.badge.early-bird": "Pájaro temprano",
+  "product.label.badge.enterprise": "Empresa",
+  "product.label.badge.new": "Nuevo",
+  "product.label.badge.popular": "Popular",
+  "product.label.badge.professional": "Profesional",
+  "product.label.badge.release": "Liberar",
+  "product.label.badge.release-1.4.0": "Versión 1.4.0",
+  "product.label.badge.safe-edition-v4.3": "Edición segura v4.3",
+  "product.label.badge.updated": "Actualizado",
+  "product.label.badge.value": "Valor",
+  "product.label.category.bundle": "Manojo",
+  "product.label.category.other": "Otro",
+  "product.label.category.software": "Software",
+  "product.label.category.tools": "Herramientas",
+  "product.label.category.utilities": "Utilidades",
+  "product.label.category.utility": "Utilidad"
 }
