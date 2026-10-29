@@ -1486,10 +1486,7 @@ function renderLanguageCombobox() {
       const flagSpan = document.createElement('span');
       flagSpan.className = 'lang-flag';
       flagSpan.textContent = FLAG_EMOJI[code] || codeToEmoji(code);
-      const textSpan = document.createElement('span');
-      textSpan.textContent = LANG_LABELS[code] || code.toUpperCase();
       li.appendChild(flagSpan);
-      li.appendChild(textSpan);
       li.addEventListener('click', () => {
         I18N.set(code);
         closeCombobox(combobox);
