@@ -1277,10 +1277,17 @@ const I18N = {
         apply();
         markActiveLanguage();
         listeners.forEach((fn) => { try { fn(lang); } catch (e) { console.error(e); } });
+        // Languages without a shipped asset (de, es, fr, ...) rely on the
+        // server-side translator to fill the gaps; trigger it on every switch so
+        // the page actually becomes that language instead of staying English.
+        ensureTranslations();
       });
+    } else {
+      ensureTranslations();
     }
   },
   onChange(fn) { listeners.add(fn); return () => listeners.delete(fn); },
+  ensureTranslations() { return ensureTranslations(); },
   register(locale, dict) {
     if (!locale) return this;
     DICT[locale] = Object.assign({}, DICT[locale] || {}, dict || {});
@@ -1450,7 +1457,20 @@ async function ensureTranslations() {
       });
       return out;
     };
-    const keys = [...new Set([...collect('data-i18n'), ...collect('data-i18n-html')])];
+    const collectAttr = () => {
+      const out = [];
+      document.querySelectorAll('[data-i18n-attr]').forEach((el) => {
+        const value = el.getAttribute('data-i18n-attr') || '';
+        value.split(',').forEach((pair) => {
+          const parts = pair.split(':').map((s) => s.trim());
+          const key = parts[1];
+          const table = DICT[current];
+          if (key && (!table || table[key] === undefined)) out.push(key);
+        });
+      });
+      return out;
+    };
+    const keys = [...new Set([...collect('data-i18n'), ...collect('data-i18n-html'), ...collectAttr()])];
     for (const key of keys) {
       try {
         const res = await fetch('/api/translate', {
@@ -1460,14 +1480,20 @@ async function ensureTranslations() {
         });
         if (res.ok) {
           const { translated } = await res.json();
-          if (!DICT[current]) DICT[current] = {};
-          DICT[current][key] = translated;
+          if (translated !== undefined && translated !== null && translated !== '') {
+            if (!DICT[current]) DICT[current] = {};
+            DICT[current][key] = translated;
+          }
         }
       } catch (e) {
         // API not configured or network error: leave English fallback visible.
       }
     }
-    if (keys.length) apply();
+    if (keys.length) {
+      apply();
+      markActiveLanguage();
+      listeners.forEach((fn) => { try { fn(current); } catch (e) { console.error(e); } });
+    }
   } finally {
     translating = false;
   }
