@@ -36,6 +36,7 @@
     "seo:check": "node scripts/seo-check.mjs",
     "assets:logo": "node scripts/make-logo-assets.mjs",
     "assets:og": "node scripts/make-og-image.mjs",
+    "assets:products": "node scripts/make-product-images.mjs",
     "start": "node src/server.js",
     "dev": "node --watch src/server.js",
     "test": "node scripts/run-tests.mjs",

@@ -379,7 +379,11 @@ test('danh mục lọc được sinh từ dữ liệu, không phải danh sách 
 test('mọi trang lập chỉ mục đều chứa dữ liệu có cấu trúc và logo tồn tại', async () => {
   assert.ok(existsSync(new URL('../public/favicon.svg', import.meta.url)), 'file logo phải tồn tại thật');
   const html = await text(`/product/${product.slug}`);
-  const graph = [...html.matchAll(/<script type="application\/ld\+json">([\s\S]*?)<\/script>/g)].flatMap((m) => JSON.parse(m[1].replace(/\\u003c/g, '<')));
+  // The product page ships one @graph document (the same shape the homepage
+  // uses), so the nodes live one level down. Flattening here keeps this test
+  // about the node's contents rather than about the envelope around it.
+  const graph = [...html.matchAll(/<script type="application\/ld\+json">([\s\S]*?)<\/script>/g)]
+    .flatMap((m) => { const parsed = JSON.parse(m[1].replace(/\\u003c/g, '<')); return parsed['@graph'] || parsed; });
   const organization = graph.find((node) => node['@type'] === 'Organization');
   assert.equal(organization.logo, `${ORIGIN}/logo-1024.png`, 'logo phải trỏ tới file có thật');
   // Google removed the sitelinks search box in November 2024, and the only page

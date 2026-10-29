@@ -474,23 +474,12 @@ const productPage = (lang) => async (req, res) => {
       return notFound(req, res);
     }
     const reviews = await listReviewsForProduct(product.id);
-    // Only the English page needs a dollar figure: the Vietnamese shelf price is
-    // the price a Vietnamese buyer is charged, and converting it for a reader who
-    // is about to pay in dong adds nothing but a rounded number. The figure is
-    // resolved with the same function checkout uses, so what the page states and
-    // what PayPal takes cannot drift apart.
-    let usd = null;
-    if (lang === "en") {
-      try {
-        const { charge } = await paypalChargeForProduct(product);
-        usd = charge.amount;
-      } catch {
-        // Rate unavailable: the page falls back to the shelf price rather than
-        // inventing a dollar amount. Charging still works — checkout resolves
-        // the rate again at order time.
-      }
-    }
-    res.set("Cache-Control", "public, max-age=600").type("html").send(renderProductPage(product, lang, reviews, usd));
+    // No converted figure is resolved here any more. The page states the shelf
+    // price in the product's own currency on both languages, so the number Google
+    // reads is the number the product data carries and it does not move between
+    // crawls. The USD amount is still resolved at checkout, where it is shown to
+    // the buyer as the exact PayPal charge rather than as a second list price.
+    res.set("Cache-Control", "public, max-age=600").type("html").send(renderProductPage(product, lang, reviews));
   } catch (error) {
     console.error(error);
     try {

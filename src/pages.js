@@ -1,3 +1,6 @@
+import { readdirSync } from "node:fs";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
 import { env } from "./config.js";
 import { isSellable } from "./store.js";
 import { esc, money, formatBytes, initials } from "./format.js";
@@ -76,6 +79,67 @@ export function productSummary(product, max = 155) {
 }
 
 /**
+ * Tokens that make a string unusable as product data.
+ *
+ * Google's product data specification forbids price, discount and urgency in the
+ * title, and Merchant Center reads the landing page title whenever the page does
+ * not carry a Product node. This catalogue's copy was written for a sale, so the
+ * title read "RAMCleaner Early Bird - 199k VND (33% off) First 100 Customers
+ * Only" — three violations in one line, and the reason the feed item was built
+ * from it instead of from the catalogue.
+ *
+ * The check is deliberately all-or-nothing. Editing a promotional sentence token
+ * by token leaves the grammar behind ("all features for instead of ."), and a
+ * half-rewritten title is worse data than a clean one derived from the product's
+ * own name. So a string that trips this is discarded, not repaired.
+ */
+const PROMO_IN_TEXT = new RegExp([
+  String.raw`\d[\d.,]*\s*k?\s*(?:₫|đ|vnd|usd|eur|gbp)`,
+  String.raw`[$€£]\s?\d`,
+  String.raw`\d{1,3}\s*%`,
+  String.raw`\b(?:first|only|last)\s+\d+\s+(?:customers?|copies|orders?|slots?|units?)`,
+  String.raw`\b\d+\s+(?:copies|gói|khách)\b`,
+  String.raw`\bchỉ\s+\d+\s+(?:gói|bản|khách|suất)`,
+  String.raw`\bgiảm\s+\d`,
+  String.raw`\b(?:early bird deal|ưu đãi sớm|hết là hết|limited time|while supplies last)\b`,
+].join("|"), "i");
+
+/**
+ * The owner's SEO copy when it is safe to publish, otherwise an empty string.
+ *
+ * Returning "" rather than a repaired string is what lets every caller fall back
+ * to a title built from the product's own name, which is the only value that is
+ * guaranteed to be free of the promotion the owner was running that week.
+ */
+const cleanSeoText = (value) => {
+  const text = fillCopy(String(value ?? "")).trim();
+  return text && !PROMO_IN_TEXT.test(text) ? text : "";
+};
+
+const truncateAtWord = (text, max) => (text.length <= max ? text : `${text.slice(0, text.lastIndexOf(" ") || max)}…`);
+
+/**
+ * The first sentence of the full description that says something factual.
+ *
+ * A short description can be nothing but a sale notice ("Early bird deal for the
+ * first 100 customers"), and using it as the meta description means the one
+ * sentence Google has to judge the page by describes a discount rather than a
+ * product. The full description usually still carries a real sentence, so the
+ * promotional one is skipped instead of being rewritten — the same rule the
+ * title follows.
+ *
+ * English pages never borrow Vietnamese prose here: a meta description in the
+ * wrong language is worse than a derived one, and the caller has a fallback.
+ */
+const firstCleanSentence = (product, lang, max) => {
+  const raw = String(product.description || "").replace(/\s+/g, " ").trim();
+  if (!raw) return "";
+  if (lang === "en" && /[À-ỹ]/.test(raw)) return "";
+  const sentence = raw.split(/(?<=[.!?])\s+/).find((item) => item.length >= 20 && !PROMO_IN_TEXT.test(item));
+  return sentence ? truncateAtWord(sentence, max) : "";
+};
+
+/**
  * The description a search engine and a link preview are shown.
  *
  * Distinct from productSummary on purpose. productSummary describes the product for a
@@ -86,29 +150,38 @@ export function productSummary(product, max = 155) {
  * text in the result and reads as two pages competing for the same query, which is
  * what hreflang exists to prevent.
  *
- * So: the owner's own SEO copy when it exists, then English prose, then a
- * language-neutral line built from the product name and platform. A weak description
- * is recoverable; a description in the wrong language is worse than none.
+ * So: the owner's own SEO copy when it exists and carries no promotion, then the
+ * product's own prose, then a language-neutral line built from the product name and
+ * platform. A weak description is recoverable; a description in the wrong language
+ * is worse than none.
  *
  * @param {object} product already passed through localisedProduct
  * @param {string} lang "en" or anything else for Vietnamese
  * @returns {string}
  */
 const metaDescriptionFor = (product, lang = "vi", max = 155) => {
-  const own = fillCopy(String(product.seoDescription || "").trim());
-  if (own) return own.length <= max ? own : `${own.slice(0, own.lastIndexOf(" ") || max)}…`;
-  if (lang !== "en") return productSummary(product, max);
+  const own = cleanSeoText(product.seoDescription);
+  if (own) return truncateAtWord(own, max);
+
+  // The short description is the preferred summary, but only when it describes
+  // the product. When it is a promotion, the full description is asked for one
+  // clean sentence before anything is derived from the product name.
+  const summary = productSummary(product, max);
+  if (PROMO_IN_TEXT.test(summary)) {
+    const clean = firstCleanSentence(product, lang, max);
+    if (clean) return clean;
+  }
+  if (lang !== "en") return summary;
 
   // English requested, no English copy: describe it in words that are the same in
   // both languages rather than borrowing the Vietnamese sentence.
   const name = fillCopy(String(product.name || "").trim());
   const platform = fillCopy(String(product.platform || "Windows").trim());
-  const summary = fillCopy(String(product.short_description || product.shortDescription || "").trim());
-  if (summary && !/[À-ỹ]/.test(summary)) return productSummary(product, max);
+  if (summary && !/[À-ỹ]/.test(summary)) return summary;
   const derived = platform && platform.toLowerCase() !== "windows"
     ? `${name} for ${platform} — download from ${env.brand.name}`
     : `${name} for Windows — download from ${env.brand.name}`;
-  return derived.length <= max ? derived : `${derived.slice(0, derived.lastIndexOf(" ") || max)}…`;
+  return truncateAtWord(derived, max);
 };
 
 /**
@@ -126,6 +199,44 @@ const metaDescriptionFor = (product, lang = "vi", max = 155) => {
  * /favicon.svg: 64px is all a tab can show, and SVG is sharper there.
  */
 export const LOGO_PATH = "/logo-1024.png";
+
+const PUBLIC_DIR = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "public");
+
+/**
+ * The per-product covers scripts/make-product-images.mjs writes, read once.
+ *
+ * Read once rather than per request: the directory only changes when the
+ * generator runs, and a product page should not pay a stat call per render. A
+ * missing directory is a valid state — a checkout without the assets still
+ * serves pages — so it becomes an empty set rather than an error.
+ */
+let coverCache = null;
+const productCovers = () => {
+  if (coverCache) return coverCache;
+  try {
+    coverCache = new Set(readdirSync(path.join(PUBLIC_DIR, "og")).filter((file) => file.endsWith(".png")));
+  } catch {
+    coverCache = new Set();
+  }
+  return coverCache;
+};
+
+/**
+ * The image a crawler is given for this product.
+ *
+ * A catalogue-wide logo is the same image for every item, and Merchant Center
+ * reads that as "the image does not show the product". The generated cover per
+ * slug is distinct, carries no price or promotion, and is 1200x630, so it also
+ * satisfies the share-card dimensions. `imageUrl` wins over both: an owner who
+ * uploads a real screenshot should never have to edit code for it.
+ */
+const productImage = (product) => {
+  const explicit = String(product.imageUrl || product.image_url || "").trim();
+  if (explicit) return /^https?:\/\//i.test(explicit) ? explicit : absolute(explicit);
+  const slug = String(product.slug || "").trim();
+  if (slug && productCovers().has(`${slug}.png`)) return absolute(`/og/${slug}.png`);
+  return absolute(LOGO_PATH);
+};
 
 /**
  * The icon slots, declared once because every page has to link the same set.
@@ -256,7 +367,7 @@ const productSchema = (product, lang = "vi") => ({
   softwareRequirements: product.requirements || undefined,
   downloadUrl: absolute(productUrl(product.slug, lang)),
   installUrl: absolute(productUrl(product.slug, lang)),
-  image: absolute(LOGO_PATH),
+  image: productImage(product),
   brand: { "@type": "Brand", name: brand() },
   ...(env.brand.socialLinks.length ? { sameAs: env.brand.socialLinks } : {}),
   author: { "@id": `${site()}/#organization` },
@@ -266,11 +377,78 @@ const productSchema = (product, lang = "vi") => ({
     price: Number(product.price) || 0,
     priceCurrency: product.currency || "VND",
     availability: "https://schema.org/InStock",
-    priceValidUntil: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10),
     url: absolute(productUrl(product.slug, lang)),
     seller: { "@id": `${site()}/#organization` },
   },
 });
+
+/**
+ * The node Merchant Center reads.
+ *
+ * SoftwareApplication is the right type for an app rich result and the wrong type
+ * for a product feed: Google's merchant listing markup expects Product with an
+ * Offer, and a page that ships only SoftwareApplication is a page Merchant Center
+ * has to guess at. That guess is what produced a feed item titled
+ * "RAMCleaner Early Bird - 199k VND (33% off) First 100 Customers Only": with no
+ * Product to read, Google fell back to <title> and the meta description.
+ *
+ * Both nodes are emitted. They describe the same URL, they do not contradict each
+ * other, and each is read by a different Google surface — the app result reads
+ * SoftwareApplication, the shopping surface reads Product.
+ *
+ * `price` is the shelf price in the product's own currency, which is also the
+ * number printed on the page. It is never the converted figure: a price that
+ * moves with the exchange rate is a price Google cannot match on the next crawl.
+ */
+const merchantProductSchema = (product, lang = "vi") => {
+  const url = absolute(productUrl(product.slug, lang));
+  const currency = String(product.currency || "VND").toUpperCase();
+  // Google's description attribute is a product description, not a sale notice.
+  // Sentences that only exist to run a promotion are dropped whole — a sentence
+  // is the smallest unit that survives deletion with its grammar intact. If every
+  // sentence is promotional the raw text is kept rather than shipping an empty
+  // field, because a weak description is a warning and an empty one is an error.
+  const rawDescription = String(product.description || product.shortDescription || "").replace(/\s+/g, " ").trim();
+  const kept = rawDescription.split(/(?<=[.!?])\s+/).filter((sentence) => !PROMO_IN_TEXT.test(sentence)).join(" ").trim();
+  const description = (kept || rawDescription).slice(0, 5000);
+  return {
+    "@type": "Product",
+    "@id": `${url}#product`,
+    name: fillCopy(String(product.name || "").trim()),
+    description,
+    url,
+    // One image, resolved by productImage(): an uploaded screenshot first, then
+    // the generated cover for this slug, then the brand mark. Google wants an
+    // image of the product, not a catalogue-wide logo.
+    image: [productImage(product)],
+    // No GTIN is assigned to a small developer's utility, so the identifier pair
+    // Google asks for instead is brand + MPN. The product id is stable and unique.
+    sku: String(product.id || product.slug),
+    mpn: String(product.id || product.slug),
+    brand: { "@type": "Brand", name: brand() },
+    category: "Software > Computer Software",
+    additionalType: "https://schema.org/SoftwareApplication",
+    itemCondition: "https://schema.org/NewCondition",
+    offers: {
+      "@type": "Offer",
+      price: Number(product.price) || 0,
+      priceCurrency: currency,
+      availability: "https://schema.org/InStock",
+      itemCondition: "https://schema.org/NewCondition",
+      url,
+      seller: { "@id": `${site()}/#organization` },
+      // The refund policy published at /refund: 14 days, no restocking fee. Stated
+      // in the offer because Merchant Center reads it from here when the account
+      // has no return policy configured.
+      hasMerchantReturnPolicy: {
+        "@type": "MerchantReturnPolicy",
+        returnPolicyCategory: "https://schema.org/MerchantReturnFiniteReturnWindow",
+        merchantReturnDays: 14,
+        returnFees: "https://schema.org/FreeReturn",
+      },
+    },
+  };
+};
 
 const breadcrumbSchema = (product, lang = "vi") => {
   const labels = lang === "en"
@@ -334,7 +512,28 @@ const websiteSchema = () => ({
   publisher: { "@id": `${site()}/#organization` },
 });
 
-const jsonLd = (data) => `<script type="application/ld+json">${JSON.stringify(data).replace(/</g, "\\u003c")}</script>`;
+/**
+ * The one place a structured-data block is serialised.
+ *
+ * Every node gets its own `@context`. Without it the block is valid JSON and
+ * invalid JSON-LD: a consumer has no vocabulary to resolve `Product` or
+ * `SoftwareApplication` against, so it ignores the graph and falls back to
+ * <title>, the meta description and og:image. That fallback is exactly how a
+ * promotional page title ended up as a Merchant Center product title.
+ *
+ * The product page passes one `@graph` document, which is the shape the
+ * homepage already used. That keeps the Organization and WebSite nodes
+ * byte-identical on both pages — a crawler comparing them is comparing the
+ * shop's identity, and two spellings of it is the drift the graph exists to
+ * prevent. The array branch stays for any caller that ships loose nodes.
+ */
+const jsonLd = (data) => {
+  const withContext = (node) => (node && typeof node === "object" && !Array.isArray(node)
+    ? { "@context": "https://schema.org", ...node }
+    : node);
+  const payload = Array.isArray(data) ? data.map(withContext) : withContext(data);
+  return `<script type="application/ld+json">${JSON.stringify(payload).replace(/</g, "\\u003c")}</script>`;
+};
 
 /**
  * Search engine ownership tokens, as meta tags.
@@ -1109,7 +1308,13 @@ function localizeToEnglish(product) {
     ...product,
     shortDescription: pick(product.shortDescriptionEn, product.shortDescription),
     description: pick(product.descriptionEn, product.description),
-    requirements: pick(product.requirementsEn, /[^\x00-\x7F]/.test(String(product.requirements || '')) ? "Full system requirements are listed in the included guide (the guide is written in Vietnamese)." : product.requirements),
+    // System requirements are the one field a buyer must be able to check before
+    // paying, and the old fallback answered it with "the guide is written in
+    // Vietnamese" — a sentence that tells an English reader nothing. The stored
+    // requirements are a technical spec (platform names, versions, architecture),
+    // so showing them untranslated is more useful than showing a refusal; the
+    // platform column is the last resort when the spec itself is empty.
+    requirements: pick(product.requirementsEn, String(product.requirements || "").trim() || product.platform || ""),
     features: featuresEn.length ? featuresEn : product.features,
     // SEO copy is the one pair that does NOT fall back to Vietnamese.
     //
@@ -1172,25 +1377,27 @@ export const localised = (value, map, fallback = "") => {
  * and the browser already used it, which meant an assistant asked in English
  * found a page it could only cite in translation.
  *
- * `usd` is the payable USD amount for this product, resolved by the caller
- * through the same conversion checkout uses. It is passed in rather than looked
- * up here because this renderer is synchronous: the rate can require a network
- * call, and a page render must never wait on a rate service to emit HTML. When
- * it is missing — no rate, no fallback — the shelf price is shown instead, in
- * its own currency, which is always a figure the buyer is actually charged.
+ * The price printed here is always the shelf price in the product's own
+ * currency. The renderer used to take a converted USD amount for the English
+ * page, which made the figure depend on a live exchange rate and on the crawl
+ * time — the two things a price must never depend on. Conversion now happens
+ * only at checkout, where the buyer sees the exact charge before confirming.
  */
-export function renderProductPage(rawProduct, lang = "vi", reviews = [], usd = null) {
+export function renderProductPage(rawProduct, lang = "vi", reviews = []) {
   const product = localize(rawProduct, lang);
   const en = lang === "en";
   const url = absolute(productUrl(product.slug, lang));
   const { intro, groups } = sections(product.description);
   const features = product.features || [];
-  // The currency on screen follows the language the reader asked for, but the
-  // number has to stay the one PayPal takes. money() formats each currency in
-  // its own locale (en-US for USD, vi-VN for VND), which is what makes "$7.02"
-  // read as a dollar amount rather than a dong amount with the label changed.
-  const showUsd = en && Number.isFinite(usd) && String(product.currency || "VND").toUpperCase() === "VND";
-  const priceLabel = showUsd ? money(usd, "USD") : money(product.price, product.currency);
+  // The shelf price is stated in the product's own currency, on both languages.
+  //
+  // It used to be converted to dollars on the English page from a live exchange
+  // rate. That number changed between crawls, never matched the VND figure in the
+  // structured data, and is the "price mismatch" Merchant Center reports: the feed
+  // said 7,69 US$, the page said 7,71, and the product data said 199000 VND. A
+  // listed price is a promise, not a quote. Conversion belongs to the payment step,
+  // where PayPal shows the exact charge before the buyer confirms it.
+  const priceLabel = money(product.price, product.currency);
   // The headline leads with what someone types into a search box, not with the
   // product's own name, which nobody outside this site has heard of. The two are
   // the same sentence read differently: "bật macro Excel" is the problem, "Excel
@@ -1200,7 +1407,12 @@ export function renderProductPage(rawProduct, lang = "vi", reviews = [], usd = n
   // and the copy table below. The ternary that used to sit here had an identical
   // arm on each side — an editor had edited one and not the other, and a page that
   // looked localized was emitting the same title twice.
-  const title = product.seoTitle || `${product.name} v${product.version} — ${product.platform || "Windows"} | ${brand()}`;
+  // The owner's SEO title is used only when it is safe as product data. A title
+  // that carries a price, a discount or a deadline is discarded rather than
+  // rewritten, because Merchant Center reads this string as the product name when
+  // it cannot find a Product node — and a product name is not a sale banner.
+  const title = cleanSeoText(product.seoTitle)
+    || `${product.name} v${product.version} — ${product.platform || "Windows"} | ${brand()}`;
   const description = metaDescriptionFor(product, lang);
   const copy = getCopy(lang);
   const faq = faqSchema(product, lang);
@@ -1211,14 +1423,14 @@ export function renderProductPage(rawProduct, lang = "vi", reviews = [], usd = n
 ${tokenMeta()}
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-${meta({ title, description, url, type: "product", lang, alternates: { vi: absolute(productUrl(product.slug, "vi")), en: absolute(productUrl(product.slug, "en")) } })}
+${meta({ title, description, url, type: "product", lang, image: productImage(product), alternates: { vi: absolute(productUrl(product.slug, "vi")), en: absolute(productUrl(product.slug, "en")) } })}
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="/styles.css?v=${cssVersion}">
 ${brandMeta()}
 ${analyticsMeta()}
-${jsonLd([organization(), websiteSchema(), productSchema(product, lang), breadcrumbSchema(product, lang), faq])}
+${jsonLd({ "@graph": [organization(), websiteSchema(), productSchema(product, lang), merchantProductSchema(product, lang), breadcrumbSchema(product, lang), faq] })}
 </head>
 <body class="product-page">
 <header class="site-header"><a class="brand" href="/">${brandWordmark()}${headerNav("", copy)}<a class="header-cta" href="/#products"><span>${esc(copy.buyNow)}</span> <span>↗</span></a></header>
@@ -1377,7 +1589,7 @@ export function renderFeed(products) {
         name: product.name,
         description: productSummary(product, 300),
         url: absolute(productUrl(product.slug)),
-        image: absolute(LOGO_PATH),
+        image: productImage(product),
         brand: { "@type": "Brand", name: brand() },
         ...(product.seoTitle ? { alternateName: product.seoTitle } : {}),
         applicationCategory: product.category || "UtilitiesApplication",
