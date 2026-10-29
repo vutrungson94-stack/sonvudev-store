@@ -1077,8 +1077,9 @@ const EXTRA_LOCALES = ['de', 'es', 'fr', 'ja', 'zh-CN'];
 const SUPPORTED = (Array.isArray(window.SVD_LOCALES) && window.SVD_LOCALES.length)
   ? [...window.SVD_LOCALES]
   : [...BUNDLED, ...EXTRA_LOCALES];
-const LANG_LABELS = { vi: 'VI', en: 'EN', de: 'DE', es: 'ES', fr: 'FR', ja: 'JA', 'zh-CN': '中文' };
+const LANG_LABELS = { vi: 'Tiếng Việt', en: 'English', de: 'Deutsch', es: 'Español', fr: 'Français', ja: '日本語', 'zh-CN': '中文' };
 const LOCALE_TAGS = { vi: 'vi-VN', en: 'en-US', de: 'de-DE', es: 'es-ES', fr: 'fr-FR', ja: 'ja-JP', 'zh-CN': 'zh-CN' };
+const FLAG_EMOJI = { vi: '🇻🇳', en: '🇺🇸', de: '🇩🇪', es: '🇪🇸', fr: '🇫🇷', ja: '🇯🇵', 'zh-CN': '🇨🇳' };
 const STORAGE_KEY = 'sonvudev_lang';
 const listeners = new Set();
 const loadedLocales = new Set(BUNDLED);
@@ -1419,9 +1420,11 @@ function apply(root = document) {
 // survive a language change made anywhere: the storefront's own toggle, a
 // programmatically-set language, or the browser's stored choice being restored.
 function markActiveLanguage() {
-  document.querySelectorAll('[data-lang-switch] [data-lang-set]').forEach((button) => {
-    const active = button.dataset.langSet === current;
-    button.setAttribute('aria-pressed', active ? 'true' : 'false');
+  document.querySelectorAll('[data-lang-switch]').forEach((combobox) => {
+    const flag = combobox.querySelector('[data-lang-flag]');
+    if (flag) flag.textContent = FLAG_EMOJI[current] || codeToEmoji(current);
+    const label = combobox.closest('.lang-combobox-wrap')?.querySelector('[data-lang-label]');
+    if (label) label.textContent = LANG_LABELS[current] || current.toUpperCase();
   });
 }
 
@@ -1470,29 +1473,93 @@ async function ensureTranslations() {
   }
 }
 
-function renderLanguageButtons() {
-  document.querySelectorAll('[data-lang-switch]').forEach((group) => {
+function renderLanguageCombobox() {
+  document.querySelectorAll('[data-lang-switch]').forEach((combobox) => {
+    const dropdown = combobox.querySelector('.lang-dropdown');
+    if (!dropdown) return;
+    dropdown.innerHTML = '';
     for (const code of SUPPORTED) {
-      if (group.querySelector(`[data-lang-set="${code}"]`)) continue;
-      const button = document.createElement('button');
-      button.type = 'button';
-      button.dataset.langSet = code;
-      button.textContent = LANG_LABELS[code] || code.toUpperCase();
-      button.setAttribute('aria-pressed', code === current ? 'true' : 'false');
-      group.appendChild(button);
+      const li = document.createElement('li');
+      li.role = 'option';
+      li.dataset.langSet = code;
+      li.setAttribute('aria-selected', code === current ? 'true' : 'false');
+      const flagSpan = document.createElement('span');
+      flagSpan.className = 'lang-flag';
+      flagSpan.textContent = FLAG_EMOJI[code] || codeToEmoji(code);
+      const textSpan = document.createElement('span');
+      textSpan.textContent = LANG_LABELS[code] || code.toUpperCase();
+      li.appendChild(flagSpan);
+      li.appendChild(textSpan);
+      li.addEventListener('click', () => {
+        I18N.set(code);
+        closeCombobox(combobox);
+      });
+      dropdown.appendChild(li);
     }
+    const trigger = combobox.querySelector('.lang-trigger');
+    const flag = combobox.querySelector('[data-lang-flag]');
+    if (flag) flag.textContent = FLAG_EMOJI[current] || codeToEmoji(current);
+    if (trigger) trigger.setAttribute('aria-expanded', 'false');
+    combobox.setAttribute('aria-expanded', 'false');
+    if (dropdown) dropdown.setAttribute('aria-hidden', 'true');
   });
+}
+
+function codeToEmoji(code) {
+  // Fallback: regional indicator symbols for unknown codes.
+  const offset = 0x1F1E6 - 65;
+  return code.toUpperCase().split('').map(c => String.fromCodePoint(c.charCodeAt(0) + offset)).join('');
+}
+
+function openCombobox(combobox) {
+  const dropdown = combobox.querySelector('.lang-dropdown');
+  const trigger = combobox.querySelector('.lang-trigger');
+  const label = combobox.closest('.lang-combobox-wrap')?.querySelector('[data-lang-label]');
+  if (dropdown) { dropdown.setAttribute('aria-hidden', 'false'); }
+  if (trigger) { trigger.setAttribute('aria-expanded', 'true'); }
+  combobox.setAttribute('aria-expanded', 'true');
+  if (label) label.classList.add('lang-label--hidden');
+}
+
+function closeCombobox(combobox) {
+  const dropdown = combobox.querySelector('.lang-dropdown');
+  const trigger = combobox.querySelector('.lang-trigger');
+  const label = combobox.closest('.lang-combobox-wrap')?.querySelector('[data-lang-label]');
+  if (dropdown) { dropdown.setAttribute('aria-hidden', 'true'); }
+  if (trigger) { trigger.setAttribute('aria-expanded', 'false'); }
+  combobox.setAttribute('aria-expanded', 'false');
+  if (label) {
+    label.classList.remove('lang-label--hidden');
+    label.textContent = LANG_LABELS[current] || current.toUpperCase();
+  }
+  const flag = combobox.querySelector('[data-lang-flag]');
+  if (flag) flag.textContent = FLAG_EMOJI[current] || codeToEmoji(current);
 }
 
 function boot() {
   apply();
-  renderLanguageButtons();
-  // Language switch buttons - client-side toggle only (no navigation)
-  document.querySelectorAll('[data-lang-switch] [data-lang-set]').forEach((button) => {
-    button.addEventListener('click', () => {
-      const target = button.dataset.langSet;
-      I18N.set(target);
-    });
+  renderLanguageCombobox();
+  // Language switch combobox - client-side toggle only (no navigation)
+  document.querySelectorAll('[data-lang-switch]').forEach((combobox) => {
+    const trigger = combobox.querySelector('.lang-trigger');
+    if (trigger) {
+      trigger.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const expanded = combobox.getAttribute('aria-expanded') === 'true';
+        if (expanded) {
+          closeCombobox(combobox);
+        } else {
+          // Close other comboboxes first
+          document.querySelectorAll('[data-lang-switch]').forEach((cb) => closeCombobox(cb));
+          openCombobox(combobox);
+        }
+      });
+    }
+  });
+  document.addEventListener('click', (e) => {
+    if (!e.target.closest('[data-lang-switch]')) {
+      document.querySelectorAll('[data-lang-switch]').forEach((combobox) => closeCombobox(combobox));
+    }
   });
   markActiveLanguage();
   // Translate any keys still missing for the current language (JA, zh-CN, ...).

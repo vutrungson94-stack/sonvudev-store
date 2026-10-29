@@ -52,8 +52,58 @@ export class El {
       contains(c) { return self.className.split(' ').includes(c); },
     };
   }
-  querySelector() { return null; }
-  querySelectorAll() { return []; }
+  querySelector(sel) {
+    if (typeof sel === 'string' && sel.startsWith('.')) {
+      const cls = sel.slice(1);
+      const found = this._findByClass(cls);
+      return found || null;
+    }
+    if (typeof sel === 'string' && sel.startsWith('[')) {
+      const attr = sel.slice(1, sel.indexOf(']'));
+      const found = this._findByAttr(attr);
+      return found || null;
+    }
+    return null;
+  }
+  _findByClass(cls) {
+    if (this.classList.contains(cls)) return this;
+    for (const child of this.children) {
+      const found = child._findByClass(cls);
+      if (found) return found;
+    }
+    return null;
+  }
+  _findByAttr(attr) {
+    if (this.attrs?.[attr] !== undefined) return this;
+    for (const child of this.children) {
+      const found = child._findByAttr(attr);
+      if (found) return found;
+    }
+    return null;
+  }
+  querySelectorAll(sel) {
+    if (typeof sel === 'string' && sel.startsWith('.')) {
+      const cls = sel.slice(1);
+      return this._allByClass(cls);
+    }
+    if (typeof sel === 'string' && sel.startsWith('[')) {
+      const attr = sel.slice(1, sel.indexOf(']'));
+      return this._allByAttr(attr);
+    }
+    return [];
+  }
+  _allByClass(cls) {
+    const out = [];
+    if (this.classList.contains(cls)) out.push(this);
+    for (const child of this.children) out.push(...child._allByClass(cls));
+    return out;
+  }
+  _allByAttr(attr) {
+    const out = [];
+    if (this.attrs?.[attr] !== undefined) out.push(this);
+    for (const child of this.children) out.push(...child._allByAttr(attr));
+    return out;
+  }
   setAttribute(k, v) { this.attrs[k] = String(v); }
   getAttribute(k) { return this.attrs[k] ?? null; }
   hasAttribute(k) { return k in this.attrs; }
@@ -97,6 +147,9 @@ export function createDom(ids) {
       if (typeof sel === 'string' && sel.includes('data-lang-toggle')) return nodes.get('lang-toggle');
       if (typeof sel === 'string' && sel.includes('data-lang-set')) return nodes.get('lang-set-vi');
       if (typeof sel === 'string' && sel.includes('data-i18n')) return findAttr('data-i18n');
+      if (typeof sel === 'string' && sel.includes('data-lang-switch')) return findAttr('data-lang-switch') || [...nodes.values()].find((el) => el.attrs?.['data-lang-switch'] !== undefined);
+      if (typeof sel === 'string' && sel.includes('data-lang-flag')) return findAttr('data-lang-flag') || [...nodes.values()].find((el) => el.attrs?.['data-lang-flag'] !== undefined);
+      if (typeof sel === 'string' && sel.includes('data-lang-label')) return findAttr('data-lang-label') || [...nodes.values()].find((el) => el.attrs?.['data-lang-label'] !== undefined);
       return null;
     },
     querySelectorAll: (sel) => {

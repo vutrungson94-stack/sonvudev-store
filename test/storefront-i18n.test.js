@@ -224,53 +224,88 @@ test('mọi khoá i18n tồn tại ở cả hai ngôn ngữ', async () => {
   for (const k of keys) assert.notEqual(vi.get(k), en.get(k), `khoa "${k}" phau khac nhau giua 2 ngon ngu`);
 });
 
-test('doi ngon ngu thi <html lang> va nut doi cung doi theo', async () => {
+test('doi ngon ngu thi <html lang> va combobox doi theo', async () => {
   const { document, nodes } = createDom(IDS);
+  // Seed a minimal combobox so i18n.js can paint the flag and label.
+  const wrap = document.createElement('div');
+  wrap.className = 'lang-combobox-wrap';
+  const labelEl = document.createElement('span');
+  labelEl.className = 'lang-label';
+  labelEl.attrs['data-lang-label'] = '';
+  labelEl.dataset.langLabel = '';
+  const combobox = document.createElement('div');
+  combobox.className = 'lang-combobox';
+  combobox.attrs['data-lang-switch'] = '';
+  combobox.dataset.langSwitch = '';
+  const trigger = document.createElement('button');
+  trigger.className = 'lang-trigger';
+  trigger.attrs['aria-haspopup'] = 'listbox';
+  const flagEl = document.createElement('span');
+  flagEl.className = 'lang-flag';
+  flagEl.attrs['data-lang-flag'] = '';
+  flagEl.dataset.langFlag = '';
+  const caret = document.createElement('span');
+  caret.className = 'lang-caret';
+  caret.attrs['aria-hidden'] = 'true';
+  caret.textContent = '▾';
+  const dropdown = document.createElement('ul');
+  dropdown.className = 'lang-dropdown';
+  dropdown.attrs['role'] = 'listbox';
+  dropdown.attrs['aria-label'] = 'Chọn ngôn ngữ';
+  trigger.appendChild(flagEl);
+  trigger.appendChild(caret);
+  combobox.appendChild(trigger);
+  combobox.appendChild(dropdown);
+  wrap.appendChild(labelEl);
+  wrap.appendChild(combobox);
+  document.body.appendChild(wrap);
+  nodes.set('lang-combobox', combobox);
+  nodes.set('lang-flag', flagEl);
+  nodes.set('lang-label', labelEl);
   const res = await runScript(read('i18n.js'), {
     document, window: {}, localStorage: { _v: {}, getItem: () => null, setItem() {}, removeItem() {} },
   });
   const I18N = res.window.I18N;
   assert.equal(document.documentElement.lang, 'vi');
-  // aria-pressed is what paints the active half of the "VI | EN" switch and what a
-  // screen reader announces. It is read from the current language rather than set
-  // once, so a switch that survived a change made anywhere else is still correct.
-  const pressed = () => [...document.querySelectorAll('[data-lang-set]')]
-    .filter((b) => b.getAttribute('aria-pressed') === 'true')
-    .map((b) => b.dataset.langSet);
-  assert.deepEqual(pressed(), ['vi'], 'VI phải là nửa đang bật khi trang mở');
+  // The combobox flag and label must reflect the active language.
+  const flagText = () => wrap.querySelector('[data-lang-flag]')?.textContent || '';
+  const labelText = () => wrap.querySelector('[data-lang-label]')?.textContent || '';
+  assert.ok(flagText().includes('🇻🇳') || labelText().includes('Tiếng Việt'), 'cờ hoặc nhãn phải hiện tiếng Việt khi trang mở');
   I18N.set('en');
   assert.equal(document.documentElement.lang, 'en', 'lang tren <html> phai doi theo');
-  assert.deepEqual(pressed(), ['en'], 'nut phai chuyen sang EN khi doi sang tieng anh');
+  assert.ok(flagText().includes('🇺🇸') || labelText().includes('English'), 'cờ hoặc nhãn phải chuyển sang EN khi đổi sang tiếng anh');
   I18N.set('vi');
   assert.equal(document.documentElement.lang, 'vi');
-  assert.deepEqual(pressed(), ['vi'], 'nut phai quay lai VI');
+  assert.ok(flagText().includes('🇻🇳') || labelText().includes('Tiếng Việt'), 'cờ hoặc nhãn phải quay lại VI');
 });
 
-test('nút chuyển ngôn ngữ không làm vỡ layout trên màn hình nhỏ', () => {
+test('combobox ngôn ngữ không làm vỡ layout trên màn hình nhỏ', () => {
   const css = read('styles.css');
-  // The switch is a flex child of .site-header. Without flex:0 0 auto it stretches
+  // The combobox is a flex child of .site-header. Without flex:0 0 auto it stretches
   // and pushes the row past the viewport, which is what broke the header on phones
   // when the language feature was added.
-  const rule = css.match(/^\.lang-switch\{[^}]*\}/m);
-  assert.ok(rule, 'phải có rule .lang-switch');
-  assert.ok(rule[0].includes('flex:0 0 auto'), 'switch phai co flex:0 0 auto de khong bi keo gian');
-  // Below 800px the nav is hidden and the CTA is pushed right, so the switch needs
+  const rule = css.match(/^\.lang-combobox\{[^}]*\}/m);
+  assert.ok(rule, 'phải có rule .lang-combobox');
+  assert.ok(rule[0].includes('flex:0 0 auto'), 'combobox phai co flex:0 0 auto de khong bi keo gian');
+  // Below 800px the nav is hidden and the CTA is pushed right, so the combobox needs
   // its own margin and the CTA must stop using margin-left:auto.
-  assert.ok(/@media\(max-width:800px\)\{[^}]*\.lang-switch\{[^}]*margin-left:auto/.test(css), 'can margin-left:auto cho switch o man hinh nho');
+  assert.ok(/@media\(max-width:800px\)\{[^}]*\.lang-combobox\{[^}]*margin-left:auto/.test(css), 'can margin-left:auto cho combobox o man hinh nho');
   assert.ok(/\.site-header \.header-cta\{margin-left:0\}/.test(css), 'nut mua phai bo margin-left:auto o man hinh nho');
-  assert.ok(/@media\(max-width:420px\)\{[^}]*\.lang-switch button\{/.test(css), 'can rule rieng cho man hinh 420px');
-  // The active half is painted from aria-pressed, so the state a screen reader reads
+  assert.ok(/@media\(max-width:420px\)\{[^}]*\.lang-trigger\{/.test(css), 'can rule rieng cho trigger 420px');
+  // The combobox trigger has a visible active state tied to aria-expanded and the
+  // selected option is painted from aria-selected, so the state a screen reader reads
   // and the state the eye sees are one attribute rather than two that can disagree.
-  assert.ok(/\.lang-switch button\[aria-pressed="true"\]\{/.test(css),
-    'nửa đang bật phải được tô bằng cùng thuộc tính mà trình đọc màn hình đọc');
+  assert.ok(/\.lang-trigger\[aria-expanded="true"\]\{/.test(css) || /\.lang-dropdown li\[aria-selected="true"\]\{/.test(css),
+    'trạng thái đang mở/phải được tô bằng thuộc tính mà trình đọc màn hình đọc');
 });
 
-test('nut chuyen ngon ngu nam trong header cua index.html', () => {
+test('combobox ngon ngu nam trong header cua index.html', () => {
   const html = read('index.html');
-  assert.ok(/<button[^>]*data-lang-set="vi"/.test(html), 'phai co nua VI');
-  assert.ok(/<button[^>]*data-lang-set="en"/.test(html), 'phai co nua EN');
+  assert.ok(/data-lang-switch/.test(html), 'combobox phải có data-lang-switch');
+  assert.ok(/<span[^>]*data-lang-label/.test(html), 'phai co nhan hien thi ten ngon ngu');
+  assert.ok(/<span[^>]*data-lang-flag/.test(html), 'phai co co ngon ngu');
   const header = html.slice(html.indexOf('<header'), html.indexOf('</header>'));
-  assert.ok(header.includes('data-lang-switch'), 'switch phải nằm trong header');
+  assert.ok(header.includes('data-lang-switch'), 'combobox phải nằm trong header');
 });
 
 // The switch lives on the homepage only. Nine pages each carrying a control for one
