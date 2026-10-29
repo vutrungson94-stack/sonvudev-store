@@ -365,6 +365,7 @@
    Every other page reads the choice from localStorage, which the dictionary does
    before it paints anything, so the button on those pages was a duplicate control
    for a decision already made. */
+.lang-combobox-wrap{display:flex;align-items:center;flex:0 0 auto;min-width:0}
 .lang-label{font:inherit;font-weight:600;font-size:12px;letter-spacing:.08em;color:var(--muted,#4a5568);margin-right:8px}
 .lang-combobox{position:relative;display:inline-flex;flex:0 0 auto}
 .lang-trigger{display:inline-flex;align-items:center;gap:6px;font:inherit;font-weight:600;font-size:12px;letter-spacing:.08em;color:var(--muted,#4a5568);background:transparent;border:1px solid #cbd9d2;border-radius:999px;padding:6px 12px;cursor:pointer;transition:background .18s ease,color .18s ease}
@@ -379,9 +380,10 @@
 .lang-dropdown li[aria-selected="true"]{background:#f0fdf4;color:var(--green)}
 .lang-dropdown .lang-flag{font-size:18px}
 
-/* Narrow screens: the nav is hidden and the CTA is pushed right, so the switch
-   has to sit in the gap without stretching the row. flex:0 0 auto plus a
-   shrinkable gap keeps the header on one line at 320px. */
+/* Narrow screens: the header becomes two rows — brand, language switch and CTA
+   on the first, the navigation links on the second — so the switch has to stay
+   a fixed-size item instead of stretching with the row. flex:0 0 auto plus a
+   shrinkable gap keeps the first row on one line down to 320px. */
 
 
 
@@ -544,7 +546,7 @@ body.modal-open{overflow:hidden}
 @media(max-width:900px){.field-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.field-grid-2{grid-template-columns:1fr}}
 @media(max-width:560px){.field-grid{grid-template-columns:1fr}}
 @media(max-width:800px){.admin-shell{width:min(100% - 32px,760px)}.admin-heading h1{font-size:24px}.admin-card{padding:18px 16px}#dashboard,#revenue-panel{padding:16px 14px}.form-block{padding:10px 12px 2px}}
-@media(max-width:800px){.wrap,.site-header{width:min(100% - 32px,600px)}.site-header nav{display:none}.header-cta{margin-left:auto}.hero{grid-template-columns:1fr;padding-top:45px;gap:20px}.hero h1{font-size:53px}.hero-art{height:370px;transform:scale(.9);margin:-20px}.stats{grid-template-columns:repeat(3,1fr);gap:16px}.stats strong{font-size:26px}.stats small{font-size:10px}.stats>div:not(.stats-note){border:0}.stats-note{grid-column:1/-1;border-top:1px solid var(--line);padding-top:18px}.products-section,.faq-section{padding:80px 0}.section-heading{display:block}.section-intro{margin-top:20px}.filter-row{display:block}.product-search{margin:18px 0 0;flex:none}.product-count{display:block;margin-top:18px}.filters{gap:16px;overflow:auto}.product-grid{grid-template-columns:1fr}.why-grid{grid-template-columns:1fr;gap:45px}.why-section{padding:75px 22px}.why-copy h2{font-size:42px}.site-footer{grid-template-columns:1fr;align-items:start}.footer-links{justify-content:flex-start;flex-wrap:nowrap;white-space:nowrap}.site-footer small{grid-column:auto}.feature-list{grid-template-columns:1fr}.detail-copy,.checkout-head{padding-left:25px;padding-right:25px}.checkout-form{padding-left:25px;padding-right:25px}.detail-footer{align-items:stretch;flex-direction:column}.detail-footer .button{width:100%}.card-main{width:360px}.card-status{right:-15px}.card-label{left:-15px}}
+@media(max-width:800px){.wrap,.site-header{width:min(100% - 32px,600px)}.hero{grid-template-columns:1fr;padding-top:45px;gap:20px}.hero h1{font-size:53px}.hero-art{height:370px;transform:scale(.9);margin:-20px}.stats{grid-template-columns:repeat(3,1fr);gap:16px}.stats strong{font-size:26px}.stats small{font-size:10px}.stats>div:not(.stats-note){border:0}.stats-note{grid-column:1/-1;border-top:1px solid var(--line);padding-top:18px}.products-section,.faq-section{padding:80px 0}.section-heading{display:block}.section-intro{margin-top:20px}.filter-row{display:block}.product-search{margin:18px 0 0;flex:none}.product-count{display:block;margin-top:18px}.filters{gap:16px;overflow:auto}.product-grid{grid-template-columns:1fr}.why-grid{grid-template-columns:1fr;gap:45px}.why-section{padding:75px 22px}.why-copy h2{font-size:42px}.site-footer{grid-template-columns:1fr;align-items:start}.footer-links{justify-content:flex-start;flex-wrap:nowrap;white-space:nowrap}.site-footer small{grid-column:auto}.feature-list{grid-template-columns:1fr}.detail-copy,.checkout-head{padding-left:25px;padding-right:25px}.checkout-form{padding-left:25px;padding-right:25px}.detail-footer{align-items:stretch;flex-direction:column}.detail-footer .button{width:100%}.card-main{width:360px}.card-status{right:-15px}.card-label{left:-15px}}
 @media(max-width:480px){.announcement{font-size:10px}.announcement a{margin-left:4px}.hero h1{font-size:46px}.hero-art{height:310px;transform:scale(.72);margin:-50px -40px;width:calc(100% + 80px)}.product-art{height:170px}.success-state{padding:38px 22px}.modal{max-height:94vh}}
 @media(max-width:700px){.legal{width:calc(100% - 32px);padding:44px 0 60px}.legal p,.legal ul{font-size:13px}.legal h2{font-size:18px;margin-top:30px}}
 @media(max-width:700px){.order-shell{padding:40px 0 55px}.order-row{flex-direction:column;align-items:flex-start;gap:4px}.order-row>b{text-align:left}}
@@ -552,7 +554,7 @@ body.modal-open{overflow:hidden}
 @media(max-width:760px){.admin-page .site-header{height:56px}}
 @media(max-width:420px){.admin-page .site-header{width:calc(100% - 24px)}.admin-shell{width:calc(100% - 24px)}.admin-card{padding:14px}}
 @media(max-width:560px){.admin-product-row{grid-template-columns:32px 1fr}.admin-product-actions{grid-column:2;justify-content:space-between}.admin-upload-button{padding:5px 7px}}
-@media(max-width:800px){.lang-combobox{margin-left:auto}.site-header .header-cta{margin-left:0}.lang-trigger{padding:5px 9px;font-size:11px}}
+@media(max-width:800px){.site-header .header-cta{flex:0 0 auto;margin-left:0}.lang-trigger{padding:5px 9px;font-size:11px}}
 @media(max-width:420px){.lang-trigger{padding:4px 7px;font-size:10px;letter-spacing:.04em}}
 @media(max-width:700px){
   /* Without this the page behind keeps its own scroll offset and drags along
@@ -599,12 +601,40 @@ body.modal-open{overflow:hidden}
 }
 @media (max-width:700px){.admin-seo-form{grid-template-columns:1fr}}
 
-/* Mobile (<=800px): header duoc phep gập, footer-links xuống dòng.
-   Header giữ 1 hàng trên đa số máy; nếu không đủ chỗ (máy ~320px) thì
-   .header-cta rơi xuống hàng 2 thay vì đẩy tràn ngang. */
+/* Mobile (<=800px): header is two rows, footer-links are allowed to wrap.
+   The brand, language switch and CTA share the first row; the navigation links
+   take a full-width row of their own underneath. The nav used to be hidden
+   here, which left a phone reader unable to reach Sản phẩm, FAQ or Điều khoản
+   at all. order:1 keeps the nav after every first-row item, and flex-basis:100%
+   is what forces it onto its own line regardless of how wide the other items
+   render on a given phone. */
 @media (max-width:800px){
-  .site-header{height:auto;min-height:58px;flex-wrap:wrap;row-gap:10px;column-gap:16px}
+  .site-header{height:auto;min-height:58px;flex-wrap:wrap;row-gap:8px;column-gap:16px;padding:6px 0}
+  .site-header nav{order:1;flex:0 0 100%;justify-content:center;gap:24px;font-size:12px}
+  .admin-page .site-header{height:auto;min-height:56px}
   .footer-links{flex-wrap:wrap;white-space:normal;row-gap:10px;column-gap:16px}
+}
+/* Very narrow phones (<=480px): the first header row has three fixed-size
+   items — brand, language switch and CTA — and only ~288px of frame at 320px.
+   The language name is the one part that is decorative (the flag, the pill and
+   the aria-label still say which language is active), so drop it here and trim
+   the brand and CTA instead of letting the CTA fall onto a row of its own.
+   These rules come after the 800px block above because they narrow it; CSS
+   resolves the column-gap by source order, not by breakpoint number. */
+@media (max-width:480px){
+  .site-header{column-gap:10px}
+  .site-header .brand{font-size:18px;gap:8px}
+  .lang-label{display:none}
+  .site-header .header-cta{padding:8px 12px;font-size:12px}
+}
+/* The 320px frame is the tightest one the header has to survive: brand,
+   language pill and CTA together are a few pixels wider than the frame at the
+   sizes above, and the CTA would wrap alone onto a second row. One more trim
+   keeps all three on the first row all the way down to 320px. */
+@media (max-width:360px){
+  .site-header{column-gap:8px}
+  .site-header .brand{font-size:17px;gap:6px}
+  .site-header .header-cta{padding:8px 9px}
 }
 /* ===== Admin panel: alert tren dau, don hang gon, danh sach SP tu cuon trong ===== */
 /* display cua block nay dang de len attribute hidden: banner luon hien va chop mai,

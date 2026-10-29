@@ -287,10 +287,21 @@ test('combobox ngôn ngữ không làm vỡ layout trên màn hình nhỏ', () =
   const rule = css.match(/^\.lang-combobox\{[^}]*\}/m);
   assert.ok(rule, 'phải có rule .lang-combobox');
   assert.ok(rule[0].includes('flex:0 0 auto'), 'combobox phai co flex:0 0 auto de khong bi keo gian');
-  // Below 800px the nav is hidden and the CTA is pushed right, so the combobox needs
-  // its own margin and the CTA must stop using margin-left:auto.
-  assert.ok(/@media\(max-width:800px\)\{[^}]*\.lang-combobox\{[^}]*margin-left:auto/.test(css), 'can margin-left:auto cho combobox o man hinh nho');
-  assert.ok(/\.site-header \.header-cta\{margin-left:0\}/.test(css), 'nut mua phai bo margin-left:auto o man hinh nho');
+  const wrap = css.match(/^\.lang-combobox-wrap\{[^}]*\}/m);
+  assert.ok(wrap, 'phải có rule .lang-combobox-wrap');
+  assert.ok(wrap[0].includes('flex:0 0 auto'), 'nhóm ngôn ngữ phải giữ kích thước cố định');
+  // Below 800px the header is two rows: brand, switch and CTA on the first, the
+  // navigation links on the second. The nav must not be hidden — that left a
+  // phone reader with no link to Sản phẩm, FAQ or Điều khoản at all — and the
+  // CTA must not take an auto margin that would push it away from the switch.
+  assert.ok(!/\.site-header nav\{[^}]*display:none/.test(css), 'nav phải hiện trên màn hình nhỏ');
+  const mobile = css.match(/@media \(max-width:800px\)\{([\s\S]*?)\n\}/);
+  assert.ok(mobile, 'cần khối rule mobile cho header');
+  assert.match(mobile[1], /\.site-header nav\{[^}]*flex:0 0 100%/,
+    'nav phải xuống hàng riêng trên màn hình nhỏ');
+  assert.match(mobile[1], /\.site-header\{[^}]*flex-wrap:wrap/,
+    'header phải cho phép xuống hàng trên màn hình nhỏ');
+  assert.ok(/\.site-header \.header-cta\{[^}]*margin-left:0\}/.test(css), 'nut mua phai bo margin-left:auto o man hinh nho');
   assert.ok(/@media\(max-width:420px\)\{[^}]*\.lang-trigger\{/.test(css), 'can rule rieng cho trigger 420px');
   // The combobox trigger has a visible active state tied to aria-expanded and the
   // selected option is painted from aria-selected, so the state a screen reader reads

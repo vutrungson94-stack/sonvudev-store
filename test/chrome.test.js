@@ -181,3 +181,21 @@ test('headerNav là cùng một thanh trên mọi trang, chỉ đổi ở aria-c
   assert.equal(items('/terms').filter((tag) => tag.includes('aria-current')).length, 1,
     'đúng một mục được đánh dấu, và đó là trang đang đọc');
 });
+
+// ---------------------------------------------------------------------------
+// On a phone the navigation used to be hidden outright, so a reader could not
+// reach Sản phẩm, FAQ or Điều khoản at all — the header showed only the brand,
+// the language switch and the buy button. The nav must stay visible at every
+// width; on the narrow layout it takes a row of its own under those controls.
+// ---------------------------------------------------------------------------
+test('nav vẫn hiện trên màn hình điện thoại và xuống hàng riêng', async () => {
+  const css = await fs.readFile(path.join(process.cwd(), 'public', 'styles.css'), 'utf8');
+  assert.ok(!/\.site-header nav\{[^}]*display:none/.test(css),
+    'không được ẩn thanh điều hướng trên màn hình nhỏ');
+  const mobile = css.match(/@media \(max-width:800px\)\{([\s\S]*?)\n\}/);
+  assert.ok(mobile, 'phải có khối rule mobile cho header');
+  assert.match(mobile[1], /\.site-header nav\{[^}]*flex:0 0 100%/,
+    'nav phải chiếm một hàng riêng trên màn hình nhỏ');
+  assert.match(mobile[1], /\.site-header\{[^}]*flex-wrap:wrap/,
+    'header phải cho phép xuống hàng trên màn hình nhỏ');
+});
