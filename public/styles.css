@@ -370,7 +370,7 @@
 .lang-trigger{display:inline-flex;align-items:center;gap:6px;font:inherit;font-weight:600;font-size:12px;letter-spacing:.08em;color:var(--muted,#4a5568);background:transparent;border:1px solid #cbd9d2;border-radius:999px;padding:6px 12px;cursor:pointer;transition:background .18s ease,color .18s ease}
 .lang-trigger:hover{color:var(--green)}
 .lang-trigger:focus-visible{outline:2px solid var(--green);outline-offset:2px}
-.lang-flag{font-size:16px;line-height:1}
+.lang-flag{font-family:"Segoe UI Emoji","Apple Color Emoji","Noto Color Emoji",sans-serif;font-size:16px;line-height:1}
 .lang-caret{font-size:10px;opacity:.7}
 .lang-dropdown{position:absolute;top:calc(100% + 6px);right:0;min-width:180px;background:#fff;border:1px solid #cbd9d2;border-radius:8px;box-shadow:0 4px 12px rgba(0,0,0,.08);list-style:none;margin:0;padding:4px;z-index:50;display:none}
 .lang-dropdown[aria-hidden="false"]{display:block}
