@@ -1073,6 +1073,19 @@ const paragraphBlocks = (text) => String(text || "").split(/\n{2,}/).map((block)
  * languages, whereas falling back per product would show an English page full of
  * Vietnamese.
  */
+/**
+ * Strips hardcoded VND price strings from product copy.
+ *
+ * The price is rendered from structured data and the price component, so a
+ * sentence that repeats "199.000đ" or "299,000 ₫" is not copy — it is a
+ * feed-integrity hazard. A page whose text says one currency and whose
+ * JSON-LD says another is flagged by Google's crawler as mismatched data.
+ * This removes those price tokens from every field that passes through
+ * localize(), leaving the surrounding prose intact.
+ */
+const VND_PRICE_RE = /\b\d{1,3}(?:[.,]\d{3})+\s*(?:đ|₫|VND)\b|\b\d+k\s*(?:VND|đ|₫)\b/gi;
+const stripPrices = (text) => String(text || "").replace(VND_PRICE_RE, "").replace(/\s+/g, " ").trim();
+
 export function localize(product, lang) {
   if (!product) return product;
   const resolved = lang === "en" ? localizeToEnglish(product) : product;
@@ -1080,7 +1093,12 @@ export function localize(product, lang) {
   // carries the owner's name in both. Filling them first would put the name into
   // whatever was picked as the fallback, and the English page would then show a
   // Vietnamese sentence with an English name in it.
-  return { ...resolved, shortDescription: fillCopy(resolved.shortDescription), description: fillCopy(resolved.description), features: (resolved.features || []).map(fillCopy) };
+  return {
+    ...resolved,
+    shortDescription: stripPrices(fillCopy(resolved.shortDescription)),
+    description: stripPrices(fillCopy(resolved.description)),
+    features: (resolved.features || []).map((f) => stripPrices(fillCopy(f))),
+  };
 }
 
 /** Chooses the English text where it exists and the Vietnamese where it does not. */
