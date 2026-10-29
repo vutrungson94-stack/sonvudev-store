@@ -72,7 +72,11 @@ export const fillCopy = (value) => {
  * Facebook truncate well before that, so a truncated wall of text buys nothing.
  */
 export function productSummary(product, max = 155) {
-  const source = fillCopy(product.short_description || product.shortDescription || product.description || "").replace(/\s+/g, " ").trim();
+  // The camelCase field is the one localize() has already picked for this
+  // language and stripped of prices; the snake_case field is the raw database
+  // row. Preferring the raw row put Vietnamese text in English metadata and
+  // reintroduced prices the render path had just removed.
+  const source = fillCopy(product.shortDescription || product.short_description || product.description || "").replace(/\s+/g, " ").trim();
   if (source.length <= max) return source;
   const cut = source.slice(0, max);
   return `${cut.slice(0, cut.lastIndexOf(" "))}…`;
@@ -93,16 +97,26 @@ export function productSummary(product, max = 155) {
  * half-rewritten title is worse data than a clean one derived from the product's
  * own name. So a string that trips this is discarded, not repaired.
  */
-const PROMO_IN_TEXT = new RegExp([
-  String.raw`\d[\d.,]*\s*k?\s*(?:₫|đ|vnd|usd|eur|gbp)`,
-  String.raw`[$€£]\s?\d`,
-  String.raw`\d{1,3}\s*%`,
-  String.raw`\b(?:first|only|last)\s+\d+\s+(?:customers?|copies|orders?|slots?|units?)`,
-  String.raw`\b\d+\s+(?:copies|gói|khách)\b`,
-  String.raw`\bchỉ\s+\d+\s+(?:gói|bản|khách|suất)`,
-  String.raw`\bgiảm\s+\d`,
-  String.raw`\b(?:early bird deal|ưu đãi sớm|hết là hết|limited time|while supplies last)\b`,
-].join("|"), "i");
+export const PROMO_IN_TEXT = new RegExp(
+  `(?<![\\p{L}\\p{N}_])(?:${[
+    String.raw`\d[\d.,]*\s*k?\s*(?:₫|đ|vnd|usd|eur|gbp)`,
+    String.raw`[$€£]\s?\d`,
+    String.raw`\d{1,3}\s*%`,
+    String.raw`(?:first|only|last)\s+\d+\s+(?:customers?|copies|orders?|slots?|units?)`,
+    String.raw`\d+\s+(?:copies|gói|khách)`,
+    String.raw`chỉ\s+\d+\s+(?:gói|bản|khách|suất)`,
+    String.raw`giảm\s+\d`,
+    // Vietnamese sale wording that carries no number: "mua sớm", "khóa giá",
+    // "ưu đãi". The bare word "giá" is deliberately not matched on its own,
+    // because "đánh giá" (review) is a legitimate word and would be dropped
+    // with it. A "giá" followed by a sale qualifier is still promotional.
+    String.raw`(?:mua sớm|mua ngay|đặt ngay|khóa giá|giữ giá|ưu đãi|khuyến m[ãa]i|giảm giá|hết là hết)`,
+    String.raw`giá\s+(?:chỉ|sẽ|gốc|tiêu chuẩn|niêm yết|ưu đãi|rẻ)`,
+    String.raw`(?:early bird deal|limited time|while supplies last|act now|hurry|order now|buy now|special offer|discount|on sale|lock in)`,
+    String.raw`prices?`,
+  ].join("|")})(?![\\p{L}\\p{N}_])`,
+  "iu"
+);
 
 /**
  * The owner's SEO copy when it is safe to publish, otherwise an empty string.
@@ -117,6 +131,21 @@ const cleanSeoText = (value) => {
 };
 
 const truncateAtWord = (text, max) => (text.length <= max ? text : `${text.slice(0, text.lastIndexOf(" ") || max)}…`);
+
+/**
+ * A last-resort description built only from facts the catalogue always carries.
+ *
+ * Reached when the owner's copy is entirely promotional or in the wrong
+ * language. It describes the product and the platforms it runs on without
+ * mentioning a price, a discount or a deadline — the three things Google's
+ * product data specification forbids in this field.
+ */
+const derivedDescription = (product, max = 0) => {
+  const name = fillCopy(String(product.name || "").trim());
+  const platform = fillCopy(String(product.platform || "Windows").trim());
+  const line = `${name} for ${platform} — software from ${env.brand.name}`;
+  return max ? truncateAtWord(line, max) : line;
+};
 
 /**
  * The first sentence of the full description that says something factual.
@@ -164,24 +193,19 @@ const metaDescriptionFor = (product, lang = "vi", max = 155) => {
   if (own) return truncateAtWord(own, max);
 
   // The short description is the preferred summary, but only when it describes
-  // the product. When it is a promotion, the full description is asked for one
-  // clean sentence before anything is derived from the product name.
+  // the product in the language the page declares. A promotional summary is
+  // skipped rather than rewritten; the full description is asked for one clean
+  // sentence next.
   const summary = productSummary(product, max);
-  if (PROMO_IN_TEXT.test(summary)) {
-    const clean = firstCleanSentence(product, lang, max);
-    if (clean) return clean;
-  }
-  if (lang !== "en") return summary;
+  const usable = summary && !PROMO_IN_TEXT.test(summary) && (lang !== "en" || !/[À-ỹ]/.test(summary));
+  if (usable) return summary;
 
-  // English requested, no English copy: describe it in words that are the same in
-  // both languages rather than borrowing the Vietnamese sentence.
-  const name = fillCopy(String(product.name || "").trim());
-  const platform = fillCopy(String(product.platform || "Windows").trim());
-  if (summary && !/[À-ỹ]/.test(summary)) return summary;
-  const derived = platform && platform.toLowerCase() !== "windows"
-    ? `${name} for ${platform} — download from ${env.brand.name}`
-    : `${name} for Windows — download from ${env.brand.name}`;
-  return truncateAtWord(derived, max);
+  const clean = firstCleanSentence(product, lang, max);
+  if (clean) return clean;
+
+  // Every sentence was promotional or in the wrong language. The derived line
+  // still says what the product is, and it says nothing about its price.
+  return derivedDescription(product, max);
 };
 
 /**
@@ -406,11 +430,12 @@ const merchantProductSchema = (product, lang = "vi") => {
   // Google's description attribute is a product description, not a sale notice.
   // Sentences that only exist to run a promotion are dropped whole — a sentence
   // is the smallest unit that survives deletion with its grammar intact. If every
-  // sentence is promotional the raw text is kept rather than shipping an empty
-  // field, because a weak description is a warning and an empty one is an error.
+  // sentence was promotional, a line derived from the product's own name and
+  // platforms is used instead of the raw text: an empty field is an error, but a
+  // promotional one is the policy violation this code exists to remove.
   const rawDescription = String(product.description || product.shortDescription || "").replace(/\s+/g, " ").trim();
   const kept = rawDescription.split(/(?<=[.!?])\s+/).filter((sentence) => !PROMO_IN_TEXT.test(sentence)).join(" ").trim();
-  const description = (kept || rawDescription).slice(0, 5000);
+  const description = (kept || derivedDescription(product)).slice(0, 5000);
   return {
     "@type": "Product",
     "@id": `${url}#product`,
@@ -1282,7 +1307,11 @@ const paragraphBlocks = (text) => String(text || "").split(/\n{2,}/).map((block)
  * This removes those price tokens from every field that passes through
  * localize(), leaving the surrounding prose intact.
  */
-const VND_PRICE_RE = /\b\d{1,3}(?:[.,]\d{3})+\s*(?:đ|₫|VND)\b|\b\d+k\s*(?:VND|đ|₫)\b/gi;
+// No trailing \b on this pattern: JavaScript's \b is an ASCII word boundary,
+// and both "đ" and "₫" are non-ASCII, so the old pattern never matched
+// "199.000đ" — the exact form this catalogue uses. The currency word is matched
+// explicitly, with "đồng" before "đ" so the longer form is removed whole.
+const VND_PRICE_RE = /\b\d{1,3}(?:[.,]\d{3})+\s*(?:đồng|đ|₫|VND)|\b\d+k\s*(?:VND|đồng|đ|₫)/gi;
 const stripPrices = (text) => String(text || "").replace(VND_PRICE_RE, "").replace(/\s+/g, " ").trim();
 
 export function localize(product, lang) {
