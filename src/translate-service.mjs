@@ -15,6 +15,8 @@ import { join } from "node:path";
 
 const DEEPL_API_KEY = process.env.DEEPL_API_KEY;
 const DEEPL_URL = "https://api-free.deepl.com/v2/translate";
+const USE_GOOGLE = true;
+const GOOGLE_URL = "https://translate.googleapis.com/translate_a/single";
 const USE_LINGVA = true;
 const LINGVA_BASE = process.env.LINGVA_BASE || "https://lingva.ml";
 const USE_MYMEMORY = true;
@@ -131,6 +133,31 @@ async function translateChunk(text, target, source = "vi") {
   if (!srcCode || !tgtCode || srcCode === tgtCode) return text;
 
   const p = protect(text);
+
+  // 0. Google Translate free endpoint (no API key required) - most reliable.
+  if (USE_GOOGLE) {
+    for (let attempt = 0; attempt < 3; attempt++) {
+      try {
+        const url = `${GOOGLE_URL}?client=gtx&sl=${encodeURIComponent(srcCode)}&tl=${encodeURIComponent(tgtCode)}&dt=t&q=${encodeURIComponent(p.text)}`;
+        const res = await fetch(url);
+        if (res.status === 429 || res.status >= 500) {
+          await sleep(400 * Math.pow(2, attempt));
+          continue;
+        }
+        if (res.ok) {
+          const data = await res.json();
+          const parts = Array.isArray(data?.[0]) ? data[0] : [];
+          const out = parts.map((x) => (Array.isArray(x) ? x[0] : "")).join("");
+          if (out && out.trim()) {
+            return unprotect(out, p.map);
+          }
+        }
+        break;
+      } catch (e) {
+        await sleep(400 * Math.pow(2, attempt));
+      }
+    }
+  }
 
   // 1. Lingva (no API key required)
   if (USE_LINGVA) {
