@@ -1514,11 +1514,9 @@ function codeToEmoji(code) {
 function openCombobox(combobox) {
   const dropdown = combobox.querySelector('.lang-dropdown');
   const trigger = combobox.querySelector('.lang-trigger');
-  const label = combobox.closest('.lang-combobox-wrap')?.querySelector('[data-lang-label]');
   if (dropdown) { dropdown.setAttribute('aria-hidden', 'false'); }
   if (trigger) { trigger.setAttribute('aria-expanded', 'true'); }
   combobox.setAttribute('aria-expanded', 'true');
-  if (label) label.classList.add('lang-label--hidden');
 }
 
 function closeCombobox(combobox) {
@@ -1528,10 +1526,7 @@ function closeCombobox(combobox) {
   if (dropdown) { dropdown.setAttribute('aria-hidden', 'true'); }
   if (trigger) { trigger.setAttribute('aria-expanded', 'false'); }
   combobox.setAttribute('aria-expanded', 'false');
-  if (label) {
-    label.classList.remove('lang-label--hidden');
-    label.textContent = LANG_LABELS[current] || current.toUpperCase();
-  }
+  if (label) label.textContent = LANG_LABELS[current] || current.toUpperCase();
   const flag = combobox.querySelector('[data-lang-flag]');
   if (flag) flag.textContent = FLAG_EMOJI[current] || codeToEmoji(current);
 }

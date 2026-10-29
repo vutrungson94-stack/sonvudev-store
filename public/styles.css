@@ -365,8 +365,7 @@
    Every other page reads the choice from localStorage, which the dictionary does
    before it paints anything, so the button on those pages was a duplicate control
    for a decision already made. */
-.lang-label{font:inherit;font-weight:600;font-size:12px;letter-spacing:.08em;color:var(--muted,#4a5568);margin-right:8px;transition:opacity .18s ease,visibility .18s ease}
-.lang-label--hidden{opacity:0;visibility:hidden;width:0;margin-right:0;overflow:hidden}
+.lang-label{font:inherit;font-weight:600;font-size:12px;letter-spacing:.08em;color:var(--muted,#4a5568);margin-right:8px}
 .lang-combobox{position:relative;display:inline-flex;flex:0 0 auto}
 .lang-trigger{display:inline-flex;align-items:center;gap:6px;font:inherit;font-weight:600;font-size:12px;letter-spacing:.08em;color:var(--muted,#4a5568);background:transparent;border:1px solid #cbd9d2;border-radius:999px;padding:6px 12px;cursor:pointer;transition:background .18s ease,color .18s ease}
 .lang-trigger:hover{color:var(--green)}
