@@ -327,11 +327,20 @@ const organization = () => ({
   url: `${site()}/`,
   logo: absolute(LOGO_PATH),
   description: env.brand.description,
-  address: { "@type": "PostalAddress", addressCountry: "VN" },
-  // The profile accounts for the same shop elsewhere. This is the one thing that
-  // links this storefront to the rest of the web in a knowledge graph: with an
-  // empty sameAs the brand is an island that nothing can corroborate, and an
-  // unverifiable entity is one a model has no reason to quote.
+  // Contact details for the Merchant Center misrepresentation check and for
+  // Google's knowledge graph: a brand with a real address and phone is treated
+  // as a verifiable entity, an anonymous one is not. Hardcoded here rather than
+  // read from env so the deploy contract (render.yaml/.env.example) does not
+  // gain five new variables; a solo developer changes them in this one place.
+  telephone: "+84348808045",
+  address: {
+    "@type": "PostalAddress",
+    streetAddress: "Đường XH3, Tổ 4, Khu Phố Phú Điền",
+    addressLocality: "Phường Chánh Phú Hòa",
+    addressRegion: "Thành Phố Hồ Chí Minh",
+    postalCode: "75913",
+    addressCountry: "VN",
+  },
   ...(env.brand.socialLinks.length ? { sameAs: env.brand.socialLinks } : {}),
   // A named person behind the shop. Anonymous storefronts get cited far less
   // readily than a place with a human attached to it.
