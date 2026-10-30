@@ -1323,6 +1323,29 @@ const paragraphBlocks = (text) => String(text || "").split(/\n{2,}/).map((block)
 const VND_PRICE_RE = /\b\d{1,3}(?:[.,]\d{3})+\s*(?:đồng|đ|₫|VND)|\b\d+k\s*(?:VND|đồng|đ|₫)/gi;
 const stripPrices = (text) => String(text || "").replace(VND_PRICE_RE, "").replace(/\s+/g, " ").trim();
 
+/**
+ * Removes promotional or price-carrying sentences from a text block.
+ *
+ * A sentence is anything separated by terminal punctuation (`.`, `!`, `?`)
+ * followed by whitespace. Sentences that carry a price, a discount, a
+ * deadline or a call to action are dropped whole — a partial rewrite leaves
+ * the grammar broken ("all features for instead of .").
+ *
+ * Used by the machine-readable catalogue (`/feed.json`, `/llms.txt`) so the
+ * data a crawler reads carries the same amount of promotional noise as the
+ * page's `Product`/`Offer` schema, and by nothing else.
+ */
+const stripPromotionalSentences = (text) => {
+  const trimmed = String(text ?? "").replace(/\s+/g, " ").trim();
+  if (!trimmed) return trimmed;
+  const kept = trimmed
+    .split(/(?<=[.!?])\s+/)
+    .filter((sentence) => !PROMO_IN_TEXT.test(sentence))
+    .join(" ")
+    .trim();
+  return kept;
+};
+
 export function localize(product, lang) {
   if (!product) return product;
   const resolved = lang === "en" ? localizeToEnglish(product) : product;
@@ -1582,7 +1605,7 @@ export function renderLlmsTxt(products) {
           product.version ? `v${product.version}` : "",
           money(product.price, product.currency),
         ].filter(Boolean).join(" · ");
-        return `- [${product.name}](${absolute(productUrl(product.slug))}): ${productSummary(product, 120)} (${facts})`;
+        return `- [${product.name}](${absolute(productUrl(product.slug))}): ${stripPromotionalSentences(productSummary(product, 120))} (${facts})`;
       }).join("\n")
       : "- The catalogue is empty at the moment.",
     "",
@@ -1625,7 +1648,7 @@ export function renderFeed(products) {
         "@type": "SoftwareApplication",
         "@id": absolute(`${productUrl(product.slug)}#software`),
         name: product.name,
-        description: productSummary(product, 300),
+        description: stripPromotionalSentences(productSummary(product, 300)),
         url: absolute(productUrl(product.slug)),
         image: productImage(product),
         brand: { "@type": "Brand", name: brand() },
