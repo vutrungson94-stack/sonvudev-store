@@ -67,7 +67,14 @@ if (!ADMIN_API_TOKEN) {
 
 // The live site URL. Must come from the environment so the same script works
 // across dev, staging and production without editing source.
-const APP_URL = String(process.env.APP_URL || "").replace(/\/+$/, "");
+const APP_URL = String(process.env.APP_URL || (() => {
+  try {
+    const env = readFileSync(`${projectRoot}/.env`, "utf8");
+    return env.match(/^APP_URL=(.+)$/m)?.[1]?.trim() || "";
+  } catch {
+    return "";
+  }
+})()).replace(/\/+$/, "");
 if (!APP_URL) {
   console.error("[sync] ERROR: APP_URL is not set. Export it or add it to .env.");
   process.exit(1);

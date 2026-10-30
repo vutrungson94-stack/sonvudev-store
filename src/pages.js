@@ -76,7 +76,12 @@ export function productSummary(product, max = 155) {
   // language and stripped of prices; the snake_case field is the raw database
   // row. Preferring the raw row put Vietnamese text in English metadata and
   // reintroduced prices the render path had just removed.
-  const source = fillCopy(product.shortDescription || product.short_description || product.description || "").replace(/\s+/g, " ").trim();
+  //
+  // For machine-readable outputs (/llms.txt, /feed.json) we prefer the English
+  // copy when it exists, because those endpoints are read by search engines and
+  // assistants that do not negotiate a language. A Vietnamese summary there is
+  // not a fallback — it is the only text the crawler sees.
+  const source = fillCopy(product.shortDescriptionEn || product.shortDescription || product.short_description || product.description || "").replace(/\s+/g, " ").trim();
   if (source.length <= max) return source;
   const cut = source.slice(0, max);
   return `${cut.slice(0, cut.lastIndexOf(" "))}…`;
