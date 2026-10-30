@@ -1598,17 +1598,22 @@ ${price}
  */
 export function renderLlmsTxt(products) {
   const sellable = (products || []).filter(isSellable);
+  // Machine-readable endpoints are read by search engines and LLM agents that
+  // do not negotiate a language, so the tagline and prices here must be English
+  // and currency-neutral. The site-facing copy stays in the user's language.
+  const plainPrice = (amount, currency) =>
+    currency === "VND" ? `${Number(amount) || 0} VND` : money(amount, currency);
   const lines = [
     `# ${brand()}`,
     "",
-    `> ${organization().description}`,
+    `> Software tools and utilities for businesses and individuals.`,
     "",
     sellable.length
       ? sellable.map((product) => {
         const facts = [
           `${product.platform || "Windows"}`,
           product.version ? `v${product.version}` : "",
-          money(product.price, product.currency),
+          plainPrice(product.price, product.currency),
         ].filter(Boolean).join(" · ");
         return `- [${product.name}](${absolute(productUrl(product.slug))}): ${stripPromotionalSentences(productSummary(product, 120))} (${facts})`;
       }).join("\n")

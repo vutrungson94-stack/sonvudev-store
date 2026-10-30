@@ -192,7 +192,12 @@ export const env = {
     endpoint: value("INDEXNOW_ENDPOINT", "https://api.indexnow.org/indexnow"),
   },
   notify: {
-    resendApiUrl: value("RESEND_API_URL", "https://api.resend.com/emails"),
+    // The user may set RESEND_API_URL without the /emails path; normalize it
+    // here so the rest of the code and the tests can rely on one shape.
+    resendApiUrl: (() => {
+      const raw = value("RESEND_API_URL", "https://api.resend.com/emails");
+      return raw.replace(/\/+$/, "").endsWith("/emails") ? raw : `${raw.replace(/\/+$/, "")}/emails`;
+    })(),
   },
   orders: {
     // Unpaid orders are cancelled once this many hours have passed. The window
