@@ -1205,12 +1205,27 @@ const I18N = {
       const value = table[`product.copy.${slug}.${field}`];
       return value === undefined || value === null || value === '' ? undefined : value;
     };
+    // Strip hardcoded shelf prices from translated product copy.
+    //
+    // The catalogue stores the price as a number in the database and renders it
+    // through structured data and the price component, so any price written into
+    // prose is a duplicate that Google treats as a mismatch. The Vietnamese
+    // source rows carry prices because they were written for a sale; the
+    // per-locale asset was translated from that source, so the overlay inherits
+    // the same tokens. Removing them here means every language the shop ships
+    // gets the same price-free prose without touching the locale files.
+    const stripPrices = (text) => {
+      if (typeof text !== 'string') return text;
+      return text
+        .replace(/\b\d{1,3}(?:[., ]\d{3})+\s*(?:đồng|đ|₫|VND)|\b\d+k\s*(?:VND|đồng|đ|₫)/gi, '')
+        .replace(/\s+/g, ' ').trim();
+    };
     const copy = {
-      name: read('name'),
-      shortDescription: read('shortDescription'),
-      description: read('description'),
-      requirements: read('requirements'),
-      features: read('features'),
+      name: stripPrices(read('name')),
+      shortDescription: stripPrices(read('shortDescription')),
+      description: stripPrices(read('description')),
+      requirements: stripPrices(read('requirements')),
+      features: Array.isArray(read('features')) ? read('features').map(stripPrices) : read('features'),
     };
     return Object.values(copy).some((value) => value !== undefined) ? copy : null;
   },

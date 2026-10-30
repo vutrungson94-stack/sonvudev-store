@@ -358,7 +358,7 @@
   "paypal.successHint": "谢谢。您的订单查询码已发送至您的邮箱。",
   "paypal.wait": "请勿关闭此页面。",
   "product.buyNow": "立即购买",
-  "product.copy.dotnet-sdk-portable-updater.description": "在任何计算机上安装 .NET SDK — 包括您没有管理员权限的计算机。\n\n被公司政策锁定，不允许更改机器路径，或借用的实验室计算机：该工具涵盖了所有三个。\n\n它的作用\n直接读取 Microsoft 的版本索引，为您要求的渠道选择正确的 SDK，下载与您的 CPU 匹配的存档，根据 Microsoft 发布的哈希验证其 SHA-512，解压它，然后设置 DOTNET_ROOT 并将该文件夹添加到您自己的用户 PATH 中。\n\n它与 Microsoft 的 dotnet-install.ps1 有何不同\n官方脚本确实在用户范围内安装了 SDK，但您仍然必须自己设置 DOTNET_ROOT 并编辑 PATH，并且被取代的 SDK 文件夹将永远保留。这三个步骤都完成了，并且拒绝安装不支持的通道。\n\n特权\n仅限用户范围。它从不触及机器级环境变量，也从不要求提升。",
+  "product.copy.dotnet-sdk-portable-updater.description": "在任何计算机上安装 .NET SDK — 包括您没有管理员权限的计算机。 被公司政策锁定，不允许更改机器路径，或借用的实验室计算机：该工具涵盖了所有三个。 它的作用 直接读取 Microsoft 的版本索引，为您要求的渠道选择正确的 SDK，下载与您的 CPU 匹配的存档，根据 Microsoft 发布的哈希验证其 SHA-512，解压它，然后设置 DOTNET_ROOT 并将该文件夹添加到您自己的用户 PATH 中。 它与 Microsoft 的 dotnet-install.ps1 有何不同 官方脚本确实在用户范围内安装了 SDK，但您仍然必须自己设置 DOTNET_ROOT 并编辑 PATH，并且被取代的 SDK 文件夹将永远保留。这三个步骤都完成了，并且拒绝安装不支持的通道。 特权 仅限用户范围。它从不触及机器级环境变量，也从不要求提升。",
   "product.copy.dotnet-sdk-portable-updater.features": [
     "无需管理员权限，绝不修改系统级环境变量。",
     "设置 DOTNET_ROOT，并把安装目录加入当前用户的 PATH 开头。",
@@ -376,7 +376,7 @@
   "product.copy.dotnet-sdk-portable-updater.name": ".NET SDK 便携安装器",
   "product.copy.dotnet-sdk-portable-updater.requirements": "Windows 10 内部版本 1903 或更高版本、Windows 11 或 Windows Server 2019+。需要 .NET Framework 4.8（在上述操作系统上可用）。大约 2 GB 可用空间。在用户范围内运行。",
   "product.copy.dotnet-sdk-portable-updater.shortDescription": "在没有管理员权限的电脑上安装 .NET SDK：自动设置 DOTNET_ROOT 和 PATH、清理旧 SDK、校验 SHA-512。",
-  "product.copy.excel-trusted-locations-setup.description": "运行此文件可使您的 Excel 工作区停止阻止宏。\n\n默认情况下，Excel 会阻止来自内部共享和映射驱动器的宏和文件。手动编辑设置意味着没有人记得更改了什么，并且您在网上找到的指南会完全关闭受保护的视图。此脚本仅将您选择的文件夹添加到受信任位置列表中 - 正是需要信任的位置，而不会扩大攻击面。\n\n当您需要时\n\n- 在工作中打开 .xlsm 或 .xlsb 报告宏被禁用\n- 映射驱动器（Z: 或网络路径）上的文件打开被阻止\n- 您不想手动编辑 Excel 选项或删除受保护的视图\n\n这个工具有什么作用\n\n1. 将您选择的文件夹添加到 Excel 受信任位置\n2. 为安装的 Excel 版本启用受信任位置\n3.清理带有该工具自身指纹的条目，包括旧版本留下的条目\n4. 将每个操作记录到日志中以供以后查看\n\n该工具不做什么\n\n- 不创建宏\n- 不禁用受保护的视图，除非 ini 中显示禁用网络\n- 不自动信任下载或临时文件\n- 不会永久删除文件或文件夹\n- 永远不会删除 IT 管理员配置的条目\n\n安全地图：四个门\n\n1号门，系统目录被封锁。 C:\\Windows、C:\\Program Files、C:\\Program Files (x86) 以及它们下面的所有内容。即使使用 /yes，选择其中任何一个都会被彻底拒绝。\n\nGate 2，下载永远不会被自动信任。下载是恶意软件最常传播的地方。信任它意味着放置在那里的每个 .xlsm 都会立即运行宏，包括陌生人发送的文件。无声的奔跑完全拒绝；交互式运行会显示红色警告，并要求您输入 y 才能继续。\n\nGate 3，一次要求一个网络驱动器，默认没有。找到的每个映射驱动器都会被单独询问，默认答案是否定的。只有 ini 中的 autoTrustMapped=1 会跳过该问题，并且该选择由您自己决定。\n\nGate 4，Excel运行表示运行被拒绝。 Excel 退出时会写回其安全设置，因此运行时添加的条目会被覆盖。当检测到 EXCEL.EXE 时，即使使用 /yes，实际运行也会被拒绝。\n\n操作：三种模式\n\n自动从 ini 的文件夹部分读取文件夹列表，然后询问每个映射的网络驱动器。脚本中没有硬编码路径或服务器地址。\n\n驱动器信任整个驱动器。这是可能的最广泛的操作，因此它始终需要确认：拒绝不带 /yes 的静默运行。\n\n文件夹信任一个特定文件夹，并处理包含空格的路径。\n\n提交前预览\n\n键入命令trusted_locations_excel_safe.bat /auto /dryrun\n\n/dryrun 模式打印将更改的内容并且不写入任何内容：没有注册表项，没有日志条目，没有快照。一旦你高兴了，就放弃/dryrun。这是在企业推出之前评估该工具时使用的模式。\n\n撤消：三秒，没有丢失任何内容\n\n每次实际运行都会在写入任何内容之前对注册表进行快照。要回滚，请双击undo_trusted_locations.bat 或运行命令trusted_locations_excel_safe.bat /undo。\n\n仅恢复快照的密钥。不会删除任何文件夹，不会触及任何文件，也不会创建或删除任何条目 - 这是以前状态的干净恢复。\n\n剩余文件夹将进入回收站，从未被删除\n\n在 ini 中设置 cleanupJunk=1 时，垃圾部分中命名的文件夹将被发送到 Windows 回收站，因此可以以正常方式恢复它们。如果移动无法完成，文件夹将保持不变并报告失败。\n\n以前的版本使用 rmdir /s /q，这会不可恢复地破坏数据。这就是为什么 cleanupJunk 默认处于关闭状态并从 ini 读取文件夹名称。\n\n记录：每个动作都会留下痕迹\n\n每次运行都会附加一行，其中包含日期、时间、用户和计算机名称：哪个文件夹受信任、哪些文件夹被拒绝以及撤消运行的时间。足以让 IT 在重要时协调变更。\n\n自上一版本以来发生了什么变化\n\nQUERY LENGTH LIMIT EXCEEDED. MAX ALLOWED QUERY : 500 CHARS\n\n从旧版本升级\n\n旧版本将其条目命名为 Trust_，当前版本使用 SV_。升级后，两者可以同时存在。没有任何损坏，Excel 合并了它们，但重复的看起来不整洁。\n\n运行该工具一次，它会自行清理：仅删除带有自己指纹的条目，而 IT 管理员设置的任何内容都保留在原处。每次运行都会打印删除了多少条目以及留下了多少条目，因此您可以看到之前和之后的差异。\n\n你应该知道的事情\n\n- 受信任的文件夹运行其中放置的每个 .xlsm 的宏，包括您不认识的人发送的文件。这就是可信位置的工作原理。\n- 除非必要，否则不要信任下载，也不要信任公司范围内的文件共享。\n- 不要信任共享计算机上的整个驱动器、驱动器模式。\n- 该工具仅写入 HKCU；标准用户权限就足够了，不需要管理员。\n- 该包不包含凭据、令牌或登录详细信息。\n\n系统要求\n\n- Windows 10 或 11\n- 安装了 Microsoft Excel，自动检测版本\n- 无需管理员权限\n- Excel运行前必须完全关闭",
+  "product.copy.excel-trusted-locations-setup.description": "运行此文件可使您的 Excel 工作区停止阻止宏。 默认情况下，Excel 会阻止来自内部共享和映射驱动器的宏和文件。手动编辑设置意味着没有人记得更改了什么，并且您在网上找到的指南会完全关闭受保护的视图。此脚本仅将您选择的文件夹添加到受信任位置列表中 - 正是需要信任的位置，而不会扩大攻击面。 当您需要时 - 在工作中打开 .xlsm 或 .xlsb 报告宏被禁用 - 映射驱动器（Z: 或网络路径）上的文件打开被阻止 - 您不想手动编辑 Excel 选项或删除受保护的视图 这个工具有什么作用 1. 将您选择的文件夹添加到 Excel 受信任位置 2. 为安装的 Excel 版本启用受信任位置 3.清理带有该工具自身指纹的条目，包括旧版本留下的条目 4. 将每个操作记录到日志中以供以后查看 该工具不做什么 - 不创建宏 - 不禁用受保护的视图，除非 ini 中显示禁用网络 - 不自动信任下载或临时文件 - 不会永久删除文件或文件夹 - 永远不会删除 IT 管理员配置的条目 安全地图：四个门 1号门，系统目录被封锁。 C:\\Windows、C:\\Program Files、C:\\Program Files (x86) 以及它们下面的所有内容。即使使用 /yes，选择其中任何一个都会被彻底拒绝。 Gate 2，下载永远不会被自动信任。下载是恶意软件最常传播的地方。信任它意味着放置在那里的每个 .xlsm 都会立即运行宏，包括陌生人发送的文件。无声的奔跑完全拒绝；交互式运行会显示红色警告，并要求您输入 y 才能继续。 Gate 3，一次要求一个网络驱动器，默认没有。找到的每个映射驱动器都会被单独询问，默认答案是否定的。只有 ini 中的 autoTrustMapped=1 会跳过该问题，并且该选择由您自己决定。 Gate 4，Excel运行表示运行被拒绝。 Excel 退出时会写回其安全设置，因此运行时添加的条目会被覆盖。当检测到 EXCEL.EXE 时，即使使用 /yes，实际运行也会被拒绝。 操作：三种模式 自动从 ini 的文件夹部分读取文件夹列表，然后询问每个映射的网络驱动器。脚本中没有硬编码路径或服务器地址。 驱动器信任整个驱动器。这是可能的最广泛的操作，因此它始终需要确认：拒绝不带 /yes 的静默运行。 文件夹信任一个特定文件夹，并处理包含空格的路径。 提交前预览 键入命令trusted_locations_excel_safe.bat /auto /dryrun /dryrun 模式打印将更改的内容并且不写入任何内容：没有注册表项，没有日志条目，没有快照。一旦你高兴了，就放弃/dryrun。这是在企业推出之前评估该工具时使用的模式。 撤消：三秒，没有丢失任何内容 每次实际运行都会在写入任何内容之前对注册表进行快照。要回滚，请双击undo_trusted_locations.bat 或运行命令trusted_locations_excel_safe.bat /undo。 仅恢复快照的密钥。不会删除任何文件夹，不会触及任何文件，也不会创建或删除任何条目 - 这是以前状态的干净恢复。 剩余文件夹将进入回收站，从未被删除 在 ini 中设置 cleanupJunk=1 时，垃圾部分中命名的文件夹将被发送到 Windows 回收站，因此可以以正常方式恢复它们。如果移动无法完成，文件夹将保持不变并报告失败。 以前的版本使用 rmdir /s /q，这会不可恢复地破坏数据。这就是为什么 cleanupJunk 默认处于关闭状态并从 ini 读取文件夹名称。 记录：每个动作都会留下痕迹 每次运行都会附加一行，其中包含日期、时间、用户和计算机名称：哪个文件夹受信任、哪些文件夹被拒绝以及撤消运行的时间。足以让 IT 在重要时协调变更。 自上一版本以来发生了什么变化 QUERY LENGTH LIMIT EXCEEDED. MAX ALLOWED QUERY : 500 CHARS 从旧版本升级 旧版本将其条目命名为 Trust_，当前版本使用 SV_。升级后，两者可以同时存在。没有任何损坏，Excel 合并了它们，但重复的看起来不整洁。 运行该工具一次，它会自行清理：仅删除带有自己指纹的条目，而 IT 管理员设置的任何内容都保留在原处。每次运行都会打印删除了多少条目以及留下了多少条目，因此您可以看到之前和之后的差异。 你应该知道的事情 - 受信任的文件夹运行其中放置的每个 .xlsm 的宏，包括您不认识的人发送的文件。这就是可信位置的工作原理。 - 除非必要，否则不要信任下载，也不要信任公司范围内的文件共享。 - 不要信任共享计算机上的整个驱动器、驱动器模式。 - 该工具仅写入 HKCU；标准用户权限就足够了，不需要管理员。 - 该包不包含凭据、令牌或登录详细信息。 系统要求 - Windows 10 或 11 - 安装了 Microsoft Excel，自动检测版本 - 无需管理员权限 - Excel运行前必须完全关闭",
   "product.copy.excel-trusted-locations-setup.features": [
     "三种模式：Auto（读取 ini）、Drive、Folder——目标由你选择",
     "下载文件夹绝不自动信任：红色警告并需明确确认",
@@ -395,7 +395,7 @@
   "product.copy.excel-trusted-locations-setup.name": "Excel 受信任位置设置",
   "product.copy.excel-trusted-locations-setup.requirements": "Windows 10/11，安装了 Microsoft Excel。无需管理员权限。 Excel 运行前必须完全退出。",
   "product.copy.excel-trusted-locations-setup.shortDescription": ".xlsm 宏被 Excel 拦截？把所选文件夹加入受信任位置，支持预演（dry-run）、撤销和审计日志。不删除文件、不改动 IT 设置、无需管理员权限。",
-  "product.copy.mousewheel-vba.description": "MouseWheel for VBA 是一个独立的 VBA 模块，支持 ListBox、ComboBox、Frame 控件和 UserForm 本身的鼠标滚轮滚动 — VBA 不支持开箱即用。导入一个 .bas 文件并添加两行代码。\n\nQUERY LENGTH LIMIT EXCEEDED. MAX ALLOWED QUERY : 500 CHARS",
+  "product.copy.mousewheel-vba.description": "MouseWheel for VBA 是一个独立的 VBA 模块，支持 ListBox、ComboBox、Frame 控件和 UserForm 本身的鼠标滚轮滚动 — VBA 不支持开箱即用。导入一个 .bas 文件并添加两行代码。 QUERY LENGTH LIMIT EXCEEDED. MAX ALLOWED QUERY : 500 CHARS",
   "product.copy.mousewheel-vba.features": [
     "为 ListBox / ComboBox / Frame / UserForm 启用滚轮",
     "只需一个 .bas 文件，添加两行代码即可",
@@ -439,17 +439,17 @@
   "product.copy.ramcleaner-business.name": "RAMCleaner 企业版",
   "product.copy.ramcleaner-business.requirements": "Windows 10/11 (x64)、Linux (glibc 2.31+)、macOS 10.15+ |需要管理员/root 权限才能使用激进模式",
   "product.copy.ramcleaner-business.shortDescription": "企业级内存清理——10 台设备、集中部署、优先支持。",
-  "product.copy.ramcleaner-earlybird.description": "前 100 名顾客可享受早鸟优惠。完整的 RAMCleaner 个人功能售价为 199,000đ（比标准价格 299,000đ 低 33%）。一旦 100 份售完，价格就会恢复正常。包括终身更新。 Windows 10/11 (x64)。",
+  "product.copy.ramcleaner-earlybird.description": "前 100 名顾客可享受早鸟优惠。完整的 RAMCleaner 个人功能售价为 （比标准价格 低 33%）。一旦 100 份售完，价格就会恢复正常。包括终身更新。 Windows 10/11 (x64)。",
   "product.copy.ramcleaner-earlybird.features": [
     "RAMCleaner 个人版全部功能",
-    "早鸟价 199,000đ（比标准价低 33%）",
+    "早鸟价 （比标准价低 33%）",
     "限量 100 份，售完即止",
     "与标准版相同的终身更新",
     "支持 Windows 10/11 (x64)"
   ],
   "product.copy.ramcleaner-earlybird.name": "RAMCleaner 早鸟版",
   "product.copy.ramcleaner-earlybird.requirements": "Windows 10/11 (x64)、Linux (glibc 2.31+)、macOS 10.15+ |需要管理员/root 才能使用激进模式",
-  "product.copy.ramcleaner-earlybird.shortDescription": "前 100 名客户专享——199,000đ（立减 33%）。",
+  "product.copy.ramcleaner-earlybird.shortDescription": "前 100 名客户专享——（立减 33%）。",
   "product.copy.ramcleaner-personal.description": "RAMCleaner Personal 可释放待机/修改过的 RAM、压缩内存并清理临时文件，以实现更流畅的游戏和繁重的工作负载。便携式运行 - 无需安装，基本模式无需管理员权限。支持 Windows 10/11 (x64)。",
   "product.copy.ramcleaner-personal.features": [
     "自动清理待机/已修改/列表内存",
@@ -463,7 +463,7 @@
   "product.copy.ramcleaner-personal.name": "RAMCleaner 个人版",
   "product.copy.ramcleaner-personal.requirements": "Windows 10/11 (x64)、Linux (glibc 2.31+)、macOS 10.15+ |需要管理员/root 才能使用激进模式",
   "product.copy.ramcleaner-personal.shortDescription": "智能内存清理——个人授权，1 台设备，终身更新。",
-  "product.copy.spark-capacity-tester-pro.description": "Spark Capacity Tester 由 {{Founder}} 使用简单的 System.IO 重写。它不依赖于内核欺骗，因此防病毒工具无法将其标记为误报。\n\n结果以清晰的 [PASS]/[FAIL] 标记形式返回：正品驱动器报告其标签上印有的容量，假冒驱动器报告的实际容量要小得多，并带有欺诈的偏移量。您不需要任何技术知识即可阅读结果。\n\n版本 1.4.0 — 便携式构建，无需安装，无需管理员权限。\n\n在 WINDOWS 上运行 .EXE：Windows 可能会显示“Windows 保护了您的电脑”，因为该文件没有代码签名。单击“更多信息”，然后单击“仍然运行”。这是从互联网下载的软件的正常行为，而不是病毒的迹象。\n\n如何使用：插入 USB 驱动器或存储卡，运行 .exe，选择设备并按“检查”。整个运行过程需要几秒钟。\n\n无需安装，无需向驱动器写入任何内容，无需网络。",
+  "product.copy.spark-capacity-tester-pro.description": "Spark Capacity Tester 由 {{Founder}} 使用简单的 System.IO 重写。它不依赖于内核欺骗，因此防病毒工具无法将其标记为误报。 结果以清晰的 [PASS]/[FAIL] 标记形式返回：正品驱动器报告其标签上印有的容量，假冒驱动器报告的实际容量要小得多，并带有欺诈的偏移量。您不需要任何技术知识即可阅读结果。 版本 1.4.0 — 便携式构建，无需安装，无需管理员权限。 在 WINDOWS 上运行 .EXE：Windows 可能会显示“Windows 保护了您的电脑”，因为该文件没有代码签名。单击“更多信息”，然后单击“仍然运行”。这是从互联网下载的软件的正常行为，而不是病毒的迹象。 如何使用：插入 USB 驱动器或存储卡，运行 .exe，选择设备并按“检查”。整个运行过程需要几秒钟。 无需安装，无需向驱动器写入任何内容，无需网络。",
   "product.copy.spark-capacity-tester-pro.features": [
     "仅使用 System.IO，不易被杀毒软件误报",
     "清晰的 [PASS] / [FAIL] 结论，并给出假盘的容量偏差",
