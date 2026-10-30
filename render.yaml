@@ -150,7 +150,7 @@ services:
       - key: PAYPAL_ACCOUNT_EMAIL
         sync: false
 
-      # Render sits in front of this process and adds one X-Forwarded-For hop.
+    # Render sits in front of this process and adds one X-Forwarded-For hop.
       # 1 tells Express to trust exactly that one, which makes req.ip the buyer's
       # address — and req.ip is what the rate limiter counts on (src/app.js:84,
       # src/app.js:664). Left unset it defaults to 1 and works; setting it to 0
