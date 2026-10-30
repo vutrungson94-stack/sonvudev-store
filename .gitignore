@@ -21,6 +21,7 @@ public/build-report.json
 # Local runtime scratch
 logs/
 data/
+!data/products.json
 backup/
 .tmp-*
 
