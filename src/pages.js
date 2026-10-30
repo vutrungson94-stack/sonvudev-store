@@ -6,17 +6,17 @@ import { isSellable } from "./store.js";
 import { esc, money, formatBytes, initials } from "./format.js";
 import { commitHash } from "./lib/git.mjs";
 
-// The commit that produced this process, for CSS cache-busting. It used to be a
-// private copy of the git call that scripts/build-web.mjs also carries, so the
-// live page and the packaged page could name different stylesheet versions. Both
-// now read the one implementation in src/lib/git.mjs.
+// The commit that produced this process, for CSS cache-busting. This replaces a
+// private copy of the git call that scripts/build-web.mjs also carried, so the
+// live page and the packaged page could end up naming different stylesheet
+// versions. Both now read the single implementation in src/lib/git.mjs.
 const cssVersion = commitHash().slice(0, 8);
 
-// Product pages are rendered here, on the server, rather than in the browser.
-// The storefront ships an empty skeleton and fills it in with JavaScript, which
-// is fine for a person but leaves a search engine with a page of empty headings
-// and no products. It also leaves link-preview crawlers — the ones Facebook,
-// Zalo and Telegram use when someone shares your URL — with nothing at all.
+// Product pages are rendered on the server here, not in the browser. The
+// storefront sends an empty skeleton and fills it in with JavaScript. That is
+// fine for a person, but leaves a search engine with a page of empty headings
+// and no products, and it leaves link-preview crawlers (those used by Facebook,
+// Zalo and Telegram when a URL is shared) with nothing at all.
 //
 // Everything a crawler needs has to be in the bytes the server sends.
 //
