@@ -548,9 +548,8 @@
   "product.label.badge.updated": "Aktualisiert",
   "product.label.badge.value": "Wert",
   "product.label.category.bundle": "Bündeln",
-  "product.label.category.other": "Andere",
-  "product.label.category.software": "Software",
-  "product.label.category.tools": "Werkzeuge",
-  "product.label.category.utilities": "Dienstprogramme",
-  "product.label.category.utility": "Dienstprogramm"
+  "product.label.category.khac": "Andere",
+  "product.label.category.phan-mem": "Software",
+  "product.label.category.cong-cu": "Werkzeuge",
+  "product.label.category.tien-ich": "Dienstprogramm"
 }

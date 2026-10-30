@@ -548,9 +548,8 @@
   "product.label.badge.updated": "Actualizado",
   "product.label.badge.value": "Valor",
   "product.label.category.bundle": "Manojo",
-  "product.label.category.other": "Otro",
-  "product.label.category.software": "Software",
-  "product.label.category.tools": "Herramientas",
-  "product.label.category.utilities": "Utilidades",
-  "product.label.category.utility": "Utilidad"
+  "product.label.category.khac": "Otro",
+  "product.label.category.phan-mem": "Software",
+  "product.label.category.cong-cu": "Herramientas",
+  "product.label.category.tien-ich": "Utilidad"
 }

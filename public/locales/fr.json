@@ -548,9 +548,8 @@
   "product.label.badge.updated": "Mis à jour",
   "product.label.badge.value": "Valeur",
   "product.label.category.bundle": "Paquet",
-  "product.label.category.other": "Autre",
-  "product.label.category.software": "Logiciel",
-  "product.label.category.tools": "Outils",
-  "product.label.category.utilities": "Utilitaires",
-  "product.label.category.utility": "Utilitaire"
+  "product.label.category.khac": "Autre",
+  "product.label.category.phan-mem": "Logiciel",
+  "product.label.category.cong-cu": "Outils",
+  "product.label.category.tien-ich": "Utilitaire"
 }
