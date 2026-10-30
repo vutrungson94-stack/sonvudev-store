@@ -1,95 +1,5 @@
 [
   {
-    "id": "sonvu-starter",
-    "slug": "sonvu-starter",
-    "name": "SonVu Starter",
-    "shortDescription": "Bộ công cụ nền cho người mới bắt đầu.",
-    "description": "Sản phẩm mẫu. Thay nội dung này bằng mô tả phần mềm thật của bạn.",
-    "category": "Công cụ",
-    "platform": "Windows",
-    "version": "1.0.0",
-    "price": 149000,
-    "currency": "VND",
-    "badge": "Phổ biến",
-    "features": [
-      "Giao diện tiếng Việt",
-      "Cập nhật miễn phí trong 12 tháng",
-      "Hỗ trợ qua email"
-    ],
-    "requirements": "Windows 10/11, 4 GB RAM",
-    "status": "active",
-    "fileKey": "",
-    "featured": true,
-    "nameEn": "SonVu Starter",
-    "shortDescriptionEn": "A foundational toolkit for beginners.",
-    "descriptionEn": "A starter program. Replace this content with your real software description.",
-    "featuresEn": [
-      "Vietnamese interface",
-      "Free updates for 12 months",
-      "Email support"
-    ]
-  },
-  {
-    "id": "sonvu-pro",
-    "slug": "sonvu-pro",
-    "name": "SonVu Pro",
-    "shortDescription": "Bộ tính năng nâng cao cho người dùng chuyên nghiệp.",
-    "description": "Sản phẩm mẫu cho gói Pro.",
-    "category": "Công cụ",
-    "platform": "Windows",
-    "version": "2.0.0",
-    "price": 349000,
-    "currency": "VND",
-    "badge": "Chuyên nghiệp",
-    "features": [
-      "Đầy đủ tính năng Pro",
-      "Ưu tiên hỗ trợ",
-      "Cập nhật lâu dài"
-    ],
-    "requirements": "Windows 10/11, 8 GB RAM",
-    "status": "active",
-    "fileKey": "",
-    "featured": true,
-    "nameEn": "SonVu Pro",
-    "shortDescriptionEn": "Advanced feature set for professional users.",
-    "descriptionEn": "Sample product for the Pro plan.",
-    "featuresEn": [
-      "All Pro features",
-      "Priority support",
-      "Long-term updates"
-    ]
-  },
-  {
-    "id": "sonvu-lifetime",
-    "slug": "sonvu-lifetime",
-    "name": "SonVu Lifetime",
-    "shortDescription": "Một lần mua, sử dụng lâu dài.",
-    "description": "Sản phẩm mẫu cho gói Lifetime.",
-    "category": "Bundle",
-    "platform": "Windows",
-    "version": "1.0.0",
-    "price": 699000,
-    "currency": "VND",
-    "badge": "Tiết kiệm",
-    "features": [
-      "Tất cả gói hiện có",
-      "License cá nhân",
-      "Ưu tiên cập nhật"
-    ],
-    "requirements": "Windows 10/11, 4 GB RAM",
-    "status": "active",
-    "fileKey": "",
-    "featured": false,
-    "nameEn": "SonVu Lifetime",
-    "shortDescriptionEn": "Buy once, use for the long term.",
-    "descriptionEn": "Sample product for the Lifetime plan.",
-    "featuresEn": [
-      "All current plans included",
-      "Personal license",
-      "Priority updates"
-    ]
-  },
-  {
     "id": "ramcleaner-personal",
     "slug": "ramcleaner-personal",
     "name": "RAMCleaner Personal",
@@ -195,14 +105,14 @@
     "featured": true,
     "nameEn": "RAMCleaner Early Bird",
     "shortDescriptionEn": "Early bird deal - 33% off for the first 100 customers.",
-    "descriptionEn": "Early Bird offer for the first 100 customers. Full RAMCleaner Personal features at 33% off the standard price. Once 100 copies sell out, price returns to standard. Lifetime updates included. Windows 10/11 (x64), Linux (x64), macOS (Intel & Apple Silicon).",
+    "descriptionEn": "Early Bird offer for the first 100 customers. Full RAMCleaner Personal features at a discounted introductory price. Once 100 copies sell out, the price returns to the standard rate. Lifetime updates included. Windows 10/11 (x64), Linux (x64), macOS (Intel and Apple Silicon).",
     "requirementsEn": "Windows 10/11 (x64), Linux (glibc 2.31+) or macOS 10.15+; admin/root only for aggressive mode.",
     "featuresEn": [
       "All RAMCleaner Personal features",
-      "Early bird price - 33% off standard",
-      "Only 100 copies - first come first served",
-      "Lifetime updates like standard edition",
-      "Windows 10/11 (x64), Linux (x64), macOS (Intel & Apple Silicon) support"
+      "Introductory early-bird price - limited to first 100 customers",
+      "Only 100 copies available - first come first served",
+      "Lifetime updates same as standard edition",
+      "Windows 10/11 (x64), Linux (x64), macOS (Intel and Apple Silicon) support"
     ]
   }
 ]
