@@ -128,10 +128,10 @@ test('productCopy chỉ trả về trường thật sự có trong asset', async
 
 test('nhãn danh mục và badge tra theo giá trị, kể cả khi gõ thiếu dấu', async () => {
   const { I18N } = await boot({ lang: 'ja' });
-  assert.equal(I18N.productLabel('category', 'Tools'), 'ツール');
-  assert.equal(I18N.productLabel('category', 'Utilities'), 'ユーティリティ');
-  assert.equal(I18N.productLabel('badge', 'Popular'), '人気');
-  assert.equal(I18N.productLabel('badge', 'Release 1.4.0'), 'v1.4.0 リリース', 'key suy ra từ giá trị, không cần bảng tay');
+  assert.equal(I18N.productLabel('category', 'Công cụ'), 'ツール');
+  assert.equal(I18N.productLabel('category', 'Tiện ích'), 'ユーティリティ');
+  assert.equal(I18N.productLabel('badge', 'Phổ biến'), '人気');
+  assert.equal(I18N.productLabel('badge', 'Phát hành 1.4.0'), 'v1.4.0 リリース', 'key suy ra từ giá trị, không cần bảng tay');
   assert.equal(I18N.productLabel('category', 'Không tồn tại'), null, 'giá trị lạ phải trả null để nơi gọi tự dự phòng');
 });
 
