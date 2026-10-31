@@ -45,7 +45,8 @@
     "backup": "node scripts/backup.mjs",
     "provenance": "node scripts/provenance.mjs",
     "benchmark": "node scripts/benchmark.mjs",
-    "trust:virustotal": "node scripts/set-virus-scan.mjs"
+    "trust:virustotal": "node scripts/set-virus-scan.mjs",
+    "merchant:feed": "node scripts/generate-merchant-feed.mjs"
   },
   "files": [
     "src",
