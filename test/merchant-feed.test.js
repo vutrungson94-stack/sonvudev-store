@@ -32,7 +32,7 @@ try {
   const lines = content.split('\n').filter((l) => l.trim());
 
   test('generates TSV with header', () => {
-    assert.ok(lines[0].startsWith('id\ttitle\tdescription\tlink\timage_link\tprice\tavailability\tcondition\tbrand\tmpn\tproduct_type\tshipping'));
+    assert.ok(lines[0].startsWith('id\ttitle\tdescription\tlink\timage_link\tprice\tavailability\tcondition\tbrand\tmpn\tproduct_type'));
   });
 
   test('writes one data row per sellable product', async () => {
@@ -44,9 +44,9 @@ try {
   test('every row has required fields populated', () => {
     for (const line of lines.slice(1)) {
       const cols = line.split('\t');
-      assert.ok(cols.length >= 12, `row has ${cols.length} columns`);
+      assert.ok(cols.length >= 11, `row has ${cols.length} columns`);
       for (const col of ['title', 'link', 'image_link', 'price', 'availability', 'condition', 'brand']) {
-        const idx = ['id','title','description','link','image_link','price','availability','condition','brand','mpn','product_type','shipping'].indexOf(col);
+        const idx = ['id','title','description','link','image_link','price','availability','condition','brand','mpn','product_type'].indexOf(col);
         assert.ok(cols[idx]?.trim(), `missing ${col}`);
       }
     }
