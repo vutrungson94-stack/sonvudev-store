@@ -2,9 +2,12 @@ import https from "node:https";
 import http from "node:http";
 
 const BING_API = "https://ssl.bing.com/webmaster/api.svc/json/SubmitUrlbatch";
-const SITEMAP_URL = process.env.SITE_URL
-  ? `${process.env.SITE_URL.replace(/\/$/, "")}/sitemap.xml`
-  : "https://sonvudev.com/sitemap.xml";
+const SITE_URL = process.env.SITE_URL?.replace(/\/$/, "");
+if (!SITE_URL) {
+  console.log("[skip] SITE_URL not set, skipping Bing sitemap submission.");
+  process.exit(0);
+}
+const SITEMAP_URL = `${SITE_URL}/sitemap.xml`;
 
 function request(url, body) {
   return new Promise((resolve, reject) => {
@@ -30,7 +33,7 @@ async function submitToBing() {
   console.log(`[bing] Submitting sitemap: ${SITEMAP_URL}`);
 
   const body = {
-    siteUrl: process.env.SITE_URL?.replace(/\/$/, "") || "https://sonvudev.com",
+    siteUrl: SITE_URL,
     urlList: [SITEMAP_URL],
   };
 
