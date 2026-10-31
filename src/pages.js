@@ -1732,6 +1732,10 @@ export function renderMerchantFeed(products) {
       escape("SonVuDev"),
       mpn,
       escape(product.category || "Software"),
+      "0",
+      "0",
+      "0",
+      "0",
     ].join("\t");
   });
 
@@ -1747,6 +1751,10 @@ export function renderMerchantFeed(products) {
     "brand",
     "mpn",
     "product_type",
+    "shipping_weight",
+    "shipping_length",
+    "shipping_width",
+    "shipping_height",
   ].join("\t");
 
   return [header, ...rows].join("\n") + "\n";
