@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{{title}}</title>
+  <meta name="description" content="{{description}}">
+  <link rel="canonical" href="{{url}}">
+  <meta property="og:type" content="article">
+  <meta property="og:site_name" content="SonVuDev">
+  <meta property="og:locale" content="{{locale}}">
+  <meta property="og:locale:alternate" content="{{localeAlternate}}">
+  <meta property="og:title" content="{{title}}">
+  <meta property="og:description" content="{{description}}">
+  <meta property="og:url" content="{{url}}">
+  <meta property="og:image" content="{{image}}">
+  <meta property="og:image:width" content="{{imageWidth}}">
+  <meta property="og:image:height" content="{{imageHeight}}">
+  <meta property="og:image:alt" content="{{title}}">
+  <meta property="article:published_time" content="{{published}}">
+  <meta property="article:modified_time" content="{{modified}}">
+  <meta property="article:author" content="SonVuDev">
+  <meta property="article:section" content="{{section}}">
+  {{#each tags}}
+  <meta property="article:tag" content="{{this}}">
+  {{/each}}
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="{{title}}">
+  <meta name="twitter:description" content="{{description}}">
+  <meta name="x-brand" content="SonVuDev">
+  <link rel="alternate" hreflang="vi" href="{{urlVi}}">
+  <link rel="alternate" hreflang="en" href="{{urlEn}}">
+  <link rel="alternate" hreflang="x-default" href="{{urlVi}}">
+</head>
+<body>
+  <article class="blog-post">
+    <header class="blog-header">
+      <div class="blog-meta">
+        <span class="blog-date">{{dateDisplay}}</span>
+        <span class="blog-section">{{section}}</span>
+      </div>
+      <h1>{{title}}</h1>
+      <p class="blog-lead">{{lead}}</p>
+    </header>
+    <div class="blog-content">
+      {{content}}
+    </div>
+    <footer class="blog-footer">
+      <div class="blog-related">
+        <h2>Related Products</h2>
+        <div id="related-products">Loading…</div>
+      </div>
+    </footer>
+  </article>
+</body>
+</html>
