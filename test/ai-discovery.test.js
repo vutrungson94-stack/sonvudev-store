@@ -391,13 +391,14 @@ test('/merchant-feed.tsv là TSV hợp lệ và có đủ trường GMC', async 
   assert.equal(created.status, 201);
   const text = await (await fetch(`${base}/merchant-feed.tsv`)).text();
   const lines = text.split('\n').filter((l) => l.trim());
-  assert.ok(lines[0].startsWith('id\ttitle\tdescription\tlink\timage_link\tprice\tavailability\tcondition\tbrand\tmpn\tproduct_type'));
+  assert.ok(lines[0].startsWith('id\ttitle\tdescription\tlink\timage_link\tprice\tavailability\tcondition\tbrand\tmpn\tproduct_type\tshipping'));
   assert.ok(lines.length >= 2, 'phải có ít nhất 1 sản phẩm');
   const cols = lines[1].split('\t');
-  assert.equal(cols.length, 11);
+  assert.equal(cols.length, 12);
   assert.match(cols[5], /\d+\s+(VND|USD|EUR|GBP)/);
   assert.equal(cols[6], 'in stock');
   assert.equal(cols[7], 'new');
+  assert.ok(cols[11].length > 0, 'shipping phải có giá trị');
 });
 
 // ---------------------------------------------------------------------------

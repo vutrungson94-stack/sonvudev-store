@@ -1731,6 +1731,7 @@ export function renderMerchantFeed(products) {
       escape("SonVuDev"),
       mpn,
       escape(product.category || "Software"),
+      escape("VN:free"),
     ].join("\t");
   });
 
@@ -1746,6 +1747,7 @@ export function renderMerchantFeed(products) {
     "brand",
     "mpn",
     "product_type",
+    "shipping",
   ].join("\t");
 
   return [header, ...rows].join("\n") + "\n";
