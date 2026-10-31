@@ -1716,7 +1716,7 @@ export function renderMerchantFeed(products) {
     const image = product.imageUrl
       ? product.imageUrl
       : absolute(`/og/${product.slug}.png`);
-    const price = `${Number(product.price) || 0} ${String(product.currency || "VND").toUpperCase()}`;
+    const price = `${Number(product.price) || 0} USD`;
     const mpn = String(product.id || product.slug);
 
     return [
@@ -1731,7 +1731,7 @@ export function renderMerchantFeed(products) {
       escape("SonVuDev"),
       mpn,
       escape(product.category || "Software"),
-      escape("VN:free"),
+      escape("US:free"),
     ].join("\t");
   });
 
