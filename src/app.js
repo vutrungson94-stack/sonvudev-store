@@ -11,7 +11,7 @@ import { paypalEnvironmentIsSet } from "./config.js";
 import { createDownloadUrl, createUploadUrl } from "./r2.js";
 import { captureOrder, createOrder as createPayPalOrder, hashToken, newOrderId, newToken, paypalChargeForProduct, paymentMatchesOrder, readOrder, verifyWebhook } from "./paypal.js";
 import { paymentInstructions, paymentOptions } from "./payments.js";
-import { analyticsMeta, brandMeta, esc, fillCopy, fillPageTokens, pageTokenValues, renderFeed, renderIndexCount, renderIndexFilters, renderIndexGrid, renderLlmsTxt, renderOgImage, renderProductPage, renderStats, tokenMeta, verificationFile, verificationMeta, REFUND_POLICY_UPDATED } from "./pages.js";
+import { analyticsMeta, brandMeta, esc, fillCopy, fillPageTokens, pageTokenValues, renderFeed, renderIndexCount, renderIndexFilters, renderIndexGrid, renderLlmsTxt, renderMerchantFeed, renderOgImage, renderProductPage, renderStats, tokenMeta, verificationFile, verificationMeta, REFUND_POLICY_UPDATED } from "./pages.js";
 import { hasPayment, isClosed, isUnpaid, markOrderDelivered, markOrderPaid, paymentDeadline, sweeperRunning, voidPayment } from "./orders.js";
 import { notifyOrder, notifyMode } from "./notify.js";
 import { resolveCountry } from "./geo.js";
@@ -446,6 +446,13 @@ app.get("/feed.json", async (_req, res, next) => {
   try {
     res.set("Cache-Control", "public, max-age=3600").type("application/json")
       .send(await cachedText("feed", renderFeed));
+  } catch (error) { next(error); }
+});
+
+app.get("/merchant-feed.tsv", async (_req, res, next) => {
+  try {
+    res.set("Cache-Control", "public, max-age=3600").type("text/plain; charset=utf-8")
+      .send(await cachedText("merchant-feed", renderMerchantFeed));
   } catch (error) { next(error); }
 });
 

@@ -1690,6 +1690,67 @@ export function renderFeed(products) {
   };
 }
 
+/**
+ * Google Merchant Center feed as TSV.
+ *
+ * This exists so GMC can ingest the live catalogue without a third-party
+ * tool. The file is served at /merchant-feed.tsv and can also be written
+ * to disk by scripts/generate-merchant-feed.mjs for manual upload.
+ */
+export function renderMerchantFeed(products) {
+  const sellable = (products || []).filter(isSellable);
+  if (!sellable.length) {
+    return "id\ttitle\tdescription\tlink\timage_link\tprice\tavailability\tcondition\tbrand\tmpn\tproduct_type\n";
+  }
+
+  const escape = (value) => String(value ?? "").replace(/[\t\n\r]/g, " ").trim();
+
+  const rows = sellable.map((product) => {
+    const title = escape(product.name + (product.version ? ` v${product.version}` : ""));
+    const description = escape(
+      (product.shortDescriptionEn || product.shortDescription || product.description || "")
+        .replace(/\s+/g, " ")
+        .trim()
+    );
+    const link = absolute(productUrl(product.slug));
+    const image = product.imageUrl
+      ? product.imageUrl
+      : absolute(`/og/${product.slug}.png`);
+    const price = `${Number(product.price) || 0} ${String(product.currency || "VND").toUpperCase()}`;
+    const mpn = String(product.id || product.slug);
+
+    return [
+      escape(product.slug || mpn),
+      title,
+      description,
+      link,
+      image,
+      price,
+      "in stock",
+      "new",
+      escape("SonVuDev"),
+      mpn,
+      escape(product.category || "Software"),
+    ].join("\t");
+  });
+
+  const header = [
+    "id",
+    "title",
+    "description",
+    "link",
+    "image_link",
+    "price",
+    "availability",
+    "condition",
+    "brand",
+    "mpn",
+    "product_type",
+  ].join("\t");
+
+  return [header, ...rows].join("\n") + "\n";
+}
+
 // `esc` is re-exported because app.js builds its own markup with it — one
 // implementation, two consumers, rather than a second copy of the escape rules.
 // The other three that used to sit here had no caller at all, which meant each had

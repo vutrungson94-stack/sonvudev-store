@@ -372,6 +372,34 @@ test('/llms.txt và /feed.json không báo sản phẩm đã ngừng bán', asyn
   assert.equal(page404.status, 404, 'trang sản phẩm phải trả 404');
 });
 
+test('/merchant-feed.tsv là TSV hợp lệ và có đủ trường GMC', async () => {
+  const headers = { 'content-type': 'application/json', 'x-admin-token': 'test-admin-token' };
+  const created = await fetch(`${base}/api/admin/products`, {
+    method: 'POST',
+    headers,
+    body: JSON.stringify({
+      name: 'Merchant Feed Probe',
+      category: 'Công cụ',
+      platform: 'Windows',
+      version: '1.0.0',
+      price: 99000,
+      currency: 'VND',
+      fileKey: 'products/merchant-feed/1.0.0/probe.exe',
+      status: 'active',
+    }),
+  });
+  assert.equal(created.status, 201);
+  const text = await (await fetch(`${base}/merchant-feed.tsv`)).text();
+  const lines = text.split('\n').filter((l) => l.trim());
+  assert.ok(lines[0].startsWith('id\ttitle\tdescription\tlink\timage_link\tprice\tavailability\tcondition\tbrand\tmpn\tproduct_type'));
+  assert.ok(lines.length >= 2, 'phải có ít nhất 1 sản phẩm');
+  const cols = lines[1].split('\t');
+  assert.equal(cols.length, 11);
+  assert.match(cols[5], /\d+\s+(VND|USD|EUR|GBP)/);
+  assert.equal(cols[6], 'in stock');
+  assert.equal(cols[7], 'new');
+});
+
 // ---------------------------------------------------------------------------
 // robots.txt states the crawler decision instead of leaving it implied.
 // ---------------------------------------------------------------------------
