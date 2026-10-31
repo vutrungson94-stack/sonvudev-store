@@ -66,6 +66,7 @@
     "status": "active",
     "fileKey": "products/mousewheel-vba/1.0.0/1791969502371-MouseWheel-for-VBA-v1.0.0.zip",
     "featured": true,
+    "imageUrl": "https://sonvudev.com/og/mousewheel-vba-v2.png",
     "nameEn": "MouseWheel for VBA",
     "shortDescriptionEn": "Enable mouse-wheel scrolling for ListBox, ComboBox, Frame and UserForm in VBA — one file, two lines.",
     "descriptionEn": "MouseWheel for VBA is a single, self-contained VBA module that enables mouse-wheel scrolling for ListBox, ComboBox, Frame controls and the UserForm itself — which VBA does not support out of the box. Import one .bas file and add two lines of code.\n\nRefactored to a high quality bar: no hardcoding, no dead code, no duplication, maximum reuse, and no MSForms library dependency (control type is detected by duck typing), so it runs on Excel/Access/Word/PowerPoint/VB6. Ships with a 21/21 passing self-test. Supports both 64-bit (VBA7) and 32-bit (VBA6) Office. Hook state self-heals if an install fails, optional diagnostics (EnableDebug), honest platform-capability reporting (IsWheelSupported/PlatformName), plus a 1-minute demo and a ready-made MouseWheel-Demo.xlsm file to verify before adopting.",
