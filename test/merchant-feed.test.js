@@ -54,7 +54,7 @@ try {
 
   test('price includes currency', () => {
     const dataLine = lines[1];
-    assert.match(dataLine, /\d+\s+(VND|USD|EUR|GBP)/);
+    assert.match(dataLine, /\d+\.\d+\s+USD/);
   });
 
   test('no raw tabs or newlines inside fields', () => {

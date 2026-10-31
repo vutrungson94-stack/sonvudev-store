@@ -1716,7 +1716,8 @@ export function renderMerchantFeed(products) {
     const image = product.imageUrl
       ? product.imageUrl
       : absolute(`/og/${product.slug}.png`);
-    const price = `${Number(product.price) || 0} USD`;
+    const vndToUsd = 26000;
+    const price = `${((Number(product.price) || 0) / vndToUsd).toFixed(2)} USD`;
     const mpn = String(product.id || product.slug);
 
     return [

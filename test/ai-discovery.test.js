@@ -395,7 +395,7 @@ test('/merchant-feed.tsv là TSV hợp lệ và có đủ trường GMC', async 
   assert.ok(lines.length >= 2, 'phải có ít nhất 1 sản phẩm');
   const cols = lines[1].split('\t');
   assert.equal(cols.length, 12);
-  assert.match(cols[5], /\d+\s+(VND|USD|EUR|GBP)/);
+  assert.match(cols[5], /\d+\.\d+\s+USD/);
   assert.equal(cols[6], 'in stock');
   assert.equal(cols[7], 'new');
   assert.ok(cols[11].length > 0, 'shipping phải có giá trị');
