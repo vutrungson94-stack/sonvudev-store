@@ -149,8 +149,8 @@
     "fileKey": "products/ramcleaner-earlybird/2.0.0/1792041203202-RamCleaner-2.0.0-earlybird-win-x64.zip",
     "featured": false,
     "nameEn": "RAMCleaner Early Bird",
-    "shortDescriptionEn": "Early bird deal - 33% off for the first 100 customers.",
-    "descriptionEn": "Early Bird offer for the first 100 customers. Full RAMCleaner Personal features at a discounted introductory price. Once 100 copies sell out, the price returns to the standard rate. Lifetime updates included. Windows 10/11 (x64), Linux (x64), macOS (Intel and Apple Silicon).",
+    "shortDescriptionEn": "Early Bird license for RAMCleaner Personal with lifetime updates.",
+    "descriptionEn": "Introductory license for RAMCleaner Personal. Includes all Personal features with lifetime updates. Supports Windows 10/11 (x64), Linux (x64), macOS (Intel and Apple Silicon).",
     "requirementsEn": "Windows 10/11 (x64), Linux (glibc 2.31+) or macOS 10.15+; admin/root only for aggressive mode.",
     "featuresEn": [
       "All RAMCleaner Personal features",
@@ -325,8 +325,8 @@
     "fileKey": "products/spark-capacity-tester-pro/1.4.0/1790526009561-SparkCapacityTester.exe",
     "featured": true,
     "nameEn": "Spark Capacity Tester",
-    "shortDescriptionEn": "Detect fake USB drives and check the real capacity of USB sticks, SD cards and disks. Portable Windows tool, clear PASS/FAIL report, nothing to install.",
-    "descriptionEn": "Spark Capacity Tester was rewritten by {{founder}} using plain System.IO. It relies on no kernel trickery, so antivirus tools cannot flag it as a false positive.\n\nResults come back as clear [PASS] / [FAIL] markers: a genuine drive reports the capacity printed on its label, a counterfeit one reports a much smaller real capacity along with the offset of the fraud. You do not need any technical knowledge to read the outcome.\n\nRELEASE 1.4.0 — portable build, no installation and no Administrator rights required.\n\nRUNNING THE .EXE ON WINDOWS: Windows may show \"Windows protected your PC\" because the file has no code signature. Click More info, then Run anyway. This is normal behaviour for software downloaded from the internet, not a sign of a virus.\n\nHOW TO USE: plug in the USB drive or memory card, run the .exe, pick the device and press Check. The whole run takes a few seconds.\n\nNO INSTALLATION, NOTHING WRITTEN TO YOUR DRIVES, NO NETWORK NEEDED.",
+    "shortDescriptionEn": "Detect fake USB drives and check the real capacity of USB sticks, SD cards and disks.",
+    "descriptionEn": "Spark Capacity Tester checks the real capacity of USB drives, SD cards and disks. It returns clear PASS or FAIL results: a genuine drive reports its labeled capacity, while a counterfeit drive reports a much smaller real capacity. Portable Windows build, no installation required.",
     "requirementsEn": "Windows 10/11. File EXE đã đóng gói runtime nên chạy được ngay trên máy chưa cài .NET. KHÔNG cần cài thêm gì. Dung lượng tải về khoảng 111 MB.",
     "featuresEn": [
       "Uses plain System.IO, so antivirus tools cannot flag it as a false positive",
