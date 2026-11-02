@@ -145,6 +145,7 @@ export function renderBlogPost(post, lang = "vi") {
       </div>
     </footer>
   </article>
+  <script src="/lang-detect.js"></script>
 </body>
 </html>`;
 }
@@ -227,6 +228,7 @@ export function renderBlogIndex(posts, lang = "vi") {
       ${cards || `<p>${isEn ? "No posts yet." : "Chưa có bài viết."}</p>`}
     </div>
   </main>
+  <script src="/lang-detect.js"></script>
 </body>
 </html>`;
 }

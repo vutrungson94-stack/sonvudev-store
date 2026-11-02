@@ -1545,6 +1545,7 @@ ${footerBar("", copy)}
 -->
 <script src="/format.js"></script>
 <script src="/related.js" data-self="${esc(product.id)}"></script>
+<script src="/lang-detect.js"></script>
 </body>
 </html>`;
 }

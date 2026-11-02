@@ -536,7 +536,7 @@ const productPage = (lang) => async (req, res) => {
     }
   }
 };
-app.get("/product/:slug", redirectRootLangToEnglish, productPage("vi"));
+app.get("/product/:slug", productPage("vi"));
 app.get("/en/product/:slug", productPage("en"));
 
 // Blog routes — dynamic, served from data/blog/*.json.
@@ -552,7 +552,7 @@ const blogPage = (lang) => async (req, res) => {
     res.status(500).sendFile(path.join(publicDir, "404.html"));
   }
 };
-app.get("/blog", redirectRootLangToEnglish, async (req, res) => {
+app.get("/blog", async (req, res) => {
   try {
     const posts = loadBlogPosts();
     res.set("Cache-Control", "public, max-age=300").type("html").send(renderBlogIndex(posts, "vi"));
@@ -570,7 +570,7 @@ app.get("/en/blog", async (req, res) => {
     res.status(500).sendFile(path.join(publicDir, "404.html"));
   }
 });
-app.get("/blog/:slug", redirectRootLangToEnglish, blogPage("vi"));
+app.get("/blog/:slug", blogPage("vi"));
 app.get("/en/blog/:slug", blogPage("en"));
 
 app.get("/og/:slug.svg", async (req, res, next) => {
