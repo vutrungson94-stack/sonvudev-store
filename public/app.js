@@ -324,8 +324,8 @@ function openProduct(id) {
     if (!related.length) { container.remove(); return; }
     container.className = 'related-articles';
     container.innerHTML = `<div class="detail-requirements" style="border-top:1px solid var(--line);margin-top:18px;padding-top:15px"><b>${esc(T('product.relatedArticles'))}</b>${related.map(post => {
-      const title = post.title || post.titleVi || post.titleEn || '';
-      const href = lang === 'en' && post.slug ? `/en/blog/${post.slug}` : post.slug ? `/blog/${post.slug}` : '#';
+      const title = lang !== 'vi' ? (post.titleEn || post.titleVi || post.title || '') : (post.titleVi || post.title || post.titleEn || '');
+      const href = lang !== 'vi' && post.slug ? `/en/blog/${post.slug}` : post.slug ? `/blog/${post.slug}` : '#';
       return `<span><a class="text-link" href="${esc(href)}">${esc(title)} →</a></span>`;
     }).join('')}</div>`;
   }).catch(() => {
@@ -670,10 +670,10 @@ if (blogCards) {
       .slice(0, 3);
     blogCards.innerHTML = sorted.length
       ? sorted.map(post => {
-          const title = lang === 'en' ? (post.titleEn || post.titleVi || post.title || '') : (post.titleVi || post.title || post.titleEn || '');
-          const desc = lang === 'en' ? (post.descriptionEn || post.descriptionVi || post.description || '') : (post.descriptionVi || post.description || post.descriptionEn || '');
+          const title = lang !== 'vi' ? (post.titleEn || post.titleVi || post.title || '') : (post.titleVi || post.title || post.titleEn || '');
+          const desc = lang !== 'vi' ? (post.descriptionEn || post.descriptionVi || post.description || '') : (post.descriptionVi || post.description || post.descriptionEn || '');
           const date = new Date(post.published || post.modified).toLocaleDateString(lang === 'vi' ? 'vi-VN' : 'en-US', { month: 'short', day: 'numeric', year: 'numeric' });
-          const href = lang === 'en' && post.slug ? `/en/blog/${post.slug}` : post.slug ? `/blog/${post.slug}` : '#';
+          const href = lang !== 'vi' && post.slug ? `/en/blog/${post.slug}` : post.slug ? `/blog/${post.slug}` : '#';
           const safeTitle = desc
             ? `${esc(title)}`
             : esc(title);

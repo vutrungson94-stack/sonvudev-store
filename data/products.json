@@ -9,6 +9,7 @@
     "platform": "Windows, macOS, Linux",
     "version": "1.0.0",
     "price": 99000,
+    "priceUsd": 4,
     "currency": "VND",
     "badge": "",
     "features": [
@@ -46,6 +47,7 @@
     "platform": "Windows",
     "version": "1.0.0",
     "price": 99000,
+    "priceUsd": 4,
     "currency": "VND",
     "badge": "",
     "features": [
@@ -96,6 +98,7 @@
     "platform": "Windows, Linux, macOS",
     "version": "2.0.0",
     "price": 299000,
+    "priceUsd": 12,
     "currency": "VND",
     "badge": "",
     "features": [
@@ -137,6 +140,7 @@
     "platform": "Windows, Linux, macOS",
     "version": "2.0.0",
     "price": 199000,
+    "priceUsd": 8,
     "currency": "VND",
     "badge": "",
     "features": [
@@ -171,6 +175,7 @@
     "platform": "Windows, Linux, macOS",
     "version": "2.0.0",
     "price": 499000,
+    "priceUsd": 20,
     "currency": "VND",
     "badge": "",
     "features": [
@@ -211,6 +216,7 @@
     "platform": "Windows",
     "version": "1.0.0",
     "price": 149000,
+    "priceUsd": 6,
     "currency": "VND",
     "badge": "",
     "features": [
@@ -260,6 +266,7 @@
     "platform": "Windows",
     "version": "4.3",
     "price": 169000,
+    "priceUsd": 7,
     "currency": "VND",
     "badge": "",
     "features": [
@@ -310,6 +317,7 @@
     "platform": "Windows",
     "version": "1.4.0",
     "price": 99000,
+    "priceUsd": 4,
     "currency": "VND",
     "badge": "",
     "features": [

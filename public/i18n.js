@@ -1551,16 +1551,22 @@ function renderLanguageCombobox() {
         // Server-rendered pages (product, blog) bake their copy into HTML, so a
         // client-side dictionary swap is not enough. Navigate to the same page
         // in the selected language instead of leaving the old content behind.
+        // Only Vietnamese and English have server-rendered routes; any other
+        // language falls back to the English page.
         if (code !== prev) {
           const path = window.location.pathname;
           let target = null;
           if (path.startsWith('/en/product/') && code === 'vi') {
             target = path.replace('/en/product/', '/product/');
-          } else if (path.startsWith('/product/') && code === 'en') {
+          } else if (path.startsWith('/product/') && code === 'vi') {
+            target = path;
+          } else if (path.startsWith('/product/') && code !== 'vi') {
             target = path.replace('/product/', '/en/product/');
           } else if (path.startsWith('/en/blog/') && code === 'vi') {
             target = path.replace('/en/blog/', '/blog/');
-          } else if (path.startsWith('/blog/') && code === 'en') {
+          } else if (path.startsWith('/blog/') && code === 'vi') {
+            target = path;
+          } else if (path.startsWith('/blog/') && code !== 'vi') {
             target = path.replace('/blog/', '/en/blog/');
           }
           if (target && target !== path) {
