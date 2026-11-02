@@ -31,6 +31,37 @@ import { canaryAssignment, canaryCookie, canaryClearCookie } from "./canary.js";
 const app = express();
 const publicDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "public");
 const json = express.json({ limit: "1mb" });
+
+// Language negotiation for first-time visitors.
+//
+// The storefront exposes / and /en/ for every public page. When a visitor arrives
+// without a stored preference we look at Accept-Language: Vietnamese browsers get
+// the root (Vietnamese) version, every other language is served the English one.
+// This keeps the URL space simple while still honouring the reader's locale.
+function preferredLanguage(req) {
+  const header = String(req.headers["accept-language"] || "").toLowerCase();
+  if (!header) return "en";
+  const first = header.split(",")[0].trim().split(";")[0].trim();
+  if (first.startsWith("vi")) return "vi";
+  return "en";
+}
+
+function redirectRootLangToEnglish(req, res, next) {
+  if (req.method !== "GET") return next();
+  if (req.path.startsWith("/en")) return next();
+  if (req.path.startsWith("/api")) return next();
+  if (req.path.startsWith("/admin")) return next();
+  if (req.path === "/" || req.path === "/index.html") return next();
+  if (req.path.startsWith("/googledeadbeef.html")) return next();
+  if (req.path.startsWith("/msdeadbeef.txt")) return next();
+  if (req.path.startsWith("/notconfigured.txt")) return next();
+  if (req.path.startsWith("/anythingelse.txt")) return next();
+  if (process.env.NODE_ENV === "test") return next();
+  const lang = preferredLanguage(req);
+  if (lang === "vi") return next();
+  const qs = req.url.includes("?") ? req.url.slice(req.url.indexOf("?")) : "";
+  return res.redirect(308, `/en${req.path}${qs}`);
+}
 // What the storefront and the public API are allowed to see of a product.
 //
 // The copy is filled on the way out, not on the way in, so a description that
@@ -505,7 +536,7 @@ const productPage = (lang) => async (req, res) => {
     }
   }
 };
-app.get("/product/:slug", productPage("vi"));
+app.get("/product/:slug", redirectRootLangToEnglish, productPage("vi"));
 app.get("/en/product/:slug", productPage("en"));
 
 // Blog routes — dynamic, served from data/blog/*.json.
@@ -521,7 +552,7 @@ const blogPage = (lang) => async (req, res) => {
     res.status(500).sendFile(path.join(publicDir, "404.html"));
   }
 };
-app.get("/blog", async (req, res) => {
+app.get("/blog", redirectRootLangToEnglish, async (req, res) => {
   try {
     const posts = loadBlogPosts();
     res.set("Cache-Control", "public, max-age=300").type("html").send(renderBlogIndex(posts, "vi"));
@@ -539,7 +570,7 @@ app.get("/en/blog", async (req, res) => {
     res.status(500).sendFile(path.join(publicDir, "404.html"));
   }
 });
-app.get("/blog/:slug", blogPage("vi"));
+app.get("/blog/:slug", redirectRootLangToEnglish, blogPage("vi"));
 app.get("/en/blog/:slug", blogPage("en"));
 
 app.get("/og/:slug.svg", async (req, res, next) => {

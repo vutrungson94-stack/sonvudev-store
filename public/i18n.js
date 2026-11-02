@@ -1130,7 +1130,8 @@ function readStored() {
   const browser = String(navigator.language || '').toLowerCase();
   if (browser.startsWith('ja')) return 'ja';
   if (browser.startsWith('zh')) return 'zh-CN';
-  return browser.startsWith('en') ? 'en' : 'vi';
+  if (browser.startsWith('vi')) return 'vi';
+  return 'en';
 }
 
 let current = readStored();

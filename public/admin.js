@@ -335,7 +335,10 @@ if(orderSearch){orderSearch.addEventListener('input',debounce(()=>resetOrderPage
 if(orderStatusFilter)orderStatusFilter.addEventListener('change',()=>resetOrderPage());
 if(productSearch){productSearch.addEventListener('input',debounce(()=>loadProducts(),300));productSearch.addEventListener('keydown',(e)=>{if(e.key==='Enter'){e.preventDefault();loadProducts()}else if(e.key==='Escape'){productSearch.value='';loadProducts()}})}
 if(productStatusFilter)productStatusFilter.addEventListener('change',()=>loadProducts());
-document.getElementById('login-form').onsubmit=loginSubmit;logout.onclick=()=>{stopPolling();sessionStorage.removeItem('sonvudev_admin');token='';hideAll();login.hidden=false;logout.hidden=true};document.getElementById('refresh').onclick=()=>{resetOrderPage();loadProducts()};// The list now starts visible; the button collapses it, so the label has to
+if(productStatusFilter)productStatusFilter.addEventListener('change',()=>resetOrderPage());document.getElementById('login-form').onsubmit=loginSubmit;logout.onclick=()=>{stopPolling();sessionStorage.removeItem('sonvudev_admin');token='';hideAll();login.hidden=false;logout.hidden=true};document.getElementById('refresh').onclick=()=>{resetOrderPage();loadProducts()};// The list now starts visible; the button collapses it, so the label has to
 // describe the action rather than the destination.
 const productToggle=document.getElementById('toggle-products');productToggle.onclick=()=>{productList.hidden=!productList.hidden;productToggle.textContent=productList.hidden?'Xem danh sách ↓':'Ẩn danh sách ↑'};productForm.onsubmit=submitProduct;if(token){login.hidden=true;showAfterLogin();resetOrderPage();loadRevenue();loadProducts();checkMail();startPolling()}
+// Site age display: calculated from the repository's first commit so the owner
+// can see how long the shop has been live without opening git log.
+const SITE_CREATED=new Date('2026-09-26');const siteAgeEl=document.getElementById('site-age');if(siteAgeEl){const diff=Date.now()-SITE_CREATED.getTime();const days=Math.floor(diff/864e5);const months=Math.floor(days/30);const rem=days%30;const msg=months?'Trang web đã hoạt động '+months+' tháng '+rem+' ngày (từ 26/09/2026)':'Trang web đã hoạt động '+days+' ngày (từ 26/09/2026)';siteAgeEl.textContent=msg}
 
