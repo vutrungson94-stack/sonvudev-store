@@ -9,7 +9,7 @@
     var path = window.location.pathname;
     var isEn = path.indexOf('/en/') === 0;
     var browser = String(navigator.language || '').toLowerCase();
-    var wantsEn = stored === 'en' || (!stored && browser.indexOf('vi') !== 0);
+    var wantsEn = stored && stored !== 'vi' || (!stored && browser.indexOf('vi') !== 0);
 
     if (wantsEn && !isEn) {
       window.location.replace('/en' + path);
