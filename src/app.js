@@ -1302,8 +1302,8 @@ app.patch("/api/admin/products/:id", admin, json, async (req, res) => {
     const caps = {
       name: 120, slug: 80, shortDescription: 180, description: 2000, shortDescriptionEn: 180,
       descriptionEn: 4000, category: 50, platform: 50, version: 30, currency: 8,
-      badge: 40, requirements: 240, requirementsEn: 240, fileKey: 500, seoTitle: 70, seoDescription: 175,
-      seoTitleEn: 70, seoDescriptionEn: 175,
+      badge: 40, requirements: 240, requirementsEn: 240, fileKey: 500, fileSize: 20,
+      seoTitle: 70, seoDescription: 175, seoTitleEn: 70, seoDescriptionEn: 175,
     };
     const patch = {};
     for (const [field, cap] of Object.entries(caps)) {
