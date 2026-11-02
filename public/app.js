@@ -670,8 +670,8 @@ if (blogCards) {
       .slice(0, 3);
     blogCards.innerHTML = sorted.length
       ? sorted.map(post => {
-          const title = post.title || post.titleVi || post.titleEn || '';
-          const desc = post.description || post.descriptionVi || post.descriptionEn || '';
+          const title = lang === 'en' ? (post.titleEn || post.titleVi || post.title || '') : (post.titleVi || post.title || post.titleEn || '');
+          const desc = lang === 'en' ? (post.descriptionEn || post.descriptionVi || post.description || '') : (post.descriptionVi || post.description || post.descriptionEn || '');
           const date = new Date(post.published || post.modified).toLocaleDateString(lang === 'vi' ? 'vi-VN' : 'en-US', { month: 'short', day: 'numeric', year: 'numeric' });
           const href = lang === 'en' && post.slug ? `/en/blog/${post.slug}` : post.slug ? `/blog/${post.slug}` : '#';
           const safeTitle = desc
