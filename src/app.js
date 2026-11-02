@@ -12,6 +12,7 @@ import { createDownloadUrl, createUploadUrl } from "./r2.js";
 import { captureOrder, createOrder as createPayPalOrder, hashToken, newOrderId, newToken, paypalChargeForProduct, paymentMatchesOrder, readOrder, verifyWebhook } from "./paypal.js";
 import { paymentInstructions, paymentOptions } from "./payments.js";
 import { analyticsMeta, brandMeta, esc, fillCopy, fillPageTokens, pageTokenValues, renderFeed, renderIndexCount, renderIndexFilters, renderIndexGrid, renderLlmsTxt, renderMerchantFeed, renderOgImage, renderProductPage, renderStats, tokenMeta, verificationFile, verificationMeta, REFUND_POLICY_UPDATED } from "./pages.js";
+import { renderBlogPost, renderBlogIndex, renderBlogFeed, loadBlogPosts, getBlogPostBySlug } from "./blog.js";
 import { hasPayment, isClosed, isUnpaid, markOrderDelivered, markOrderPaid, paymentDeadline, sweeperRunning, voidPayment } from "./orders.js";
 import { notifyOrder, notifyMode } from "./notify.js";
 import { resolveCountry } from "./geo.js";
@@ -456,6 +457,14 @@ app.get("/merchant-feed.tsv", async (_req, res, next) => {
   } catch (error) { next(error); }
 });
 
+app.get("/blog.json", async (_req, res, next) => {
+  try {
+    const posts = loadBlogPosts();
+    res.set("Cache-Control", "public, max-age=3600").type("application/json")
+      .send(renderBlogFeed(posts));
+  } catch (error) { next(error); }
+});
+
 /**
  * The product page, in whichever language the URL asks for.
  *
@@ -498,6 +507,40 @@ const productPage = (lang) => async (req, res) => {
 };
 app.get("/product/:slug", productPage("vi"));
 app.get("/en/product/:slug", productPage("en"));
+
+// Blog routes — dynamic, served from data/blog/*.json.
+// A missing post is treated as 404 so a typo in the slug never publishes
+// an empty page to crawlers.
+const blogPage = (lang) => async (req, res) => {
+  try {
+    const post = getBlogPostBySlug(req.params.slug);
+    if (!post) return notFound(req, res);
+    res.set("Cache-Control", "public, max-age=300").type("html").send(renderBlogPost(post, lang));
+  } catch (error) {
+    console.error(error);
+    res.status(500).sendFile(path.join(publicDir, "404.html"));
+  }
+};
+app.get("/blog", async (req, res) => {
+  try {
+    const posts = loadBlogPosts();
+    res.set("Cache-Control", "public, max-age=300").type("html").send(renderBlogIndex(posts, "vi"));
+  } catch (error) {
+    console.error(error);
+    res.status(500).sendFile(path.join(publicDir, "404.html"));
+  }
+});
+app.get("/en/blog", async (req, res) => {
+  try {
+    const posts = loadBlogPosts();
+    res.set("Cache-Control", "public, max-age=300").type("html").send(renderBlogIndex(posts, "en"));
+  } catch (error) {
+    console.error(error);
+    res.status(500).sendFile(path.join(publicDir, "404.html"));
+  }
+});
+app.get("/blog/:slug", blogPage("vi"));
+app.get("/en/blog/:slug", blogPage("en"));
 
 app.get("/og/:slug.svg", async (req, res, next) => {
   try {
@@ -551,6 +594,14 @@ app.get("/sitemap.xml", async (_req, res, next) => {
     urls.push(`<url><loc>${vi}</loc>${lastmod}<changefreq>weekly</changefreq><priority>0.8</priority><xhtml:link rel="alternate" hreflang="vi" href="${vi}"/><xhtml:link rel="alternate" hreflang="en" href="${en}"/><xhtml:link rel="alternate" hreflang="x-default" href="${vi}"/></url>`);
     const hasEnglish = String(product.descriptionEn || "").trim() || String(product.shortDescriptionEn || "").trim() || (Array.isArray(product.featuresEn) && product.featuresEn.length);
     if (hasEnglish) urls.push(`<url><loc>${en}</loc>${lastmod}<changefreq>weekly</changefreq><priority>0.7</priority><xhtml:link rel="alternate" hreflang="vi" href="${vi}"/><xhtml:link rel="alternate" hreflang="en" href="${en}"/><xhtml:link rel="alternate" hreflang="x-default" href="${vi}"/></url>`);
+  }
+  for (const post of loadBlogPosts()) {
+    const updated = post.modified || post.published;
+    const lastmod = updated ? `<lastmod>${new Date(updated).toISOString().slice(0, 10)}</lastmod>` : "";
+    const vi = `${base}/blog/${encodeURIComponent(post.slug)}`;
+    const en = `${base}/en/blog/${encodeURIComponent(post.slug)}`;
+    urls.push(`<url><loc>${vi}</loc>${lastmod}<changefreq>monthly</changefreq><priority>0.6</priority><xhtml:link rel="alternate" hreflang="vi" href="${vi}"/><xhtml:link rel="alternate" hreflang="en" href="${en}"/><xhtml:link rel="alternate" hreflang="x-default" href="${vi}"/></url>`);
+    if (post.titleEn || post.contentEn) urls.push(`<url><loc>${en}</loc>${lastmod}<changefreq>monthly</changefreq><priority>0.5</priority><xhtml:link rel="alternate" hreflang="vi" href="${vi}"/><xhtml:link rel="alternate" hreflang="en" href="${en}"/><xhtml:link rel="alternate" hreflang="x-default" href="${vi}"/></url>`);
   }
   res.type("application/xml").send(`<?xml version="1.0" encoding="UTF-8"?><urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9" xmlns:xhtml="http://www.w3.org/1999/xhtml">${urls.join("")}</urlset>`);
   } catch (error) { next(error); }

@@ -74,7 +74,7 @@ const i18nSource = await read(path.join("public", "i18n.js"));
 // build, not a silently accepted 404. /llms.txt, /feed.json and the English
 // product path were all missing here when they were first written, and each one
 // was caught by the same check that has been catching bad links all along.
-const dynamicRoute = /^(?:\/$|\/en(?:\/product\/[^/]+)?$|\/product\/[^/]+$|\/order\/[^/]+$|\/og\/[^/]+$|\/robots\.txt$|\/sitemap\.xml$|\/llms\.txt$|\/feed\.json$|\/api\/|\/admin(?:\.js|\.html)?$|\/paypal-return(?:\.html)?$|\/lookup(?:\.html)?$|\/google[0-9a-z]+\.html$|\/ms[0-9a-z]+\.txt$|\/[0-9a-z-]{8,128}\.txt$)/;
+const dynamicRoute = /^(?:\/$|\/en(?:\/product\/[^/]+)?$|\/product\/[^/]+$|\/order\/[^/]+$|\/og\/[^/]+$|\/robots\.txt$|\/sitemap\.xml$|\/llms\.txt$|\/feed\.json$|\/blog\.json$|\/api\/|\/admin(?:\.js|\.html)?$|\/paypal-return(?:\.html)?$|\/lookup(?:\.html)?$|\/google[0-9a-z]+\.html$|\/ms[0-9a-z]+\.txt$|\/[0-9a-z-]{8,128}\.txt$|\/blog(?:\/[^/]+)?$|\/en\/blog(?:\/[^/]+)?$)/;
 // Pages that are entry points rather than link targets: the buyer reaches them
 // from an email or a PayPal redirect, and robots.txt deliberately keeps crawlers
 // away from all three.

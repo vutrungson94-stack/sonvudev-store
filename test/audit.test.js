@@ -63,7 +63,14 @@ test('audit chặn được từng loại lỗi nó sinh ra để bắt', async 
   // 1. A link to a file that does not exist.
   {
     const cwd = await copy('broken-link');
-    await fs.writeFile(path.join(cwd, 'public', 'index.html'), '<a href="/khong-ton-tai.html">x</a>', 'utf8');
+    const file = path.join(cwd, 'public', 'index.html');
+    const source = await fs.readFile(file, 'utf8');
+    // Inject a broken link into the existing page so the data-i18n keys stay
+    // intact. Replacing the whole file would orphan every homepage key and
+    // mask the real failure under a cascade of unrelated i18n errors.
+    const anchor = '</main>';
+    assert.ok(source.includes(anchor), 'index.html phải còn </main> để test này còn chỗ cắm link');
+    await fs.writeFile(file, source.replace(anchor, '<a href="/khong-ton-tai.html">x</a></main>'), 'utf8');
     const result = runAudit(cwd);
     const output = `${result.stdout}${result.stderr}`;
     assert.equal(result.status, 1, 'phải FAIL');

@@ -1,10 +1,11 @@
-import { readdirSync } from "node:fs";
+import { readdirSync, readFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { env } from "./config.js";
 import { isSellable } from "./store.js";
 import { esc, money, formatBytes, initials } from "./format.js";
 import { commitHash } from "./lib/git.mjs";
+import { loadBlogPosts, getBlogPostBySlug, renderBlogPost, renderBlogIndex, renderBlogFeed } from "./blog.js";
 
 // The commit that produced this process, for CSS cache-busting. This replaces a
 // private copy of the git call that scripts/build-web.mjs also carried, so the
@@ -29,6 +30,8 @@ const cssVersion = commitHash().slice(0, 8);
 const site = () => env.appUrl.replace(/\/$/, "");
 
 const absolute = (path) => `${site()}${path.startsWith("/") ? path : `/${path}`}`;
+
+export { absolute };
 
 
 /**
@@ -1610,14 +1613,23 @@ export function renderLlmsTxt(products) {
     "",
     sellable.length
       ? sellable.map((product) => {
-        const facts = [
-          `${product.platform || "Windows"}`,
-          product.version ? `v${product.version}` : "",
-          plainPrice(product.price, product.currency),
-        ].filter(Boolean).join(" · ");
-        return `- [${product.name}](${absolute(productUrl(product.slug))}): ${stripPromotionalSentences(productSummary(product, 120))} (${facts})`;
-      }).join("\n")
+          const facts = [
+            `${product.platform || "Windows"}`,
+            product.version ? `v${product.version}` : "",
+            plainPrice(product.price, product.currency),
+          ].filter(Boolean).join(" · ");
+          return `- [${product.name}](${absolute(productUrl(product.slug))}): ${stripPromotionalSentences(productSummary(product, 120))} (${facts})`;
+        }).join("\n")
       : "- The catalogue is empty at the moment.",
+    "",
+    "## Blog",
+    ...(loadBlogPosts().length
+      ? loadBlogPosts().map((post) => {
+          const title = post.titleEn || post.titleVi || "Untitled";
+          const desc = (post.descriptionEn || post.descriptionVi || "").replace(/\s+/g, " ").trim();
+          return `- [${title}](/blog/${encodeURIComponent(post.slug)}): ${desc.slice(0, 120)}`;
+        })
+      : ["- No blog posts yet."]),
     "",
     "## About",
     `- Who: ${env.brand.founderName ? `${env.brand.founderName}${env.brand.legalEntity ? ` (${env.brand.legalEntity})` : ""}` : brand()}`,
@@ -1628,6 +1640,7 @@ export function renderLlmsTxt(products) {
     "## Pages",
     `- [Homepage](${absolute("/")}) — overview and the full catalogue`,
     `- [Feed (JSON)](${absolute("/feed.json")}) — every product with price, platform and version`,
+    `- [Blog (JSON)](${absolute("/blog.json")}) — blog posts`,
     ...(env.brand.socialLinks.length ? [`- [Elsewhere](${env.brand.socialLinks.join(", ")})`] : []),
     "",
   ];
@@ -1644,49 +1657,72 @@ export function renderLlmsTxt(products) {
  */
 export function renderFeed(products) {
   const sellable = (products || []).filter(isSellable);
+  const blogPosts = loadBlogPosts();
+  const productItems = sellable.map((product, index) => ({
+    "@type": "ListItem",
+    position: index + 1,
+    item: {
+      "@type": "SoftwareApplication",
+      "@id": absolute(`${productUrl(product.slug)}#software`),
+      name: product.name,
+      description: stripPromotionalSentences(productSummary(product, 300)) || derivedDescription(product, 300),
+      url: absolute(productUrl(product.slug)),
+      image: productImage(product),
+      brand: { "@type": "Brand", name: brand() },
+      ...(cleanSeoText(product.seoTitle) ? { alternateName: cleanSeoText(product.seoTitle) } : {}),
+      applicationCategory: product.category || "UtilitiesApplication",
+      operatingSystem: product.platform || "Windows",
+      softwareVersion: product.version || undefined,
+      ...(product.requirements ? { softwareRequirements: product.requirements } : {}),
+      sku: String(product.id || product.slug),
+      mpn: String(product.id || product.slug),
+      category: "Software > Computer Software",
+      itemCondition: "https://schema.org/NewCondition",
+      offers: {
+        "@type": "Offer",
+        price: Number(product.price) || 0,
+        priceCurrency: product.currency || "VND",
+        availability: "https://schema.org/InStock",
+        url: absolute(productUrl(product.slug)),
+        seller: { "@id": `${site()}/#organization` },
+        hasMerchantReturnPolicy: {
+          "@type": "MerchantReturnPolicy",
+          returnPolicyCategory: "https://schema.org/MerchantReturnFiniteReturnWindow",
+          merchantReturnDays: 14,
+          returnFees: "https://schema.org/FreeReturn",
+        },
+      },
+    },
+  }));
+  const blogItems = blogPosts.map((post, index) => {
+    const title = post.titleEn || post.titleVi || "Untitled";
+    const desc = (post.descriptionEn || post.descriptionVi || "").replace(/\s+/g, " ").trim();
+    return {
+      "@type": "ListItem",
+      position: sellable.length + index + 1,
+      item: {
+        "@type": "WebPage",
+        "@id": absolute(`/blog/${encodeURIComponent(post.slug)}#blog`),
+        name: title,
+        description: desc,
+        url: absolute(`/blog/${encodeURIComponent(post.slug)}`),
+        image: absolute("/og.png"),
+        isPartOf: { "@id": `${site()}/#website` },
+        datePublished: new Date(post.published || post.modified || Date.now()).toISOString(),
+        dateModified: new Date(post.modified || post.published || Date.now()).toISOString(),
+        inLanguage: "vi",
+        genre: post.section || "Blog",
+      },
+    };
+  });
   return {
     "@context": "https://schema.org",
     "@type": "ItemList",
-    name: `${brand()} catalogue`,
+    name: `${brand()} catalogue and blog`,
     url: absolute("/feed.json"),
-    numberOfItems: sellable.length,
+    numberOfItems: sellable.length + blogPosts.length,
     dateModified: new Date().toISOString().slice(0, 10),
-    itemListElement: sellable.map((product, index) => ({
-      "@type": "ListItem",
-      position: index + 1,
-      item: {
-        "@type": "SoftwareApplication",
-        "@id": absolute(`${productUrl(product.slug)}#software`),
-        name: product.name,
-        description: stripPromotionalSentences(productSummary(product, 300)) || derivedDescription(product, 300),
-        url: absolute(productUrl(product.slug)),
-        image: productImage(product),
-        brand: { "@type": "Brand", name: brand() },
-        ...(cleanSeoText(product.seoTitle) ? { alternateName: cleanSeoText(product.seoTitle) } : {}),
-        applicationCategory: product.category || "UtilitiesApplication",
-        operatingSystem: product.platform || "Windows",
-        softwareVersion: product.version || undefined,
-        ...(product.requirements ? { softwareRequirements: product.requirements } : {}),
-        sku: String(product.id || product.slug),
-        mpn: String(product.id || product.slug),
-        category: "Software > Computer Software",
-        itemCondition: "https://schema.org/NewCondition",
-        offers: {
-          "@type": "Offer",
-          price: Number(product.price) || 0,
-          priceCurrency: product.currency || "VND",
-          availability: "https://schema.org/InStock",
-          url: absolute(productUrl(product.slug)),
-          seller: { "@id": `${site()}/#organization` },
-          hasMerchantReturnPolicy: {
-            "@type": "MerchantReturnPolicy",
-            returnPolicyCategory: "https://schema.org/MerchantReturnFiniteReturnWindow",
-            merchantReturnDays: 14,
-            returnFees: "https://schema.org/FreeReturn",
-          },
-        },
-      },
-    })),
+    itemListElement: [...productItems, ...blogItems],
   };
 }
 
