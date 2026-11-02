@@ -120,6 +120,11 @@ export function renderBlogPost(post, lang = "vi") {
   <link rel="alternate" hreflang="x-default" href="${esc(viUrl)}">
 </head>
 <body>
+  <nav class="blog-lang">
+    <span>${isEn ? 'Language:' : 'Ngôn ngữ:'}</span>
+    <a href="${esc(viUrl)}" class="${!isEn ? 'active' : ''}">Tiếng Việt</a>
+    <a href="${esc(enUrl)}" class="${isEn ? 'active' : ''}">English</a>
+  </nav>
   <article class="blog-post">
     <header class="blog-header">
       <div class="blog-meta">
@@ -206,6 +211,11 @@ export function renderBlogIndex(posts, lang = "vi") {
   <link rel="alternate" hreflang="x-default" href="${esc(viUrl)}">
 </head>
 <body>
+  <nav class="blog-lang">
+    <span>${isEn ? 'Language:' : 'Ngôn ngữ:'}</span>
+    <a href="${esc(viUrl)}" class="${!isEn ? 'active' : ''}">Tiếng Việt</a>
+    <a href="${esc(enUrl)}" class="${isEn ? 'active' : ''}">English</a>
+  </nav>
   <main class="wrap">
     <header class="blog-index-header">
       <h1>${isEn ? "Blog" : "Blog"}</h1>
