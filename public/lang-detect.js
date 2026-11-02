@@ -4,7 +4,7 @@
 // Stored preference in localStorage is always respected.
 (function () {
   try {
-    var STORAGE_KEY = 'sv-lang';
+    var STORAGE_KEY = 'sonvudev_lang';
     var stored = localStorage.getItem(STORAGE_KEY);
     var path = window.location.pathname;
     var isEn = path.indexOf('/en/') === 0;
