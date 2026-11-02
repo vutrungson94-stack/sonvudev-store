@@ -216,6 +216,7 @@ export function renderBlogIndex(posts, lang = "vi") {
 </head>
 <body>
   <nav class="blog-lang">
+    <a href="${absolute("/")}" class="blog-home">← ${isEn ? 'Home' : 'Trang chủ'}</a>
     <span>${isEn ? 'Language:' : 'Ngôn ngữ:'}</span>
     <a href="${esc(viUrl)}" class="${!isEn ? 'active' : ''}">Tiếng Việt</a>
     <a href="${esc(enUrl)}" class="${isEn ? 'active' : ''}">English</a>
