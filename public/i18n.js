@@ -172,6 +172,11 @@ const DICT = {
     'products.intro1': 'Từ công cụ miễn phí đến bộ giải pháp chuyên nghiệp.',
     'products.intro2': 'Mọi thứ đều dễ bắt đầu.',
     'products.all': 'Tất cả',
+    'blog.eyebrow': 'Bài viết & hướng dẫn',
+    'blog.title1': 'Mẹo công nghệ',
+    'blog.title2': 'giúp bạn làm việc tốt hơn.',
+    'blog.more': 'Xem tất cả bài viết',
+    'blog.readMore': 'Đọc tiếp',
     // Ô tìm kiếm. Lọc phía client trên catalogue đã nạp, nên không có endpoint nào
     // để dịch — chỉ nhãn cho người đọc màn hình và gợi ý trong ô.
     'products.searchLabel': 'Tìm sản phẩm',
@@ -311,6 +316,7 @@ const DICT = {
     'product.requirements': 'Yêu cầu hệ thống',
     'product.version': 'Phiên bản',
     'product.buyNow': 'Mua ngay',
+    'product.relatedArticles': 'Bài viết liên quan',
     // Trang đơn hàng. Trước đây copy ở đây nằm thẳng trong order.js nên khách
     // nước ngoài đọc tiếng Việt sau khi đã trả tiền, và cùng một trạng thái lại
     // hiện hai chữ khác nhau ở popup thanh toán với ở trang đơn. Nhãn trạng thái
@@ -689,6 +695,11 @@ const DICT = {
     'products.intro1': 'From free tools to professional solutions.',
     'products.intro2': 'Everything is easy to start.',
     'products.all': 'All',
+    'blog.eyebrow': 'Guides & tips',
+    'blog.title1': 'Tech tips',
+    'blog.title2': 'to help you work better.',
+    'blog.more': 'View all posts',
+    'blog.readMore': 'Read more',
     'products.searchLabel': 'Search products',
     'products.searchPlaceholder': 'Search by name or feature…',
     'products.count': 'products',
@@ -783,6 +794,7 @@ const DICT = {
     'geo.domestic': 'You are in Vietnam. A domestic bank transfer is the fastest option; you can still pick PayPal if you prefer.',
     'product.priceOnce': 'One-time price',
     'product.seeGuide': 'See the guide included',
+    'product.relatedArticles': 'Related articles',
     // Shown in the English UI for a product whose system-requirements text was
     // never translated: says what to do instead of leaving Vietnamese copy under
     // an English heading. The honest note beats a silent half-translation.

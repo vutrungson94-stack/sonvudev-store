@@ -311,10 +311,27 @@ function openProduct(id) {
     <div class="detail-footer">
       <div><small>${esc(T('product.priceOnce'))}</small><strong>${priceFor(p)}</strong></div>
       <button class="button button-primary" id="buy-product">${esc(T('product.buyNow'))} <span>→</span></button>
-    </div>`;
+    </div>
+    <div id="related-articles"></div>`;
   modal.hidden = false;
   document.body.classList.add('modal-open');
   document.getElementById('buy-product').onclick = () => openCheckout(p);
+  // Load related blog posts to connect the product with guides that help
+  // customers understand the problem this tool solves.
+  fetch('/blog.json').then(r => r.ok ? r.json() : []).then(posts => {
+    const related = posts.filter(post => post.relatedProductSlug === p.slug).slice(0, 2);
+    const container = document.getElementById('related-articles');
+    if (!related.length) { container.remove(); return; }
+    container.className = 'related-articles';
+    container.innerHTML = `<div class="detail-requirements" style="border-top:1px solid var(--line);margin-top:18px;padding-top:15px"><b>${esc(T('product.relatedArticles'))}</b>${related.map(post => {
+      const title = post.title || post.titleVi || post.titleEn || '';
+      const href = lang === 'en' && post.slug ? `/en/blog/${post.slug}` : post.slug ? `/blog/${post.slug}` : '#';
+      return `<span><a class="text-link" href="${esc(href)}">${esc(title)} →</a></span>`;
+    }).join('')}</div>`;
+  }).catch(() => {
+    const container = document.getElementById('related-articles');
+    if (container) container.remove();
+  });
 }
 
 function closeModal() {
@@ -601,8 +618,14 @@ if (searchInput) {
     render();
   });
 }
-modal.addEventListener('click', (e) => { if (e.target === modal || e.target.hasAttribute('data-close')) closeModal(); });
+modal.addEventListener('click', (e) => { if (e.target === modal || e.target.hasAttribute('data-close') || e.target.closest('[data-close]')) closeModal(); });
 document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && !modal.hidden) closeModal(); });
+// Ensure the built-in close button always works, even if the click target is a
+// child node of the button (for example a text node or icon inside it).
+document.querySelector('.modal-close')?.addEventListener('click', (e) => {
+  e.stopPropagation();
+  closeModal();
+});
 
 // Repaint in place when the language flips so an open modal follows along.
 window.addEventListener('i18n:ready', () => { render(); });
@@ -636,3 +659,29 @@ loadProducts().then(() => {
   if (query.get('buy') || query.get('paypal')) history.replaceState(null, '', location.pathname + location.hash);
 });
 loadPayOptions();
+// Render recent blog posts on the homepage to connect visitors with guides
+// that are related to the products they are browsing.
+const blogCards = document.getElementById('blog-cards');
+if (blogCards) {
+  fetch('/blog.json').then(r => r.ok ? r.json() : []).then(posts => {
+    const sorted = posts
+      .filter(p => p.title || p.titleVi || p.titleEn)
+      .sort((a, b) => new Date(b.published || b.modified || 0) - new Date(a.published || a.modified || 0))
+      .slice(0, 3);
+    blogCards.innerHTML = sorted.length
+      ? sorted.map(post => {
+          const title = post.title || post.titleVi || post.titleEn || '';
+          const desc = post.description || post.descriptionVi || post.descriptionEn || '';
+          const date = new Date(post.published || post.modified).toLocaleDateString(lang === 'vi' ? 'vi-VN' : 'en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+          const href = lang === 'en' && post.slug ? `/en/blog/${post.slug}` : post.slug ? `/blog/${post.slug}` : '#';
+          const safeTitle = desc
+            ? `${esc(title)}`
+            : esc(title);
+          const safeDesc = desc.length > 120 ? `${esc(desc.slice(0, 120))}…` : esc(desc);
+          return `<a class="blog-card" href="${esc(href)}"><div class="blog-card-meta"><span>${esc(date)}</span><span>${esc(T('blog.readMore'))}</span></div><h3>${safeTitle}</h3>${safeDesc ? `<p>${safeDesc}</p>` : ''}</a>`;
+        }).join('')
+      : `<p style="color:var(--muted);font-size:13px">${lang === 'vi' ? 'Chưa có bài viết nào.' : 'No posts yet.'}</p>`;
+  }).catch(() => {
+    blogCards.innerHTML = `<p style="color:var(--muted);font-size:13px">${lang === 'vi' ? 'Không thể tải bài viết.' : 'Could not load posts.'}</p>`;
+  });
+}
