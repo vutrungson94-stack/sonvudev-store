@@ -7,7 +7,7 @@
 //
 // The percentage can come from two places, in order:
 //
-//   1. CANARY_FILE (default /etc/sonvudev-store.canary in production) - written
+//   1. CANARY_FILE (default `/etc/<brand>.canary` in production) - written
 //      by deploy/canary.sh, so widening 5% -> 25% -> 100% needs no restart.
 //   2. CANARY_PERCENT - the fallback for a host that does not use the script.
 //
@@ -16,10 +16,13 @@
 // defaults to zero (stable).
 import { createHash } from "node:crypto";
 import { readFileSync } from "node:fs";
+import { env } from "./config.js";
 
 const COOKIE = "svd_canary";
 const CACHE_MS = 5000;
-const DEFAULT_FILE = process.env.NODE_ENV === "production" ? "/etc/sonvudev-store.canary" : "";
+const DEFAULT_FILE = process.env.NODE_ENV === "production"
+  ? `/etc/${String(env.brand.name || "store").toLowerCase()}.canary`
+  : "";
 
 let cache = { at: 0, percent: 0, key: null };
 

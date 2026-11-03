@@ -89,10 +89,10 @@ function bodyFor(spans) {
       resource: {
         attributes: [{
           key: "service.name",
-          value: { stringValue: String(process.env.OTEL_SERVICE_NAME || env.brand?.name || "sonvudev-store") },
+          value: { stringValue: String(process.env.OTEL_SERVICE_NAME || env.brand?.name || "store") },
         }],
       },
-      scopeSpans: [{ scope: { name: "sonvudev-store" }, spans }],
+      scopeSpans: [{ scope: { name: String(process.env.OTEL_SERVICE_NAME || env.brand?.name || "store") }, spans }],
     }],
   };
 }

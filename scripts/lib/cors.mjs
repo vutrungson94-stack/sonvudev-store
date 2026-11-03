@@ -30,7 +30,7 @@
  * removing it to tidy the list breaks local development with no visible cause.
  */
 export function requiredOrigins(appUrl) {
-  const origins = new Set(["http://localhost:3000"]);
+  const origins = new Set([process.env.LOCAL_ORIGIN || "http://localhost:3000"]);
   const host = hostOf(appUrl);
   if (!host) return [...origins];
   origins.add(`https://${host}`);

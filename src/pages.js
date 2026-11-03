@@ -1766,7 +1766,7 @@ export function renderMerchantFeed(products) {
       price,
       "in stock",
       "new",
-      escape("SonVuDev"),
+      escape(env.brand.name),
       mpn,
       escape(product.category || "Software"),
       "0",

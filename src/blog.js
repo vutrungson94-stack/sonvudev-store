@@ -93,11 +93,11 @@ export function renderBlogPost(post, lang = "vi") {
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>${esc(title)} — ${esc(section)} | SonVuDev</title>
+  <title>${esc(title)} — ${esc(section)} | ${esc(env.brand.name)}</title>
   <meta name="description" content="${esc(description)}">
   <link rel="canonical" href="${esc(url)}">
   <meta property="og:type" content="article">
-  <meta property="og:site_name" content="SonVuDev">
+  <meta property="og:site_name" content="${esc(env.brand.name)}">
   <meta property="og:locale" content="${isEn ? "en_US" : "vi_VN"}">
   <meta property="og:locale:alternate" content="${isEn ? "vi_VN" : "en_US"}">
   <meta property="og:title" content="${esc(title)}">
@@ -109,7 +109,7 @@ export function renderBlogPost(post, lang = "vi") {
   <meta property="og:image:alt" content="${esc(title)}">
   <meta property="article:published_time" content="${esc(published)}">
   <meta property="article:modified_time" content="${esc(modified)}">
-  <meta property="article:author" content="SonVuDev">
+  <meta property="article:author" content="${esc(env.brand.name)}">
   <meta property="article:section" content="${esc(section)}">
   ${tags.map((t) => `<meta property="article:tag" content="${esc(t)}">`).join("\n")}
   <meta name="twitter:card" content="summary_large_image">
@@ -154,10 +154,10 @@ export function renderBlogPost(post, lang = "vi") {
 // Render blog index page listing all posts.
 export function renderBlogIndex(posts, lang = "vi") {
   const isEn = lang === "en";
-  const title = isEn ? "Blog — SonVuDev" : "Blog — SonVuDev";
+  const title = isEn ? `Blog — ${env.brand.name}` : `Blog — ${env.brand.name}`;
   const description = isEn
-    ? "Guides, tips and tools from SonVuDev to help you work faster and safer on Windows."
-    : "Hướng dẫn, mẹo và công cụ từ SonVuDev giúp bạn làm việc nhanh hơn và an toàn hơn trên Windows.";
+    ? `Guides, tips and tools from ${env.brand.name} to help you work faster and safer on Windows.`
+    : `Hướng dẫn, mẹo và công cụ từ ${env.brand.name} giúp bạn làm việc nhanh hơn và an toàn hơn trên Windows.`;
   const url = absolute(lang === "en" ? "/en/blog" : "/blog");
   const viUrl = absolute("/blog");
   const enUrl = absolute("/en/blog");
@@ -196,7 +196,7 @@ export function renderBlogIndex(posts, lang = "vi") {
   <meta name="description" content="${esc(description)}">
   <link rel="canonical" href="${esc(url)}">
   <meta property="og:type" content="website">
-  <meta property="og:site_name" content="SonVuDev">
+  <meta property="og:site_name" content="${esc(env.brand.name)}">
   <meta property="og:locale" content="${isEn ? "en_US" : "vi_VN"}">
   <meta property="og:locale:alternate" content="${isEn ? "vi_VN" : "en_US"}">
   <meta property="og:title" content="${esc(title)}">
@@ -224,7 +224,7 @@ export function renderBlogIndex(posts, lang = "vi") {
   <main class="wrap">
     <header class="blog-index-header">
       <h1>${isEn ? "Blog" : "Blog"}</h1>
-      <p>${isEn ? "Guides and tips from SonVuDev." : "Hướng dẫn và mẹo từ SonVuDev."}</p>
+      <p>${isEn ? `Guides and tips from ${env.brand.name}.` : `Hướng dẫn và mẹo từ ${env.brand.name}.`}</p>
     </header>
     <div class="blog-index">
       ${cards || `<p>${isEn ? "No posts yet." : "Chưa có bài viết."}</p>`}
@@ -256,8 +256,8 @@ export function renderBlogFeed(posts) {
     };
   });
   return {
-    title: "SonVuDev Blog",
-    description: "Guides, tips and tools from SonVuDev.",
+    title: `${env.brand.name} Blog`,
+    description: `Guides, tips and tools from ${env.brand.name}.`,
     url: `${base}blog`,
     items,
   };
