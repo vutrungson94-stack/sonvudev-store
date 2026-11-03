@@ -35,7 +35,11 @@
       "OS update cache",
       "Recycle bin/trash cleanup",
       "Cross-platform"
-    ]
+    ],
+    "seoTitle": "PC Cleanup — Dọn dẹp máy tính, tăng tốc Windows | SonVuDev",
+    "seoDescription": "Công cụ dọn dẹp temp, cache, junk trên Windows/macOS/Linux. Tăng tốc máy tính, giải phóng dung lượng ổ cứng. Tải ngay.",
+    "seoTitleEn": "PC Cleanup — Clean Junk Files & Speed Up Windows | SonVuDev",
+    "seoDescriptionEn": "Cross-platform desktop cleaner for temp, cache, and system junk. Free up disk space and speed up Windows, macOS, Linux. Buy once, use forever."
   },
   {
     "id": "mousewheel-vba",
@@ -86,7 +90,11 @@
       "Includes a 21/21 passing self-test + test runner script",
       "1-minute sample demo + ready-made MouseWheel-Demo.xlsm file",
       "Free lifetime updates"
-    ]
+    ],
+    "seoTitle": "MouseWheel for VBA — Cuộn chuột trong ListBox, ComboBox | SonVuDev",
+    "seoDescription": "Module VBA duy nhất bật cuộn con lăn chuột cho ListBox, ComboBox, Frame, UserForm. Chỉ 1 file, 2 dòng code. Mua một lần dùng vĩnh viễn.",
+    "seoTitleEn": "MouseWheel for VBA — Enable Mouse Scroll in ListBox & ComboBox | SonVuDev",
+    "seoDescriptionEn": "Single VBA module adds mouse-wheel scrolling to ListBox, ComboBox, Frame, UserForm. Just 1 file, 2 lines of code. Lifetime license."
   },
   {
     "id": "721383af-e2ca-41a6-8f7b-b175fe288f9e",
@@ -128,7 +136,11 @@
       "Vietnamese/English interface",
       "Portable single exe - no installation",
       "Supports Linux (x64) and macOS (Intel & Apple Silicon)"
-    ]
+    ],
+    "seoTitle": "RAMCleaner Personal — Dọn RAM, tăng tốc Windows | SonVuDev",
+    "seoDescription": "Phần mềm dọn RAM thông minh cho Windows. Giải phóng Standby/Modified memory, nén bộ nhớ, dọn file tạm. License cá nhân 1 máy, cập nhật vĩnh viễn.",
+    "seoTitleEn": "RAMCleaner Personal — Smart RAM Cleaner for Windows | SonVuDev",
+    "seoDescriptionEn": "Intelligent memory cleaner for Windows. Frees standby/modified memory, compresses RAM, cleans temp files. Personal license, 1 device, lifetime updates."
   },
   {
     "id": "e2df7b07-010f-4cbe-8110-762c8b94811b",
@@ -163,7 +175,11 @@
       "Only 100 copies available",
       "Lifetime updates same as standard edition",
       "Windows 10/11 (x64), Linux (x64), macOS (Intel and Apple Silicon) support"
-    ]
+    ],
+    "seoTitle": "RAMCleaner Early Bird — Giảm giá đặc biệt, dọn RAM | SonVuDev",
+    "seoDescription": "Giá Early Bird cho RAMCleaner Personal. Tất cả tính năng dọn RAM, nén bộ nhớ, cập nhật vĩnh viễn. Mua sớm, giá tốt.",
+    "seoTitleEn": "RAMCleaner Early Bird — Intro Pricing, Smart RAM Cleaner | SonVuDev",
+    "seoDescriptionEn": "Introductory Early Bird license for RAMCleaner Personal. All features: standby cleanup, memory compression, temp cleaning. Lifetime updates included."
   },
   {
     "id": "7495919e-31e0-4f3d-86a2-2be4ba30c0dd",
@@ -204,7 +220,11 @@
       "Priority email support 1 year",
       "Aggressive mode (requires admin/root) for deeper cleanup",
       "Detailed HTML/CSV reports after each run"
-    ]
+    ],
+    "seoTitle": "RAMCleaner Business — Dọn RAM doanh nghiệp, 10 thiết bị | SonVuDev",
+    "seoDescription": "Giải pháp dọn RAM doanh nghiệp cho 10 thiết bị. Triển khai tập trung, config file chung, hỗ trợ ưu tiên. Tối ưu bộ nhớ cho team.",
+    "seoTitleEn": "RAMCleaner Business — Enterprise RAM Cleaner, 10 Devices | SonVuDev",
+    "seoDescriptionEn": "Enterprise memory cleaner for up to 10 devices. Centralized deployment, shared config, priority support. Optimize RAM across your team."
   },
   {
     "id": "b2507fa1-55a0-4a9a-b8d1-2b5493fb2c06",
@@ -254,7 +274,11 @@
       "Ctrl+C cleans up the temporary download instead of leaving a half-finished install.",
       "A single 59 KB .exe. Nothing to install, nothing to uninstall.",
       "Note: the binary is not code-signed. Windows SmartScreen warns on first launch — click More info, then Run anyway."
-    ]
+    ],
+    "seoTitle": ".NET SDK Portable Updater — Cài .NET không cần Admin | SonVuDev",
+    "seoDescription": "Cài .NET SDK mà không cần quyền Administrator. Tự đặt DOTNET_ROOT, PATH, xác minh SHA-512. Dành cho máy bị khóa quyền.",
+    "seoTitleEn": ".NET SDK Portable Updater — Install .NET Without Admin Rights | SonVuDev",
+    "seoDescriptionEn": "Install the .NET SDK on machines with no admin rights. Sets DOTNET_ROOT and PATH, verifies SHA-512, prunes old SDKs. No system-wide changes."
   },
   {
     "id": "19524885-1453-486e-9f20-4d157b63089e",
@@ -305,7 +329,11 @@
       "Detects Excel 16.0, 15.0, 14.0, 12.0 automatically",
       "Audit log reports how many entries were removed and how many were left",
       "No administrator rights needed — writes to HKCU only"
-    ]
+    ],
+    "seoTitle": "Excel Trusted Locations Setup — Mở macro .xlsm bị chặn | SonVuDev",
+    "seoDescription": "Thêm thư mục vào Trusted Locations của Excel. Giải quyết macro bị chặn trong .xlsm. Xem trước dry-run, hoàn tác, audit log.",
+    "seoTitleEn": "Excel Trusted Locations Setup — Fix Blocked Excel Macros | SonVuDev",
+    "seoDescriptionEn": "Add folders to Excel Trusted Locations to unblock macros in .xlsm files. Dry-run preview, undo, audit log. Fix macro security warnings."
   },
   {
     "id": "369294db-2a75-40a5-b5ee-e6ce76dc9c35",
@@ -345,6 +373,10 @@
       "Takes a few seconds per device, fully offline",
       "Nothing is written to the drive being tested",
       "We explain the Windows SmartScreen prompt so buyers are not put off"
-    ]
+    ],
+    "seoTitle": "Spark Capacity Tester — Kiểm tra dung lượng USB thật | SonVuDev",
+    "seoDescription": "Phát hiện USB giả, kiểm tra dung lượng thực tế của USB, thẻ nhớ, ổ cứng. Test nhanh 1GB, kiểm tra sector lỗi. Mua một lần dùng vĩnh viễn.",
+    "seoTitleEn": "Spark Capacity Tester — Detect Fake USB & Check Real Capacity | SonVuDev",
+    "seoDescriptionEn": "Detect fake USB drives and verify the real capacity of USB sticks, SD cards, and disks. Quick Size Test, bad sector detection. Lifetime license."
   }
 ]
