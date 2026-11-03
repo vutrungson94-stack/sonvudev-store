@@ -551,5 +551,9 @@
   "product.label.category.khac": "Autre",
   "product.label.category.phan-mem": "Logiciel",
   "product.label.category.cong-cu": "Outils",
-  "product.label.category.tien-ich": "Utilitaire"
+  "product.label.category.tien-ich": "Utilitaire",
+  "blog.eyebrow": "Articles et guides",
+  "blog.title1": "Astuces tech",
+  "blog.title2": "pour mieux travailler.",
+  "blog.more": "Voir tous les articles"
 }

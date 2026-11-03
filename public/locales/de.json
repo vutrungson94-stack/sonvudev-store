@@ -551,5 +551,9 @@
   "product.label.category.khac": "Andere",
   "product.label.category.phan-mem": "Software",
   "product.label.category.cong-cu": "Werkzeuge",
-  "product.label.category.tien-ich": "Dienstprogramm"
+  "product.label.category.tien-ich": "Dienstprogramm",
+  "blog.eyebrow": "Artikel & Anleitungen",
+  "blog.title1": "Tech-Tipps",
+  "blog.title2": "damit Sie besser arbeiten.",
+  "blog.more": "Alle Beiträge anzeigen"
 }

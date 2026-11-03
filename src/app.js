@@ -572,6 +572,58 @@ app.get("/en/blog", async (req, res) => {
 });
 app.get("/blog/:slug", blogPage("vi"));
 app.get("/en/blog/:slug", blogPage("en"));
+// Non-Vietnamese locales share English blog content; the static pages translate
+// client-side, but the blog is server-rendered and only authored in vi/en.
+app.get("/de/blog", async (req, res) => {
+  try {
+    const posts = loadBlogPosts();
+    res.set("Cache-Control", "public, max-age=300").type("html").send(renderBlogIndex(posts, "en"));
+  } catch (error) {
+    console.error(error);
+    res.status(500).sendFile(path.join(publicDir, "404.html"));
+  }
+});
+app.get("/es/blog", async (req, res) => {
+  try {
+    const posts = loadBlogPosts();
+    res.set("Cache-Control", "public, max-age=300").type("html").send(renderBlogIndex(posts, "en"));
+  } catch (error) {
+    console.error(error);
+    res.status(500).sendFile(path.join(publicDir, "404.html"));
+  }
+});
+app.get("/fr/blog", async (req, res) => {
+  try {
+    const posts = loadBlogPosts();
+    res.set("Cache-Control", "public, max-age=300").type("html").send(renderBlogIndex(posts, "en"));
+  } catch (error) {
+    console.error(error);
+    res.status(500).sendFile(path.join(publicDir, "404.html"));
+  }
+});
+app.get("/ja/blog", async (req, res) => {
+  try {
+    const posts = loadBlogPosts();
+    res.set("Cache-Control", "public, max-age=300").type("html").send(renderBlogIndex(posts, "en"));
+  } catch (error) {
+    console.error(error);
+    res.status(500).sendFile(path.join(publicDir, "404.html"));
+  }
+});
+app.get("/zh-CN/blog", async (req, res) => {
+  try {
+    const posts = loadBlogPosts();
+    res.set("Cache-Control", "public, max-age=300").type("html").send(renderBlogIndex(posts, "en"));
+  } catch (error) {
+    console.error(error);
+    res.status(500).sendFile(path.join(publicDir, "404.html"));
+  }
+});
+app.get("/de/blog/:slug", blogPage("en"));
+app.get("/es/blog/:slug", blogPage("en"));
+app.get("/fr/blog/:slug", blogPage("en"));
+app.get("/ja/blog/:slug", blogPage("en"));
+app.get("/zh-CN/blog/:slug", blogPage("en"));
 
 app.get("/og/:slug.svg", async (req, res, next) => {
   try {

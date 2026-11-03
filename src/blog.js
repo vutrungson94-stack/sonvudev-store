@@ -56,19 +56,19 @@ export function getBlogPostBySlug(slug) {
 
 // Build blog route path from slug and language.
 const blogUrl = (slug, lang = "vi") =>
-  lang === "en" ? `/en/blog/${slug}` : `/blog/${slug}`;
+  lang === "vi" ? `/blog/${slug}` : `/en/blog/${slug}`;
 
 // Render a single blog post as a full HTML document.
 export function renderBlogPost(post, lang = "vi") {
-  const isEn = lang === "en";
-  const title = isEn ? post.titleEn || post.titleVi : post.titleVi;
-  const description = isEn
-    ? post.descriptionEn || post.descriptionVi
-    : post.descriptionVi;
-  const content = isEn ? post.contentEn || post.contentVi : post.contentVi;
-  const section = isEn ? post.sectionEn || post.section : post.section;
+  const isVi = lang === "vi";
+  const title = isVi ? post.titleVi : post.titleEn || post.titleVi;
+  const description = isVi
+    ? post.descriptionVi
+    : post.descriptionEn || post.descriptionVi;
+  const content = isVi ? post.contentVi : post.contentEn || post.contentVi;
+  const section = isVi ? post.section : post.sectionEn || post.section;
   const dateDisplay = new Date(post.published || post.modified || Date.now())
-    .toLocaleDateString(isEn ? "en-US" : "vi-VN", {
+    .toLocaleDateString(isVi ? "vi-VN" : "en-US", {
       year: "numeric",
       month: "long",
       day: "numeric",
@@ -85,11 +85,11 @@ export function renderBlogPost(post, lang = "vi") {
   const relatedHtml = post.relatedProductSlug
     ? `<a class="blog-related-link" href="${absolute(
         `/product/${post.relatedProductSlug}`
-      )}">${isEn ? 'View product' : 'Xem sản phẩm'} →</a>`
+      )}">${isVi ? 'Sản phẩm liên quan' : 'Related Product'} →</a>`
     : "";
 
   return `<!DOCTYPE html>
-<html lang="${isEn ? "en" : "vi"}">
+<html lang="${isVi ? "vi" : "en"}">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -98,8 +98,8 @@ export function renderBlogPost(post, lang = "vi") {
   <link rel="canonical" href="${esc(url)}">
   <meta property="og:type" content="article">
   <meta property="og:site_name" content="${esc(env.brand.name)}">
-  <meta property="og:locale" content="${isEn ? "en_US" : "vi_VN"}">
-  <meta property="og:locale:alternate" content="${isEn ? "vi_VN" : "en_US"}">
+  <meta property="og:locale" content="${isVi ? "vi_VN" : "en_US"}">
+  <meta property="og:locale:alternate" content="${isVi ? "en_US" : "vi_VN"}">
   <meta property="og:title" content="${esc(title)}">
   <meta property="og:description" content="${esc(description)}">
   <meta property="og:url" content="${esc(url)}">
@@ -122,10 +122,10 @@ export function renderBlogPost(post, lang = "vi") {
 </head>
 <body>
   <nav class="blog-lang">
-    <a href="${absolute("/")}" class="blog-home">← ${isEn ? 'Home' : 'Trang chủ'}</a>
-    <span>${isEn ? 'Language:' : 'Ngôn ngữ:'}</span>
-    <a href="${esc(viUrl)}" class="${!isEn ? 'active' : ''}">Tiếng Việt</a>
-    <a href="${esc(enUrl)}" class="${isEn ? 'active' : ''}">English</a>
+    <a href="${absolute("/")}" class="blog-home">← ${isVi ? 'Trang chủ' : 'Home'}</a>
+    <span>${isVi ? 'Ngôn ngữ:' : 'Language:'}</span>
+    <a href="${esc(viUrl)}" class="${!isVi ? 'active' : ''}">Tiếng Việt</a>
+    <a href="${esc(enUrl)}" class="${isVi ? 'active' : ''}">English</a>
   </nav>
   <article class="blog-post">
     <header class="blog-header">
@@ -141,8 +141,8 @@ export function renderBlogPost(post, lang = "vi") {
     </div>
     <footer class="blog-footer">
       <div class="blog-related">
-        <h2>${isEn ? "Related Product" : "Sản phẩm liên quan"}</h2>
-        <div id="related-products">${relatedHtml || (isEn ? "No related product." : "Không có sản phẩm liên quan.")}</div>
+        <h2>${isVi ? "Sản phẩm liên quan" : "Related Product"}</h2>
+        <div id="related-products">${relatedHtml || (isVi ? "Không có sản phẩm liên quan." : "No related product.")}</div>
       </div>
     </footer>
   </article>
@@ -153,25 +153,25 @@ export function renderBlogPost(post, lang = "vi") {
 
 // Render blog index page listing all posts.
 export function renderBlogIndex(posts, lang = "vi") {
-  const isEn = lang === "en";
-  const title = isEn ? `Blog — ${env.brand.name}` : `Blog — ${env.brand.name}`;
-  const description = isEn
-    ? `Guides, tips and tools from ${env.brand.name} to help you work faster and safer on Windows.`
-    : `Hướng dẫn, mẹo và công cụ từ ${env.brand.name} giúp bạn làm việc nhanh hơn và an toàn hơn trên Windows.`;
-  const url = absolute(lang === "en" ? "/en/blog" : "/blog");
+  const isVi = lang === "vi";
+  const title = isVi ? `Blog — ${env.brand.name}` : `Blog — ${env.brand.name}`;
+  const description = isVi
+    ? `Hướng dẫn, mẹo và công cụ từ ${env.brand.name} giúp bạn làm việc nhanh hơn và an toàn hơn trên Windows.`
+    : `Guides, tips and tools from ${env.brand.name} to help you work faster and safer on Windows.`;
+  const url = absolute(lang === "vi" ? "/blog" : "/en/blog");
   const viUrl = absolute("/blog");
   const enUrl = absolute("/en/blog");
 
   const cards = (posts || [])
     .map((post) => {
-      const pTitle = isEn ? post.titleEn || post.titleVi : post.titleVi;
-      const pDesc = isEn
-        ? post.descriptionEn || post.descriptionVi
-        : post.descriptionVi;
+      const pTitle = isVi ? post.titleVi : post.titleEn || post.titleVi;
+      const pDesc = isVi
+        ? post.descriptionVi
+        : post.descriptionEn || post.descriptionVi;
       const pUrl = absolute(blogUrl(post.slug, lang));
       const pDate = new Date(
         post.published || post.modified || Date.now()
-      ).toLocaleDateString(isEn ? "en-US" : "vi-VN", {
+      ).toLocaleDateString(isVi ? "vi-VN" : "en-US", {
         year: "numeric",
         month: "short",
         day: "numeric",
@@ -179,7 +179,7 @@ export function renderBlogIndex(posts, lang = "vi") {
       return `<a class="blog-card" href="${esc(pUrl)}">
         <div class="blog-card-meta">
           <span class="blog-date">${esc(pDate)}</span>
-          <span class="blog-section">${esc(isEn ? post.sectionEn || post.section : post.section)}</span>
+          <span class="blog-section">${esc(isVi ? post.section : post.sectionEn || post.section)}</span>
         </div>
         <h3>${esc(pTitle)}</h3>
         <p>${esc(pDesc)}</p>
@@ -188,7 +188,7 @@ export function renderBlogIndex(posts, lang = "vi") {
     .join("");
 
   return `<!DOCTYPE html>
-<html lang="${isEn ? "en" : "vi"}">
+<html lang="${isVi ? "vi" : "en"}">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -197,8 +197,8 @@ export function renderBlogIndex(posts, lang = "vi") {
   <link rel="canonical" href="${esc(url)}">
   <meta property="og:type" content="website">
   <meta property="og:site_name" content="${esc(env.brand.name)}">
-  <meta property="og:locale" content="${isEn ? "en_US" : "vi_VN"}">
-  <meta property="og:locale:alternate" content="${isEn ? "vi_VN" : "en_US"}">
+  <meta property="og:locale" content="${isVi ? "vi_VN" : "en_US"}">
+  <meta property="og:locale:alternate" content="${isVi ? "en_US" : "vi_VN"}">
   <meta property="og:title" content="${esc(title)}">
   <meta property="og:description" content="${esc(description)}">
   <meta property="og:url" content="${esc(url)}">
@@ -216,18 +216,18 @@ export function renderBlogIndex(posts, lang = "vi") {
 </head>
 <body>
   <nav class="blog-lang">
-    <a href="${absolute("/")}" class="blog-home">← ${isEn ? 'Home' : 'Trang chủ'}</a>
-    <span>${isEn ? 'Language:' : 'Ngôn ngữ:'}</span>
-    <a href="${esc(viUrl)}" class="${!isEn ? 'active' : ''}">Tiếng Việt</a>
-    <a href="${esc(enUrl)}" class="${isEn ? 'active' : ''}">English</a>
+    <a href="${absolute("/")}" class="blog-home">← ${isVi ? 'Trang chủ' : 'Home'}</a>
+    <span>${isVi ? 'Ngôn ngữ:' : 'Language:'}</span>
+    <a href="${esc(viUrl)}" class="${!isVi ? 'active' : ''}">Tiếng Việt</a>
+    <a href="${esc(enUrl)}" class="${isVi ? 'active' : ''}">English</a>
   </nav>
   <main class="wrap">
     <header class="blog-index-header">
-      <h1>${isEn ? "Blog" : "Blog"}</h1>
-      <p>${isEn ? `Guides and tips from ${env.brand.name}.` : `Hướng dẫn và mẹo từ ${env.brand.name}.`}</p>
+      <h1>${isVi ? "Blog" : "Blog"}</h1>
+      <p>${isVi ? `Hướng dẫn và mẹo từ ${env.brand.name}.` : `Guides and tips from ${env.brand.name}.`}</p>
     </header>
     <div class="blog-index">
-      ${cards || `<p>${isEn ? "No posts yet." : "Chưa có bài viết."}</p>`}
+      ${cards || `<p>${isVi ? "Chưa có bài viết." : "No posts yet."}</p>`}
     </div>
   </main>
   <script src="/lang-detect.js"></script>
