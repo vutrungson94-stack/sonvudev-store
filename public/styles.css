@@ -701,3 +701,44 @@ body.modal-open{overflow:hidden}
 
 .product-detail h3 ~ *:not(h3){padding-left:48px}
 .product-detail h3 ~ ul{padding-left:72px}.blog-translation-wrap{margin:0 0 18px;padding:12px 14px;border-radius:10px;background:#fff8e1;border:1px solid #ffe082;color:#5d4037;font-size:13px;line-height:1.6}.blog-translation-notice{margin:0}
+
+/* Admin product edit modal */
+.edit-modal .refund-card{max-width:760px;width:min(760px,100%)}
+.edit-modal .form-actions{display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin-top:4px}
+.edit-modal .form-actions .button{margin:0}
+.edit-modal .form-message{flex:1 1 100%;margin:6px 0 0}
+
+/* Admin mobile fixes */
+@media(max-width:800px){
+  .admin-toolbar{flex-wrap:wrap;gap:10px}
+  .admin-tools{flex-wrap:wrap;gap:8px}
+  .admin-search,.admin-filter{flex:1 1 100%;min-width:0}
+  .admin-product-actions{flex-wrap:wrap;gap:6px;justify-content:flex-start}
+  .admin-upload-button{padding:6px 10px;font-size:11px}
+  .text-link{padding:6px 8px;font-size:11px}
+  .admin-table-wrap{overflow-x:auto;-webkit-overflow-scrolling:touch}
+  .admin-table{min-width:640px}
+  .admin-table td,.admin-table th{padding:10px 8px;font-size:11px}
+  .table-action{padding:6px 8px;font-size:10px}
+  .admin-seo-form{grid-template-columns:1fr}
+}
+@media(max-width:560px){
+  .admin-product-row{grid-template-columns:32px 1fr;gap:10px}
+  .admin-product-actions{grid-column:2;display:flex;flex-wrap:wrap;gap:6px;justify-content:flex-start}
+  .admin-upload-button{padding:5px 8px;font-size:10px}
+  .text-link{padding:4px 6px;font-size:10px}
+  .admin-shell{width:calc(100% - 24px);margin:20px auto 60px}
+  .admin-heading h1{font-size:22px}
+  .admin-card{padding:16px 14px}
+  .admin-card input,.admin-card textarea{padding:10px 12px;font-size:12px}
+  .admin-card .button{padding:10px 14px;font-size:12px}
+  .field-grid{gap:10px}
+  .admin-table td,.admin-table th{padding:8px 6px;font-size:10px}
+  .table-action{padding:5px 7px;font-size:9px}
+  .refund-card,.edit-modal .refund-card{padding:18px 16px}
+}
+@media(max-width:420px){
+  .admin-shell{width:calc(100% - 16px)}
+  .admin-card{padding:14px 12px}
+  .admin-product-icon{width:28px;height:28px;font-size:9px}
+}

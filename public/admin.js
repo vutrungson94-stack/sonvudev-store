@@ -1,4 +1,4 @@
-const body=document.getElementById('orders-body'),summary=document.getElementById('order-summary'),login=document.getElementById('login-card'),dashboard=document.getElementById('dashboard'),tokenInput=document.getElementById('admin-token'),status=document.getElementById('login-status'),logout=document.getElementById('logout'),toast=document.getElementById('toast'),productPanel=document.getElementById('product-panel'),productForm=document.getElementById('product-form'),productStatus=document.getElementById('product-status'),productList=document.getElementById('admin-product-list'),revenuePanel=document.getElementById('revenue-panel'),moreRow=document.getElementById('orders-more'),moreBtn=document.getElementById('orders-more-btn'),revenueBody=document.getElementById('revenue-body'),revenueTotals=document.getElementById('revenue-totals'),revenueNote=document.getElementById('revenue-note'),revenueRefresh=document.getElementById('revenue-refresh'),orderSearch=document.getElementById('order-search'),orderStatusFilter=document.getElementById('order-status'),productSearch=document.getElementById('product-search'),productStatusFilter=document.getElementById('product-status-filter'),refundModal=document.getElementById('refund-modal'),refundForm=document.getElementById('refund-form'),refundOrderLine=document.getElementById('refund-order'),refundEvidence=document.getElementById('refund-evidence'),refundStatus=document.getElementById('refund-status'),refundPartial=document.getElementById('refund-partial'),refundSubmit=document.getElementById('refund-submit');let token=sessionStorage.getItem('sonvudev_admin')||'';const esc=v=>window.SVDFormat.esc(v);// Money is formatted for the currency of the row, never for VND with the code
+const body=document.getElementById('orders-body'),summary=document.getElementById('order-summary'),login=document.getElementById('login-card'),dashboard=document.getElementById('dashboard'),tokenInput=document.getElementById('admin-token'),status=document.getElementById('login-status'),logout=document.getElementById('logout'),toast=document.getElementById('toast'),productPanel=document.getElementById('product-panel'),productForm=document.getElementById('product-form'),productStatus=document.getElementById('product-status'),productList=document.getElementById('admin-product-list'),revenuePanel=document.getElementById('revenue-panel'),moreRow=document.getElementById('orders-more'),moreBtn=document.getElementById('orders-more-btn'),revenueBody=document.getElementById('revenue-body'),revenueTotals=document.getElementById('revenue-totals'),revenueNote=document.getElementById('revenue-note'),revenueRefresh=document.getElementById('revenue-refresh'),orderSearch=document.getElementById('order-search'),orderStatusFilter=document.getElementById('order-status'),productSearch=document.getElementById('product-search'),productStatusFilter=document.getElementById('product-status-filter'),refundModal=document.getElementById('refund-modal'),refundForm=document.getElementById('refund-form'),refundOrderLine=document.getElementById('refund-order'),refundEvidence=document.getElementById('refund-evidence'),refundStatus=document.getElementById('refund-status'),refundPartial=document.getElementById('refund-partial'),refundSubmit=document.getElementById('refund-submit'),editModal=document.getElementById('edit-modal'),editForm=document.getElementById('edit-form'),editStatus=document.getElementById('edit-status'),editOrderLine=document.getElementById('edit-order');let token=sessionStorage.getItem('sonvudev_admin')||'';const esc=v=>window.SVDFormat.esc(v);// Money is formatted for the currency of the row, never for VND with the code
 // appended afterwards. That combination is wrong the moment a row is not VND: the
 // amount was grouped as vi-VN with no decimals and then labelled USD, which is the
 // exact mistake src/format.js documents — a PayPal order read "3 USD" or
@@ -258,7 +258,7 @@ const productCount=document.getElementById('product-count');
 // the shop holds.
 const productQuery=()=>{const params=new URLSearchParams();if(productSearch.value.trim())params.set('q',productSearch.value.trim());if(productStatusFilter.value)params.set('status',productStatusFilter.value);return params};
 const productFiltering=()=>Boolean(productSearch.value.trim()||productStatusFilter.value);
-async function loadProducts(){try{const params=productQuery(),d=await api('/api/admin/products'+(params.toString()?'?'+params.toString():'')),list=d.products||[];if(productCount)productCount.textContent=list.length+' sản phẩm';productList.innerHTML=list.length?list.map(p=>`<div class="admin-product-row"><span class="admin-product-icon">${esc(initials(p.name))}</span><div><b>${esc(p.name)}</b><small>${esc(p.version)} · ${esc(amount(p.price, p.currency))} · ${esc(productStatusLabel(p.status))}</small></div><div class="admin-product-actions"><span>${p.fileKey ? ('Đã có file' + ((p.fileSize || p.file_size) ? ' (' + formatBytes(p.fileSize || p.file_size) + ')' : '')) : 'Chưa có file'}</span><label class="admin-upload-button">Cập nhật file<input type="file" accept=".zip,.exe,.msi,.7z" data-product-id="${esc(p.id)}" data-product-ref="${esc(p.slug)}" data-version="${esc(p.version)}" hidden></label><button class="text-link" type="button" data-seo-toggle="${esc(p.id)}">${p.seoTitle?'Sửa SEO':'Thêm SEO'}</button><button class="text-link" type="button" data-archive="${esc(p.id)}" data-archive-to="${p.status==='archived'?(p.fileKey?'active':'draft'):'archived'}">${p.status==='archived'?'Bỏ lưu trữ':'Lưu trữ'}</button><button class="text-link text-link-danger" type="button" data-delete="${esc(p.id)}">Xoá</button></div>${seoEditor(p)}</div>`).join(''):`<p class="table-empty">${productFiltering()?'Không có sản phẩm nào khớp bộ lọc.':'Chưa có sản phẩm.'}</p>`;productList.querySelectorAll('input[type=file]').forEach(input=>input.onchange=uploadExistingProduct);productList.querySelectorAll('[data-seo-toggle]').forEach(button=>button.onclick=()=>{const form=productList.querySelector(`[data-seo-form="${button.dataset.seoToggle}"]`);if(form){form.hidden=!form.hidden;if(!form.hidden){seoLock(form,false);countSeo(form)}}});productList.querySelectorAll('[data-seo-form]').forEach(form=>{form.onsubmit=saveSeo;seoLock(form,true);form.querySelectorAll('input,textarea').forEach(input=>input.oninput=()=>countSeo(form))});productList.querySelectorAll('[data-archive]').forEach(button=>button.onclick=()=>changeProductStatus(button));productList.querySelectorAll('[data-delete]').forEach(button=>button.onclick=()=>deleteProductRow(button))}catch(e){showToast(e.message,true)}}
+async function loadProducts(){try{const params=productQuery(),d=await api('/api/admin/products'+(params.toString()?'?'+params.toString():'')),list=d.products||[];if(productCount)productCount.textContent=list.length+' sản phẩm';productList.innerHTML=list.length?list.map(p=>`<div class="admin-product-row" data-product-id="${esc(p.id)}"><span class="admin-product-icon">${esc(initials(p.name))}</span><div><b>${esc(p.name)}</b><small>${esc(p.version)} · ${esc(amount(p.price, p.currency))} · ${esc(productStatusLabel(p.status))}</small></div><div class="admin-product-actions"><span>${p.fileKey ? ('Đã có file' + ((p.fileSize || p.file_size) ? ' (' + formatBytes(p.fileSize || p.file_size) + ')' : '')) : 'Chưa có file'}</span><label class="admin-upload-button">Cập nhật file<input type="file" accept=".zip,.exe,.msi,.7z" data-product-id="${esc(p.id)}" data-product-ref="${esc(p.slug)}" data-version="${esc(p.version)}" hidden></label><button class="text-link" type="button" data-edit="${esc(p.id)}">Sửa</button><button class="text-link" type="button" data-seo-toggle="${esc(p.id)}">${p.seoTitle?'Sửa SEO':'Thêm SEO'}</button><button class="text-link" type="button" data-archive="${esc(p.id)}" data-archive-to="${p.status==='archived'?(p.fileKey?'active':'draft'):'archived'}">${p.status==='archived'?'Bỏ lưu trữ':'Lưu trữ'}</button><button class="text-link text-link-danger" type="button" data-delete="${esc(p.id)}">Xoá</button></div>${seoEditor(p)}</div>`).join(''):`<p class="table-empty">${productFiltering()?'Không có sản phẩm nào khớp bộ lọc.':'Chưa có sản phẩm.'}</p>`;productList.querySelectorAll('input[type=file]').forEach(input=>input.onchange=uploadExistingProduct);productList.querySelectorAll('[data-seo-toggle]').forEach(button=>button.onclick=()=>{const form=productList.querySelector(`[data-seo-form="${button.dataset.seoToggle}"]`);if(form){form.hidden=!form.hidden;if(!form.hidden){seoLock(form,false);countSeo(form)}}});productList.querySelectorAll('[data-edit]').forEach(button=>button.onclick=async()=>{const id=button.dataset.edit;try{const p=await api('/api/admin/products/'+encodeURIComponent(id));openEditModal(p.product||p)}catch(e){showToast(e.message,true)}});productList.querySelectorAll('[data-seo-form]').forEach(form=>{form.onsubmit=saveSeo;seoLock(form,true);form.querySelectorAll('input,textarea').forEach(input=>input.oninput=()=>countSeo(form))});productList.querySelectorAll('[data-archive]').forEach(button=>button.onclick=()=>changeProductStatus(button));productList.querySelectorAll('[data-delete]').forEach(button=>button.onclick=()=>deleteProductRow(button))}catch(e){showToast(e.message,true)}}
 function seoEditor(p){return `<form class="admin-seo-form" data-seo-form="${esc(p.id)}" data-seo-title="${esc(p.seoTitle||'')}" data-seo-description="${esc(p.seoDescription||'')}" data-seo-title-en="${esc(p.seoTitleEn||'')}" data-seo-description-en="${esc(p.seoDescriptionEn||'')}" hidden><label>Tiêu đề tìm kiếm<input name="seoTitle" maxlength="70" value="${esc(p.seoTitle||'')}" placeholder="Để trống thì lấy tên sản phẩm"></label><label>Mô tả tìm kiếm<textarea name="seoDescription" maxlength="175" rows="2" placeholder="Câu người ta gõ vào Google, trả lời thẳng vấn đề của họ">${esc(p.seoDescription||'')}</textarea></label><label>SEO tiếng Anh — tiêu đề<input name="seoTitleEn" maxlength="70" value="${esc(p.seoTitleEn||'')}" placeholder="Để trống: trang /en/ tự sinh tiêu đề từ tên sản phẩm"></label><label>SEO tiếng Anh — mô tả<textarea name="seoDescriptionEn" maxlength="175" rows="2" placeholder="Để trống: trang /en/ dùng mô tả tiếng Anh của sản phẩm">${esc(p.seoDescriptionEn||'')}</textarea></label><p class="admin-seo-count"></p><button class="button button-primary" type="submit" disabled>Lưu SEO</button></form>`}
 // Read-only once saved, editable once "Sửa SEO" is pressed.
 //
@@ -318,6 +318,72 @@ async function submitProduct(event){event.preventDefault();const form=event.curr
 // machine to keep showing.
 const hideAll=()=>{for(const panel of[dashboard,productPanel,revenuePanel])if(panel)panel.hidden=true};
 const showAfterLogin=()=>{hideAll();if(revenuePanel)revenuePanel.hidden=false;dashboard.hidden=false;productPanel.hidden=false;logout.hidden=false};
+let editTargetId = null;
+function openEditModal(product) {
+  editTargetId = product.id;
+  editOrderLine.textContent = `Đang sửa: ${product.name} (${product.slug})`;
+  const data = Object.fromEntries(new FormData(editForm));
+  data.name = product.name || '';
+  data.price = product.price ?? '';
+  data.category = product.category || '';
+  data.platform = product.platform || '';
+  data.version = product.version || '';
+  data.badge = product.badge || '';
+  data.shortDescription = product.shortDescription || '';
+  data.shortDescriptionEn = product.shortDescriptionEn || '';
+  data.description = product.description || '';
+  data.descriptionEn = product.descriptionEn || '';
+  data.requirements = product.requirements || '';
+  data.requirementsEn = product.requirementsEn || '';
+  data.features = Array.isArray(product.features) ? product.features.join('
+') : (product.features || '');
+  data.featuresEn = Array.isArray(product.featuresEn) ? product.featuresEn.join('
+') : (product.featuresEn || '');
+  data.seoTitle = product.seoTitle || '';
+  data.seoDescription = product.seoDescription || '';
+  data.seoTitleEn = product.seoTitleEn || '';
+  data.seoDescriptionEn = product.seoDescriptionEn || '';
+  for (const [key, value] of Object.entries(data)) {
+    const el = editForm.elements[key];
+    if (el) el.value = value;
+  }
+  editStatus.textContent = '';
+  editStatus.className = 'form-message';
+  editModal.hidden = false;
+}
+function closeEdit() { editModal.hidden = true; editTargetId = null; }
+if (editModal) {
+  document.getElementById('edit-close').onclick = closeEdit;
+  document.getElementById('edit-cancel').onclick = closeEdit;
+}
+if (editForm) editForm.onsubmit = async event => {
+  event.preventDefault();
+  if (!editTargetId) return;
+  const button = document.getElementById('save-edit');
+  button.disabled = true;
+  editStatus.className = 'form-message';
+  const data = Object.fromEntries(new FormData(editForm));
+  const payload = {
+    ...data,
+    features: lines(data.features),
+    featuresEn: lines(data.featuresEn),
+    price: Number(data.price),
+  };
+  try {
+    await api('/api/admin/products/' + encodeURIComponent(editTargetId), {
+      method: 'PATCH',
+      body: JSON.stringify(payload),
+    });
+    showToast('Đã cập nhật sản phẩm');
+    closeEdit();
+    await loadProducts();
+  } catch (e) {
+    editStatus.textContent = e.message;
+    editStatus.className = 'form-message error';
+  } finally {
+    button.disabled = false;
+  }
+};
 // Archiving is how a product comes off sale without its history going with it: it
 // leaves the shop, the sitemap and the catalogue, and keeps its page, its reviews
 // and every order ever placed for it. Coming back puts it where the file allows —

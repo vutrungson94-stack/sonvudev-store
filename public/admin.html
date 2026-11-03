@@ -145,6 +145,59 @@
 </form>
 </div>
 </div>
+<div class="refund-modal" id="edit-modal" hidden role="dialog" aria-modal="true" aria-labelledby="edit-title">
+<div class="refund-card">
+<button type="button" class="back-button" id="edit-close">← Đóng</button>
+<p class="eyebrow">Sản phẩm</p>
+<h2 id="edit-title">Sửa sản phẩm</h2>
+<p class="refund-order" id="edit-order"></p>
+<form id="edit-form">
+<fieldset class="form-block">
+<legend>Thông tin chính</legend>
+<div class="field-grid">
+<label>Tên sản phẩm<input name="name" required maxlength="120"></label>
+<label>Giá (VND)<input name="price" type="number" min="0" step="1000" required></label>
+<label>Danh mục<input name="category" maxlength="50"></label>
+<label>Nền tảng<input name="platform" maxlength="50"></label>
+<label>Phiên bản<input name="version" maxlength="30" required></label>
+<label>Nhãn<input name="badge" maxlength="40"></label>
+</div>
+</fieldset>
+<fieldset class="form-block">
+<legend>Mô tả</legend>
+<div class="field-grid field-grid-2">
+<label>Mô tả ngắn<input name="shortDescription" maxlength="180"></label>
+<label>Mô tả ngắn (tiếng Anh)<input name="shortDescriptionEn" maxlength="180"></label>
+<label>Mô tả đầy đủ<textarea name="description" rows="4" maxlength="2000"></textarea></label>
+<label>Mô tả đầy đủ (tiếng Anh)<textarea name="descriptionEn" rows="4" maxlength="2000"></textarea></label>
+</div>
+</fieldset>
+<fieldset class="form-block">
+<legend>Yêu cầu & tính năng</legend>
+<label>Yêu cầu hệ thống<input name="requirements" maxlength="240"></label>
+<label>Yêu cầu hệ thống (tiếng Anh)<input name="requirementsEn" maxlength="240"></label>
+<div class="field-grid field-grid-2">
+<label>Tính năng, mỗi dòng một tính năng<textarea name="features" rows="3" maxlength="2000"></textarea></label>
+<label>Tính năng (tiếng Anh), mỗi dòng một tính năng<textarea name="featuresEn" rows="3" maxlength="2000"></textarea></label>
+</div>
+</fieldset>
+<fieldset class="form-block">
+<legend>SEO</legend>
+<div class="field-grid field-grid-2">
+<label>Tiêu đề tìm kiếm<input name="seoTitle" maxlength="70"></label>
+<label>SEO tiếng Anh — tiêu đề<input name="seoTitleEn" maxlength="70"></label>
+<label>Mô tả tìm kiếm<textarea name="seoDescription" maxlength="175" rows="2"></textarea></label>
+<label>SEO tiếng Anh — mô tả<textarea name="seoDescriptionEn" maxlength="175" rows="2"></textarea></label>
+</div>
+</fieldset>
+<div class="form-actions">
+<button class="button button-primary" type="submit" id="save-edit">Lưu thay đổi <span>→</span></button>
+<button class="button button-secondary" type="button" id="edit-cancel">Đóng</button>
+<p class="form-message" id="edit-status"></p>
+</div>
+</form>
+</div>
+</div>
 <div class="toast" id="toast" role="status"></div>
 <script src="format.js"></script>
 <script src="admin.js"></script>
