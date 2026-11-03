@@ -73,7 +73,7 @@ const blogLangLinks = (slug, currentLang) =>
   BLOG_LANGS.map(({ code, label, flag }) => {
     const active = code === currentLang ? ' active' : '';
     const flagSpan = `<span class="lang-flag" aria-hidden="true">${flag}</span>`;
-    return `<a href="${esc(blogLangHref(code, slug))}" class="${active}">${flagSpan} ${label}</a>`;
+    return `<a href="${esc(blogLangHref(code, slug))}" class="${active}" data-blog-lang="${code}">${flagSpan} ${label}</a>`;
   }).join("");
 
 // Render a single blog post as a full HTML document.
@@ -144,6 +144,7 @@ export function renderBlogPost(post, lang = "vi") {
     <span>${isVi ? 'Ngôn ngữ:' : 'Language:'}</span>
     ${blogLangLinks(post.slug, lang)}
   </nav>
+  <script src="/blog-lang.js"></script>
   <article class="blog-post">
     <header class="blog-header">
       <div class="blog-meta">
@@ -237,6 +238,7 @@ export function renderBlogIndex(posts, lang = "vi") {
     <span>${isVi ? 'Ngôn ngữ:' : 'Language:'}</span>
     ${blogLangLinks("", lang)}
   </nav>
+  <script src="/blog-lang.js"></script>
   <main class="wrap">
     <header class="blog-index-header">
       <h1>${isVi ? "Blog" : "Blog"}</h1>
