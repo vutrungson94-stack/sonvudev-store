@@ -335,10 +335,10 @@ function openEditModal(product) {
   data.descriptionEn = product.descriptionEn || '';
   data.requirements = product.requirements || '';
   data.requirementsEn = product.requirementsEn || '';
-  data.features = Array.isArray(product.features) ? product.features.join('
-') : (product.features || '');
-  data.featuresEn = Array.isArray(product.featuresEn) ? product.featuresEn.join('
-') : (product.featuresEn || '');
+  data.features = Array.isArray(product.features) ? product.features.join('\n') : (product.features || '');
+
+  data.featuresEn = Array.isArray(product.featuresEn) ? product.featuresEn.join('\n') : (product.featuresEn || '');
+
   data.seoTitle = product.seoTitle || '';
   data.seoDescription = product.seoDescription || '';
   data.seoTitleEn = product.seoTitleEn || '';
