@@ -742,3 +742,8 @@ body.modal-open{overflow:hidden}
   .admin-card{padding:14px 12px}
   .admin-product-icon{width:28px;height:28px;font-size:9px}
 }
+
+/* Ensure edit button sits on the same row as other action buttons on mobile */
+@media(max-width:560px){
+  .admin-product-actions>span{flex:1 1 100%;margin-bottom:4px}
+}

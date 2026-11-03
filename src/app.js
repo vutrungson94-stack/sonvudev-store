@@ -1336,6 +1336,10 @@ app.post("/api/admin/products", admin, json, async (req, res) => {
     invalidatePages();
   } catch (error) { console.error(error); res.status(500).json(refuse("api.err.productCreate", "Không thể tạo sản phẩm", 500)); }
 });
+app.get("/api/admin/products/:id", admin, async (req, res) => {
+  try { const product = await getProduct(req.params.id); if (!product) return res.status(404).json(refuse("api.err.productNotFound", "Không tìm thấy sản phẩm", 404)); res.json({ product }); }
+  catch (error) { console.error(error); res.status(500).json(refuse("api.err.productLoad", "Không thể tải sản phẩm", 500)); }
+});
 app.patch("/api/admin/products/:id", admin, json, async (req, res) => {
   try {
     // The allow-list, because the body is not the editor's to trust.
