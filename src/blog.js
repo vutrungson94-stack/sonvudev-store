@@ -55,8 +55,26 @@ export function getBlogPostBySlug(slug) {
 }
 
 // Build blog route path from slug and language.
-const blogUrl = (slug, lang = "vi") =>
-  lang === "vi" ? `/blog/${slug}` : `/en/blog/${slug}`;
+const BLOG_LANGS = [
+  { code: "vi", label: "Tiếng Việt", flag: "🇻🇳" },
+  { code: "en", label: "English", flag: "🇺🇸" },
+  { code: "de", label: "Deutsch", flag: "🇩🇪" },
+  { code: "es", label: "Español", flag: "🇪🇸" },
+  { code: "fr", label: "Français", flag: "🇫🇷" },
+  { code: "ja", label: "日本語", flag: "🇯🇵" },
+  { code: "zh-CN", label: "中文", flag: "🇨🇳" },
+];
+const blogUrl = (slug, lang = "vi") => {
+  if (!slug) return lang === "vi" ? "/blog" : `/${lang}/blog`;
+  return lang === "vi" ? `/blog/${slug}` : `/${lang}/blog/${slug}`;
+};
+const blogLangHref = (code, slug) => absolute(blogUrl(slug, code));
+const blogLangLinks = (slug, currentLang) =>
+  BLOG_LANGS.map(({ code, label, flag }) => {
+    const active = code === currentLang ? ' active' : '';
+    const flagSpan = `<span class="lang-flag" aria-hidden="true">${flag}</span>`;
+    return `<a href="${esc(blogLangHref(code, slug))}" class="${active}">${flagSpan} ${label}</a>`;
+  }).join("");
 
 // Render a single blog post as a full HTML document.
 export function renderBlogPost(post, lang = "vi") {
@@ -124,8 +142,7 @@ export function renderBlogPost(post, lang = "vi") {
   <nav class="blog-lang">
     <a href="${absolute("/")}" class="blog-home">← ${isVi ? 'Trang chủ' : 'Home'}</a>
     <span>${isVi ? 'Ngôn ngữ:' : 'Language:'}</span>
-    <a href="${esc(viUrl)}" class="${!isVi ? 'active' : ''}">Tiếng Việt</a>
-    <a href="${esc(enUrl)}" class="${isVi ? 'active' : ''}">English</a>
+    ${blogLangLinks(post.slug, lang)}
   </nav>
   <article class="blog-post">
     <header class="blog-header">
@@ -218,8 +235,7 @@ export function renderBlogIndex(posts, lang = "vi") {
   <nav class="blog-lang">
     <a href="${absolute("/")}" class="blog-home">← ${isVi ? 'Trang chủ' : 'Home'}</a>
     <span>${isVi ? 'Ngôn ngữ:' : 'Language:'}</span>
-    <a href="${esc(viUrl)}" class="${!isVi ? 'active' : ''}">Tiếng Việt</a>
-    <a href="${esc(enUrl)}" class="${isVi ? 'active' : ''}">English</a>
+    ${blogLangLinks("", lang)}
   </nav>
   <main class="wrap">
     <header class="blog-index-header">

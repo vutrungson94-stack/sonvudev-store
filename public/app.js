@@ -378,7 +378,7 @@ async function submitCheckout(event, p) {
     const res = await fetch('/api/checkout', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ ...data, productId: p.id, idempotencyKey: checkoutKey }),
+      body: JSON.stringify({ ...data, productId: p.id, idempotencyKey: checkoutKey, lang: window.I18N.lang }),
     });
     // A network drop after the server already created the order leaves the
     // buyer with an error and an order they have never been told about. The

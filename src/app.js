@@ -1055,7 +1055,7 @@ app.post("/api/checkout", json, async (req, res) => {
     const paypalCharge = paypalQuote?.charge ?? null;
     const order = {
       id, orderNumber: id, accessTokenHash: hashToken(accessToken), customerEmail: email,
-      customerName: text(req.body.customerName, 100), status: "pending", paymentProvider: method,
+      customerName: text(req.body.customerName, 100), lang: text(req.body.lang, 10), status: "pending", paymentProvider: method,
       providerOrderId: null, amount: Number(product.price), currency: product.currency || "VND",
       // The deadline the buyer is shown on the form is written down here, so the
       // countdown they read and the moment the sweep acts on cannot drift apart.

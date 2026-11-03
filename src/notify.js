@@ -44,104 +44,151 @@ const item = (order) => (order.items || [])[0] || {};
 /** Details every buyer-facing message repeats, so each template stays short. */
 function context(order) {
   const product = item(order);
+  const lang = String(order.lang || "").toLowerCase();
+  const isVi = lang === "vi" || !lang;
+  const isEn = lang === "en";
   return {
     id: order.id,
     product: product.name || env.brand.name,
     version: product.version || "",
     amount: money(order.amount, order.currency),
     currency: order.currency || "VND",
-    // The deadline the buyer was promised is the one the sweep enforces. Reading
-    // the number from config is the whole point: an email that says "24 hours"
-    // while the server cancels at 12 tells the buyer to stop waiting for an
-    // order that is already gone. config.js has already clamped it.
     windowHours: env.orders.paymentWindowHours,
     deadline: stamp(order.expiresAt),
     paidAt: stamp(order.paidAt),
     refundReason: order.refundReason || "không rõ",
-    // The exact string the bank-transfer QR and the checkout panel ask the buyer to
-    // write. It used to be written out as "SonVuDev <order id>" here while the QR
-    // code was built from BANK_TRANSFER_NOTE_PREFIX, so setting that variable left
-    // the email telling buyers to write a note that would not match their own
-    // payment. There is one transfer note now and it is built the same way as the
-    // one on screen.
     transferNote: `${env.bank.notePrefix} ${order.id}`.trim(),
     lookupUrl: `${env.appUrl}/lookup`,
     support: env.email.supportEmail,
+    lang,
+    isVi,
+    isEn,
   };
 }
 
-// Bilingual on purpose. The checkout form carries a language switch, but the
-// order row does not remember which one the buyer picked, and guessing wrong on
-// a payment receipt is worse than a short English paragraph underneath.
+// Buyer-facing copy. The order now stores the language the buyer used on the
+// checkout form, so guessing bilingual is no longer necessary: we send the
+// message in the language they actually read.
 const TEMPLATES = {
-  created: (c) => ({
-    subject: `Đơn ${c.id} đã được tạo · Order ${c.id} created`,
-    heading: "Đơn hàng đã được tạo",
-    headingEn: "Your order was created",
-    lines: [
-      `Bạn cần thanh toán trước ${c.deadline}. Đơn chưa thanh toán sẽ tự động bị hủy sau ${c.windowHours} giờ.`,
-      `Pay before ${c.deadline}. Unpaid orders are cancelled automatically after ${c.windowHours} hours.`,
-    ],
-    blocks: [
-      `Thanh toán đúng số tiền và ghi nội dung chuyển khoản là <b>${c.transferNote}</b> để chúng tôi đối soát.`,
-      `Mã tra cứu đơn hàng được lưu trong trình duyệt của bạn. Nếu mất, mở ${c.lookupUrl} và nhập mã đơn cùng email này để lấy lại.`,
-      `Bạn chỉ bị tính phí khi thanh toán thành công. Cần trợ giúp: ${c.support}.`,
-    ],
-  }),
-  expiring: (c) => ({
-    subject: `Đơn ${c.id} sắp hết hạn · Order ${c.id} expires soon`,
-    heading: "Đơn hàng sắp hết hạn",
-    headingEn: "Your order expires soon",
-    lines: [
-      `Đơn ${c.id} chưa được thanh toán và sẽ bị hủy sau ${c.deadline}.`,
-      `Order ${c.id} is still unpaid and will be cancelled after ${c.deadline}.`,
-    ],
-    blocks: [
-      `Thanh toán ngay tại ${c.lookupUrl} bằng mã đơn và email này.`,
-      `Cần trợ giúp: ${c.support}.`,
-    ],
-  }),
-  cancelled: (c) => ({
-    subject: `Đơn ${c.id} đã bị hủy · Order ${c.id} cancelled`,
-    heading: "Đơn hàng đã bị hủy",
-    headingEn: "Your order was cancelled",
-    lines: [
-      `Đơn ${c.id} không được thanh toán trong ${c.windowHours} giờ nên đã bị hủy tự động.`,
-      `Order ${c.id} was not paid within ${c.windowHours} hours and has been cancelled automatically.`,
-    ],
-    blocks: [
-      `Bạn vẫn có thể đặt đơn mới bất cứ lúc nào. Nếu bạn đã chuyển khoản, hãy gửi ảnh biên lai để chúng tôi đối soát hoặc hoàn lại.`,
-      `You can place a new order at any time. If you already transferred the money, send us the receipt so we can reconcile or refund it.`,
-      `Liên hệ: ${c.support}.`,
-    ],
-  }),
-  paid: (c) => ({
-    subject: `Thanh toán thành công · Order ${c.id} paid`,
-    heading: "Cảm ơn bạn, thanh toán đã thành công",
-    headingEn: "Payment received",
-    lines: [
-      `Chúng tôi đã nhận đủ ${c.amount} cho đơn ${c.id}. Nút tải sản phẩm đã được mở khóa.`,
-      `We received ${c.amount} for order ${c.id}. The download button is now unlocked.`,
-    ],
-    blocks: [
-      `Mở ${c.lookupUrl} và nhập mã đơn <b>${c.id}</b> cùng email này để tải sản phẩm. Liên kết tải có thời hạn ngắn, nhưng bạn luôn có thể tạo lại.`,
-      `Go to ${c.lookupUrl} with order ${c.id} and this email to download. Download links are short lived, but you can always generate a new one.`,
-      `Cần trợ giúp: ${c.support}.`,
-    ],
-  }),
-  refunded: (c) => ({
-    subject: `Đã hoàn tiền · Order ${c.id} refunded`,
-    heading: "Đơn hàng đã được hoàn tiền",
-    headingEn: "Your order was refunded",
-    lines: [
-      `Chúng tôi đã hoàn lại ${c.amount} cho đơn ${c.id}. Lý do: ${c.refundReason}`,
-      `We refunded ${c.amount} for order ${c.id}. Reason: ${c.refundReason}`,
-    ],
-    blocks: [
-      `Quyền tải sản phẩm của đơn này đã bị thu hồi. Nếu bạn cho rằng đây là nhầm lẫn, hãy trả lời thư này hoặc liên hệ ${c.support} kèm mã đơn.`,
-      `Access to this release has been revoked. If you think this is a mistake, reply to this email or contact ${c.support} with the order id.`,
-    ],
-  }),
+  created: (c) => {
+    const subject = c.isVi
+      ? `Đơn ${c.id} đã được tạo`
+      : `Order ${c.id} created`;
+    const heading = c.isVi ? "Đơn hàng đã được tạo" : "Your order was created";
+    const lines = c.isVi
+      ? [
+          `Bạn cần thanh toán trước ${c.deadline}. Đơn chưa thanh toán sẽ tự động bị hủy sau ${c.windowHours} giờ.`,
+        ]
+      : [
+          `Pay before ${c.deadline}. Unpaid orders are cancelled automatically after ${c.windowHours} hours.`,
+        ];
+    const blocks = c.isVi
+      ? [
+          `Thanh toán đúng số tiền và ghi nội dung chuyển khoản là <b>${c.transferNote}</b> để chúng tôi đối soát.`,
+          `Mã tra cứu đơn hàng được lưu trong trình duyệt của bạn. Nếu mất, mở ${c.lookupUrl} và nhập mã đơn cùng email này để lấy lại.`,
+          `Bạn chỉ bị tính phí khi thanh toán thành công. Cần trợ giúp: ${c.support}.`,
+        ]
+      : [
+          `Pay the exact amount and write <b>${c.transferNote}</b> as the transfer note so we can reconcile it.`,
+          `Your order lookup code is saved in your browser. If you lost it, open ${c.lookupUrl} and enter the order id plus this email to recover it.`,
+          `You are only charged once the payment clears. Need help? ${c.support}.`,
+        ];
+    return { subject, heading, lines, blocks };
+  },
+  expiring: (c) => {
+    const subject = c.isVi
+      ? `Đơn ${c.id} sắp hết hạn`
+      : `Order ${c.id} expires soon`;
+    const heading = c.isVi ? "Đơn hàng sắp hết hạn" : "Your order expires soon";
+    const lines = c.isVi
+      ? [
+          `Đơn ${c.id} chưa được thanh toán và sẽ bị hủy sau ${c.deadline}.`,
+        ]
+      : [
+          `Order ${c.id} is still unpaid and will be cancelled after ${c.deadline}.`,
+        ];
+    const blocks = c.isVi
+      ? [
+          `Thanh toán ngay tại ${c.lookupUrl} bằng mã đơn và email này.`,
+          `Cần trợ giúp: ${c.support}.`,
+        ]
+      : [
+          `Pay now at ${c.lookupUrl} using the order id and this email.`,
+          `Need help? ${c.support}.`,
+        ];
+    return { subject, heading, lines, blocks };
+  },
+  cancelled: (c) => {
+    const subject = c.isVi
+      ? `Đơn ${c.id} đã bị hủy`
+      : `Order ${c.id} cancelled`;
+    const heading = c.isVi ? "Đơn hàng đã bị hủy" : "Your order was cancelled";
+    const lines = c.isVi
+      ? [
+          `Đơn ${c.id} không được thanh toán trong ${c.windowHours} giờ nên đã bị hủy tự động.`,
+        ]
+      : [
+          `Order ${c.id} was not paid within ${c.windowHours} hours and has been cancelled automatically.`,
+        ];
+    const blocks = c.isVi
+      ? [
+          `Bạn vẫn có thể đặt đơn mới bất cứ lúc nào. Nếu bạn đã chuyển khoản, hãy gửi ảnh biên lai để chúng tôi đối soát hoặc hoàn lại.`,
+          `Liên hệ: ${c.support}.`,
+        ]
+      : [
+          `You can place a new order at any time. If you already transferred the money, send us the receipt so we can reconcile or refund it.`,
+          `Contact: ${c.support}.`,
+        ];
+    return { subject, heading, lines, blocks };
+  },
+  paid: (c) => {
+    const subject = c.isVi
+      ? `Thanh toán thành công`
+      : `Payment received`;
+    const heading = c.isVi
+      ? "Cảm ơn bạn, thanh toán đã thành công"
+      : "Payment received";
+    const lines = c.isVi
+      ? [
+          `Chúng tôi đã nhận đủ ${c.amount} cho đơn ${c.id}. Nút tải sản phẩm đã được mở khóa.`,
+        ]
+      : [
+          `We received ${c.amount} for order ${c.id}. The download button is now unlocked.`,
+        ];
+    const blocks = c.isVi
+      ? [
+          `Mở ${c.lookupUrl} và nhập mã đơn <b>${c.id}</b> cùng email này để tải sản phẩm. Liên kết tải có thời hạn ngắn, nhưng bạn luôn có thể tạo lại.`,
+          `Cần trợ giúp: ${c.support}.`,
+        ]
+      : [
+          `Go to ${c.lookupUrl} with order ${c.id} and this email to download. Download links are short lived, but you can always generate a new one.`,
+          `Need help? ${c.support}.`,
+        ];
+    return { subject, heading, lines, blocks };
+  },
+  refunded: (c) => {
+    const subject = c.isVi
+      ? `Đã hoàn tiền`
+      : `Order ${c.id} refunded`;
+    const heading = c.isVi
+      ? "Đơn hàng đã được hoàn tiền"
+      : "Your order was refunded";
+    const lines = c.isVi
+      ? [
+          `Chúng tôi đã hoàn lại ${c.amount} cho đơn ${c.id}. Lý do: ${c.refundReason}`,
+        ]
+      : [
+          `We refunded ${c.amount} for order ${c.id}. Reason: ${c.refundReason}`,
+        ];
+    const blocks = c.isVi
+      ? [
+          `Quyền tải sản phẩm của đơn này đã bị thu hồi. Nếu bạn cho rằng đây là nhầm lẫn, hãy trả lời thư này hoặc liên hệ ${c.support} kèm mã đơn.`,
+        ]
+      : [
+          `Access to this release has been revoked. If you think this is a mistake, reply to this email or contact ${c.support} with the order id.`,
+        ];
+    return { subject, heading, lines, blocks };
+  },
 };
 
 function body(order, template) {
@@ -149,26 +196,27 @@ function body(order, template) {
   const spec = TEMPLATES[template](c);
   const product = `${c.product}${c.version ? ` v${c.version}` : ""}`;
   const text = [
-    spec.heading, spec.headingEn, "",
-    ...spec.lines, "",
+    spec.heading,
+    "",
+    ...spec.lines,
+    "",
     `Sản phẩm / Product: ${product}`,
     `Số tiền / Amount: ${c.amount}`,
     `Mã đơn / Order: ${c.id}`,
     ...spec.blocks.map(stripTags),
   ].join("\n");
-  const html = `<!doctype html><html lang="vi"><body style="margin:0;padding:24px;background:#f1f6f3;font-family:-apple-system,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;color:#16302a">
+  const html = `<!doctype html><html lang="${c.isVi ? 'vi' : 'en'}"><body style="margin:0;padding:24px;background:#f1f6f3;font-family:-apple-system,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;color:#16302a">
 <div style="max-width:560px;margin:0 auto;background:#fff;border:1px solid #dbe7e0;border-radius:14px;padding:28px">
 <table role="presentation" cellpadding="0" cellspacing="0" style="margin:0 0 16px"><tr>
 <td style="padding:0 10px 0 0;vertical-align:middle"><img src="${escapeHtml(env.appUrl)}/icon-64.png" alt="${escapeHtml(env.brand.name)}" width="34" height="34" style="display:block;border:0;border-radius:7px"></td>
 <td style="padding:0;vertical-align:middle;font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:#3f8f68">${escapeHtml(env.brand.name)}</td>
 </tr></table>
 <h1 style="margin:0 0 18px;font-size:22px;line-height:1.3">${escapeHtml(spec.heading)}</h1>
-<h2 style="margin:0 0 18px;font-size:16px;line-height:1.4;color:#4b6159">${escapeHtml(spec.headingEn)}</h2>
 ${spec.lines.map((l) => `<p style="margin:0 0 10px;font-size:14px;line-height:1.6">${escapeHtml(l)}</p>`).join("")}
 <table style="margin:18px 0;border-collapse:collapse;font-size:14px">
-<tr><td style="padding:4px 16px 4px 0;color:#6b7d76">Sản phẩm / Product</td><td style="padding:4px 0;font-weight:600">${escapeHtml(product)}</td></tr>
-<tr><td style="padding:4px 16px 4px 0;color:#6b7d76">Số tiền / Amount</td><td style="padding:4px 0;font-weight:600">${escapeHtml(c.amount)}</td></tr>
-<tr><td style="padding:4px 16px 4px 0;color:#6b7d76">Mã đơn / Order</td><td style="padding:4px 0;font-weight:600">${escapeHtml(c.id)}</td></tr>
+<tr><td style="padding:4px 16px 4px 0;color:#6b7d76">${c.isVi ? 'Sản phẩm' : 'Product'}</td><td style="padding:4px 0;font-weight:600">${escapeHtml(product)}</td></tr>
+<tr><td style="padding:4px 16px 4px 0;color:#6b7d76">${c.isVi ? 'Số tiền' : 'Amount'}</td><td style="padding:4px 0;font-weight:600">${escapeHtml(c.amount)}</td></tr>
+<tr><td style="padding:4px 16px 4px 0;color:#6b7d76">${c.isVi ? 'Mã đơn' : 'Order'}</td><td style="padding:4px 0;font-weight:600">${escapeHtml(c.id)}</td></tr>
 </table>
 ${spec.blocks.map((b) => `<p style="margin:0 0 10px;font-size:13px;line-height:1.6;color:#3d514a">${b.replace(/(https?:\/\/[^\s<]+)/g, '<a href="$1" style="color:#247653">$1</a>')}</p>`).join("")}
 <hr style="border:0;border-top:1px solid #e6eee9;margin:22px 0">
