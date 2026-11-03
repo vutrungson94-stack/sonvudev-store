@@ -76,17 +76,118 @@ const blogLangLinks = (slug, currentLang) =>
     return `<a href="${esc(blogLangHref(code, slug))}" class="${active}" data-blog-lang="${code}">${flagSpan} ${label}</a>`;
   }).join("");
 
+// UI labels for every supported blog language.
+const BLOG_UI = {
+  'vi': {
+    home: 'Trang chủ',
+    language: 'Ngôn ngữ:',
+    pageTitle: 'Blog',
+    pageSubtitle: (brand) => `Hướng dẫn và mẹo từ ${brand}.`,
+    related: 'Sản phẩm liên quan',
+    empty: 'Chưa có bài viết.',
+    dateLocale: 'vi-VN',
+    htmlLang: 'vi',
+    ogLocale: 'vi_VN',
+    ogLocaleAlt: 'en_US',
+    translationNotice: '',
+  },
+  'en': {
+    home: 'Home',
+    language: 'Language:',
+    pageTitle: 'Blog',
+    pageSubtitle: (brand) => `Guides and tips from ${brand}.`,
+    related: 'Related Product',
+    empty: 'No posts yet.',
+    dateLocale: 'en-US',
+    htmlLang: 'en',
+    ogLocale: 'en_US',
+    ogLocaleAlt: 'vi_VN',
+    translationNotice: '',
+  },
+  'de': {
+    home: 'Startseite',
+    language: 'Sprache:',
+    pageTitle: 'Blog',
+    pageSubtitle: (brand) => `Anleitungen und Tipps von ${brand}.`,
+    related: 'Zugehöriges Produkt',
+    empty: 'Noch keine Beiträge.',
+    dateLocale: 'de-DE',
+    htmlLang: 'de',
+    ogLocale: 'de_DE',
+    ogLocaleAlt: 'en_US',
+    translationNotice: '<p class="blog-translation-notice">Dieser Beitrag ist derzeit nur auf Vietnamesisch und Englisch verfügbar. Englische Version wird angezeigt.</p>',
+  },
+  'es': {
+    home: 'Página de inicio',
+    language: 'Idioma:',
+    pageTitle: 'Blog',
+    pageSubtitle: (brand) => `Guías y consejos de ${brand}.`,
+    related: 'Producto relacionado',
+    empty: 'Aún no hay publicaciones.',
+    dateLocale: 'es-ES',
+    htmlLang: 'es',
+    ogLocale: 'es_ES',
+    ogLocaleAlt: 'en_US',
+    translationNotice: '<p class="blog-translation-notice">Esta publicación solo está disponible en vietnamita e inglés por ahora. Se muestra la versión en inglés.</p>',
+  },
+  'fr': {
+    home: 'Accueil',
+    language: 'Langue :',
+    pageTitle: 'Blog',
+    pageSubtitle: (brand) => `Guides et conseils de ${brand}.`,
+    related: 'Produit associé',
+    empty: 'Aucun article pour le moment.',
+    dateLocale: 'fr-FR',
+    htmlLang: 'fr',
+    ogLocale: 'fr_FR',
+    ogLocaleAlt: 'en_US',
+    translationNotice: '<p class="blog-translation-notice">Cet article est actuellement disponible uniquement en vietnamien et en anglais. Version anglaise affichée.</p>',
+  },
+  'ja': {
+    home: 'ホーム',
+    language: '言語：',
+    pageTitle: 'ブログ',
+    pageSubtitle: (brand) => `${brand}からのガイドとヒント。`,
+    related: '関連製品',
+    empty: '記事がまだありません。',
+    dateLocale: 'ja-JP',
+    htmlLang: 'ja',
+    ogLocale: 'ja_JP',
+    ogLocaleAlt: 'en_US',
+    translationNotice: '<p class="blog-translation-notice">この記事は現在、ベトナム語と英語でのみ利用可能です。英語版を表示しています。</p>',
+  },
+  'zh-CN': {
+    home: '首页',
+    language: '语言：',
+    pageTitle: '博客',
+    pageSubtitle: (brand) => `${brand}的指南和技巧。`,
+    related: '相关产品',
+    empty: '暂无文章。',
+    dateLocale: 'zh-CN',
+    htmlLang: 'zh-CN',
+    ogLocale: 'zh_CN',
+    ogLocaleAlt: 'en_US',
+    translationNotice: '<p class="blog-translation-notice">此文章目前仅提供越南语和英语版本。正在显示英语版本。</p>',
+  },
+};
+const blogUi = (lang) => BLOG_UI[lang] || BLOG_UI['en'];
+
 // Render a single blog post as a full HTML document.
 export function renderBlogPost(post, lang = "vi") {
+  const ui = blogUi(lang);
   const isVi = lang === "vi";
+  const isEn = lang === "en";
+  // Blog posts are authored in Vietnamese and English only.
+  // Non-Vi/En languages fall back to the English version as the best-available
+  // translation until full translations are provided.
   const title = isVi ? post.titleVi : post.titleEn || post.titleVi;
   const description = isVi
     ? post.descriptionVi
     : post.descriptionEn || post.descriptionVi;
-  const content = isVi ? post.contentVi : post.contentEn || post.contentVi;
+  const bodyContent = isVi ? post.contentVi : post.contentEn || post.contentVi;
   const section = isVi ? post.section : post.sectionEn || post.section;
   const dateDisplay = new Date(post.published || post.modified || Date.now())
-    .toLocaleDateString(isVi ? "vi-VN" : "en-US", {
+    .toLocaleDateString(ui.dateLocale, {
       year: "numeric",
       month: "long",
       day: "numeric",
@@ -103,11 +204,15 @@ export function renderBlogPost(post, lang = "vi") {
   const relatedHtml = post.relatedProductSlug
     ? `<a class="blog-related-link" href="${absolute(
         `/product/${post.relatedProductSlug}`
-      )}">${isVi ? 'Sản phẩm liên quan' : 'Related Product'} →</a>`
+      )}">${ui.related} →</a>`
+    : "";
+
+  const noticeHtml = !isVi && !isEn && ui.translationNotice
+    ? ui.translationNotice
     : "";
 
   return `<!DOCTYPE html>
-<html lang="${isVi ? "vi" : "en"}">
+<html lang="${ui.htmlLang}">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -116,8 +221,8 @@ export function renderBlogPost(post, lang = "vi") {
   <link rel="canonical" href="${esc(url)}">
   <meta property="og:type" content="article">
   <meta property="og:site_name" content="${esc(env.brand.name)}">
-  <meta property="og:locale" content="${isVi ? "vi_VN" : "en_US"}">
-  <meta property="og:locale:alternate" content="${isVi ? "en_US" : "vi_VN"}">
+  <meta property="og:locale" content="${ui.ogLocale}">
+  <meta property="og:locale:alternate" content="${ui.ogLocaleAlt}">
   <meta property="og:title" content="${esc(title)}">
   <meta property="og:description" content="${esc(description)}">
   <meta property="og:url" content="${esc(url)}">
@@ -140,8 +245,8 @@ export function renderBlogPost(post, lang = "vi") {
 </head>
 <body>
   <nav class="blog-lang">
-    <a href="${absolute("/")}" class="blog-home">← ${isVi ? 'Trang chủ' : 'Home'}</a>
-    <span>${isVi ? 'Ngôn ngữ:' : 'Language:'}</span>
+    <a href="${absolute("/")}" class="blog-home">← ${ui.home}</a>
+    <span>${ui.language}</span>
     ${blogLangLinks(post.slug, lang)}
   </nav>
   <script src="/blog-lang.js"></script>
@@ -155,11 +260,11 @@ export function renderBlogPost(post, lang = "vi") {
       <p class="blog-lead">${esc(description)}</p>
     </header>
     <div class="blog-content">
-      ${content}
+      ${noticeHtml}${bodyContent}
     </div>
     <footer class="blog-footer">
       <div class="blog-related">
-        <h2>${isVi ? "Sản phẩm liên quan" : "Related Product"}</h2>
+        <h2>${ui.related}</h2>
         <div id="related-products">${relatedHtml || (isVi ? "Không có sản phẩm liên quan." : "No related product.")}</div>
       </div>
     </footer>
@@ -169,14 +274,15 @@ export function renderBlogPost(post, lang = "vi") {
 </html>`;
 }
 
+
 // Render blog index page listing all posts.
 export function renderBlogIndex(posts, lang = "vi") {
+  const ui = blogUi(lang);
   const isVi = lang === "vi";
-  const title = isVi ? `Blog — ${env.brand.name}` : `Blog — ${env.brand.name}`;
-  const description = isVi
-    ? `Hướng dẫn, mẹo và công cụ từ ${env.brand.name} giúp bạn làm việc nhanh hơn và an toàn hơn trên Windows.`
-    : `Guides, tips and tools from ${env.brand.name} to help you work faster and safer on Windows.`;
-  const url = absolute(lang === "vi" ? "/blog" : "/en/blog");
+  const isEn = lang === "en";
+  const title = `${ui.pageTitle} — ${env.brand.name}`;
+  const description = ui.pageSubtitle(env.brand.name);
+  const url = absolute(blogUrl("", lang));
   const viUrl = absolute("/blog");
   const enUrl = absolute("/en/blog");
 
@@ -189,7 +295,7 @@ export function renderBlogIndex(posts, lang = "vi") {
       const pUrl = absolute(blogUrl(post.slug, lang));
       const pDate = new Date(
         post.published || post.modified || Date.now()
-      ).toLocaleDateString(isVi ? "vi-VN" : "en-US", {
+      ).toLocaleDateString(ui.dateLocale, {
         year: "numeric",
         month: "short",
         day: "numeric",
@@ -205,8 +311,12 @@ export function renderBlogIndex(posts, lang = "vi") {
     })
     .join("");
 
+  const noticeHtml = !isVi && !isEn && ui.translationNotice
+    ? `<div class="blog-translation-wrap">${ui.translationNotice}</div>`
+    : "";
+
   return `<!DOCTYPE html>
-<html lang="${isVi ? "vi" : "en"}">
+<html lang="${ui.htmlLang}">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -215,8 +325,8 @@ export function renderBlogIndex(posts, lang = "vi") {
   <link rel="canonical" href="${esc(url)}">
   <meta property="og:type" content="website">
   <meta property="og:site_name" content="${esc(env.brand.name)}">
-  <meta property="og:locale" content="${isVi ? "vi_VN" : "en_US"}">
-  <meta property="og:locale:alternate" content="${isVi ? "en_US" : "vi_VN"}">
+  <meta property="og:locale" content="${ui.ogLocale}">
+  <meta property="og:locale:alternate" content="${ui.ogLocaleAlt}">
   <meta property="og:title" content="${esc(title)}">
   <meta property="og:description" content="${esc(description)}">
   <meta property="og:url" content="${esc(url)}">
@@ -234,18 +344,18 @@ export function renderBlogIndex(posts, lang = "vi") {
 </head>
 <body>
   <nav class="blog-lang">
-    <a href="${absolute("/")}" class="blog-home">← ${isVi ? 'Trang chủ' : 'Home'}</a>
-    <span>${isVi ? 'Ngôn ngữ:' : 'Language:'}</span>
+    <a href="${absolute("/")}" class="blog-home">← ${ui.home}</a>
+    <span>${ui.language}</span>
     ${blogLangLinks("", lang)}
   </nav>
   <script src="/blog-lang.js"></script>
   <main class="wrap">
     <header class="blog-index-header">
-      <h1>${isVi ? "Blog" : "Blog"}</h1>
-      <p>${isVi ? `Hướng dẫn và mẹo từ ${env.brand.name}.` : `Guides and tips from ${env.brand.name}.`}</p>
+      <h1>${esc(ui.pageTitle)}</h1>
+      <p>${esc(ui.pageSubtitle(env.brand.name))}</p>
     </header>
     <div class="blog-index">
-      ${cards || `<p>${isVi ? "Chưa có bài viết." : "No posts yet."}</p>`}
+      ${noticeHtml}${cards || `<p>${esc(ui.empty)}</p>`}
     </div>
   </main>
   <script src="/lang-detect.js"></script>
