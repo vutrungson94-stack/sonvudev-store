@@ -75,6 +75,22 @@ const blogLangLinks = (slug, currentLang) =>
     const flagSpan = `<span class="lang-flag" aria-hidden="true">${flag}</span>`;
     return `<a href="${esc(blogLangHref(code, slug))}" class="${active}" data-blog-lang="${code}">${flagSpan} ${label}</a>`;
   }).join("");
+const blogField = (post, lang, base) => {
+  const suffix = lang === 'vi' ? 'Vi'
+    : lang === 'en' ? 'En'
+    : lang === 'de' ? 'De'
+    : lang === 'es' ? 'Es'
+    : lang === 'fr' ? 'Fr'
+    : lang === 'ja' ? 'Ja'
+    : lang === 'zh-CN' ? 'ZhCN'
+    : 'En';
+  const key = base + suffix;
+  if (post[key]) return post[key];
+  // Fallback chain: En -> Vi
+  if (post[base + 'En']) return post[base + 'En'];
+  if (post[base + 'Vi']) return post[base + 'Vi'];
+  return '';
+};
 
 // UI labels for every supported blog language.
 const BLOG_UI = {
@@ -180,12 +196,10 @@ export function renderBlogPost(post, lang = "vi") {
   // Blog posts are authored in Vietnamese and English only.
   // Non-Vi/En languages fall back to the English version as the best-available
   // translation until full translations are provided.
-  const title = isVi ? post.titleVi : post.titleEn || post.titleVi;
-  const description = isVi
-    ? post.descriptionVi
-    : post.descriptionEn || post.descriptionVi;
-  const bodyContent = isVi ? post.contentVi : post.contentEn || post.contentVi;
-  const section = isVi ? post.section : post.sectionEn || post.section;
+  const title = blogField(post, lang, "title");
+  const description = blogField(post, lang, "description");
+  const bodyContent = blogField(post, lang, "content");
+  const section = blogField(post, lang, "section");
   const dateDisplay = new Date(post.published || post.modified || Date.now())
     .toLocaleDateString(ui.dateLocale, {
       year: "numeric",
@@ -288,10 +302,8 @@ export function renderBlogIndex(posts, lang = "vi") {
 
   const cards = (posts || [])
     .map((post) => {
-      const pTitle = isVi ? post.titleVi : post.titleEn || post.titleVi;
-      const pDesc = isVi
-        ? post.descriptionVi
-        : post.descriptionEn || post.descriptionVi;
+      const pTitle = blogField(post, lang, "title");
+      const pDesc = blogField(post, lang, "description");
       const pUrl = absolute(blogUrl(post.slug, lang));
       const pDate = new Date(
         post.published || post.modified || Date.now()
@@ -303,7 +315,7 @@ export function renderBlogIndex(posts, lang = "vi") {
       return `<a class="blog-card" href="${esc(pUrl)}">
         <div class="blog-card-meta">
           <span class="blog-date">${esc(pDate)}</span>
-          <span class="blog-section">${esc(isVi ? post.section : post.sectionEn || post.section)}</span>
+          <span class="blog-section">${esc(blogField(post, lang, "section"))}</span>
         </div>
         <h3>${esc(pTitle)}</h3>
         <p>${esc(pDesc)}</p>
