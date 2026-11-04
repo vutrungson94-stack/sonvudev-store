@@ -15,6 +15,7 @@
   "announce.cta": "立即探索",
   "announce.text": "{brand} 正在开放新版本发布",
   "api.err.catalogLoad": "无法加载目录",
+  "api.err.badOrigin": "来源无效。",
   "api.err.downloadLink": "无法创建下载链接",
   "api.err.forbidden": "查看者角色仅限读取。",
   "api.err.internal": "服务器错误",
@@ -496,6 +497,7 @@
   "product.requirements": "系统要求",
   "product.requirementsViOnly": "完整系统要求列在随附指南中 (指南为越南语)。",
   "product.seeGuide": "请参阅随附指南",
+  "product.relatedArticles": "相关文章",
   "product.version": "版本",
   "products.all": "全部",
   "products.buyAria": "购买",
@@ -556,5 +558,6 @@
   "blog.eyebrow": "文章与指南",
   "blog.title1": "技术技巧",
   "blog.title2": "帮你更好工作。",
-  "blog.more": "查看所有文章"
+  "blog.more": "查看所有文章",
+  "blog.readMore": "阅读更多"
 }

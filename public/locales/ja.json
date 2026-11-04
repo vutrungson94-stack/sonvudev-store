@@ -15,6 +15,7 @@
   "announce.cta": "今すぐ探索",
   "announce.text": "{brand} は新リリースの受付を開始しています",
   "api.err.catalogLoad": "カタログを読み込めませんでした",
+  "api.err.badOrigin": "無効なオリジンです。",
   "api.err.downloadLink": "ダウンロードリンクを作成できませんでした",
   "api.err.forbidden": "ビューワー権限は閲覧のみです。",
   "api.err.internal": "サーバーエラー",
@@ -496,6 +497,7 @@
   "product.requirements": "動作環境",
   "product.requirementsViOnly": "動作環境の詳細は付属のガイドに記載されています（ガイドはベトナム語です）。",
   "product.seeGuide": "付属のガイドをご覧ください",
+  "product.relatedArticles": "関連記事",
   "product.version": "バージョン",
   "products.all": "すべて",
   "products.buyAria": "購入",
@@ -556,5 +558,6 @@
   "blog.eyebrow": "記事＆ガイド",
   "blog.title1": "テクニック",
   "blog.title2": "でもっと快適に。",
-  "blog.more": "すべての記事を見る"
+  "blog.more": "すべての記事を見る",
+  "blog.readMore": "続きを読む"
 }

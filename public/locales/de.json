@@ -15,6 +15,7 @@
   "announce.cta": "Entdecken Sie jetzt",
   "announce.text": "{brand} ist offen für Neuerscheinungen",
   "api.err.catalogLoad": "Der Katalog konnte nicht geladen werden",
+  "api.err.badOrigin": "Ungültiger Ursprung.",
   "api.err.downloadLink": "Download-Link konnte nicht erstellt werden",
   "api.err.forbidden": "Die Betrachterrolle ist schreibgeschützt.",
   "api.err.internal": "Serverfehler",
@@ -479,6 +480,7 @@
   "product.requirements": "Systemanforderungen",
   "product.requirementsViOnly": "Die Systemanforderungen sind in der beiliegenden Anleitung (Anleitung in vietnamesischer Sprache) aufgeführt.",
   "product.seeGuide": "Siehe beiliegende Anleitung",
+  "product.relatedArticles": "Verwandte Artikel",
   "product.version": "Version",
   "products.all": "Alle",
   "products.buyAria": "Kaufen",
@@ -556,5 +558,6 @@
   "blog.title1": "Tech-Tipps",
   "blog.title2": "damit Sie besser arbeiten.",
   "blog.more": "Alle Beiträge anzeigen",
+  "blog.readMore": "Weiterlesen",
   "brand.supportEmail": "{{support}}"
 }

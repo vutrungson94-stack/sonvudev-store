@@ -23,6 +23,7 @@ import { refuse } from "./refuse.js";
 import { renderRobotsTxt } from "./robots.js";
 import { adminThrottled, downloadThrottled, healthThrottled, tooManyAttempts, checkoutThrottled } from "./rate-limit.js";
 import { isConfigured as tIsConfigured, translateText, translateMissingKeys } from "./translate-service.mjs";
+import { LOCALE_CODES, FALLBACK_LOCALE, normalizeLocale } from "./i18n-registry.mjs";
 import { parseAdminTokens, matchAdminToken } from "./admin-auth.js";
 import { isEnabled } from "./feature-flags.js";
 import { otelEnabled, exportSpan, otelStats } from "./otel.js";
@@ -39,15 +40,11 @@ const json = express.json({ limit: "1mb" });
 // the root (Vietnamese) version, every other language is served the English one.
 // This keeps the URL space simple while still honouring the reader's locale.
 function preferredLanguage(req) {
-  const header = String(req.headers["accept-language"] || "").toLowerCase();
-  if (!header) return "en";
+  const header = String(req.headers["accept-language"] || "");
+  if (!header.trim()) return FALLBACK_LOCALE;
   const first = header.split(",")[0].trim().split(";")[0].trim();
-  if (first.startsWith("vi")) return "vi";
-  // Hỗ trợ các ngôn ngữ khác có trong danh sách được hỗ trợ
-  for (const lang of ["de", "es", "fr", "ja", "zh-CN"]) {
-    if (first.startsWith(lang)) return lang;
-  }
-  return "en";
+  // Registry normalises case, region suffixes and zh-* -> zh-CN.
+  return normalizeLocale(first);
 }
 
 function redirectRootLangToEnglish(req, res, next) {
@@ -62,8 +59,8 @@ function redirectRootLangToEnglish(req, res, next) {
   if (req.path.startsWith("/anythingelse.txt")) return next();
   if (process.env.NODE_ENV === "test") return next();
   // Don't redirect if path already has a valid locale prefix (e.g. /fr/product/...)
-  const langMatch = req.path.match(/^\/([a-z]{2}(-[A-Z]{2})?)\//);
-  if (langMatch && ["vi", "en", "de", "es", "fr", "ja", "zh-CN"].includes(langMatch[1])) return next();
+  const langMatch = req.path.match(/^\/([a-z]{2}(-[A-Za-z]{2})?)\//);
+  if (langMatch && LOCALE_CODES.some((c) => c.toLowerCase() === langMatch[1].toLowerCase())) return next();
   const lang = preferredLanguage(req);
   if (lang === "vi") return next();
   const qs = req.url.includes("?") ? req.url.slice(req.url.indexOf("?")) : "";

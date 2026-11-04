@@ -23,11 +23,21 @@ Thư viện này chứa các tài sản quy trình được dùng chung trên m�
 
 | Tài sản | Đường dẫn | Mô tả |
 |---------|-----------|-------|
-| Mẫu postmortem | `postmortems/2026-11-04-example-incident.json` | Mẫu báo cáo sự cố sản xuất |
-| Checklist build | `scripts/golden-path.mjs` | Kiểm tra 10 điều kiện trước khi triển khai |
+| Mẫu postmortem | `templates/postmortem-template.json` | Mẫu báo cáo sự cố sản xuất |
+| Checklist deployment | `checklists/deployment-checklist.json` | 10 điều kiện trước khi triển khai |
+| Checklist bảo mật | `checklists/security-checklist.json` | 10 điều kiện rà soát bảo mật |
+| Chính sách triển khai | `policies/deployment-policy.md` | Quy tắc kiểm soát thay đổi production |
+| Chính sách bảo mật | `policies/security-policy.md` | Nguyên tắc bảo mật bắt buộc |
+| Runbook deploy | `runbooks/deploy-runbook.md` | Triển khai + rollback trên VPS/Render |
+| Runbook sự cố | `runbooks/incident-runbook.md` | Ứng phó P1–P4 và quy trình hậu kiểm |
+
+## Liên quan
+
+| Tài sản | Đường dẫn | Mô tả |
+|---------|-----------|-------|
 | SLA | `SLA.md` | Cam kết cấp độ dịch vụ |
-| Runbook deploy | `deploy/deploy.sh`, `deploy/bootstrap-ubuntu.sh` | Triển khai trên Ubuntu VPS |
-| Cảnh báo | `src/otel.js` | Giám sát OTLP tracing |
+| Service catalog | `services/sonvudev-store.json` | Danh mục dịch vụ + SLO (kiểm bởi `npm run catalog:check`) |
+| Golden path | `scripts/golden-path.mjs` | 10 điều kiện nền tảng Level 5 |
 
 ---
 *Tài sản quy trình tổ chức — SonVuDev — Phiên bản 1.0*

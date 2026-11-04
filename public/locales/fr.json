@@ -15,6 +15,7 @@
   "announce.cta": "Explorez maintenant",
   "announce.text": "{brand} est ouvert aux nouvelles versions",
   "api.err.catalogLoad": "Impossible de charger le catalogue",
+  "api.err.badOrigin": "Origine non valide.",
   "api.err.downloadLink": "Impossible de créer le lien de téléchargement",
   "api.err.forbidden": "Le rôle de spectateur est en lecture seule.",
   "api.err.internal": "Erreur de serveur",
@@ -479,6 +480,7 @@
   "product.requirements": "Configuration système requise",
   "product.requirementsViOnly": "La configuration système requise est indiquée dans les instructions jointes (instructions écrites en vietnamien).",
   "product.seeGuide": "Voir les instructions ci-jointes",
+  "product.relatedArticles": "Articles liés",
   "product.version": "Version",
   "products.all": "Tous",
   "products.buyAria": "Acheter",
@@ -556,5 +558,6 @@
   "blog.title1": "Astuces tech",
   "blog.title2": "pour mieux travailler.",
   "blog.more": "Voir tous les articles",
+  "blog.readMore": "Lire la suite",
   "brand.supportEmail": "{{support}}"
 }

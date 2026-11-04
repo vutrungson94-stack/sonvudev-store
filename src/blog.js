@@ -6,6 +6,7 @@ import { fileURLToPath } from "node:url";
 import { env } from "./config.js";
 import { dataDir } from "./store.js";
 import { esc } from "./format.js";
+import { SUPPORTED_LOCALES } from "./i18n-registry.mjs";
 
 // Directory where blog post JSON files live.
 const BLOG_DIR = path.join(dataDir, "blog");
@@ -55,17 +56,10 @@ export function getBlogPostBySlug(slug) {
 }
 
 // Build blog route path from slug and language.
-const LANGUAGE_FLAGS = { vi: "flag-vi", en: "flag-en", de: "flag-de", es: "flag-es", fr: "flag-fr", ja: "flag-ja", "zh-CN": "flag-zh-cn" };
-const languageFlagClass = (code) => LANGUAGE_FLAGS[code] || "flag-generic";
-const BLOG_LANGS = [
-  { code: "vi", label: "Tiếng Việt" },
-  { code: "en", label: "English" },
-  { code: "de", label: "Deutsch" },
-  { code: "es", label: "Español" },
-  { code: "fr", label: "Français" },
-  { code: "ja", label: "日本語" },
-  { code: "zh-CN", label: "中文" },
-];
+// The locale list itself comes from the i18n registry — adding a language
+// means adding one entry to src/i18n-registry.mjs, not editing this file.
+const languageFlagClass = (code) => `flag-${String(code).toLowerCase().replace(/_/g, "-")}`;
+const BLOG_LANGS = SUPPORTED_LOCALES.map(({ code, name }) => ({ code, label: name }));
 export const BLOG_LOCALES = Object.freeze(BLOG_LANGS.map(({ code }) => code));
 export const EXTRA_BLOG_LOCALES = Object.freeze(BLOG_LOCALES.filter((code) => code !== "vi" && code !== "en"));
 

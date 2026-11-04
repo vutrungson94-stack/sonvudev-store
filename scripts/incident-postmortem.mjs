@@ -81,6 +81,14 @@ if (action === 'check') {
       }
     }
     if (!validStatuses.includes(pm.status)) problems.push(`${pm.file}: invalid status "${pm.status}"`);
+    if (pm.correctiveActions && !Array.isArray(pm.correctiveActions)) {
+      problems.push(`${pm.file}: correctiveActions must be an array`);
+    }
+    for (const action of Array.isArray(pm.correctiveActions) ? pm.correctiveActions : []) {
+      if (!action || !action.owner || !action.dueDate || !action.description) {
+        problems.push(`${pm.file}: corrective action missing owner/dueDate/description`);
+      }
+    }
     if (pm.status === 'open') openIncidents.push(pm.file);
     if (pm.status === 'resolved' && (!pm.rootCause || pm.rootCause.length < 10)) resolvedWithoutRootCause.push(pm.file);
   }

@@ -15,6 +15,11 @@ const REQUIRED_ASSETS = [
   { path: 'README.md', name: 'Hướng dẫn thư viện tài sản' },
   { path: 'templates/postmortem-template.json', name: 'Mẫu postmortem' },
   { path: 'checklists/deployment-checklist.json', name: 'Checklist triển khai' },
+  { path: 'checklists/security-checklist.json', name: 'Checklist bảo mật' },
+  { path: 'policies/deployment-policy.md', name: 'Chính sách triển khai' },
+  { path: 'policies/security-policy.md', name: 'Chính sách bảo mật' },
+  { path: 'runbooks/deploy-runbook.md', name: 'Runbook triển khai' },
+  { path: 'runbooks/incident-runbook.md', name: 'Runbook ứng phó sự cố' },
 ];
 
 const readJsonOrDefault = async (file, def) => {

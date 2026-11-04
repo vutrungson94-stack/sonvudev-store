@@ -27,6 +27,33 @@
       "failedChanges": 0,
       "totalChanges": 0,
       "mttrDays": null
+    },
+    {
+      "generatedAt": "2026-11-04T11:08:44.250Z",
+      "deploymentFrequency": 0,
+      "leadTimeDays": 0,
+      "changeFailureRate": 0,
+      "failedChanges": 0,
+      "totalChanges": 0,
+      "mttrDays": null
+    },
+    {
+      "generatedAt": "2026-11-04T11:15:24.460Z",
+      "deploymentFrequency": 0,
+      "leadTimeDays": 0,
+      "changeFailureRate": 0,
+      "failedChanges": 0,
+      "totalChanges": 0,
+      "mttrDays": null
+    },
+    {
+      "generatedAt": "2026-11-04T11:32:25.157Z",
+      "deploymentFrequency": 0,
+      "leadTimeDays": 0,
+      "changeFailureRate": 0,
+      "failedChanges": 0,
+      "totalChanges": 0,
+      "mttrDays": null
     }
   ]
 }

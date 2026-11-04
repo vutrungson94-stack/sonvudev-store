@@ -45,6 +45,7 @@
     "asset:library": "node scripts/asset-library.mjs",
     "i18n:fill": "node scripts/fill-static-text.mjs",
     "i18n:products": "node scripts/i18n-products.mjs",
+    "translate-locale": "node scripts/translate-locale.mjs",
     "test:flow": "node scripts/payment-flow-test.mjs",
     "seo:check": "node scripts/seo-check.mjs",
     "assets:logo": "node scripts/make-logo-assets.mjs",

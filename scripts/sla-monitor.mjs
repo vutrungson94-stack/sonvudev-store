@@ -66,11 +66,18 @@ for (const slo of SLOS) {
       break;
     }
     case 'buildSuccessRate': {
-      value = 100;
+      // Evidence, not optimism: the report exists only if the last build ran to
+      // completion. No report at all is "unknown", not "100% passing".
+      try {
+        const report = JSON.parse(await readFile(path.join(root, 'build-reports', 'web-build.json'), 'utf8'));
+        value = report && report.generatedAt ? 100 : null;
+      } catch { value = null; }
       break;
     }
     case 'deploySuccessRate': {
-      value = 100;
+      // No local evidence source for deploys yet. Report unknown rather than a
+      // fabricated 100%; wire this to the deploy pipeline when it emits a marker.
+      value = null;
       break;
     }
     case 'escapeRate': {
@@ -106,11 +113,14 @@ await writeFile(slaFile, JSON.stringify(result, null, 2) + '\n', 'utf8');
 
 let exitCode = 0;
 const breached = Object.values(measurements).filter((m) => m.breached);
+const unknown = Object.values(measurements).filter((m) => m.value === null || m.value === undefined);
 if (breached.length > 0) {
   console.log(`[sla] BREACH: ${breached.length} SLA breached: ${breached.map((m) => m.id).join(', ')}`);
   exitCode = 1;
+} else if (unknown.length > 0) {
+  console.log(`[sla] OK with gaps: ${SLOS.length - unknown.length}/${SLOS.length} SLO measured and within target; ${unknown.length} unknown (${unknown.map((m) => m.id).join(', ')})`);
 } else {
-  console.log(`[sla] OK: all ${SLOS.length} SLOs within target`);
+  console.log(`[sla] OK: all ${SLOS.length} SLOs measured and within target`);
 }
 
 export { result, SLOS };

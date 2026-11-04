@@ -1,0 +1,16 @@
+{
+  "name": "Security Checklist",
+  "version": "1.0",
+  "items": [
+    { "id": "S1", "description": "Không có secrets nào bị commit vào repo (kiểm tra git log / grep)", "owner": "developer", "required": true },
+    { "id": "S2", "description": "Tất cả endpoint /api/* yêu cầu xác thực hoặc rate-limit phù hợp", "owner": "developer", "required": true },
+    { "id": "S3", "description": "Dependency không có lỗ hổng nghiêm trọng (npm audit --audit-level=high)", "owner": "developer", "required": true },
+    { "id": "S4", "description": "Nguồn tải / R2 bucket không public khi không cần thiết", "owner": "platform-team", "required": true },
+    { "id": "S5", "description": "Security headers đầy đủ (CSP, HSTS, X-Frame-Options, Referrer-Policy)", "owner": "developer", "required": true },
+    { "id": "S6", "description": "Input từ client được validate/ sanitize trước khi dùng", "owner": "developer", "required": true },
+    { "id": "S7", "description": "Mọi query SQL dùng tham số hóa (không nối chuỗi trực tiếp)", "owner": "developer", "required": true },
+    { "id": "S8", "description": "Webhook / API của bên thứ ba (PayPal, Resend, Supabase) xác thực chữ ký", "owner": "developer", "required": true },
+    { "id": "S9", "description": "Log không ghi dữ liệu nhạy cảm (token, mật khẩu, thông tin thẻ)", "owner": "developer", "required": true },
+    { "id": "S10", "description": "Quyền truy cập admin chỉ cấp cho người có thẩm quyền và được rà soát định kỳ", "owner": "platform-team", "required": true }
+  ]
+}

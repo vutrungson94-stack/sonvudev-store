@@ -15,6 +15,7 @@
   "announce.cta": "Explora ahora",
   "announce.text": "{brand} está abierto a nuevos lanzamientos",
   "api.err.catalogLoad": "No se puede cargar el catálogo",
+  "api.err.badOrigin": "Origen no válido.",
   "api.err.downloadLink": "No se puede crear el enlace de descarga",
   "api.err.forbidden": "La función de espectador es de solo lectura.",
   "api.err.internal": "error del servidor",
@@ -479,6 +480,7 @@
   "product.requirements": "Requisitos del sistema",
   "product.requirementsViOnly": "Los requisitos del sistema se indican en las instrucciones adjuntas (instrucciones escritas en vietnamita).",
   "product.seeGuide": "Ver instrucciones adjuntas",
+  "product.relatedArticles": "Artículos relacionados",
   "product.version": "Versión",
   "products.all": "Todo",
   "products.buyAria": "Comprar",
@@ -556,5 +558,6 @@
   "blog.title1": "Consejos tech",
   "blog.title2": "para trabajar mejor.",
   "blog.more": "Ver todas las entradas",
+  "blog.readMore": "Leer más",
   "brand.supportEmail": "{{support}}"
 }

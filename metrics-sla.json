@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-11-04T07:38:50.707Z",
+  "generatedAt": "2026-11-04T11:32:23.863Z",
   "overall": "ok",
   "measurements": {
     "availability": {
@@ -12,7 +12,7 @@
       "value": null,
       "status": "unknown",
       "breached": false,
-      "measuredAt": "2026-11-04T07:38:50.707Z"
+      "measuredAt": "2026-11-04T11:32:23.863Z"
     },
     "errorRate": {
       "id": "errorRate",
@@ -24,7 +24,7 @@
       "value": null,
       "status": "unknown",
       "breached": false,
-      "measuredAt": "2026-11-04T07:38:50.707Z"
+      "measuredAt": "2026-11-04T11:32:23.863Z"
     },
     "latencyP95": {
       "id": "latencyP95",
@@ -36,7 +36,7 @@
       "value": null,
       "status": "unknown",
       "breached": false,
-      "measuredAt": "2026-11-04T07:38:50.707Z"
+      "measuredAt": "2026-11-04T11:32:23.863Z"
     },
     "testPassRate": {
       "id": "testPassRate",
@@ -48,7 +48,7 @@
       "value": 100,
       "status": "ok",
       "breached": false,
-      "measuredAt": "2026-11-04T07:38:50.707Z"
+      "measuredAt": "2026-11-04T11:32:23.863Z"
     },
     "buildSuccessRate": {
       "id": "buildSuccessRate",
@@ -60,7 +60,7 @@
       "value": 100,
       "status": "ok",
       "breached": false,
-      "measuredAt": "2026-11-04T07:38:50.707Z"
+      "measuredAt": "2026-11-04T11:32:23.863Z"
     },
     "deploySuccessRate": {
       "id": "deploySuccessRate",
@@ -69,10 +69,10 @@
       "unit": "%",
       "want": "up",
       "owner": "platform-team",
-      "value": 100,
-      "status": "ok",
+      "value": null,
+      "status": "unknown",
       "breached": false,
-      "measuredAt": "2026-11-04T07:38:50.707Z"
+      "measuredAt": "2026-11-04T11:32:23.863Z"
     },
     "escapeRate": {
       "id": "escapeRate",
@@ -84,7 +84,7 @@
       "value": null,
       "status": "unknown",
       "breached": false,
-      "measuredAt": "2026-11-04T07:38:50.707Z"
+      "measuredAt": "2026-11-04T11:32:23.863Z"
     }
   }
 }
