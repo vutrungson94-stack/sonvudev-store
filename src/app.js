@@ -57,6 +57,9 @@ function redirectRootLangToEnglish(req, res, next) {
   if (req.path.startsWith("/notconfigured.txt")) return next();
   if (req.path.startsWith("/anythingelse.txt")) return next();
   if (process.env.NODE_ENV === "test") return next();
+  // Don't redirect if path already has a valid locale prefix (e.g. /fr/product/...)
+  const langMatch = req.path.match(/^\/([a-z]{2}(-[A-Z]{2})?)\//);
+  if (langMatch && ["vi", "en", "de", "es", "fr", "ja", "zh-CN"].includes(langMatch[1])) return next();
   const lang = preferredLanguage(req);
   if (lang === "vi") return next();
   const qs = req.url.includes("?") ? req.url.slice(req.url.indexOf("?")) : "";
