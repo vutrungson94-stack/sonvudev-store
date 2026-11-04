@@ -1356,7 +1356,11 @@ const stripPromotionalSentences = (text) => {
 
 export function localize(product, lang) {
   if (!product) return product;
-  const resolved = lang === "en" ? localizeToEnglish(product) : product;
+  // Any language other than Vietnamese falls back to the English product copy
+  // (which itself falls back to Vietnamese for fields without English). This
+  // ensures a Japanese/German/French/etc. reader never sees raw Vietnamese
+  // product text under a translated page heading.
+  const resolved = lang === "vi" ? product : localizeToEnglish(product);
   // Placeholders are filled after the language is chosen, so the same stored text
   // carries the owner's name in both. Filling them first would put the name into
   // whatever was picked as the fallback, and the English page would then show a

@@ -1559,18 +1559,26 @@ function renderLanguageCombobox() {
         if (code !== prev) {
           const path = window.location.pathname;
           let target = null;
-          if (path.startsWith('/en/product/') && code === 'vi') {
-            target = path.replace('/en/product/', '/product/');
-          } else if (path.startsWith('/product/') && code === 'vi') {
-            target = path;
-          } else if (path.startsWith('/product/') && code !== 'vi') {
-            target = path.replace('/product/', '/en/product/');
-          } else if (path.startsWith('/en/blog/') && code === 'vi') {
-            target = path.replace('/en/blog/', '/blog/');
-          } else if (path.startsWith('/blog/') && code === 'vi') {
-            target = path;
-          } else if (path.startsWith('/blog/') && code !== 'vi') {
-            target = path.replace('/blog/', '/en/blog/');
+          // Product pages: /product/:slug (vi), /en/product/:slug (en),
+          // /de/product/:slug, /es/product/:slug, /fr/product/:slug,
+          // /ja/product/:slug, /zh-CN/product/:slug. Any language switch on a
+          // product page navigates to the same slug in the target language.
+          const productMatch = path.match(/^(\/en)?\/product\/([^\/]+)$/);
+          if (productMatch) {
+            const [, , slug] = productMatch;
+            target = code === 'vi' ? `/product/${slug}` : `/${code}/product/${slug}`;
+          } else {
+            // Blog pages: /blog (vi), /en/blog (en), /de/blog, etc.
+            const blogIndexMatch = path.match(/^(\/en)?\/blog\/?$/);
+            if (blogIndexMatch) {
+              target = code === 'vi' ? '/blog' : `/${code}/blog`;
+            } else {
+              const blogMatch = path.match(/^(\/en)?\/blog\/([^\/]+)$/);
+              if (blogMatch) {
+                const [, , slug] = blogMatch;
+                target = code === 'vi' ? `/blog/${slug}` : `/${code}/blog/${slug}`;
+              }
+            }
           }
           if (target && target !== path) {
             window.location.href = target;

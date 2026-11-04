@@ -554,6 +554,10 @@ const productPage = (lang) => async (req, res) => {
 };
 app.get("/product/:slug", productPage("vi"));
 app.get("/en/product/:slug", productPage("en"));
+// Product pages for all supported locales. Non-vi/en locales fall back to the
+// English product copy (with Vietnamese fallback for fields without English),
+// which is the best-available translation until full translations are provided.
+for (const lang of EXTRA_BLOG_LOCALES) app.get(`/${lang}/product/:slug`, productPage(lang));
 
 // Blog routes — dynamic, served from data/blog/*.json.
 // A missing post is treated as 404 so a typo in the slug never publishes
