@@ -224,6 +224,44 @@ export async function listProducts({ includeDrafts = false, q = "", status = "" 
   if (needle) items = items.filter((p) => `${p.name || ""} ${p.slug || ""}`.toLowerCase().includes(needle));
   return items;
 }
+
+/**
+ * Slugs whose product copy has been translated into the per-locale asset.
+ *
+ * Each locale ships its product copy inside public/locales/<lang>.json — the
+ * same file the storefront browser downloads on a language switch. Neither
+ * `getCopy` nor `localizeForLang` can merge an asset it has not read, so the
+ * search decision happens here: a locale URL is offered to crawlers only when
+ * the asset actually carries this product's name, and `localizeForLang` then
+ * reads exactly that key. Empty per-locale JSON (no product copy yet) yields
+ * an empty set and the caller falls back to English-only indexing.
+ *
+ * Scans the five locale assets once per call. Locale files are small static
+ * assets; read at most once and cached for the process lifetime.
+ */
+const publicDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "public");
+const localeCopySlugCache = new Map();
+export async function listProductsWithLocaleCopy() {
+  if (localeCopySlugCache.size) return [...localeCopySlugCache.keys()];
+  const out = new Set();
+  for (const lang of ["de", "es", "fr", "ja", "zh-CN"]) {
+    let json = null;
+    try {
+      json = JSON.parse(await fs.readFile(path.join(publicDir, "locales", `${lang}.json`), "utf8"));
+    } catch {
+      json = null;
+    }
+    if (!json || typeof json !== "object") continue;
+    for (const key of Object.keys(json)) {
+      const match = key.match(/^product\.copy\.([^.]+)\.name$/);
+      if (!match) continue;
+      out.add(match[1]);
+    }
+  }
+  out.forEach((slug) => localeCopySlugCache.set(slug, true));
+  return [...out];
+}
+
 export async function getProduct(id) { if (!local) return fromProduct((await supabase(`products?id=eq.${encodeURIComponent(id)}&limit=1`))[0]); return (await readJson(files.products, [])).find((p) => p.id === id || p.slug === id) || null; }
 // Product pages are addressed by slug because it is what goes in a URL and in
 // the sitemap. Slugs are unique, so an ambiguous match is a data problem worth

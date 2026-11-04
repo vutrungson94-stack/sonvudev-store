@@ -208,7 +208,10 @@ test('trang sản phẩm tiếng Anh dùng bản dịch trong database, không p
   assert.equal(vi.response.status, 200);
   assert.equal(en.response.status, 200);
 
-  assert.match(vi.body, /<html lang="vi">/);
+  // <html lang> carries the region-specific tag (vi-VN / en-US / de-DE...) —
+  // the bare "vi"/"en" form was a second answer spoken to a crawler that can
+  // request either. SCHEMA_LANG is the single source for the tag.
+  assert.match(vi.body, /<html lang="vi-VN">/);
   assert.match(en.body, /<html lang="en">/, 'trang tiếng Anh phải khai báo lang="en"');
   assert.match(en.body, /Runs without installing/, 'phải dùng featuresEn');
   assert.match(en.body, /fake one cannot pass itself off/, 'phải dùng descriptionEn');

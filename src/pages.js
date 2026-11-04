@@ -6,6 +6,7 @@ import { isSellable } from "./store.js";
 import { esc, money, formatBytes, initials } from "./format.js";
 import { commitHash } from "./lib/git.mjs";
 import { loadBlogPosts, getBlogPostBySlug, renderBlogPost, renderBlogIndex, renderBlogFeed } from "./blog.js";
+import { LOCALE_CODES } from "./i18n-registry.mjs";
 
 // The commit that produced this process, for CSS cache-busting. This replaces a
 // private copy of the git call that scripts/build-web.mjs also carried, so the
@@ -171,7 +172,7 @@ const derivedDescription = (product, max = 0) => {
 const firstCleanSentence = (product, lang, max) => {
   const raw = String(product.description || "").replace(/\s+/g, " ").trim();
   if (!raw) return "";
-  if (lang === "en" && /[À-ỹ]/.test(raw)) return "";
+  if (lang !== "vi" && VIETNAMESE_RE.test(raw)) return "";
   const sentence = raw.split(/(?<=[.!?])\s+/).find((item) => item.length >= 20 && !PROMO_IN_TEXT.test(item));
   return sentence ? truncateAtWord(sentence, max) : "";
 };
@@ -205,7 +206,7 @@ const metaDescriptionFor = (product, lang = "vi", max = 155) => {
   // skipped rather than rewritten; the full description is asked for one clean
   // sentence next.
   const summary = productSummary(product, max);
-  const usable = summary && !PROMO_IN_TEXT.test(summary) && (lang !== "en" || !/[À-ỹ]/.test(summary));
+  const usable = summary && !PROMO_IN_TEXT.test(summary) && (lang === "vi" || !VIETNAMESE_RE.test(summary));
   if (usable) return summary;
 
   const clean = firstCleanSentence(product, lang, max);
@@ -233,6 +234,64 @@ const metaDescriptionFor = (product, lang = "vi", max = 155) => {
 export const LOGO_PATH = "/logo-1024.png";
 
 const PUBLIC_DIR = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "public");
+
+// ---------------------------------------------------------------------------
+// Locale registry for the product page.
+//
+// Vietnamese is the catalogue's source language; every other supported locale
+// gets a real server-rendered page at /<lang>/product/<slug>. The per-locale
+// asset (public/locales/<lang>.json, the same one the browser fetches) carries
+// the translated product copy as `product.copy.<slug>.<field>` and the
+// translated category/badge labels as `product.label.<kind>.<key>`. Reading it
+// at render time keeps one source of truth for those translations: editing the
+// asset fixes the homepage cards, the 404 list and the product page together.
+// A missing or unreadable asset is not fatal: the page degrades to the English
+// copy, never to a blank or a crash.
+// ---------------------------------------------------------------------------
+const OG_LOCALE = { vi: "vi_VN", en: "en_US", de: "de_DE", es: "es_ES", fr: "fr_FR", ja: "ja_JP", "zh-CN": "zh_CN" };
+const SCHEMA_LANG = { vi: "vi-VN", en: "en", de: "de", es: "es", fr: "fr", ja: "ja", "zh-CN": "zh-CN" };
+const localePrefix = (lang) => (!lang || lang === "vi" ? "" : `/${lang}`);
+// Mirrors public/i18n.js labelSlug() so the server derives the same dictionary
+// keys ("Phát hành 1.4.0" -> "phat-hanh-1.4.0") without importing browser code.
+const labelSlug = (value) => String(value || "")
+  .toLowerCase()
+  .normalize("NFD")
+  .replace(/[\u0300-\u036f]/g, "")
+  .replace(/đ/g, "d")
+  .trim()
+  .replace(/[^a-z0-9.]+/g, "-")
+  .replace(/^-+|-+$/g, "");
+// Letters that exist only in Vietnamese among this site's languages (plus the
+// U+1EA0-U+1EF9 block, all Vietnamese vowels with tone). French, German,
+// Spanish, Japanese and Chinese never carry these, so a line containing one is
+// never mistaken for an Italian/French sentence.
+const VIETNAMESE_RE = /[ăĂơƠưƯĐđẠ-ỹ]/;
+const localeJsonCache = new Map();
+const loadLocaleJson = (lang) => {
+  if (!lang || lang === "vi" || lang === "en") return null; // vi is the source, en ships in the bundle
+  if (localeJsonCache.has(lang)) return localeJsonCache.get(lang);
+  try {
+    const parsed = JSON.parse(readFileSync(path.join(PUBLIC_DIR, "locales", `${lang}.json`), "utf8"));
+    localeJsonCache.set(lang, parsed);
+    return parsed;
+  } catch (error) {
+    console.error(`[i18n] locales/${lang}.json unavailable, English fallback:`, error.message);
+    localeJsonCache.set(lang, null);
+    return null;
+  }
+};
+// The catalogue's free-text category/badge columns, translated through the
+// locale asset. Returns a vi->localised map for exactly the values this shop
+// uses; an unknown value falls back to the English label, then to the raw text.
+const overlayLabels = (json, kind, viTable) => {
+  const enTable = COPY_EN[kind === "category" ? "categories" : "badges"];
+  const out = {};
+  for (const vi of Object.keys(viTable)) {
+    const hit = json ? json[`product.label.${kind}.${labelSlug(vi)}`] : undefined;
+    out[vi] = (typeof hit === "string" && hit) || enTable[vi] || vi;
+  }
+  return out;
+};
 
 /**
  * The per-product covers scripts/make-product-images.mjs writes, read once.
@@ -399,7 +458,7 @@ const productSchema = (product, lang = "vi") => ({
   description: metaDescriptionFor(product, lang),
   alternateName: cleanSeoText(product.seoTitle) || undefined,
   url: absolute(productUrl(product.slug, lang)),
-  inLanguage: lang === "en" ? "en" : "vi-VN",
+  inLanguage: SCHEMA_LANG[lang] || "en",
   applicationCategory: product.category || "UtilitiesApplication",
   operatingSystem: product.platform || "Windows",
   softwareVersion: product.version || undefined,
@@ -493,14 +552,15 @@ const merchantProductSchema = (product, lang = "vi") => {
 };
 
 const breadcrumbSchema = (product, lang = "vi") => {
-  const labels = lang === "en"
-    ? { home: "Home", products: "Products", here: product.name }
-    : { home: "Trang chủ", products: "Sản phẩm", here: product.name };
+  const labels = (() => {
+    const c = getCopy(lang);
+    return { home: c.home, products: c.products, here: product.name };
+  })();
   return {
     "@type": "BreadcrumbList",
     itemListElement: [
-      { "@type": "ListItem", position: 1, name: labels.home, item: `${site()}/` },
-      { "@type": "ListItem", position: 2, name: labels.products, item: `${site()}/#products` },
+      { "@type": "ListItem", position: 1, name: labels.home, item: lang === "vi" ? `${site()}/` : absolute(`${localePrefix(lang)}/`) },
+      { "@type": "ListItem", position: 2, name: labels.products, item: lang === "vi" ? `${site()}/#products` : absolute(`${localePrefix(lang)}/#products`) },
       { "@type": "ListItem", position: 3, name: labels.here, item: absolute(productUrl(product.slug, lang)) },
     ],
   };
@@ -516,18 +576,18 @@ const breadcrumbSchema = (product, lang = "vi") => {
  */
 const faqSchema = (product, lang = "vi") => {
   const window = env.orders.paymentWindowHours;
-  const entries = lang === "en" ? [
-    ["How do I receive the file?", "Pay by bank transfer or PayPal and the download link is emailed to you straight away. Nothing is queued for manual approval."],
-    ["How many times can I download it?", "As many as you like. The lookup code in your email makes a fresh download link on demand; links expire quickly, the number of downloads does not."],
-    ["Which platforms does it run on?", `${product.platform || "Windows"}. ${product.requirements || ""}`.trim()],
-    ["What if the file is broken or I bought the wrong thing?", `Email ${env.email.supportEmail} with your order code and the file is replaced or refunded.`],
-    ["How long do I have to pay?", `An unpaid order is cancelled after ${window} hours, so pay inside that window and nothing happens to it.`],
-  ] : [
+  const entries = lang === "vi" ? [
     ["Tôi nhận hàng bằng cách nào?", "Thanh toán xong là mã tra cứu gửi qua email ngay, kèm link tải trực tiếp. Không cần chờ ai duyệt."],
     ["Tải được mấy lần?", "Bạn tự tạo link tải mới bất cứ lúc nào bằng mã tra cứu. Link có thời hạn ngắn nhưng không giới hạn số lần tạo."],
     ["Phần mềm chạy trên nền tảng nào?", `${product.platform || "Windows"}. ${product.requirements || ""}`.trim()],
     ["Nếu file lỗi hoặc tôi mua nhầm?", `Liên hệ ${env.email.supportEmail} kèm mã đơn. Chúng tôi hoàn tiền hoặc gửi lại bản sửa.`],
     ["Tôi có bao lâu để thanh toán?", `Đơn chưa thanh toán bị hủy sau ${window} giờ, nên thanh toán trong khoảng đó là an toàn.`],
+  ] : [
+    ["How do I receive the file?", "Pay by bank transfer or PayPal and the download link is emailed to you straight away. Nothing is queued for manual approval."],
+    ["How many times can I download it?", "As many as you like. The lookup code in your email makes a fresh download link on demand; links expire quickly, the number of downloads does not."],
+    ["Which platforms does it run on?", `${product.platform || "Windows"}. ${product.requirements || ""}`.trim()],
+    ["What if the file is broken or I bought the wrong thing?", `Email ${env.email.supportEmail} with your order code and the file is replaced or refunded.`],
+    ["How long do I have to pay?", `An unpaid order is cancelled after ${window} hours, so pay inside that window and nothing happens to it.`],
   ];
   return {
     "@type": "FAQPage",
@@ -763,10 +823,16 @@ const routeForFile = (file) => {
   return `/${name.replace(/\.html$/, "")}`;
 };
 
-const chromeLink = (link, route, copy) => {
+const chromeLink = (link, route, copy, prefix = "") => {
   // The support address is configuration, and it is already filled into these
   // pages as {{support}} — the same value the mail templates and the terms use.
-  const href = link.mail ? `mailto:${esc(env.email.supportEmail)}` : link.href;
+  // A locale-prefixed page keeps its reader inside its language for the links
+  // that exist in that language (the homepage); the static legal pages have no
+  // locale route, so they are left alone and translate client-side instead.
+  const raw = link.href;
+  const href = link.mail
+    ? `mailto:${esc(env.email.supportEmail)}`
+    : (prefix && (raw === "/" || raw.startsWith("/#")) ? `${prefix}${raw}` : raw);
   const label = copy ? copy[link.copy] : link.vi;
   const current = link.page && link.route === route ? ' aria-current="page"' : "";
   // The dictionary form keeps the switch working on a page that loads i18n.js;
@@ -782,8 +848,8 @@ const chromeLink = (link, route, copy) => {
  * @param {string} route the route being rendered, or "" when it is none of them
  * @param {object} [copy] COPY_VI/COPY_EN when the server writes the words itself
  */
-export const headerNav = (route, copy = null) =>
-  `<nav>${HEADER_LINKS.map((link) => chromeLink(link, route, copy)).join("")}</nav>`;
+export const headerNav = (route, copy = null, prefix = "") =>
+  `<nav>${HEADER_LINKS.map((link) => chromeLink(link, route, copy, prefix)).join("")}</nav>`;
 
 /**
  * The footer's links: every one of them, except the one that points at this page.
@@ -791,9 +857,9 @@ export const headerNav = (route, copy = null) =>
  * @param {string} route the route being rendered, or "" when it is none of them
  * @param {object} [copy] COPY_VI/COPY_EN when the server writes the words itself
  */
-export const footerLinks = (route, copy = null) =>
+export const footerLinks = (route, copy = null, prefix = "") =>
   FOOTER_LINKS.filter((link) => !link.route || link.route !== route)
-    .map((link) => chromeLink(link, route, copy)).join("");
+    .map((link) => chromeLink(link, route, copy, prefix)).join("");
 
 /**
  * The footer as one element, for the page rendered in code rather than from a
@@ -801,9 +867,9 @@ export const footerLinks = (route, copy = null) =>
  * wordmark and the tagline stay in the markup; this is the same bar without the
  * two strings that live only in the dictionary.
  */
-export const footerBar = (route, copy) =>
+export const footerBar = (route, copy, prefix = "") =>
   `<footer class="site-footer wrap"><div class="brand">${brandWordmark()}</div>` +
-  `<div class="footer-links">${footerLinks(route, copy)}</div>` +
+  `<div class="footer-links">${footerLinks(route, copy, prefix)}</div>` +
   `<small>© ${new Date().getFullYear()} ${esc(brand())} · ${esc(copy.tagline)}</small></footer>`;
 
 /**
@@ -986,8 +1052,8 @@ export const verificationFile = (prefix, suffix, token) => {
   return { name, body: prefix === "google" ? `google-site-verification: ${name}` : value };
 };
 
-/** One product's canonical address. Vietnamese is the root; English sits under /en. */
-const productUrl = (slug, lang = "vi") => (lang === "en" ? `/en/product/${slug}` : `/product/${slug}`);
+/** One product's canonical address. Vietnamese is the root; every other locale prefixes its own code. */
+const productUrl = (slug, lang = "vi") => `${localePrefix(lang)}/product/${slug}`;
 
 /**
  * The legal-entity line, or nothing at all.
@@ -1008,12 +1074,6 @@ const legalEntityLine = (className = 'legal-entity') => {
   return name ? `<p class="${className}">${esc(name)}</p>` : '';
 };
 
-/** The other language's address for the same page, or nothing when it has none. */
-const alternateUrl = (path, lang) => {
-  if (lang === "en") return absolute(path);
-  return absolute(`/en${path === "/" ? "" : path}`).replace(/\/$/, "") || absolute("/en");
-};
-
 /**
  * Meta block shared by every indexable page.
  *
@@ -1022,20 +1082,25 @@ const alternateUrl = (path, lang) => {
  * LinkedIn and most AI answer engines refuse SVG outright, so a card that looks
  * right in a browser is an empty box at every place the link is actually shared.
  */
-const meta = ({ title, description, url, image = absolute(OG_IMAGE_PATH), type = "website", published, lang = "vi", alternates }) => [
+const meta = ({ title, description, url, image = absolute(OG_IMAGE_PATH), type = "website", published, lang = "vi", alternates }) => {
+  const ogLocale = OG_LOCALE[lang] || OG_LOCALE.en;
+  // Every supported locale is a separate URL serving the same product, so they
+  // all point at each other. A crawler that finds only vi and en sees five
+  // more pages with no declaration of who they are — and either drops them as
+  // duplicates or indexes them as competitors to the Vietnamese one.
+  const alternateLinks = LOCALE_CODES
+    .map((code) => (alternates?.[code] ? `<link rel="alternate" hreflang="${code}" href="${esc(alternates[code])}">` : null))
+    .filter(Boolean);
+  return [
   `<title>${esc(title)}</title>`,
   `<meta name="description" content="${esc(description)}">`,
   `<link rel="canonical" href="${esc(url)}">`,
-  // The two languages are separate URLs serving the same product, so they point
-  // at each other. Without this a crawler has to guess which of the two is the
-  // original and may index both as competing pages.
-  `<link rel="alternate" hreflang="vi" href="${esc(alternates?.vi || url)}">`,
-  `<link rel="alternate" hreflang="en" href="${esc(alternates?.en || alternateUrl(url, lang))}">`,
+  ...alternateLinks,
   `<link rel="alternate" hreflang="x-default" href="${esc(alternates?.vi || url)}">`,
   `<meta property="og:type" content="${type}">`,
   `<meta property="og:site_name" content="${esc(brand())}">`,
-  `<meta property="og:locale" content="${lang === "en" ? "en_US" : "vi_VN"}">`,
-  lang === "en" ? `<meta property="og:locale:alternate" content="vi_VN">` : `<meta property="og:locale:alternate" content="en_US">`,
+  `<meta property="og:locale" content="${ogLocale}">`,
+  ...LOCALE_CODES.filter((code) => code !== lang).map((code) => `<meta property="og:locale:alternate" content="${OG_LOCALE[code]}">`),
   `<meta property="og:title" content="${esc(title)}">`,
   `<meta property="og:description" content="${esc(description)}">`,
   `<meta property="og:url" content="${esc(url)}">`,
@@ -1047,7 +1112,8 @@ const meta = ({ title, description, url, image = absolute(OG_IMAGE_PATH), type =
   `<meta name="twitter:title" content="${esc(title)}">`,
   `<meta name="twitter:description" content="${esc(description)}">`,
   published ? `<meta property="article:published_time" content="${esc(published)}">` : "",
-].filter(Boolean).join("\n");
+  ].filter(Boolean).join("\n");
+};
 
 /**
  * The product grid, rendered on the server into the homepage.
@@ -1279,9 +1345,188 @@ export const COPY_EN = {
   privacy: "Privacy",
 };
 
+// The chrome for the five on-demand locales. The scalar strings live here;
+// the category/badge tables do NOT — those translations already exist in the
+// per-locale assets (product.label.category.* / product.label.badge.*) and
+// getCopy() overlays them at render time, so each wording has exactly one
+// home. Anything missing from the asset falls back to the English label.
+const COPY_DE = {
+  home: "Startseite",
+  products: "Produkte",
+  faqNav: "FAQ",
+  about: "Über uns",
+  lookup: "Bestellung nachschlagen",
+  contact: "Kontakt",
+  breadcrumbLabel: "Brotkrümelnavigation",
+  software: "Software",
+  trustHeading: "Prüfung",
+  trustScan: "Unabhängiger Virenscan (VirusTotal)",
+  trustScanNote: "Wird von einem Dritten ausgeführt, nicht von diesem Shop. Öffnen Sie die Seite, um zu sehen, wie viele Engines die exakte Datei gescannt haben, die Sie herunterladen, und wie viele sie markiert haben.",
+  trustBuild: "Build-Bericht dieses Shops",
+  trustBuildNote: "Commit, Node-Version, jede ausgelieferte Datei und jede Abhängigkeit dieses Shops, mit SHA-256. Das beschreibt den Shop, nicht die Software, die Sie kaufen.",
+  fileSizeLabel: "Größe der Download-Datei",
+  buyNow: "Jetzt kaufen",
+  buyNote: "Dauerhafte Lizenz, kein Abo. Zahlung per Überweisung oder PayPal.",
+  ogFooter: "Einmalige Lizenz · Sofortiger Download nach Zahlung",
+  pointDownload: "Sofortiger Download nach Zahlung",
+  pointLookup: "Nachschlagecode per E-Mail",
+  pointRefund: "Erstattung bei defekter Datei",
+  features: "Funktionen",
+  requirements: "Systemanforderungen",
+  faqHeading: "Häufige Fragen",
+  reviewsHeading: "Was Kunden sagen",
+  anonymous: "Kunde",
+  related: "Weitere Produkte",
+  loading: "Wird geladen…",
+  terms: "AGB",
+  refund: "Erstattung",
+  privacy: "Datenschutz",
+};
+
+const COPY_ES = {
+  home: "Inicio",
+  products: "Productos",
+  faqNav: "Preguntas",
+  about: "Sobre nosotros",
+  lookup: "Buscar pedido",
+  contact: "Contacto",
+  breadcrumbLabel: "Migas de pan",
+  software: "Software",
+  trustHeading: "Verificación",
+  trustScan: "Análisis antivirus independiente (VirusTotal)",
+  trustScanNote: "Lo ejecuta un tercero, no esta tienda. Ábralo para ver cuántos motores analizaron el archivo exacto que descarga y cuántos lo marcaron.",
+  trustBuild: "Informe de build de esta tienda",
+  trustBuildNote: "Commit, versión de Node, cada archivo distribuido y cada dependencia de esta tienda, con SHA-256. Describe la tienda, no el software que compra.",
+  fileSizeLabel: "Tamaño del archivo de descarga",
+  buyNow: "Comprar ahora",
+  buyNote: "Licencia permanente, sin suscripción. Pague por transferencia o PayPal.",
+  ogFooter: "Licencia permanente · Descarga inmediata tras el pago",
+  pointDownload: "Descarga inmediata tras el pago",
+  pointLookup: "Código de consulta enviado por correo",
+  pointRefund: "Reembolso si el archivo está dañado",
+  features: "Funciones",
+  requirements: "Requisitos del sistema",
+  faqHeading: "Preguntas frecuentes",
+  reviewsHeading: "Lo que dicen los clientes",
+  anonymous: "Cliente",
+  related: "Otros productos",
+  loading: "Cargando…",
+  terms: "Términos",
+  refund: "Reembolso",
+  privacy: "Privacidad",
+};
+
+const COPY_FR = {
+  home: "Accueil",
+  products: "Produits",
+  faqNav: "FAQ",
+  about: "À propos",
+  lookup: "Suivi de commande",
+  contact: "Contact",
+  breadcrumbLabel: "Fil d'Ariane",
+  software: "Logiciel",
+  trustHeading: "Vérification",
+  trustScan: "Analyse antivirus indépendante (VirusTotal)",
+  trustScanNote: "Réalisée par un tiers, pas par cette boutique. Ouvrez-la pour voir combien de moteurs ont analysé le fichier exact que vous téléchargez, et combien l'ont signalé.",
+  trustBuild: "Rapport de build de cette boutique",
+  trustBuildNote: "Commit, version de Node, chaque fichier livré et chaque dépendance de cette boutique, avec SHA-256. Cela décrit la boutique, pas le logiciel que vous achetez.",
+  fileSizeLabel: "Taille du fichier téléchargé",
+  buyNow: "Acheter",
+  buyNote: "Licence permanente, sans abonnement. Paiement par virement ou PayPal.",
+  ogFooter: "Licence permanente · Téléchargement immédiat après paiement",
+  pointDownload: "Téléchargement immédiat après paiement",
+  pointLookup: "Code de suivi envoyé par e-mail",
+  pointRefund: "Remboursé si le fichier est défectueux",
+  features: "Fonctionnalités",
+  requirements: "Configuration requise",
+  faqHeading: "Questions fréquentes",
+  reviewsHeading: "Avis clients",
+  anonymous: "Client",
+  related: "Autres produits",
+  loading: "Chargement…",
+  terms: "Conditions",
+  refund: "Remboursement",
+  privacy: "Confidentialité",
+};
+
+const COPY_JA = {
+  home: "ホーム",
+  products: "製品",
+  faqNav: "よくある質問",
+  about: "私たちについて",
+  lookup: "注文を検索",
+  contact: "お問い合わせ",
+  breadcrumbLabel: "パンくずリスト",
+  software: "ソフトウェア",
+  trustHeading: "検証",
+  trustScan: "独立したウイルススキャン（VirusTotal）",
+  trustScanNote: "このショップではなく第三者が実施します。開くと、ダウンロードする正確なファイルをスキャンしたエンジン数と、それを検出したエンジン数を確認できます。",
+  trustBuild: "このショップのビルドレポート",
+  trustBuildNote: "コミット、Node バージョン、配布する全ファイルと依存関係を SHA-256 で示したもの。これはショップを説明するもので、購入するソフトウェアを説明するものではありません。",
+  fileSizeLabel: "ダウンロードファイルのサイズ",
+  buyNow: "今すぐ購入",
+  buyNote: "買い切りライセンス、サブスクリプションなし。銀行振込または PayPal でお支払いください。",
+  ogFooter: "買い切りライセンス · お支払い後すぐにダウンロード",
+  pointDownload: "お支払い後すぐにダウンロード",
+  pointLookup: "照会コードをメールでお送りします",
+  pointRefund: "ファイルが破損している場合は返金",
+  features: "機能",
+  requirements: "動作環境",
+  faqHeading: "よくあるご質問",
+  reviewsHeading: "お客様の声",
+  anonymous: "顧客",
+  related: "その他の製品",
+  loading: "読み込み中…",
+  terms: "利用規約",
+  refund: "返金",
+  privacy: "プライバシー",
+};
+
+const COPY_ZH = {
+  home: "首页",
+  products: "产品",
+  faqNav: "常见问题",
+  about: "关于我们",
+  lookup: "查询订单",
+  contact: "联系",
+  breadcrumbLabel: "面包屑导航",
+  software: "软件",
+  trustHeading: "验证",
+  trustScan: "独立病毒扫描（VirusTotal）",
+  trustScanNote: "由第三方执行，而非本商店。打开后可查看多少引擎扫描了您要下载的确切文件、多少引擎将其标记。",
+  trustBuild: "本商店的构建报告",
+  trustBuildNote: "提交、Node 版本、本商店发布的每一个文件和依赖项，附 SHA-256。这描述的是商店，不是您购买的软件。",
+  fileSizeLabel: "下载文件大小",
+  buyNow: "立即购买",
+  buyNote: "永久授权，无订阅。可通过银行转账或 PayPal 付款。",
+  ogFooter: "永久授权 · 付款后立即下载",
+  pointDownload: "付款后立即下载",
+  pointLookup: "查询代码已发送至您的邮箱",
+  pointRefund: "文件损坏可退款",
+  features: "功能",
+  requirements: "系统要求",
+  faqHeading: "常见问题",
+  reviewsHeading: "客户评价",
+  anonymous: "客户",
+  related: "其他产品",
+  loading: "加载中…",
+  terms: "条款",
+  refund: "退款",
+  privacy: "隐私",
+};
+
+const SCALAR_COPY = { vi: COPY_VI, en: COPY_EN, de: COPY_DE, es: COPY_ES, fr: COPY_FR, ja: COPY_JA, "zh-CN": COPY_ZH };
+
 /** Returns the copy table for the given language. */
 function getCopy(lang) {
-  return lang === "en" ? COPY_EN : COPY_VI;
+  const base = SCALAR_COPY[lang] || COPY_EN;
+  if (lang === "vi" || lang === "en") return base;
+  const json = loadLocaleJson(lang);
+  return {
+    ...base,
+    categories: overlayLabels(json, "category", COPY_VI.categories),
+    badges: overlayLabels(json, "badge", COPY_VI.badges),
+  };
 }
 
 /** Splits the long form description on the === heading === markers. */function sections(description) {
@@ -1354,13 +1599,51 @@ const stripPromotionalSentences = (text) => {
   return kept;
 };
 
+/**
+ * The catalogue's non-vi/en languages: overlay the translated asset on top of
+ * the English columns, field by field.
+ *
+ * The per-locale asset (public/locales/<lang>.json, the same one the browser
+ * loads) carries `product.copy.<slug>.<field>` with the full product copy —
+ * name, descriptions, requirements and the feature list. Before this, every
+ * non-vi page fell back to the English columns, so a French reader selecting
+ * French got English text under a French heading. The chain is now:
+ *   locale asset -> English column -> Vietnamese source
+ * and Vietnamese keeps the catalogue's own rows, unmediated.
+ */
+function localizeForLang(product, lang) {
+  const en = localizeToEnglish(product);
+  if (lang === "en") return en;
+  const slug = String(product.slug || product.id || "").trim();
+  if (!slug) return en;
+  const json = loadLocaleJson(lang);
+  if (!json) return en;
+  const read = (field) => {
+    const value = json[`product.copy.${slug}.${field}`];
+    return typeof value === "string" && value.trim() ? value : undefined;
+  };
+  const readList = (field) => {
+    const value = json[`product.copy.${slug}.${field}`];
+    return Array.isArray(value) ? value.filter((item) => String(item || "").trim()) : undefined;
+  };
+  const overlaid = {
+    name: read("name"),
+    shortDescription: read("shortDescription"),
+    description: read("description"),
+    requirements: read("requirements"),
+    features: readList("features"),
+  };
+  const defined = Object.fromEntries(Object.entries(overlaid).filter(([, value]) => value !== undefined));
+  return Object.keys(defined).length ? { ...en, ...defined } : en;
+}
+
 export function localize(product, lang) {
   if (!product) return product;
-  // Any language other than Vietnamese falls back to the English product copy
-  // (which itself falls back to Vietnamese for fields without English). This
-  // ensures a Japanese/German/French/etc. reader never sees raw Vietnamese
-  // product text under a translated page heading.
-  const resolved = lang === "vi" ? product : localizeToEnglish(product);
+  // Vietnamese is the catalogue's source language. Every other supported locale
+  // gets the per-locale asset overlaid on the English columns (see above), so a
+  // French reader never sees raw Vietnamese (or silently English) product text
+  // under a translated page heading when a translation exists.
+  const resolved = lang === "vi" ? product : localizeForLang(product, lang);
   // Placeholders are filled after the language is chosen, so the same stored text
   // carries the owner's name in both. Filling them first would put the name into
   // whatever was picked as the fallback, and the English page would then show a
@@ -1456,12 +1739,15 @@ export const localised = (value, map, fallback = "") => {
  * time — the two things a price must never depend on. Conversion now happens
  * only at checkout, where the buyer sees the exact charge before confirming.
  */
-export function renderProductPage(rawProduct, lang = "vi", reviews = []) {
+export function renderProductPage(rawProduct, lang = "vi", reviews = [], related = []) {
   const product = localize(rawProduct, lang);
-  const en = lang !== "vi";
   const url = absolute(productUrl(product.slug, lang));
   const { intro, groups } = sections(product.description);
   const features = product.features || [];
+  const copy = getCopy(lang);
+  // Prefix for locale-aware chrome links (brand + home). Vietnamese is the root.
+  const homePrefix = localePrefix(lang);
+  const homeUrl = homePrefix ? `${homePrefix}/` : "/";
   // The shelf price is stated in the product's own currency on the Vietnamese
   // page. For any other language the price is converted to USD so a foreign
   // reader sees the amount in the currency they expect to pay in.
@@ -1471,7 +1757,9 @@ export function renderProductPage(rawProduct, lang = "vi", reviews = []) {
     const n = Number(raw);
     return Number.isFinite(n) && n > 0 ? n : 26000;
   };
-  const priceLabel = en
+  // Non-vi pages render the USD-converted price so a foreign reader sees the
+  // amount in the currency they expect to pay in. VND shelf price never moves.
+  const priceLabel = lang !== "vi" && product.currency === "VND"
     ? money(Number(product.price) / usdRate(), "USD")
     : money(product.price, product.currency);
   // The headline leads with what someone types into a search box, not with the
@@ -1490,16 +1778,15 @@ export function renderProductPage(rawProduct, lang = "vi", reviews = []) {
   const title = cleanSeoText(product.seoTitle)
     || `${product.name} v${product.version} — ${product.platform || "Windows"} | ${brand()}`;
   const description = metaDescriptionFor(product, lang);
-  const copy = getCopy(lang);
   const faq = faqSchema(product, lang);
 
   return `<!doctype html>
-<html lang="${en ? "en" : "vi"}">
+<html lang="${esc(SCHEMA_LANG[lang] || lang)}">
 <head>
 ${tokenMeta()}
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-${meta({ title, description, url, type: "product", lang, image: productImage(product), alternates: { vi: absolute(productUrl(product.slug, "vi")), en: absolute(productUrl(product.slug, "en")) } })}
+${meta({ title, description, url, type: "product", lang, image: productImage(product), alternates: Object.fromEntries(LOCALE_CODES.map((code) => [code, absolute(productUrl(product.slug, code))])) })}
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet">
@@ -1509,9 +1796,9 @@ ${analyticsMeta()}
 ${jsonLd({ "@graph": [organization(), websiteSchema(), productSchema(product, lang), merchantProductSchema(product, lang), breadcrumbSchema(product, lang), faq] })}
 </head>
 <body class="product-page">
-<header class="site-header"><a class="brand" href="/">${brandWordmark()}${headerNav("", copy)}<a class="header-cta" href="/#products"><span>${esc(copy.buyNow)}</span> <span>↗</span></a></header>
+<header class="site-header"><a class="brand" href="${homeUrl}">${brandWordmark()}${headerNav("", copy, homePrefix)}<a class="header-cta" href="${homePrefix}/#products"><span>${esc(copy.buyNow)}</span> <span>↗</span></a></header>
 <main class="wrap">
-<nav class="crumbs" aria-label="${copy.breadcrumbLabel}"><a href="/">${copy.home}</a> <span>/</span> <a href="/#products">${copy.products}</a> <span>/</span> <span aria-current="page">${esc(product.name)}</span></nav>
+<nav class="crumbs" aria-label="${esc(copy.breadcrumbLabel)}"><a href="${homeUrl}">${esc(copy.home)}</a> <span>/</span> <a href="${homePrefix}/#products">${esc(copy.products)}</a> <span>/</span> <span aria-current="page">${esc(product.name)}</span></nav>
 <article class="product-detail">
 <header class="product-hero">
 <div>
@@ -1521,38 +1808,31 @@ ${jsonLd({ "@graph": [organization(), websiteSchema(), productSchema(product, la
 </div>
 <aside class="buy-card" id="mua">
 <div class="buy-price">${esc(priceLabel)}</div>
-<p class="buy-note">${copy.buyNote}</p>
-<a class="button button-primary button-wide" href="/?buy=${encodeURIComponent(product.id)}#products">${copy.buyNow} <span>→</span></a>
-<ul class="buy-points"><li>${copy.pointDownload}</li><li>${copy.pointLookup}</li><li>${copy.pointRefund}</li></ul>
+<p class="buy-note">${esc(copy.buyNote)}</p>
+<a class="button button-primary button-wide" href="${homePrefix}/?buy=${encodeURIComponent(product.id)}#products">${esc(copy.buyNow)} <span>→</span></a>
+<ul class="buy-points"><li>${esc(copy.pointDownload)}</li><li>${esc(copy.pointLookup)}</li><li>${esc(copy.pointRefund)}</li></ul>
 </aside>
 </header>
-${features.length ? `<section class="detail-block"><h2>${copy.features}</h2><ul class="feature-grid">${features.map((item) => `<li>${esc(item)}</li>`).join("")}</ul></section>` : ""}
-${product.requirements ? `<section class="detail-block"><h2>${copy.requirements}</h2><p>${esc(product.requirements).replace(/\n/g, "<br>")}</p></section>` : ""}
+${features.length ? `<section class="detail-block"><h2>${esc(copy.features)}</h2><ul class="feature-grid">${features.map((item) => `<li>${esc(item)}</li>`).join("")}</ul></section>` : ""}
+${product.requirements ? `<section class="detail-block"><h2>${esc(copy.requirements)}</h2><p>${esc(product.requirements).replace(/\n/g, "<br>")}</p></section>` : ""}
 ${(product.fileSize || product.file_size) ? `<section class="detail-block"><h2>${esc(copy.fileSizeLabel)}</h2><p>${esc(formatBytes(product.fileSize || product.file_size))}</p></section>` : ""}
 ${trustBlock(product, copy)}
 ${intro ? `<section class="detail-block prose">${paragraphBlocks(intro)}</section>` : ""}
 ${groups.map((group) => `<section class="detail-block prose">${paragraphBlocks(group)}</section>`).join("")}
 <section class="detail-block">
-<h2>${copy.faqHeading}</h2>
+<h2>${esc(copy.faqHeading)}</h2>
 <dl class="faq-mini">
 ${faq.mainEntity.map((entry) => `<dt>${esc(entry.name)}</dt><dd>${esc(entry.acceptedAnswer.text)}</dd>`).join("\n")}
 </dl>
 </section>
-${reviews.length ? `<section class="detail-block reviews"><h2>${copy.reviewsHeading}</h2><ul class="review-list">${reviews.map((review) => `<li><p>${esc(review.body)}</p><small>${esc(review.authorName || copy.anonymous)}</small></li>`).join("")}</ul></section>` : ""}
+${reviews.length ? `<section class="detail-block reviews"><h2>${esc(copy.reviewsHeading)}</h2><ul class="review-list">${reviews.map((review) => `<li><p>${esc(review.body)}</p><small>${esc(review.authorName || copy.anonymous)}</small></li>`).join("")}</ul></section>` : ""}
 </article>
-<section class="related"><h2>${copy.related}</h2><div id="related" class="related-grid">${copy.loading}</div></section>
+${related && related.length ? `<section class="related"><h2>${esc(copy.related)}</h2><div id="related" class="related-grid">${related.map((entry) => `<a class="related-card" href="${esc(absolute(productUrl(entry.slug, lang)))}"><b>${esc(entry.name)}</b><span>v${esc(entry.version)} · ${esc(entry.platform || "Windows")}</span><span>${esc(money(entry.price, entry.currency))}</span></a>`).join("")}</div></section>` : `<section class="related"><h2>${esc(copy.related)}</h2><div id="related" class="related-grid">${esc(copy.loading)}</div></section>`}
 </main>
-${footerBar("", copy)}
-<!--
-  The related-products loader lives in /related.js rather than inline. The server
-  sends script-src 'self' with no 'unsafe-inline' and no nonce, so an inline block
-  here was silently refused by every browser: the section below the product sat on
-  "loading" forever. Nothing on this page needs inline script, so the CSP stays
-  strict and the script moves.
--->
+${footerBar("", copy, homePrefix)}
+<!-- related-loader: client fallback only; the server renders real cards above -->
 <script src="/format.js"></script>
-<script src="/related.js" data-self="${esc(product.id)}"></script>
-<script src="/lang-detect.js"></script>
+<script src="/related.js" data-self="${esc(product.id)}" data-lang="${esc(lang)}" data-prefix="${esc(homePrefix)}"></script>
 </body>
 </html>`;
 }

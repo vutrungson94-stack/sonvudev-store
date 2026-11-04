@@ -4,7 +4,7 @@ import { promises as fs } from "node:fs";
 import { fileURLToPath } from "node:url";
 import crypto from "node:crypto";
 import { env, isConfigured } from "./config.js";
-import { ORDER_STATUSES, countOrders, countOrdersForProduct, dataDir, ensureSeed, findOrderByIdempotencyKey, getOrder, getProduct, getProductBySlug, isOrderOwner, isSellable, latestOrder, listOpenOrders, listOrders, listOrdersForRevenue, listProducts, listRefundedEmails, createOrder, updateOrder, createProduct, updateProduct, deleteProduct, persistenceMode } from "./store.js";
+import { ORDER_STATUSES, countOrders, countOrdersForProduct, dataDir, ensureSeed, findOrderByIdempotencyKey, getOrder, getProduct, getProductBySlug, isOrderOwner, isSellable, latestOrder, listOpenOrders, listOrders, listOrdersForRevenue, listProducts, listProductsWithLocaleCopy, listRefundedEmails, createOrder, updateOrder, createProduct, updateProduct, deleteProduct, persistenceMode } from "./store.js";
 import { supabaseRequest } from "./supabase-http.js";
 import { slugify } from "./format.js";
 import { paypalEnvironmentIsSet } from "./config.js";
@@ -548,12 +548,9 @@ const productPage = (lang) => async (req, res) => {
       return notFound(req, res);
     }
     const reviews = await listReviewsForProduct(product.id);
-    // No converted figure is resolved here any more. The page states the shelf
-    // price in the product's own currency on both languages, so the number Google
-    // reads is the number the product data carries and it does not move between
-    // crawls. The USD amount is still resolved at checkout, where it is shown to
-    // the buyer as the exact PayPal charge rather than as a second list price.
-    res.set("Cache-Control", "public, max-age=600").type("html").send(renderProductPage(product, lang, reviews));
+    const products = await listProducts();
+    const related = (products || []).filter((item) => item.id !== product.id && isSellable(item)).slice(0, 6);
+    res.set("Cache-Control", "public, max-age=600").type("html").send(renderProductPage(product, lang, reviews, related));
   } catch (error) {
     console.error(error);
     try {
@@ -565,9 +562,10 @@ const productPage = (lang) => async (req, res) => {
 };
 app.get("/product/:slug", productPage("vi"));
 app.get("/en/product/:slug", productPage("en"));
-// Product pages for all supported locales. Non-vi/en locales fall back to the
-// English product copy (with Vietnamese fallback for fields without English),
-// which is the best-available translation until full translations are provided.
+// Product pages for all supported locales. Non-vi/en locales get the
+// per-locale asset overlaid on the English columns inside renderProductPage,
+// so a reader sees the translations that exist rather than English text under
+// a translated heading.
 for (const lang of EXTRA_BLOG_LOCALES) app.get(`/${lang}/product/:slug`, productPage(lang));
 
 // Blog routes — dynamic, served from data/blog/*.json.
@@ -643,18 +641,29 @@ app.get("/sitemap.xml", async (_req, res, next) => {
   // The filter is the storefront's own (isSellable), so a page nobody can buy
   // can never be submitted to Google.
   //
-  // Each product contributes two URLs with hreflang pointing at each other. A
-  // sitemap that lists only the Vietnamese page tells a crawler the English one
-  // is a duplicate to be dropped, which is the opposite of what the two-language
-  // setup is for.
+  // Every supported locale contributes its own URL with hreflang pointing at
+  // all siblings. A sitemap that lists only the Vietnamese page tells a crawler
+  // the six other copies are duplicates to be dropped, which is the opposite of
+  // what the multi-language setup is for. The English copy is only indexed when
+  // the product actually has English text, so an English URL that serves
+  // Vietnamese prose is never offered as a translation.
+  const localeUrl = (slug, code) => `${base}${code === "vi" ? "" : `/${code}`}/product/${encodeURIComponent(slug)}`;
+  const hreflangLinks = (slug) => LOCALE_CODES
+    .map((code) => `<xhtml:link rel="alternate" hreflang="${code}" href="${localeUrl(slug, code)}"/>`)
+    .join("") + `<xhtml:link rel="alternate" hreflang="x-default" href="${localeUrl(slug, "vi")}"/>`;
+  // Non-vi/en locale URLs are only listed when the per-locale asset actually
+  // carries this product's copy, so a crawler is never pointed at a page that
+  // silently serves the Vietnamese source in another locale.
+  const slugsWithLocaleCopy = new Set(await listProductsWithLocaleCopy());
   for (const product of (await listProducts()).filter(isSellable)) {
     const updated = product.updatedAt || product.updated_at;
     const lastmod = updated ? `<lastmod>${new Date(updated).toISOString().slice(0, 10)}</lastmod>` : "";
-    const vi = `${base}/product/${encodeURIComponent(product.slug)}`;
-    const en = `${base}/en/product/${encodeURIComponent(product.slug)}`;
-    urls.push(`<url><loc>${vi}</loc>${lastmod}<changefreq>weekly</changefreq><priority>0.8</priority><xhtml:link rel="alternate" hreflang="vi" href="${vi}"/><xhtml:link rel="alternate" hreflang="en" href="${en}"/><xhtml:link rel="alternate" hreflang="x-default" href="${vi}"/></url>`);
+    urls.push(`<url><loc>${localeUrl(product.slug, "vi")}</loc>${lastmod}<changefreq>weekly</changefreq><priority>0.8</priority>${hreflangLinks(product.slug)}</url>`);
     const hasEnglish = String(product.descriptionEn || "").trim() || String(product.shortDescriptionEn || "").trim() || (Array.isArray(product.featuresEn) && product.featuresEn.length);
-    if (hasEnglish) urls.push(`<url><loc>${en}</loc>${lastmod}<changefreq>weekly</changefreq><priority>0.7</priority><xhtml:link rel="alternate" hreflang="vi" href="${vi}"/><xhtml:link rel="alternate" hreflang="en" href="${en}"/><xhtml:link rel="alternate" hreflang="x-default" href="${vi}"/></url>`);
+    if (hasEnglish) urls.push(`<url><loc>${localeUrl(product.slug, "en")}</loc>${lastmod}<changefreq>weekly</changefreq><priority>0.7</priority>${hreflangLinks(product.slug)}</url>`);
+    for (const lang of EXTRA_BLOG_LOCALES) {
+      if (slugsWithLocaleCopy.has(product.slug)) urls.push(`<url><loc>${localeUrl(product.slug, lang)}</loc>${lastmod}<changefreq>weekly</changefreq><priority>0.6</priority>${hreflangLinks(product.slug)}</url>`);
+    }
   }
   for (const post of loadBlogPosts()) {
     const updated = post.modified || post.published;

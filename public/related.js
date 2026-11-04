@@ -50,14 +50,29 @@
   // Escaping and money come from public/format.js, loaded just before this file:
   // this loader used to carry its own copies of both, and the money one disagreed
   // with the dictionary about grouping.
+  // The language this page is being read in. The server declares it on the
+  // request (data-lang) when the loader is included; otherwise the dictionary
+  // (or <html lang>) answers. Coercing everything non-en to vi — as this file
+  // used to do — made de/es/fr/ja/zh-CN readers read Vietnamese cards under a
+  // foreign heading, and quietly dropped the whole localisation branch below.
+  var attrLang = script.getAttribute('data-lang') || '';
   var dictionary = window.I18N || null;
-  var lang = dictionary && dictionary.lang
-    ? String(dictionary.lang).toLowerCase().indexOf('en') === 0 ? 'en' : 'vi'
-    : (String((document.documentElement && document.documentElement.lang) || 'vi').toLowerCase().indexOf('en') === 0 ? 'en' : 'vi');
+  var lang = attrLang || (dictionary && dictionary.lang ? String(dictionary.lang) : null) ||
+    String((document.documentElement && document.documentElement.lang) || 'vi').toLowerCase();
+  lang = String(lang).toLowerCase();
+  var prefix = attrLang ? (script.getAttribute('data-prefix') || '') : (lang && lang !== 'vi' ? '/' + lang : '');
 
   var escapeHtml = function (value) { return window.SVDFormat.esc(value); };
 
   var money = function (value, currency) { return window.SVDFormat.money(value, currency); };
+
+  // Mirrors public/app.js priceFor: non-vi readers see the USD figure PayPal
+  // charges; without priceUsd the shelf number is shown (never an invented sum).
+  var priceFor = function (p) {
+    return lang !== 'vi' && p.priceUsd !== undefined && p.priceUsd !== null
+      ? money(p.priceUsd, 'USD')
+      : money(p.price, p.currency);
+  };
 
   // ---------------------------------------------------------------------------
   // SHARED TRANSLATION MECHANISM
@@ -76,29 +91,10 @@
   //     actually translated, so the fallback chain is: overlay -> English
   //     column -> Vietnamese source.
   //
-  // Category and badge are free-text columns, so they cannot be looked up by
-  // a fixed key. They are mapped from the Vietnamese value the catalogue stores
-  // to the English equivalent, then passed to dictionary.productLabel() which
-  // derives a key and returns the translated label for the current locale.
-  // ---------------------------------------------------------------------------
-  var CATEGORIES_VI_TO_EN = {
-    'Công cụ': 'Tools',
-    'Tiện ích': 'Utilities',
-    'Phần mềm': 'Software',
-    'Khác': 'Other',
-    'Bundle': 'Bundle',
-  };
-  var BADGES_VI_TO_EN = {
-    'Mới': 'New',
-    'Bán chạy': 'Best seller',
-    'Cập nhật': 'Updated',
-    'Phát hành': 'Release',
-    'Phổ biến': 'Popular',
-    'Chuyên nghiệp': 'Professional',
-    'Tiết kiệm': 'Value',
-    'Doanh nghiệp': 'Enterprise',
-    'Ưu đãi sớm': 'Early Bird',
-  };
+  // Related-card links keep the reader inside their language: the server
+  // declared the locale prefix on the <script> tag, so a `/fr/` page links
+  // to `/fr/product/<slug>` rather than dropping the reader back to the
+  // Vietnamese root.
 
   var localizeProduct = function (p) {
     if (!p || lang === 'vi') return p;
@@ -117,47 +113,24 @@
     }
 
     // Non-English, non-Vietnamese locale (Japanese, Chinese, etc.):
-    // start from the dictionary overlay, then fall back to the English
-    // columns, then to the Vietnamese source. The overlay is the only place
-    // per-locale copy lives for languages the catalogue schema does not have.
-    var overlay = (dictionary && dictionary.productCopy) ? dictionary.productCopy(p) : null;
-    var overlayFeatures = overlay && Array.isArray(overlay.features) ? overlay.features : null;
-
-    var localized = { ...p };
-    if (overlay) {
-      if (overlay.name) localized.name = overlay.name;
-      if (overlay.shortDescription) localized.shortDescription = overlay.shortDescription;
-      if (overlay.description) localized.description = overlay.description;
-      if (overlay.requirements) localized.requirements = overlay.requirements;
-      if (overlayFeatures) localized.features = overlayFeatures;
+    // the per-locale dictionary overlay carries the translated name, then the
+  // English column, then the Vietnamese source. The overlay is the only place
+  // per-locale product copy lives for languages the catalogue schema does not
+  // have. A page that never loaded the dictionary (the product page) keeps
+  // whatever the server rendered in the card below, and this stays a no-op.
+  var overlay = dictionary && dictionary.productCopy ? dictionary.productCopy(p) : null;
+  if (overlay) {
+    var merged = { ...p };
+    for (var field of ['name', 'shortDescription', 'description', 'requirements']) {
+      if (overlay[field] !== undefined) merged[field] = overlay[field];
     }
+    if (Array.isArray(overlay.features)) merged.features = overlay.features;
+    return merged;
+  }
 
-    // Fall back to English columns if the overlay did not cover a field.
-    var enCol = localized.nameEn || localized.name_en;
-    if (!localized.name || localized.name === p.name) localized.name = enCol || localized.name;
-    var enShort = localized.shortDescriptionEn || localized.short_description_en;
-    if (!localized.shortDescription || localized.shortDescription === p.shortDescription) localized.shortDescription = enShort || localized.shortDescription;
-    var enDesc = localized.descriptionEn || localized.description_en;
-    if (!localized.description || localized.description === p.description) localized.description = enDesc || localized.description;
-    var enReq = localized.requirementsEn || localized.requirements_en;
-    if (!localized.requirements || localized.requirements === p.requirements) localized.requirements = enReq || localized.requirements;
-    var enFeat = localized.featuresEn || localized.features_en;
-    if (!localized.features || localized.features === p.features) localized.features = enFeat || localized.features;
-
-    // Category and badge: map the Vietnamese catalogue value to English,
-    // then ask the dictionary for the current locale's label.
-    var rawCat = String(localized.category || '').trim();
-    var catEn = CATEGORIES_VI_TO_EN[rawCat] || rawCat;
-    localized.category = (dictionary && dictionary.productLabel) ? dictionary.productLabel('category', catEn) || catEn : catEn;
-
-    var rawBadge = String(localized.badge || '').trim();
-    if (rawBadge) {
-      var badgeEn = BADGES_VI_TO_EN[rawBadge] || rawBadge;
-      localized.badge = (dictionary && dictionary.productLabel) ? dictionary.productLabel('badge', badgeEn) || badgeEn : badgeEn;
-    }
-
-    return localized;
-  };
+  var enCol = p.nameEn || p.name_en;
+  return enCol && enCol !== p.name ? { ...p, name: enCol } : p;
+};
 
   var EMPTY = 'products.onlyOne';
   var emptyText = function () {
@@ -191,7 +164,7 @@
         return;
       }
       box.innerHTML = others.slice(0, 6).map(function (p) {
-        var href = '/product/' + encodeURIComponent(p.slug || '');
+        var href = prefix + '/product/' + encodeURIComponent(p.slug || '');
         var version = cardVersion(p);
         return '<a class="related-card" href="' + escapeHtml(href) + '">' +
           '<b>' + cardName(p) + '</b>' +
