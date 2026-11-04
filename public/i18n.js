@@ -1617,6 +1617,19 @@ function closeCombobox(combobox) {
 }
 
 function boot() {
+  // Ensure the server-rendered HTML matches the stored language preference.
+  // Without this, switching to French on /fr/blog/:slug then clicking "Buy now"
+  // (which links to /?buy=...) lands on the Vietnamese homepage because the
+  // server sees no language prefix. Redirect to /fr/?buy=... so the server
+  // renders French.
+  if (current && current !== 'vi') {
+    const path = window.location?.pathname;
+    if (path && path !== `/${current}` && !path.startsWith(`/${current}/`)) {
+      const target = path === '/' ? `/${current}` : `/${current}${path}`;
+      window.location.href = target + window.location.search + window.location.hash;
+      return;
+    }
+  }
   apply();
   renderLanguageCombobox();
   // Language switch combobox - client-side toggle only (no navigation)
