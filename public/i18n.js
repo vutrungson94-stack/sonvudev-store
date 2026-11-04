@@ -1624,7 +1624,15 @@ function boot() {
   // renders French.
   if (current && current !== 'vi') {
     const path = window.location?.pathname;
-    if (path && path !== `/${current}` && !path.startsWith(`/${current}/`)) {
+    // Nếu URL đã có tiền tố ngôn ngữ (ví dụ /en/product/...), hãy thay thế bằng ngôn ngữ hiện tại
+    const langMatch = path?.match(/^\/([a-z]{2}(-[A-Z]{2})?)\//);
+    if (langMatch && ["vi", "en", "de", "es", "fr", "ja", "zh-CN"].includes(langMatch[1])) {
+      const target = path.replace(/^\/[a-z]{2}(-[A-Z]{2})?\//, `/${current}/`);
+      if (target !== path) {
+        window.location.href = target + window.location.search + window.location.hash;
+        return;
+      }
+    } else if (path && path !== `/${current}` && !path.startsWith(`/${current}/`)) {
       const target = path === '/' ? `/${current}` : `/${current}${path}`;
       window.location.href = target + window.location.search + window.location.hash;
       return;

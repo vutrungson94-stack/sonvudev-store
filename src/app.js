@@ -43,6 +43,10 @@ function preferredLanguage(req) {
   if (!header) return "en";
   const first = header.split(",")[0].trim().split(";")[0].trim();
   if (first.startsWith("vi")) return "vi";
+  // Hỗ trợ các ngôn ngữ khác có trong danh sách được hỗ trợ
+  for (const lang of ["de", "es", "fr", "ja", "zh-CN"]) {
+    if (first.startsWith(lang)) return lang;
+  }
   return "en";
 }
 
@@ -63,7 +67,7 @@ function redirectRootLangToEnglish(req, res, next) {
   const lang = preferredLanguage(req);
   if (lang === "vi") return next();
   const qs = req.url.includes("?") ? req.url.slice(req.url.indexOf("?")) : "";
-  return res.redirect(308, `/en${req.path}${qs}`);
+  return res.redirect(308, `/${lang}${req.path}${qs}`);
 }
 // What the storefront and the public API are allowed to see of a product.
 //
