@@ -1458,19 +1458,22 @@ export const localised = (value, map, fallback = "") => {
  */
 export function renderProductPage(rawProduct, lang = "vi", reviews = []) {
   const product = localize(rawProduct, lang);
-  const en = lang === "en";
+  const en = lang !== "vi";
   const url = absolute(productUrl(product.slug, lang));
   const { intro, groups } = sections(product.description);
   const features = product.features || [];
-  // The shelf price is stated in the product's own currency, on both languages.
-  //
-  // It used to be converted to dollars on the English page from a live exchange
-  // rate. That number changed between crawls, never matched the VND figure in the
-  // structured data, and is the "price mismatch" Merchant Center reports: the feed
-  // said 7,69 US$, the page said 7,71, and the product data said 199000 VND. A
-  // listed price is a promise, not a quote. Conversion belongs to the payment step,
-  // where PayPal shows the exact charge before the buyer confirms it.
-  const priceLabel = money(product.price, product.currency);
+  // The shelf price is stated in the product's own currency on the Vietnamese
+  // page. For any other language the price is converted to USD so a foreign
+  // reader sees the amount in the currency they expect to pay in.
+  const usdRate = () => {
+    const raw = env.paypal.vndToUsdRate;
+    if (raw === "live" || raw === "auto" || raw === "true" || raw === "1") return 26000;
+    const n = Number(raw);
+    return Number.isFinite(n) && n > 0 ? n : 26000;
+  };
+  const priceLabel = en
+    ? money(Number(product.price) / usdRate(), "USD")
+    : money(product.price, product.currency);
   // The headline leads with what someone types into a search box, not with the
   // product's own name, which nobody outside this site has heard of. The two are
   // the same sentence read differently: "bật macro Excel" is the problem, "Excel
