@@ -1,0 +1,30 @@
+{
+  "generatedAt": "2026-11-04T07:23:21.769Z",
+  "totalServices": 1,
+  "problems": [],
+  "services": [
+    {
+      "file": "sonvudev-store.json",
+      "id": "sonvudev-store",
+      "name": "SonVuDev Store",
+      "owner": "platform-team",
+      "repository": "https://github.com/vutrungson94-stack/sonvudev-store",
+      "type": "web",
+      "slo": {
+        "availability": 99.9,
+        "errorRate": 1,
+        "latencyP95Seconds": 0.5
+      },
+      "goldenPath": "scripts/golden-path.mjs",
+      "lifecycle": "production",
+      "description": "Software storefront with private R2 downloads and PayPal checkout",
+      "healthEndpoint": "/api/health",
+      "createdAt": "2026-10-15",
+      "tags": [
+        "storefront",
+        "ecommerce",
+        "payments"
+      ]
+    }
+  ]
+}

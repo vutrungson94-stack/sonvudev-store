@@ -1,16 +1,16 @@
 {
-  "generatedAt": "2026-10-15T10:57:51.473Z",
+  "generatedAt": "2026-11-04T07:25:39.547Z",
   "measurements": {
     "tests": {
-      "value": 493,
+      "value": 536,
       "direction": "up"
     },
     "testFiles": {
-      "value": 63,
+      "value": 70,
       "direction": "up"
     },
     "routes": {
-      "value": 30,
+      "value": 40,
       "direction": "up"
     },
     "dependencies": {
@@ -34,7 +34,7 @@
       "direction": "down"
     },
     "i18nKeys": {
-      "value": 828,
+      "value": 854,
       "direction": "up"
     },
     "indexablePages": {
@@ -51,6 +51,26 @@
     },
     "productPageRenderers": {
       "value": 1,
+      "direction": "down"
+    },
+    "deploymentFrequency": {
+      "value": 0,
+      "direction": "up"
+    },
+    "leadTimeDays": {
+      "value": 0,
+      "direction": "down"
+    },
+    "changeFailureRate": {
+      "value": 0,
+      "direction": "down"
+    },
+    "escapeRate": {
+      "value": 0,
+      "direction": "down"
+    },
+    "sloBreachCount": {
+      "value": 0,
       "direction": "down"
     }
   }

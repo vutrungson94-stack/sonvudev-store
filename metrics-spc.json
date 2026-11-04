@@ -1,0 +1,135 @@
+{
+  "generatedAt": "2026-11-04T07:23:21.540Z",
+  "metrics": {
+    "tests": {
+      "mean": 497.2,
+      "stdev": 22.631,
+      "ucl": 565.0929,
+      "lcl": 429.3071,
+      "latest": 530,
+      "inControl": true,
+      "signals": [],
+      "n": 5
+    },
+    "testFiles": {
+      "mean": 64.2,
+      "stdev": 3.0594,
+      "ucl": 73.3782,
+      "lcl": 55.0218,
+      "latest": 69,
+      "inControl": true,
+      "signals": [],
+      "n": 5
+    },
+    "routes": {
+      "mean": 32.6,
+      "stdev": 3.3823,
+      "ucl": 42.7469,
+      "lcl": 22.4531,
+      "latest": 39,
+      "inControl": true,
+      "signals": [],
+      "n": 5
+    },
+    "dependencies": {
+      "mean": 6,
+      "stdev": 0,
+      "ucl": 6,
+      "lcl": 6,
+      "latest": 6,
+      "inControl": true,
+      "signals": [],
+      "n": 5
+    },
+    "escCopies": {
+      "mean": 2,
+      "stdev": 0,
+      "ucl": 2,
+      "lcl": 2,
+      "latest": 2,
+      "inControl": true,
+      "signals": [],
+      "n": 5
+    },
+    "moneyCopies": {
+      "mean": 2,
+      "stdev": 0,
+      "ucl": 2,
+      "lcl": 2,
+      "latest": 2,
+      "inControl": true,
+      "signals": [],
+      "n": 5
+    },
+    "initialsCopies": {
+      "mean": 2,
+      "stdev": 0,
+      "ucl": 2,
+      "lcl": 2,
+      "latest": 2,
+      "inControl": true,
+      "signals": [],
+      "n": 5
+    },
+    "sizeCopies": {
+      "mean": 2,
+      "stdev": 0,
+      "ucl": 2,
+      "lcl": 2,
+      "latest": 2,
+      "inControl": true,
+      "signals": [],
+      "n": 5
+    },
+    "i18nKeys": {
+      "mean": 835.2,
+      "stdev": 9.683,
+      "ucl": 864.2489,
+      "lcl": 806.1511,
+      "latest": 852,
+      "inControl": true,
+      "signals": [],
+      "n": 5
+    },
+    "indexablePages": {
+      "mean": 7,
+      "stdev": 0,
+      "ucl": 7,
+      "lcl": 7,
+      "latest": 7,
+      "inControl": true,
+      "signals": [],
+      "n": 5
+    },
+    "productPageLocales": {
+      "mean": 2,
+      "stdev": 0,
+      "ucl": 2,
+      "lcl": 2,
+      "latest": 2,
+      "inControl": true,
+      "signals": [],
+      "n": 5
+    },
+    "localizedPages": {
+      "mean": 9,
+      "stdev": 0,
+      "ucl": 9,
+      "lcl": 9,
+      "latest": 9,
+      "inControl": true,
+      "signals": [],
+      "n": 5
+    },
+    "productPageRenderers": {
+      "mean": 1,
+      "stdev": 0,
+      "ucl": 1,
+      "lcl": 1,
+      "latest": 1,
+      "inControl": true,
+      "signals": [],
+      "n": 5
+    }
+  }
+}

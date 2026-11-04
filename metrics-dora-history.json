@@ -1,0 +1,14 @@
+{
+  "schema": 1,
+  "history": [
+    {
+      "generatedAt": "2026-11-04T07:23:21.405Z",
+      "deploymentFrequency": 0,
+      "leadTimeDays": 0,
+      "changeFailureRate": 0,
+      "failedChanges": 0,
+      "totalChanges": 0,
+      "mttrDays": null
+    }
+  ]
+}

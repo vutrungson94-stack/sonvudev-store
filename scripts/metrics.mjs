@@ -161,6 +161,49 @@ const rows = [
   ['productPageRenderers', countCopies(await read('src/pages.js'), /export function renderProductPage/g), 'down', 'bộ render trang sản phẩm'],
 ];
 
+// --- CMMI Level 5 metrics: read from the Level 5 gate modules ---
+//
+// DORA, SLO, defect escape are computed by their own scripts and written to
+// JSON files. This step reads them into the same baseline/trend machinery so
+// every metric has one home: the baseline, the trend chart, and the gate.
+//
+// deploymentFrequency: tags per repo (proxy for deployments per week)
+// leadTimeDays: days from first tag to latest tag
+// changeFailureRate: fraction of tagged releases whose test run was red
+// escapeRate: production defects / (production + caught defects)
+// sloBreachCount: number of SLOs breached without corrective action
+// unresolvedBreachCount: same as sloBreachCount (kept for backwards compat)
+let deploymentFrequency = 0;
+let leadTimeDays = 0;
+let changeFailureRate = 0;
+let escapeRate = 0;
+let sloBreachCount = 0;
+
+try {
+  const dora = JSON.parse(await readFile(path.join(root, 'metrics-dora.json'), 'utf8'));
+  deploymentFrequency = dora.deploymentFrequency ?? 0;
+  leadTimeDays = dora.leadTimeDays ?? 0;
+  changeFailureRate = dora.changeFailureRate ?? 0;
+} catch { /* dora baseline not yet written */ }
+
+try {
+  const slo = JSON.parse(await readFile(path.join(root, 'metrics-slo.json'), 'utf8'));
+  sloBreachCount = slo.unresolvedBreachCount ?? 0;
+} catch { /* slo baseline not yet written */ }
+
+try {
+  const defect = JSON.parse(await readFile(path.join(root, 'metrics-defect-escape.json'), 'utf8'));
+  escapeRate = defect.escapeRate ?? 0;
+} catch { /* defect baseline not yet written */ }
+
+rows.push(
+  ['deploymentFrequency', deploymentFrequency, 'up', 'DORA: triển khai tuần'],
+  ['leadTimeDays', leadTimeDays, 'down', 'DORA: lead time (ngày)'],
+  ['changeFailureRate', changeFailureRate, 'down', 'DORA: tỷ lệ thay đổi thất bại'],
+  ['escapeRate', escapeRate, 'down', 'lỗi thoát test (tỷ lệ)'],
+  ['sloBreachCount', sloBreachCount, 'down', 'SLO vi phạm chưa xử lý'],
+);
+
 const measurements = Object.fromEntries(rows.map(([key, value, direction]) => [key, { value, direction }]));
 const label = Object.fromEntries(rows.map(([key, , , note]) => [key, note]));
 

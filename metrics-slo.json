@@ -1,0 +1,85 @@
+{
+  "generatedAt": "2026-11-04T07:23:21.499Z",
+  "overall": "ok",
+  "measurements": {
+    "availability": {
+      "id": "availability",
+      "name": "Service availability",
+      "target": 99.9,
+      "measure": "percentage",
+      "want": "up",
+      "owner": "platform-team",
+      "remediation": "PagerDuty escalation; runbook at docs/RUNBOOK.md#availability",
+      "value": null,
+      "status": "unknown",
+      "breached": false,
+      "measuredAt": "2026-11-04T07:23:21.499Z"
+    },
+    "errorRate": {
+      "id": "errorRate",
+      "name": "API error rate",
+      "target": 1,
+      "measure": "percentage",
+      "want": "down",
+      "owner": "backend-team",
+      "remediation": "Check /api/health failures; rollback if > 1% for 15 min",
+      "value": null,
+      "status": "unknown",
+      "breached": false,
+      "measuredAt": "2026-11-04T07:23:21.499Z"
+    },
+    "latencyP95": {
+      "id": "latencyP95",
+      "name": "API p95 latency",
+      "target": 500,
+      "measure": "seconds",
+      "want": "down",
+      "owner": "backend-team",
+      "remediation": "Profile slow endpoints; add caching or scale instances",
+      "value": null,
+      "status": "unknown",
+      "breached": false,
+      "measuredAt": "2026-11-04T07:23:21.499Z"
+    },
+    "testPassRate": {
+      "id": "testPassRate",
+      "name": "Test suite pass rate",
+      "target": 100,
+      "measure": "percentage",
+      "want": "up",
+      "owner": "engineering-team",
+      "remediation": "Red test must block merge; fix before next deploy",
+      "value": null,
+      "status": "unknown",
+      "breached": false,
+      "measuredAt": "2026-11-04T07:23:21.499Z"
+    },
+    "buildSuccessRate": {
+      "id": "buildSuccessRate",
+      "name": "Build success rate",
+      "target": 100,
+      "measure": "percentage",
+      "want": "up",
+      "owner": "platform-team",
+      "remediation": "Failed build blocks deploy; investigate CI logs",
+      "value": 100,
+      "status": "ok",
+      "breached": false,
+      "measuredAt": "2026-11-04T07:23:21.499Z"
+    },
+    "deploySuccessRate": {
+      "id": "deploySuccessRate",
+      "name": "Deploy success rate",
+      "target": 100,
+      "measure": "percentage",
+      "want": "up",
+      "owner": "platform-team",
+      "remediation": "Failed deploy must be rolled back within 15 min",
+      "value": 100,
+      "status": "ok",
+      "breached": false,
+      "measuredAt": "2026-11-04T07:23:21.499Z"
+    }
+  },
+  "unresolvedBreachCount": 0
+}

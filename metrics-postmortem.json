@@ -1,0 +1,30 @@
+{
+  "generatedAt": "2026-11-04T07:23:21.726Z",
+  "totalPostmortems": 1,
+  "openIncidents": 0,
+  "resolvedWithoutRootCause": 0,
+  "problems": [],
+  "postmortems": [
+    {
+      "file": "2026-11-04-example-incident.json",
+      "title": "Example incident template",
+      "date": "2026-11-04T00:00:00Z",
+      "impact": "No customer impact — example postmortem demonstrating required fields.",
+      "durationMinutes": 0,
+      "detectedBy": "health-check",
+      "rootCause": "This is an example postmortem. Replace with real root cause analysis: what changed, why it was not caught, and how to prevent recurrence.",
+      "correctiveActions": [
+        {
+          "description": "Replace this example with real corrective actions for the incident.",
+          "owner": "platform-team",
+          "dueDate": "2026-11-11"
+        }
+      ],
+      "defectEscapedTests": false,
+      "escapeReason": "N/A — example postmortem, no real defect.",
+      "owner": "platform-team",
+      "dueDate": "2026-11-11",
+      "status": "resolved"
+    }
+  ]
+}
