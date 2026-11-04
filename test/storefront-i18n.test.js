@@ -267,16 +267,22 @@ test('doi ngon ngu thi <html lang> va combobox doi theo', async () => {
   });
   const I18N = res.window.I18N;
   assert.equal(document.documentElement.lang, 'vi');
-  // The combobox flag and label must reflect the active language.
-  const flagText = () => wrap.querySelector('[data-lang-flag]')?.textContent || '';
+  // The combobox flag and label must reflect the active language. Flags are CSS
+  // backgrounds rather than regional-indicator emoji, which Windows does not render.
+  const flagClass = () => wrap.querySelector('[data-lang-flag]')?.className || '';
   const labelText = () => wrap.querySelector('[data-lang-label]')?.textContent || '';
-  assert.ok(flagText().includes('🇻🇳') || labelText().includes('Tiếng Việt'), 'cờ hoặc nhãn phải hiện tiếng Việt khi trang mở');
-  I18N.set('en');
-  assert.equal(document.documentElement.lang, 'en', 'lang tren <html> phai doi theo');
-  assert.ok(flagText().includes('🇺🇸') || labelText().includes('English'), 'cờ hoặc nhãn phải chuyển sang EN khi đổi sang tiếng anh');
   I18N.set('vi');
   assert.equal(document.documentElement.lang, 'vi');
-  assert.ok(flagText().includes('🇻🇳') || labelText().includes('Tiếng Việt'), 'cờ hoặc nhãn phải quay lại VI');
+  assert.ok(flagClass().includes('flag-vi'), 'cờ VI phải được vẽ bằng CSS class');
+  assert.ok(labelText().includes('Tiếng Việt'), 'nhãn phải hiện tiếng Việt khi trang mở');
+  I18N.set('en');
+  assert.equal(document.documentElement.lang, 'en', 'lang tren <html> phai doi theo');
+  assert.ok(flagClass().includes('flag-en'), 'cờ EN phải được vẽ bằng CSS class');
+  assert.ok(labelText().includes('English'), 'nhãn phải chuyển sang EN khi đổi sang tiếng anh');
+  I18N.set('vi');
+  assert.equal(document.documentElement.lang, 'vi');
+  assert.ok(flagClass().includes('flag-vi'), 'cờ VI phải quay lại CSS class');
+  assert.ok(labelText().includes('Tiếng Việt'), 'nhãn phải quay lại VI');
 });
 
 test('combobox ngôn ngữ không làm vỡ layout trên màn hình nhỏ', () => {

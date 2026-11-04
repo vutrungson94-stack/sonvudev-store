@@ -57,6 +57,17 @@ test.before(async () => {
 });
 test.after(async () => { await closeTest(server, tempDir); });
 
+test('mutation from a cross-origin page is refused', async () => {
+  // The admin token is not a cookie, but a stolen ambient-looking request must
+  // still never reach a mutation endpoint. The origin check runs before parsing.
+  const blocked = await fetch(`${base}/api/admin/products`, {
+    method: 'POST',
+    headers: { ...auth, origin: 'https://attacker.example' },
+    body: JSON.stringify({ name: 'Should Not Be Created', price: 1, currency: 'VND', status: 'active' }),
+  });
+  assert.equal(blocked.status, 403);
+});
+
 test('không đồng ý điều khoản thì không nhận thanh toán', async () => {
   const before = await json(await fetch(`${base}/api/admin/orders?limit=1`, { headers: { 'x-admin-token': 'test-admin-token' } })).total;
   const response = await checkout({ acceptPolicy: false });
@@ -89,8 +100,10 @@ test('mỗi lần tải file được đếm lại trên đơn', async () => {
   // written down at the moment the link is issued.
   const { order, accessToken } = await checkout({ acceptPolicy: 'on' });
   await confirmPaid(order.id);
+  const leaked = await fetch(`${base}/api/orders/${order.id}/download?token=${encodeURIComponent(accessToken)}`);
+  assert.equal(leaked.status, 404, 'URL token không được phép mở đơn');
   for (let i = 0; i < 2; i += 1) {
-    const response = await fetch(`${base}/api/orders/${order.id}/download?token=${encodeURIComponent(accessToken)}`);
+    const response = await fetch(`${base}/api/orders/${order.id}/download`, { headers: { 'x-order-token': accessToken } });
     assert.equal(response.status, 200, 'đã trả tiền thì phải tải được');
   }
   const list = await json(await fetch(`${base}/api/admin/orders?q=${encodeURIComponent(order.id)}`, { headers: { 'x-admin-token': 'test-admin-token' } }));

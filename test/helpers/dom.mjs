@@ -112,8 +112,16 @@ export class El {
   get elements() { return this; }
   reset() { return this; }
   getContext() { return null; }
-  closest() { return null; }
-  appendChild(c) { this.children.push(c); return c; }
+  closest(sel) {
+    let node = this;
+    const cls = String(sel).startsWith('.') ? String(sel).slice(1) : null;
+    while (node) {
+      if (cls && node.classList?.contains(cls)) return node;
+      node = node.parentNode || null;
+    }
+    return null;
+  }
+  appendChild(c) { c.parentNode = this; this.children.push(c); return c; }
   remove() {}
   focus() {}
   click() {}

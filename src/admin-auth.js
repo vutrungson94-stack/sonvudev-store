@@ -1,15 +1,15 @@
-// Xác thực admin với RBAC tối thiểu + expiry, tương thích ngược 100%.
+// Admin authentication with minimal RBAC and expiry, fully backward compatible.
 //
-// Trước đây chỉ có 1 token (ADMIN_API_TOKEN) không expiry, không role, không
-// tên để truy vết ai làm gì. Mọi test hiện có dùng đúng token đó nên không được
-// đổi hành vi mặc định: token đơn vẫn là admin full quyền, không expiry.
+// Previously there was only one token (ADMIN_API_TOKEN): it had no expiry, no role,
+// and no name for tracing who did what. Existing tests use that token, so the default
+// behavior must stay exactly the same: a single token remains an unrestricted admin token with no expiry.
 //
-// Mở rộng (optional, không bắt buộc để chạy):
+// Optional extension (not required in order to run):
 //   ADMIN_API_TOKENS="owner:tok1:admin, staff:tok2:viewer@2027-01-01"
-//   - mỗi entry: [name:]token[:role][@YYYY-MM-DD]
-//   - role: admin (đọc+ghi) hoặc viewer (chỉ GET). Không ghi role = admin.
-//   - @date hết hạn sau 23:59:59Z ngày đó. Hết hạn = 401 như sai token.
-//   - req.admin = { name, role } để log truy vết (observability đã log theo id).
+//   - Each entry: [name:]token[:role][@YYYY-MM-DD]
+//   - role: admin (read+write) or viewer (GET only). Missing role means admin.
+//   - @date expires at 23:59:59Z on that day; an expired token is rejected as unknown.
+//   - req.admin = { name, role } for audit logging.
 import crypto from 'node:crypto';
 
 const safeEqual = (a, b) => {
@@ -25,7 +25,7 @@ export function parseAdminTokens({ primary = '', extra = '' } = {}) {
     out.push({ name: 'primary', token: String(primary).trim(), role: 'admin', expiresAt: null });
   }
   for (const raw of String(extra || '').split(',').map((s) => s.trim()).filter(Boolean)) {
-    // Tách expiry trước: token@2027-01-01 (ngày ở cuối, sau @ cuối cùng).
+    // Split the expiry suffix before anything else: token@2027-01-01
     let body = raw;
     let expiresAt = null;
     const at = body.lastIndexOf('@');
@@ -44,7 +44,7 @@ export function parseAdminTokens({ primary = '', extra = '' } = {}) {
     if (parts.length === 1) {
       token = parts[0];
     } else if (parts.length === 2) {
-      // name:token hoặc token:role
+      // name:token or token:role
       if (['admin', 'viewer'].includes(parts[1].toLowerCase())) {
         token = parts[0];
         role = parts[1].toLowerCase();

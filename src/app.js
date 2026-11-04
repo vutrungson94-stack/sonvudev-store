@@ -21,7 +21,7 @@ import { vndPerUsd } from "./rates.js";
 import { createReview, listReviewsForProduct, reviewLimits } from "./reviews.js";
 import { refuse } from "./refuse.js";
 import { renderRobotsTxt } from "./robots.js";
-import { adminThrottled, healthThrottled, tooManyAttempts, checkoutThrottled } from "./rate-limit.js";
+import { adminThrottled, downloadThrottled, healthThrottled, tooManyAttempts, checkoutThrottled } from "./rate-limit.js";
 import { isConfigured as tIsConfigured, translateText, translateMissingKeys } from "./translate-service.mjs";
 import { parseAdminTokens, matchAdminToken } from "./admin-auth.js";
 import { isEnabled } from "./feature-flags.js";
@@ -138,8 +138,8 @@ const adminEntryFor = (req) => {
   const supplied = req.get("x-admin-token") || (req.get("authorization") || "").replace(/^Bearer\s+/i, "");
   return matchAdminToken(supplied, adminEntries());
 };
-// GET cho phép viewer + admin, ghi (POST/PATCH/PUT/DELETE) chỉ admin.
-// Token cũ không role mặc định admin nên mọi test/caller hiện tại giữ nguyên.
+// GET is allowed for viewer and admin; mutations (POST/PATCH/PUT/DELETE) require admin.
+// The old single token has no role and defaults to admin, so current tests and callers remain valid.
 const admin = async (req, res, next) => {
   if (await adminThrottled(req)) {
     return res.status(429).json(refuse("api.err.rateLimited", "Quá nhiều yêu cầu. Vui lòng thử lại sau.", 429));
@@ -195,6 +195,20 @@ const canonicalHost = (() => {
 })();
 // localhost and IP hosts have no meaningful www twin, so nothing is redirected.
 const wwwHost = canonicalHost && !/^(localhost|127\.|0\.0\.0\.0|\[?::1|.*\.local)$/i.test(canonicalHost) ? `www.${canonicalHost}` : "";
+const SAFE_METHODS = new Set(["GET", "HEAD", "OPTIONS"]);
+const AUTH_EXEMPT_ORIGIN_PATHS = new Set(["/api/paypal/webhook"]);
+// Defence in depth: a cross-origin page must not be able to drive a mutation,
+// even if it somehow obtains a token. PayPal's server does not send an Origin
+// header and the webhook is authenticated by signature, so it is exempt.
+app.use((req, res, next) => {
+  if (SAFE_METHODS.has(req.method) || AUTH_EXEMPT_ORIGIN_PATHS.has(req.path)) return next();
+  const origin = String(req.get("origin") || "").trim();
+  if (!origin) return next();
+  try {
+    if (canonicalOrigin && new URL(origin).origin === canonicalOrigin) return next();
+  } catch { /* blocked below */ }
+  return res.status(403).json(refuse("api.err.badOrigin"));
+});
 
 // The slug that answers the site-wide share card at /og/<slug>.svg.
 //
@@ -208,6 +222,8 @@ app.use((req, res, next) => {
   res.setHeader("X-Content-Type-Options", "nosniff");
   res.setHeader("Referrer-Policy", "strict-origin-when-cross-origin");
   res.setHeader("X-Frame-Options", "DENY");
+  // API responses carry order data and one-time tokens; shared caches must not keep them.
+  if (req.path.startsWith("/api/")) res.setHeader("Cache-Control", "no-store");
   res.setHeader("Permissions-Policy", "camera=(), microphone=(), geolocation=()");
   // script-src and connect-src carry static.cloudflareinsights.com and
 // cloudflareinsights.com because analyticsMeta() in src/pages.js puts the Web
@@ -458,9 +474,9 @@ const textCache = new Map();
 const TEXT_TTL_MS = 60000;
 const cachedText = async (key, build) => {
   const hit = textCache.get(key);
-  // Cache HIT phải trả về nội dung đã render, không phải cả object bao
-  // {at, value}: lần đầu (miss) trả string/object đúng, lần hai trong 60s
-  // trả nguyên wrapper khiến /llms.txt thành JSON và /feed.json bọc 2 lớp.
+  // Cache hits must return the rendered value, not the wrapper object;
+  // the first request returns a string/object, but a second request inside 60s
+  // used to return the wrapper and double-encode /llms.txt and /feed.json.
   if (hit && Date.now() - hit.at < TEXT_TTL_MS) return hit.value;
   const value = build(await listProducts());
   textCache.set(key, { at: Date.now(), value });
@@ -1034,7 +1050,12 @@ app.post("/api/checkout", json, async (req, res) => {
   } catch (error) { console.error(error); res.status(500).json(refuse("api.err.orderCreate", "Không thể tạo đơn hàng", 500)); }
 });
 
-function validOrderToken(req) { return req.get("x-order-token") || text(req.query.token, 100) || null; }
+function validOrderToken(req) {
+  // A token in a query string leaks into browser history, server logs and any
+  // link copied out of the address bar. The client already sends the token in a
+  // header everywhere it is required, so URL tokens are not accepted.
+  return req.get("x-order-token") || null;
+}
 async function requireOrder(req, res) {
   const order = await getOrder(req.params.id);
   const token = validOrderToken(req);
@@ -1050,6 +1071,7 @@ app.get("/api/orders/:id", async (req, res) => {
 });
 app.get("/api/orders/:id/download", async (req, res) => {
   try {
+    if (await downloadThrottled(req)) return res.status(429).json(refuse("api.err.rateLimited", "Quá nhiều yêu cầu. Vui lòng thử lại sau.", 429));
     const order = await requireOrder(req, res);
     if (!order) return;
     // The only gate that matters is here. The button state in the browser is a

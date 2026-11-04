@@ -55,14 +55,16 @@ export function getBlogPostBySlug(slug) {
 }
 
 // Build blog route path from slug and language.
+const LANGUAGE_FLAGS = { vi: "flag-vi", en: "flag-en", de: "flag-de", es: "flag-es", fr: "flag-fr", ja: "flag-ja", "zh-CN": "flag-zh-cn" };
+const languageFlagClass = (code) => LANGUAGE_FLAGS[code] || "flag-generic";
 const BLOG_LANGS = [
-  { code: "vi", label: "Tiếng Việt", flag: "🇻🇳" },
-  { code: "en", label: "English", flag: "🇺🇸" },
-  { code: "de", label: "Deutsch", flag: "🇩🇪" },
-  { code: "es", label: "Español", flag: "🇪🇸" },
-  { code: "fr", label: "Français", flag: "🇫🇷" },
-  { code: "ja", label: "日本語", flag: "🇯🇵" },
-  { code: "zh-CN", label: "中文", flag: "🇨🇳" },
+  { code: "vi", label: "Tiếng Việt" },
+  { code: "en", label: "English" },
+  { code: "de", label: "Deutsch" },
+  { code: "es", label: "Español" },
+  { code: "fr", label: "Français" },
+  { code: "ja", label: "日本語" },
+  { code: "zh-CN", label: "中文" },
 ];
 export const BLOG_LOCALES = Object.freeze(BLOG_LANGS.map(({ code }) => code));
 export const EXTRA_BLOG_LOCALES = Object.freeze(BLOG_LOCALES.filter((code) => code !== "vi" && code !== "en"));
@@ -73,9 +75,9 @@ const blogUrl = (slug, lang = "vi") => {
 };
 const blogLangHref = (code, slug) => absolute(blogUrl(slug, code));
 const blogLangLinks = (slug, currentLang) =>
-  BLOG_LANGS.map(({ code, label, flag }) => {
+  BLOG_LANGS.map(({ code, label }) => {
     const active = code === currentLang ? ' active' : '';
-    const flagSpan = `<span class="lang-flag" aria-hidden="true">${flag}</span>`;
+    const flagSpan = `<span class="lang-flag ${languageFlagClass(code)}" aria-hidden="true"></span>`;
     return `<a href="${esc(blogLangHref(code, slug))}" class="${active}" data-blog-lang="${code}">${flagSpan} ${label}</a>`;
   }).join("");
 const blogField = (post, lang, base) => {
@@ -263,7 +265,7 @@ export function renderBlogPost(post, lang = "vi") {
 <body>
   <nav class="blog-lang">
     <a href="${absolute("/")}" class="blog-home">← ${ui.home}</a>
-    <span>${ui.language}</span>
+    <span class="blog-language-label">${ui.language}</span>
     ${blogLangLinks(post.slug, lang)}
   </nav>
   <script src="/blog-lang.js"></script>
@@ -360,7 +362,7 @@ export function renderBlogIndex(posts, lang = "vi") {
 <body>
   <nav class="blog-lang">
     <a href="${absolute("/")}" class="blog-home">← ${ui.home}</a>
-    <span>${ui.language}</span>
+    <span class="blog-language-label">${ui.language}</span>
     ${blogLangLinks("", lang)}
   </nav>
   <script src="/blog-lang.js"></script>

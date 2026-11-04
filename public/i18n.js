@@ -67,6 +67,7 @@ const DICT = {
     // dictionary, so a failed checkout explained itself in the wrong language.
     'api.err.unauthorized': 'Không có quyền.',
     'api.err.forbidden': 'Vai trò viewer chỉ được đọc.',
+    'api.err.badOrigin': 'Nguồn yêu cầu không hợp lệ.',
     'api.err.catalogLoad': 'Không thể tải danh mục',
     'api.err.productNotFound': 'Không tìm thấy sản phẩm',
     'api.err.productLoad': 'Không thể tải sản phẩm',
@@ -606,6 +607,7 @@ const DICT = {
 
     'api.err.unauthorized': 'Not authorised.',
     'api.err.forbidden': 'The viewer role is read-only.',
+    'api.err.badOrigin': 'Invalid origin.',
     'api.err.catalogLoad': 'Could not load the catalogue',
     'api.err.productNotFound': 'Product not found',
     'api.err.productLoad': 'Could not load the product',
@@ -1092,7 +1094,8 @@ const SUPPORTED = (Array.isArray(window.SVD_LOCALES) && window.SVD_LOCALES.lengt
   : [...BUNDLED, ...EXTRA_LOCALES];
 const LANG_LABELS = { vi: 'Tiếng Việt', en: 'English', de: 'Deutsch', es: 'Español', fr: 'Français', ja: '日本語', 'zh-CN': '中文' };
 const LOCALE_TAGS = { vi: 'vi-VN', en: 'en-US', de: 'de-DE', es: 'es-ES', fr: 'fr-FR', ja: 'ja-JP', 'zh-CN': 'zh-CN' };
-const FLAG_EMOJI = { vi: '🇻🇳', en: '🇺🇸', de: '🇩🇪', es: '🇪🇸', fr: '🇫🇷', ja: '🇯🇵', 'zh-CN': '🇨🇳' };
+const FLAG_CLASS = { vi: 'flag-vi', en: 'flag-en', de: 'flag-de', es: 'flag-es', fr: 'flag-fr', ja: 'flag-ja', 'zh-CN': 'flag-zh-cn' };
+const flagClass = (code) => FLAG_CLASS[code] || 'flag-generic';
 const STORAGE_KEY = 'sonvudev_lang';
 const listeners = new Set();
 const loadedLocales = new Set(BUNDLED);
@@ -1458,7 +1461,7 @@ function apply(root = document) {
 function markActiveLanguage() {
   document.querySelectorAll('[data-lang-switch]').forEach((combobox) => {
     const flag = combobox.querySelector('[data-lang-flag]');
-    if (flag) flag.textContent = FLAG_EMOJI[current] || codeToEmoji(current);
+    if (flag) flag.className = `lang-flag ${flagClass(current)}`;
     const label = combobox.closest('.lang-combobox-wrap')?.querySelector('[data-lang-label]');
     if (label) label.textContent = LANG_LABELS[current] || current.toUpperCase();
   });
@@ -1539,8 +1542,7 @@ function renderLanguageCombobox() {
       li.dataset.langSet = code;
       li.setAttribute('aria-selected', code === current ? 'true' : 'false');
       const flagSpan = document.createElement('span');
-      flagSpan.className = 'lang-flag';
-      flagSpan.textContent = FLAG_EMOJI[code] || codeToEmoji(code);
+      flagSpan.className = `lang-flag ${flagClass(code)}`;
       const textSpan = document.createElement('span');
       textSpan.textContent = LANG_LABELS[code] || code.toUpperCase();
       li.appendChild(flagSpan);
@@ -1579,17 +1581,11 @@ function renderLanguageCombobox() {
     }
     const trigger = combobox.querySelector('.lang-trigger');
     const flag = combobox.querySelector('[data-lang-flag]');
-    if (flag) flag.textContent = FLAG_EMOJI[current] || codeToEmoji(current);
+    if (flag) flag.className = `lang-flag ${flagClass(current)}`;
     if (trigger) trigger.setAttribute('aria-expanded', 'false');
     combobox.setAttribute('aria-expanded', 'false');
     if (dropdown) dropdown.setAttribute('aria-hidden', 'true');
   });
-}
-
-function codeToEmoji(code) {
-  // Fallback: regional indicator symbols for unknown codes.
-  const offset = 0x1F1E6 - 65;
-  return code.toUpperCase().split('').map(c => String.fromCodePoint(c.charCodeAt(0) + offset)).join('');
 }
 
 function openCombobox(combobox) {
@@ -1609,7 +1605,7 @@ function closeCombobox(combobox) {
   combobox.setAttribute('aria-expanded', 'false');
   if (label) label.textContent = LANG_LABELS[current] || current.toUpperCase();
   const flag = combobox.querySelector('[data-lang-flag]');
-  if (flag) flag.textContent = FLAG_EMOJI[current] || codeToEmoji(current);
+  if (flag) flag.className = `lang-flag ${flagClass(current)}`;
 }
 
 function boot() {

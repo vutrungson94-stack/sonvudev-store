@@ -91,6 +91,18 @@ test('bài viết blog tiếng Anh trả về 200', async () => {
   assert.ok(html.includes('English content'), 'nội dung tiếng Anh phải có');
 });
 
+test('blog index uses the stored publication date and a mobile-safe meta layout', async () => {
+  const html = await text('/blog');
+  assert.ok(html.includes('15 thg 1, 2025'), 'the card must display the stored published date');
+  assert.ok(!/class="blog-date"[^>]*>.*(26|2026)/.test(html), 'the card must not fall back to request time');
+  assert.ok(html.includes('class="blog-language-label"'), 'the language label must be part of the responsive layout');
+  const css = readFileSync(path.join(process.cwd(), 'public', 'styles.css'), 'utf8');
+  assert.ok(/\.blog-lang a\.active\{[^}]*background:var\(--brand\)/.test(css), 'the active language rule must not be swallowed by the mobile media query');
+  assert.ok(/@media\(max-width:700px\)\{\.blog-lang\{display:grid;grid-template-columns:repeat\(2,minmax\(0,1fr\)\)/.test(css), 'mobile must use a two-column grid');
+  assert.ok(css.includes('.blog-date{flex:0 0 auto}'), 'dates must not shrink inside card metadata');
+  assert.ok(css.includes('.blog-section{flex:1 1 auto;text-align:right}'), 'the section must stay aligned to the right');
+});
+
 test('blog slug không tồn tại trả về 404', async () => {
   const res = await get('/blog/khong-ton-tai');
   assert.equal(res.status, 404);
@@ -108,6 +120,11 @@ test('getBlogPostBySlug tìm đúng bài viết', async () => {
   assert.equal(post.titleVi, 'Cách kiểm tra dung lượng thật của USB');
 });
 
+test('blog index không chứa token chưa thay thế', async () => {
+  const html = renderBlogIndex(loadBlogPosts(), 'vi');
+  assert.ok(!html.includes('{{title}}'), 'không được có token chưa thay');
+  assert.ok(!html.includes('{{site}}'), 'không được có token chưa thay');
+});
 test('renderBlogIndex không chứa token chưa thay thế', async () => {
   const html = renderBlogIndex(loadBlogPosts(), 'vi');
   assert.ok(!html.includes('{{title}}'), 'không được có token chưa thay');
