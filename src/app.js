@@ -455,6 +455,7 @@ for (const file of Object.keys(served)) {
     // client to apply the dictionary and any stored preference.
     for (const lang of EXTRA_BLOG_LOCALES) {
       app.get(`/${lang}/`, sendPage(file));
+      app.get(`/${lang}`, sendPage(file));
     }
     continue;
   }
