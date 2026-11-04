@@ -1,0 +1,21 @@
+{
+  "$schema": "postmortem-v1",
+  "title": "Ví dụ: Tiêu đề sự cố",
+  "date": "2026-11-04T00:00:00Z",
+  "impact": "Mô tả tác động đến khách hàng và doanh nghiệp",
+  "durationMinutes": 60,
+  "detectedBy": "monitoring",
+  "rootCause": "Nguyên nhân gốc rễ, không chỉ triệu chứng",
+  "correctiveActions": [
+    {
+      "description": "Mô tả hành động khắc phục",
+      "owner": "platform-team",
+      "dueDate": "2026-11-11"
+    }
+  ],
+  "defectEscapedTests": false,
+  "escapeReason": "N/A - vi du, khong co loi thoat test",
+  "owner": "platform-team",
+  "dueDate": "2026-11-11",
+  "status": "resolved"
+}

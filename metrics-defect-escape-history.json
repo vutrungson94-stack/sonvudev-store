@@ -9,6 +9,24 @@
       "escapeRate": null,
       "threshold": 0.05,
       "withinThreshold": true
+    },
+    {
+      "generatedAt": "2026-11-04T07:38:33.587Z",
+      "productionDefects": 0,
+      "caughtDefects": 0,
+      "total": 0,
+      "escapeRate": null,
+      "threshold": 0.05,
+      "withinThreshold": true
+    },
+    {
+      "generatedAt": "2026-11-04T07:38:50.966Z",
+      "productionDefects": 0,
+      "caughtDefects": 0,
+      "total": 0,
+      "escapeRate": null,
+      "threshold": 0.05,
+      "withinThreshold": true
     }
   ]
 }

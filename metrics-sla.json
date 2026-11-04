@@ -1,0 +1,90 @@
+{
+  "generatedAt": "2026-11-04T07:38:50.707Z",
+  "overall": "ok",
+  "measurements": {
+    "availability": {
+      "id": "availability",
+      "name": "Sẵn sàng dịch vụ",
+      "target": 99.9,
+      "unit": "%",
+      "want": "up",
+      "owner": "platform-team",
+      "value": null,
+      "status": "unknown",
+      "breached": false,
+      "measuredAt": "2026-11-04T07:38:50.707Z"
+    },
+    "errorRate": {
+      "id": "errorRate",
+      "name": "Tỷ lệ lỗi API",
+      "target": 1,
+      "unit": "%",
+      "want": "down",
+      "owner": "backend-team",
+      "value": null,
+      "status": "unknown",
+      "breached": false,
+      "measuredAt": "2026-11-04T07:38:50.707Z"
+    },
+    "latencyP95": {
+      "id": "latencyP95",
+      "name": "API p95 latency",
+      "target": 500,
+      "unit": "ms",
+      "want": "down",
+      "owner": "backend-team",
+      "value": null,
+      "status": "unknown",
+      "breached": false,
+      "measuredAt": "2026-11-04T07:38:50.707Z"
+    },
+    "testPassRate": {
+      "id": "testPassRate",
+      "name": "Tỷ lệ test pass",
+      "target": 100,
+      "unit": "%",
+      "want": "up",
+      "owner": "engineering-team",
+      "value": 100,
+      "status": "ok",
+      "breached": false,
+      "measuredAt": "2026-11-04T07:38:50.707Z"
+    },
+    "buildSuccessRate": {
+      "id": "buildSuccessRate",
+      "name": "Tỷ lệ build thành công",
+      "target": 100,
+      "unit": "%",
+      "want": "up",
+      "owner": "platform-team",
+      "value": 100,
+      "status": "ok",
+      "breached": false,
+      "measuredAt": "2026-11-04T07:38:50.707Z"
+    },
+    "deploySuccessRate": {
+      "id": "deploySuccessRate",
+      "name": "Tỷ lệ triển khai thành công",
+      "target": 100,
+      "unit": "%",
+      "want": "up",
+      "owner": "platform-team",
+      "value": 100,
+      "status": "ok",
+      "breached": false,
+      "measuredAt": "2026-11-04T07:38:50.707Z"
+    },
+    "escapeRate": {
+      "id": "escapeRate",
+      "name": "Lỗi thoát test",
+      "target": 5,
+      "unit": "%",
+      "want": "down",
+      "owner": "engineering-team",
+      "value": null,
+      "status": "unknown",
+      "breached": false,
+      "measuredAt": "2026-11-04T07:38:50.707Z"
+    }
+  }
+}

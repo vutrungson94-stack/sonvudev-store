@@ -1,0 +1,16 @@
+{
+  "name": "Deployment Checklist",
+  "version": "1.0",
+  "items": [
+    { "id": "D1", "description": "Mọi test trong npm test phải pass", "owner": "developer", "required": true },
+    { "id": "D2", "description": "npm run build phải pass (bao gồm audit, metrics, SAST)", "owner": "developer", "required": true },
+    { "id": "D3", "description": "npm run metrics phải PASS (không có regression)", "owner": "developer", "required": true },
+    { "id": "D4", "description": "SLA check phải pass (tất cả SLO trong ngưỡng)", "owner": "developer", "required": true },
+    { "id": "D5", "description": "Postmortem cho mọi sự cố P1/P2 gần đây phải đã ghi", "owner": "platform-team", "required": true },
+    { "id": "D6", "description": "Service catalog đã được cập nhật nếu có dịch vụ mới", "owner": "platform-team", "required": false },
+    { "id": "D7", "description": "Render.yaml / Dockerfile đã được review nếu có thay đổi cấu hình", "owner": "platform-team", "required": true },
+    { "id": "D8", "description": "Canary rollout đã được bật nếu thay đổi lớn", "owner": "platform-team", "required": false },
+    { "id": "D9", "description": "Rollback plan đã được xác nhận và kiểm tra", "owner": "platform-team", "required": true },
+    { "id": "D10", "description": "Thông báo về nhóm vận hành trước khi triển khai", "owner": "developer", "required": true }
+  ]
+}

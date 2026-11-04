@@ -1510,7 +1510,7 @@ ${jsonLd({ "@graph": [organization(), websiteSchema(), productSchema(product, la
 <div>
 <p class="eyebrow">${esc(localised(normaliseCategory(product.category), copy.categories, copy.software))} · ${esc(product.platform || "Windows")}${product.badge ? ` · ${esc(localised(product.badge, copy.badges))}` : ""}</p>
 <h1>${esc(product.name)} <em>v${esc(product.version)}</em></h1>
-<p class="product-lede">${esc(product.short_description || product.shortDescription || "")}</p>
+<p class="product-lede">${esc(product.shortDescription || "")}</p>
 </div>
 <aside class="buy-card" id="mua">
 <div class="buy-price">${esc(priceLabel)}</div>
