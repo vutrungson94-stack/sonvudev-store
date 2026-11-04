@@ -450,6 +450,12 @@ for (const file of Object.keys(served)) {
     // used to pass ("vi") named nothing — sendPage takes one parameter — so it
     // implied a server-side language that does not exist and would only ever be vi.
     app.get(["/", "/index.html"], sendPage(file));
+    // Homepage in every supported language: /fr/, /de/, /es/, /ja/, /zh-CN/, etc.
+    // The server renders the page in that language; i18n.js then takes over on the
+    // client to apply the dictionary and any stored preference.
+    for (const lang of EXTRA_BLOG_LOCALES) {
+      app.get(`/${lang}/`, sendPage(file));
+    }
     continue;
   }
   app.get(`/${file}`, sendPage(file));

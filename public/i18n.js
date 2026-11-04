@@ -1135,6 +1135,9 @@ function readStored() {
   if (browser.startsWith('ja')) return 'ja';
   if (browser.startsWith('zh')) return 'zh-CN';
   if (browser.startsWith('vi')) return 'vi';
+  if (browser.startsWith('de')) return 'de';
+  if (browser.startsWith('es')) return 'es';
+  if (browser.startsWith('fr')) return 'fr';
   return 'en';
 }
 
