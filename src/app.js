@@ -187,6 +187,13 @@ const adminOrHealth = async (req, res, next) => {
 app.set("trust proxy", env.trustProxy);
 app.disable("x-powered-by");
 
+// Redirect a root request without a locale prefix to the matching language
+// prefix based on Accept-Language (e.g. / -> /fr for a French browser). Paths
+// that already carry a valid locale prefix (/fr/product/...) are left alone.
+// Not registering this middleware was the reason "choose a language" never
+// changed the rendered language.
+app.use(redirectRootLangToEnglish);
+
 // Where the site canonically lives, read from APP_URL instead of written out.
 // The same file also serves localhost and the test suite, so a redirect bound to
 // one hard-coded domain stops matching the moment APP_URL changes, and the www
