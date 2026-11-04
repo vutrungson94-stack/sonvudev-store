@@ -78,7 +78,7 @@
   "art.safe": "Transactions sécurisées",
   "art.verified": "Confirmé",
   "art.window": "{brand} / espace de travail",
-  "brand.rights": "© ${YEAR} ${host()} · Copropriété",
+  "brand.rights": "© {{year}} {{brandName}} · Copropriété",
   "brand.tagline": "Un bon logiciel pour un bon travail.",
   "cart.agree": "J'ai lu les conditions, la politique de confidentialité et la politique de remboursement et je comprends que les logiciels électroniques ne sont pas remboursables une fois téléchargés.",
   "cart.back": "Revenir",
@@ -555,5 +555,6 @@
   "blog.eyebrow": "Articles et guides",
   "blog.title1": "Astuces tech",
   "blog.title2": "pour mieux travailler.",
-  "blog.more": "Voir tous les articles"
+  "blog.more": "Voir tous les articles",
+  "brand.supportEmail": "{{support}}"
 }

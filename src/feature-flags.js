@@ -15,12 +15,3 @@ export function isEnabled(name, fallback = false) {
   if (raw == null || String(raw).trim() === "") return Boolean(fallback);
   return truthy.test(String(raw).trim());
 }
-
-export function allFlags() {
-  const out = {};
-  for (const [key, value] of Object.entries(process.env)) {
-    if (!key.startsWith("FEATURE_")) continue;
-    out[key.slice("FEATURE_".length).toLowerCase()] = truthy.test(String(value).trim());
-  }
-  return out;
-}

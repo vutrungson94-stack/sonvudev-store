@@ -78,7 +78,7 @@
   "art.safe": "Sichere Transaktionen",
   "art.verified": "Bestätigt",
   "art.window": "{brand} / Arbeitsbereich",
-  "brand.rights": "© ${YEAR} ${host()} · Miteigentümer",
+  "brand.rights": "© {{year}} {{brandName}} · Miteigentümer",
   "brand.tagline": "Gute Software für gute Arbeit.",
   "cart.agree": "Ich habe die Allgemeinen Geschäftsbedingungen, die Datenschutzrichtlinie und die Rückerstattungsrichtlinie gelesen und bin mir darüber im Klaren, dass für elektronische Software nach dem Herunterladen keine Rückerstattung möglich ist.",
   "cart.back": "Komm zurück",
@@ -555,5 +555,6 @@
   "blog.eyebrow": "Artikel & Anleitungen",
   "blog.title1": "Tech-Tipps",
   "blog.title2": "damit Sie besser arbeiten.",
-  "blog.more": "Alle Beiträge anzeigen"
+  "blog.more": "Alle Beiträge anzeigen",
+  "brand.supportEmail": "{{support}}"
 }

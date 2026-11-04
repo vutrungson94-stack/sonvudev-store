@@ -78,7 +78,7 @@
   "art.safe": "Transacciones seguras",
   "art.verified": "Confirmado",
   "art.window": "{brand} / espacio de trabajo",
-  "brand.rights": "© ${YEAR} ${host()} · Copropiedad",
+  "brand.rights": "© {{year}} {{brandName}} · Copropiedad",
   "brand.tagline": "Buen software para un buen trabajo.",
   "cart.agree": "He leído los Términos, la Política de privacidad y la Política de reembolso, y entiendo que el software electrónico no es reembolsable una vez descargado.",
   "cart.back": "Regresar",
@@ -555,5 +555,6 @@
   "blog.eyebrow": "Artículos y guías",
   "blog.title1": "Consejos tech",
   "blog.title2": "para trabajar mejor.",
-  "blog.more": "Ver todas las entradas"
+  "blog.more": "Ver todas las entradas",
+  "brand.supportEmail": "{{support}}"
 }

@@ -13,14 +13,17 @@ import { join } from "node:path";
  * - Transient failures (429/5xx/network) are retried with exponential backoff.
  */
 
+// URLs are overridable so a host can adopt a provider mirror or an internal proxy
+// without editing the service. Defaults keep the zero-cost path.
+const envEndpoint = (name, fallback) => String(process.env[name] || fallback).trim().replace(/\/+$/, "");
 const DEEPL_API_KEY = process.env.DEEPL_API_KEY;
-const DEEPL_URL = "https://api-free.deepl.com/v2/translate";
+const DEEPL_URL = envEndpoint("DEEPL_API_URL", "https://api-free.deepl.com/v2/translate");
 const USE_GOOGLE = true;
-const GOOGLE_URL = "https://translate.googleapis.com/translate_a/single";
+const GOOGLE_URL = envEndpoint("GOOGLE_TRANSLATE_URL", "https://translate.googleapis.com/translate_a/single");
 const USE_LINGVA = true;
-const LINGVA_BASE = process.env.LINGVA_BASE || "https://lingva.ml";
+const LINGVA_BASE = envEndpoint("LINGVA_BASE", "https://lingva.ml");
 const USE_MYMEMORY = true;
-const MYMEMORY_BASE = process.env.MYMEMORY_BASE || "https://api.mymemory.translated.net/get";
+const MYMEMORY_BASE = envEndpoint("MYMEMORY_BASE", "https://api.mymemory.translated.net/get");
 const HF_API_KEY = process.env.HF_API_KEY || "";
 // Provider language codes (lowercase) for Lingva/MyMemory.
 const LINGVA_LANG = { vi: "vi", en: "en", de: "de", es: "es", fr: "fr", ja: "ja", "zh-CN": "zh", "zh-TW": "zh", ko: "ko" };
@@ -32,6 +35,60 @@ const LANG_MAP = {
 
 // Tokens that must never be translated
 const TOKEN_REGEX = /(\{\{[\w]+\}\}|\{[\w]+\}|<[^>]*>|&[a-z]+;)/gi;
+
+// The Vietnamese source is a JS source file, not a JSON asset. A small parser is
+// used here because the same parser is exercised by the test suite without
+// creating a build dependency. Dynamic expressions are normalised to the same
+// placeholders the runtime can fill; anything else stops the generation rather
+// than being written into a locale file.
+const DYNAMIC_SOURCE_VALUES = new Map([
+  ['${YEAR}', '{{year}}'],
+  ['${host()}', '{{brandName}}'],
+  ['supportAddress()', '{{support}}'],
+]);
+
+const normaliseSourceValue = (value) => {
+  let text = String(value);
+  for (const [from, to] of DYNAMIC_SOURCE_VALUES) text = text.replaceAll(from, to);
+  return text;
+};
+
+const looksDynamic = (value) => /\$\{[^}]*}|\b(host|supportAddress|YEAR)\s*\(/i.test(String(value));
+
+export function extractViDictionary(sourceText) {
+  const match = String(sourceText).match(/vi:\s*\{([\s\S]*?)\n\s*},\s*\n\s*en:/);
+  if (!match) throw new Error('Could not parse `vi` block from public/i18n.js');
+
+  const dictionary = {};
+  const skippedDynamic = [];
+  for (const line of match[1].split('\n')) {
+    const trimmed = line.trim();
+    if (!trimmed || trimmed.startsWith('//')) continue;
+    const keyMatch = trimmed.match(/^'([^']+)'\s*:(.+?)\s*,?\s*$/);
+    if (!keyMatch) continue;
+
+    const [, key] = keyMatch;
+    let value = keyMatch[2].replace(/,\s*$/, '').trim();
+    if (value === 'supportAddress()') {
+      value = '{{support}}';
+    } else if (value.startsWith('`') && value.endsWith('`')) {
+      value = normaliseSourceValue(value.slice(1, -1));
+    } else if (value.startsWith("'") && value.endsWith("'")) {
+      value = value.slice(1, -1).replace(/\\'/g, "'");
+    } else if (value.startsWith('"') && value.endsWith('"')) {
+      value = value.slice(1, -1).replace(/\\"/g, '"');
+    } else {
+      continue;
+    }
+
+    if (looksDynamic(value)) {
+      skippedDynamic.push(key);
+      continue;
+    }
+    dictionary[key] = value;
+  }
+  return { dictionary, skippedDynamic };
+}
 
 const LOCALES_DIR = join(process.cwd(), "public", "locales");
 mkdirSync(LOCALES_DIR, { recursive: true });
@@ -280,21 +337,9 @@ export async function translateText(text, target, source = "vi") {
  */
 export async function translateMissingKeys(targetLang) {
   const viRaw = readFileSync("public/i18n.js", "utf8");
-  const m = viRaw.match(/vi:\s*\{([\s\S]*?)\n\s*},\s*\n\s*en:/);
-  if (!m) throw new Error("Could not parse `vi` block from public/i18n.js");
-
-  const viDict = {};
-  for (const line of m[1].split("\n")) {
-    const l = line.trim();
-    if (!l || l.startsWith("//")) continue;
-    const km = l.match(/^'([^']+)'\s*:(.+?)\s*,?\s*$/);
-    if (!km) continue;
-    let v = km[2].replace(/,\s*$/, "").trim();
-    if (v.startsWith("`") && v.endsWith("`")) v = v.slice(1, -1);
-    else if (v.startsWith("'") && v.endsWith("'")) v = v.slice(1, -1);
-    else if (v.startsWith('"') && v.endsWith('"')) v = v.slice(1, -1);
-    else v = null;
-    if (v !== null) viDict[km[1]] = v;
+  const { dictionary: viDict, skippedDynamic } = extractViDictionary(viRaw);
+  if (skippedDynamic.length) {
+    console.warn(`Skipped dynamic dictionary values: ${skippedDynamic.join(", ")}`);
   }
 
   const cache = loadCache(targetLang);

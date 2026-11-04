@@ -49,9 +49,11 @@ const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 // public gtx endpoint has no key and tolerates the volume, so it is the fallback
 // here. It is deliberately NOT wired into src/translate-service.mjs: the runtime
 // path keeps its documented providers, and the storefront never calls this.
+const GOOGLE_URL = String(process.env.GOOGLE_TRANSLATE_URL || "https://translate.googleapis.com/translate_a/single").trim().replace(/\/+$/, "");
+
 async function translateViaGoogle(text, target, source) {
   const lang = (code) => ({ "zh-CN": "zh-CN", zh: "zh-CN", ja: "ja", en: "en", vi: "vi" }[code] || code);
-  const url = `https://translate.googleapis.com/translate_a/single?client=gtx&sl=${encodeURIComponent(lang(source))}`
+  const url = `${GOOGLE_URL}?client=gtx&sl=${encodeURIComponent(lang(source))}`
     + `&tl=${encodeURIComponent(lang(target))}&dt=t&q=${encodeURIComponent(text)}`;
   const response = await fetch(url, { headers: { "user-agent": "Mozilla/5.0 (compatible; sonvudev-seed)" } });
   if (!response.ok) throw new Error(`gtx HTTP ${response.status}`);

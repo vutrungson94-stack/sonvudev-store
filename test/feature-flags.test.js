@@ -5,7 +5,7 @@ import assert from 'node:assert/strict';
 import './helpers/env.mjs';
 
 test('feature flag mặc định tắt khi không có env', async () => {
-  const { isEnabled, allFlags } = await import('../src/feature-flags.js');
+  const { isEnabled } = await import('../src/feature-flags.js');
   delete process.env.FEATURE_FOO;
   assert.equal(isEnabled('foo'), false);
   assert.equal(isEnabled('foo', true), true);
@@ -29,13 +29,3 @@ test('feature flag tắt với giá trị khác', async () => {
   delete process.env.FEATURE_BAZ;
 });
 
-test('allFlags chỉ trả về FEATURE_*', async () => {
-  const { allFlags } = await import('../src/feature-flags.js');
-  process.env.FEATURE_X = '1';
-  process.env.NOT_A_FLAG = '1';
-  const flags = allFlags();
-  assert.equal(flags.x, true);
-  assert.equal(flags.not_a_flag, undefined);
-  delete process.env.FEATURE_X;
-  delete process.env.NOT_A_FLAG;
-});

@@ -64,6 +64,9 @@ const BLOG_LANGS = [
   { code: "ja", label: "日本語", flag: "🇯🇵" },
   { code: "zh-CN", label: "中文", flag: "🇨🇳" },
 ];
+export const BLOG_LOCALES = Object.freeze(BLOG_LANGS.map(({ code }) => code));
+export const EXTRA_BLOG_LOCALES = Object.freeze(BLOG_LOCALES.filter((code) => code !== "vi" && code !== "en"));
+
 const blogUrl = (slug, lang = "vi") => {
   if (!slug) return lang === "vi" ? "/blog" : `/${lang}/blog`;
   return lang === "vi" ? `/blog/${slug}` : `/${lang}/blog/${slug}`;

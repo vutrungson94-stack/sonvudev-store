@@ -1,4 +1,5 @@
-// SonVuDev i18n - Vietnamese / English only.
+// SonVuDev i18n - Vietnamese and English are bundled; de, es, fr, ja and zh-CN
+// are loaded on demand from /locales/<code>.json.
 //
 // Every customer-facing string on the storefront lives here. Admin stays
 // Vietnamese on purpose: the owner is the only person who reads it.
