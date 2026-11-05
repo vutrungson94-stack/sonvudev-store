@@ -79,7 +79,8 @@ function redirectRootLangToEnglish(req, res, next) {
   if (req.path.startsWith("/en")) return next();
   if (req.path.startsWith("/api")) return next();
   if (req.path.startsWith("/admin")) return next();
-  if (req.path === "/" || req.path === "/index.html") return next();
+  // Only the root path gets language-based redirect. Content paths without a locale prefix (/product/..., /blog/..., /about, /terms, /privacy, /refund) are Vietnamese routes and must not be redirected — they are served as-is.
+  if (req.path !== "/" && req.path !== "/index.html") return next();
   if (req.path.startsWith("/googledeadbeef.html")) return next();
   if (req.path.startsWith("/msdeadbeef.txt")) return next();
   if (req.path.startsWith("/notconfigured.txt")) return next();
@@ -1694,4 +1695,5 @@ app.use((error, req, res, next) => {
 });
 export async function createApp() { await ensureSeed(); return app; }
 export default app;
+
 
