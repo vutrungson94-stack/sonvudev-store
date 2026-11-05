@@ -47,6 +47,33 @@ function preferredLanguage(req) {
   return normalizeLocale(first);
 }
 
+// Paths that answer for the whole shop and therefore are not locale-routes.
+// The language redirect exists for a human who landed on the un-prefixed
+// homepage or a content URL; it must not reach the crawlers' entry points, the
+// answer engines' summaries, the share card, the brand mark or any static asset.
+// A crawler that asks for /robots.txt with an English Accept-Language used to be
+// sent to /en/robots.txt — which has no route at all — so the redirect turned
+// every machine-readable file into a dead end and the SEO gate read the 308 as a
+// failure. The exemption is by pattern because the static names are many and the
+// list would rot the moment someone adds a new asset prefix.
+const NON_LOCALE_PATH_PATTERNS = [
+  /^\/robots\.txt$/i,
+  /^\/sitemap\.xml$/i,
+  /^\/llms\.txt$/i,
+  /^\/feed\.json$/i,
+  /^\/merchant-feed\.tsv$/i,
+  /^\/blog\.json$/i,
+  /^\/og(\.|\/|$)/i,
+  /^\/logo/i,
+  /^\/img(\/|$)/i,
+  /^\/favicon/i,
+  /^\/site\.webmanifest$/i,
+  /^\/apple-touch-icon/i,
+  /^\/mask-icon/i,
+  /^\/icon-/i,
+];
+const isNonLocalizedPath = (p) => NON_LOCALE_PATH_PATTERNS.some((re) => re.test(p));
+
 function redirectRootLangToEnglish(req, res, next) {
   if (req.method !== "GET") return next();
   if (req.path.startsWith("/en")) return next();
@@ -57,6 +84,13 @@ function redirectRootLangToEnglish(req, res, next) {
   if (req.path.startsWith("/msdeadbeef.txt")) return next();
   if (req.path.startsWith("/notconfigured.txt")) return next();
   if (req.path.startsWith("/anythingelse.txt")) return next();
+  // The machine and asset paths above are answered by un-prefixed handlers, so
+  // they must not be handed to the locale picker. Without this line a crawler
+  // with an English Accept-Language got a 308 toward /en/... for /og.png, /og/<slug>.png
+  // and /logo-1024.png, and the follow-up landed on /en/... which has no handler —
+  // the share card and the brand logo, the two things a crawler actually fetches,
+  // both read as broken.
+  if (isNonLocalizedPath(req.path)) return next();
   if (process.env.NODE_ENV === "test") return next();
   // Don't redirect if path already has a valid locale prefix (e.g. /fr/product/...)
   const langMatch = req.path.match(/^\/([a-z]{2}(-[A-Za-z]{2})?)\//);
