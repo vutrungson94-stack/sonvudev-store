@@ -57,6 +57,10 @@ test('every locale answers its own homepage with its own words', async () => {
     const { status, body } = await get(pathname);
     assert.equal(status, 200, `GET ${pathname} must answer 200`);
     assert.match(body, new RegExp(`<html lang="${escapeRe(lang)}">`), `GET ${pathname} must carry its own html lang`);
+    // The templates once used href="styles.css", which a prefixed URL resolves
+    // to /de/styles.css and /en/styles.css - both 404. Absolute is the only
+    // shape that survives a language prefix.
+    assert.ok(body.includes('<link rel="stylesheet" href="/styles.css"'), `GET ${pathname} must use an absolute stylesheet URL`);
     assert.ok(body.includes(needle), `GET ${pathname} must carry its own head copy (looking for "${needle}")`);
     assert.match(body, new RegExp(`<link rel="canonical" href="${escapeRe(APP)}/?(${escapeRe(lang)}/?)?"`),
       `GET ${pathname} canonical must name its own URL`);
