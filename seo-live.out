@@ -1,4 +1,0 @@
-
-> sonvudev-store@1.0.0 seo:check
-> node scripts/seo-check.mjs https://sonvudev.com
-
