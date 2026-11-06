@@ -31,7 +31,7 @@
     "metrics:auto": "node scripts/metrics.mjs --auto-update",
     "metrics:trends": "node scripts/metrics.mjs --trends",
     "dora:metrics": "node scripts/dora-metrics.mjs",
-    "dora:check": "node scripts/dora-metrics.mjs",
+    "dora:check": "node scripts/dora-metrics.mjs --check",
     "slo:check": "node scripts/slo-monitor.mjs",
     "spc:check": "node scripts/spc-control-chart.mjs",
     "defect:escape": "node scripts/defect-escape.mjs",

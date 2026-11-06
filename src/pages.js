@@ -6,7 +6,7 @@ import { isSellable } from "./store.js";
 import { esc, money, formatBytes, initials } from "./format.js";
 import { commitHash } from "./lib/git.mjs";
 import { loadBlogPosts, getBlogPostBySlug, renderBlogPost, renderBlogIndex, renderBlogFeed } from "./blog.js";
-import { LOCALE_CODES } from "./i18n-registry.mjs";
+import { LOCALE_CODES, DEFAULT_LOCALE } from "./i18n-registry.mjs";
 
 // The commit that produced this process, for CSS cache-busting. This replaces a
 // private copy of the git call that scripts/build-web.mjs also carried, so the
@@ -268,9 +268,13 @@ const labelSlug = (value) => String(value || "")
 const VIETNAMESE_RE = /[ăĂơƠưƯĐđẠ-ỹ]/;
 const localeJsonCache = new Map();
 const loadLocaleJson = (lang) => {
-  if (!lang || lang === "vi" || lang === "en") return null; // vi is the source, en ships in the bundle
+  if (!lang || lang === "vi") return null; // vi is the source language; the templates carry it already
   if (localeJsonCache.has(lang)) return localeJsonCache.get(lang);
   try {
+    // en.json is generated from public/i18n.js's bundled DICT (see
+    // scripts/lib/i18n-bundled.mjs and test/locale-en.test.js); it exists so the
+    // server can render the same English words the browser would, from the
+    // same source, without a network fetch or a vm at request time.
     const parsed = JSON.parse(readFileSync(path.join(PUBLIC_DIR, "locales", `${lang}.json`), "utf8"));
     localeJsonCache.set(lang, parsed);
     return parsed;
@@ -826,13 +830,15 @@ const routeForFile = (file) => {
 const chromeLink = (link, route, copy, prefix = "") => {
   // The support address is configuration, and it is already filled into these
   // pages as {{support}} — the same value the mail templates and the terms use.
-  // A locale-prefixed page keeps its reader inside its language for the links
-  // that exist in that language (the homepage); the static legal pages have no
-  // locale route, so they are left alone and translate client-side instead.
+  // A locale-prefixed page keeps its reader inside its language: every internal
+  // link this bar can offer exists under every supported locale (the homepage,
+  // the legal pages), so the prefix follows. A bare mailto stays bare. Links
+  // to the landing sections (/#products) keep the prefix too, because /de/#products
+  // is the German homepage's products section.
   const raw = link.href;
   const href = link.mail
     ? `mailto:${esc(env.email.supportEmail)}`
-    : (prefix && (raw === "/" || raw.startsWith("/#")) ? `${prefix}${raw}` : raw);
+    : (prefix && raw.startsWith("/") && !raw.startsWith("//") ? `${prefix}${raw}` : raw);
   const label = copy ? copy[link.copy] : link.vi;
   const current = link.page && link.route === route ? ' aria-current="page"' : "";
   // The dictionary form keeps the switch working on a page that loads i18n.js;
@@ -926,7 +932,8 @@ export const REFUND_POLICY_UPDATED = "2026-09-28";
 export const policyUpdatedFor = (iso, lang) => {
   const at = new Date(`${String(iso)}T00:00:00Z`);
   if (!Number.isFinite(at.getTime())) return String(iso);
-  return at.toLocaleDateString(lang === "en" ? "en-GB" : "vi-VN", {
+  const DATE_LOCALES = { vi: "vi-VN", en: "en-GB", de: "de-DE", es: "es-ES", fr: "fr-FR", ja: "ja-JP", "zh-CN": "zh-CN" };
+  return at.toLocaleDateString(DATE_LOCALES[lang] || "en-GB", {
     day: "2-digit", month: "2-digit", year: "numeric", timeZone: "UTC",
   });
 };
@@ -942,9 +949,14 @@ export const KNOWN_TEMPLATE_TOKENS = [...PAGE_TOKENS, ...COPY_TOKENS];
  * `page` is the template being rendered, and it is the one thing the chrome needs
  * to know: the footer is the same everywhere except that it does not offer a link
  * back to the page it is printed on. See headerNav() and footerLinks().
+ *
+ * `lang` is the language of the page being rendered. The static pages answer
+ * under their own prefix for every locale, so the chrome links and the
+ * policy-date format follow it instead of assuming Vietnamese.
  */
-export function pageTokenValues({ products = [], reviewLimits = null, page = "" } = {}) {
+export function pageTokenValues({ products = [], reviewLimits = null, page = "", lang = DEFAULT_LOCALE } = {}) {
   const route = routeForFile(page);
+  const prefix = lang === DEFAULT_LOCALE ? "" : `/${lang}`;
   return {
     site: env.appUrl,
     brandName: esc(env.brand.name),
@@ -960,7 +972,7 @@ export function pageTokenValues({ products = [], reviewLimits = null, page = "" 
     // today. Two copies of this date is the bug where they disagree under a
     // dispute; it lives here because every reader imports it from one module.
     policyUpdated: REFUND_POLICY_UPDATED,
-    policyUpdatedDisplay: policyUpdatedFor(REFUND_POLICY_UPDATED, "vi"),
+    policyUpdatedDisplay: policyUpdatedFor(REFUND_POLICY_UPDATED, lang),
     // Only legalEntityLine, not legalEntity. fillPageTokens fills the names in
     // PAGE_TOKENS and "legalEntity" is not one of them, so the bare value below
     // was an entry in this object that nothing could ever read — the legal entity
@@ -972,9 +984,10 @@ export function pageTokenValues({ products = [], reviewLimits = null, page = "" 
     iconLinks: iconLinkMarkup().join("\n"),
     // The same argument for the two bars, and one step further: the footer cannot
     // be a block of text at all, because which of its links is missing depends on
-    // the route being rendered.
-    headerNav: headerNav(route),
-    footerLinks: footerLinks(route),
+    // the route being rendered. The prefix keeps a localized page's chrome links
+    // inside its own language.
+    headerNav: headerNav(route, null, prefix),
+    footerLinks: footerLinks(route, null, prefix),
     cssVersion,
   };
 }
@@ -989,6 +1002,203 @@ export function fillPageTokens(html, values) {
   for (const name of PAGE_TOKENS) {
     if (values[name] !== undefined) out = out.replaceAll(`{{${name}}}`, values[name]);
   }
+  return out;
+}
+
+// ---------------------------------------------------------------------------
+// Localisation for the static pages (homepage, legal pages).
+//
+// The same static file used to be served as-is in every locale, so a crawler
+// asking for /de/ received a Vietnamese <html lang>, a Vietnamese title and a
+// canonical pointing at "/", indistinguishable from the Vietnamese homepage.
+// renderPage() passes the route's language along; this function makes the rest
+// of the head tell the truth - html lang, title, description, canonical,
+// Open Graph locale, hreflang - and swaps the body's data-i18n text for the
+// language's own words before the crawler ever sees them.
+// ---------------------------------------------------------------------------
+
+/**
+ * The static pages rendered for every locale, and the route slug each one owns.
+ * Keyed by file name because that is what public/ ships and what the router
+ * mounts; vi is the source language, so it maps to the unprefixed routes.
+ */
+const STATIC_PAGES = {
+  "index.html": { slug: "", key: "home" },
+  "about.html": { slug: "/about", key: "about" },
+  "terms.html": { slug: "/terms", key: "terms" },
+  "privacy.html": { slug: "/privacy", key: "privacy" },
+  "refund.html": { slug: "/refund", key: "refund" },
+};
+
+/**
+ * The title and description a non-Vietnamese reader and crawler should see,
+ * per page, per locale. Vietnamese lives in the templates themselves (it is
+ * the source language); English is the fallback for any locale that ever loses
+ * its entry here. {{brandName}} is resolved in the same pass as every other
+ * page token, so a brand change still reaches every sentence.
+ */
+export const STATIC_META = {
+  home: {
+    vi: { title: "Bật macro Excel & kiểm tra dung lượng USB | {{brandName}}", description: "Bật macro Excel không cần chỉnh tay từng file, kiểm tra dung lượng thật của USB và thẻ nhớ. Hai tiện ích Windows, mua một lần dùng vĩnh viễn, tải ngay sau khi thanh toán." },
+    en: { title: "Excel macro fix & real USB capacity check | {{brandName}}", description: "Get Excel macros running without touching each file by hand, and check the real capacity of your USB drive and memory card. Two Windows utilities, one-time payment, download right after payment." },
+    de: { title: "Excel-Makros aktivieren & echte USB-Kapazität prüfen | {{brandName}}", description: "Bringen Sie Excel-Makros ohne Handarbeit pro Datei zum Laufen und prüfen Sie die echte Kapazität Ihres USB-Sticks und Ihrer Speicherkarten. Zwei Windows-Werkzeuge, einmaliger Kauf, sofortiger Download nach Zahlung." },
+    es: { title: "Activar macros de Excel & comprobar capacidad real del USB | {{brandName}}", description: "Activa las macros de Excel sin ajustar archivo por archivo y comprueba la capacidad real de tu USB y tarjetas de memoria. Dos utilidades para Windows, pago único, descarga inmediata tras el pago." },
+    fr: { title: "Activer les macros Excel & mesurer la vraie capacité USB | {{brandName}}", description: "Faites fonctionner vos macros sans réglage fichier par fichier et mesurez la vraie capacité de votre clé USB et de vos cartes mémoire. Deux utilitaires Windows, achat unique, téléchargement immédiat après paiement." },
+    ja: { title: "Excelマクロを有効化 & USB容量の実測 | {{brandName}}", description: "ファイルごとの手作業なしでExcelマクロを動かし、USBメモリとメモリカードの本当の容量を検証。Windows向け2つのユーティリティ、買い切り、お支払い後すぐにダウンロード。" },
+    "zh-CN": { title: "启用 Excel 宏 & 实测 USB 真实容量 | {{brandName}}", description: "无需逐个文件手动修改即可启用 Excel 宏，并检测 U 盘和内存卡的真实容量。两款 Windows 小工具，一次买断，付款后立即下载。" },
+  },
+  about: {
+    vi: { title: "Về chúng tôi - ai làm ra {{brandName}} và vì sao", description: "{{brandName}} là ai, làm phần mềm gì, và ai đứng sau nó. Trang này nói thẳng để bạn biết mình đang mua của ai." },
+    en: { title: "About {{brandName}} - who makes this software and why", description: "Who {{brandName}} is, what software it makes and who is behind it. This page says it plainly so you know who you are buying from." },
+    de: { title: "Über {{brandName}} - wer diese Software macht und warum", description: "Wer {{brandName}} ist, welche Software es entwickelt und wer dahintersteht. Auf dieser Seite steht es klar und deutlich, damit Sie wissen, bei wem Sie kaufen." },
+    es: { title: "Sobre {{brandName}} - quién hace este software y por qué", description: "Quién es {{brandName}}, qué software fabrica y quién está detrás. En esta página se dice claramente para que sepas a quién le compras." },
+    fr: { title: "À propos de {{brandName}} - qui conçoit ce logiciel et pourquoi", description: "Qui est {{brandName}}, quels logiciels sont conçus et qui est derrière tout cela. Cette page le dit clairement, pour que vous sachiez à qui vous achetez." },
+    ja: { title: "{{brandName}} について - 誰が、なぜこのソフトを作ったか", description: "{{brandName}} とは何者か、どんなソフトウェアを作っているか、誰が運営しているかを率直に書きます。誰から買っているかを知ってほしいからです。" },
+    "zh-CN": { title: "关于 {{brandName}} - 谁在做这个软件，为什么", description: "{{brandName}} 是谁，做什么软件，背后是谁。这一页直说重点，让你知道自己在向谁购买。" },
+  },
+  terms: {
+    vi: { title: "Điều khoản sử dụng - {{brandName}}", description: "Điều khoản sử dụng kho phần mềm {{brandName}}: phạm vi cấp phép, thanh toán, bảo hành và giới hạn trách nhiệm." },
+    en: { title: "Terms of use - {{brandName}}", description: "Terms of use for the {{brandName}} software catalogue: licence scope, payment, warranty and liability limits." },
+    de: { title: "Nutzungsbedingungen - {{brandName}}", description: "Nutzungsbedingungen für den {{brandName}} Softwarekatalog: Lizenzumfang, Zahlung, Gewährleistung und Haftungsgrenzen." },
+    es: { title: "Términos de uso - {{brandName}}", description: "Términos de uso del catálogo de software de {{brandName}}: alcance de la licencia, pagos, garantía y límites de responsabilidad." },
+    fr: { title: "Conditions d'utilisation - {{brandName}}", description: "Conditions d'utilisation du catalogue logiciel {{brandName}} : périmètre de licence, paiement, garantie et limites de responsabilité." },
+    ja: { title: "利用規約 - {{brandName}}", description: "{{brandName}} ソフトウェアカタログの利用規約：ライセンス範囲、支払い、保証と責任の制限。" },
+    "zh-CN": { title: "使用条款 - {{brandName}}", description: "{{brandName}} 软件目录的使用条款：授权范围、付款、保修与责任限制。" },
+  },
+  privacy: {
+    vi: { title: "Chính sách bảo mật - {{brandName}}", description: "Chính sách bảo mật {{brandName}}: dữ liệu nào được thu thập, lưu giữ bao lâu và ai có thể truy cập." },
+    en: { title: "Privacy policy - {{brandName}}", description: "{{brandName}} privacy policy: what data we collect, how long we keep it and who can access it." },
+    de: { title: "Datenschutzerklärung - {{brandName}}", description: "Datenschutzerklärung von {{brandName}}: welche Daten wir erheben, wie lange wir sie speichern und wer sie einsehen kann." },
+    es: { title: "Política de privacidad - {{brandName}}", description: "Política de privacidad de {{brandName}}: qué datos recopilamos, cuánto tiempo los conservamos y quién puede acceder." },
+    fr: { title: "Politique de confidentialité - {{brandName}}", description: "Politique de confidentialité de {{brandName}} : quelles données sont collectées, combien de temps elles sont conservées et qui y accède." },
+    ja: { title: "プライバシーポリシー - {{brandName}}", description: "{{brandName}} のプライバシーポリシー：収集するデータ、保存期間と、誰がアクセスできるか。" },
+    "zh-CN": { title: "隐私政策 - {{brandName}}", description: "{{brandName}} 隐私政策：我们收集什么数据、保存多久，以及谁可以访问。" },
+  },
+  refund: {
+    vi: { title: "Chính sách hoàn tiền - {{brandName}}", description: "Chính sách hoàn tiền {{brandName}}: điều kiện được hoàn, thời hạn xử lý và các trường hợp không hoàn." },
+    en: { title: "Refund policy - {{brandName}}", description: "{{brandName}} refund policy: refund conditions, processing deadlines and the cases where we cannot refund." },
+    de: { title: "Rückerstattungsrichtlinie - {{brandName}}", description: "Rückerstattungsrichtlinie von {{brandName}}: Erstattungsbedingungen, Bearbeitungsfristen und die Fälle, in denen keine Erstattung erfolgt." },
+    es: { title: "Política de reembolso - {{brandName}}", description: "Política de reembolso de {{brandName}}: condiciones de reembolso, plazos de tramitación y los casos en los que no se puede reembolsar." },
+    fr: { title: "Politique de remboursement - {{brandName}}", description: "Politique de remboursement de {{brandName}} : conditions de remboursement, délais de traitement et les cas où le remboursement est impossible." },
+    ja: { title: "返金ポリシー - {{brandName}}", description: "{{brandName}} の返金ポリシー：返金条件、処理期限、返金できない場合。" },
+    "zh-CN": { title: "退款政策 - {{brandName}}", description: "{{brandName}} 退款政策：退款条件、处理期限，以及不予退款的情形。" },
+  },
+};
+
+/** The URL a static page answers on in one language. Vietnamese keeps the root; every other locale prefixes its own code. */
+const staticPageUrl = (slug, lang) => `${site()}${lang === "vi" ? "" : `/${lang}`}${slug || "/"}`;
+
+const altLinks = (slug) =>
+  `${LOCALE_CODES.map((code) => `<link rel="alternate" hreflang="${code}" href="${esc(staticPageUrl(slug, code))}">`).join("\n")}\n` +
+  `<link rel="alternate" hreflang="x-default" href="${esc(staticPageUrl(slug, DEFAULT_LOCALE))}">`;
+
+/** The single-brace placeholders the browser dictionary fills from its own TOKENS map; the server resolves the ones it can and leaves the rest alone. */
+const fillSingleBraces = (text, lang) => {
+  const vars = {
+    brand: env.brand.name,
+    brandName: env.brand.name,
+    founder: env.brand.founderName || env.brand.name,
+    support: env.email.supportEmail,
+    year: String(new Date().getFullYear()),
+    hours: String(env.orders.paymentWindowHours),
+    paymentWindowHours: String(env.orders.paymentWindowHours),
+    site: site(),
+    policyUpdatedDisplay: policyUpdatedFor(REFUND_POLICY_UPDATED, lang),
+    policyUpdatedDisplayEn: policyUpdatedFor(REFUND_POLICY_UPDATED, "en"),
+  };
+  let out = String(text);
+  // Double-brace tokens belong to pageTokenValues, not to this pass. A plain
+  // replacement would find {{brandName}}'s trailing {brandName} and leave the
+  // outer braces around the real value ({SonVuDev}).
+  for (const [key, value] of Object.entries(vars)) {
+    out = out.replace(new RegExp(`(?<!\\{)\\{${key}\\}(?!\\})`, "g"), String(value));
+  }
+  return out;
+};
+
+const dictFor = (lang) => (lang === "vi" ? null : loadLocaleJson(lang));
+
+/**
+ * Localizes a static page for one language. Returns the HTML ready to send.
+ *
+ * `values` is the same token bag pageTokenValues() built - the second pass fills
+ * any {{...}} the dictionaries introduce (legal strings carry {{brandName}}
+ * and {{paymentWindowHours}}), so the browser and the crawler agree on the
+ * numbers.
+ */
+export function localizeStaticHtml(html, { file = "", lang = DEFAULT_LOCALE, values = null } = {}) {
+  const entry = STATIC_PAGES[file];
+  if (!entry) return String(html);
+  const { slug, key } = entry;
+  const meta = STATIC_META[key][lang] || STATIC_META[key].en;
+  const url = staticPageUrl(slug, lang);
+  const title = esc(fillSingleBraces(meta.title, lang));
+  const description = esc(fillSingleBraces(meta.description, lang));
+  let out = String(html);
+
+  // 1. Root language, and every crawler-visible head field.
+  out = out.replace(/<html lang="[^"]*">/, `<html lang="${lang}">`);
+  out = out.replace(/<title([^>]*)>[\s\S]*?<\/title>/, `<title$1>${title}</title>`);
+  out = out.replace(/<meta name="description" content="[^"]*">/, `<meta name="description" content="${description}">`);
+  out = out.replace(/<link rel="canonical" href="[^"]*">/, `<link rel="canonical" href="${esc(url)}">`);
+  out = out.replace(/<meta property="og:url" content="[^"]*">/, `<meta property="og:url" content="${esc(url)}">`);
+  out = out.replace(/<meta property="og:title" content="[^"]*">/, `<meta property="og:title" content="${title}">`);
+  out = out.replace(/<meta property="og:description" content="[^"]*">/, `<meta property="og:description" content="${description}">`);
+  out = out.replace(/<meta property="twitter:title" content="[^"]*">/, `<meta property="twitter:title" content="${title}">`);
+  out = out.replace(/<meta property="twitter:description" content="[^"]*">/, `<meta property="twitter:description" content="${description}">`);
+  // The link-preview card says what the page is; make it the same sentence the page opens with.
+  out = out.replace(/<meta property="og:image:alt" content="[^"]*">/, `<meta property="og:image:alt" content="${title}">`);
+  out = out.replace(/<meta property="og:locale" content="[^"]*">/, `<meta property="og:locale" content="${OG_LOCALE[lang] || OG_LOCALE.en}">`);
+  // og:locale:alternate: one line per other locale, not a single stale vi_VN.
+  out = out.replace(/\n?[ \t]*<meta property="og:locale:alternate" content="[^"]*">/g, "");
+  out = out.replace(
+    /(<meta property="og:locale" content="[^"]*">)/,
+    `$1\n${LOCALE_CODES.filter((code) => code !== lang).map((code) => `<meta property="og:locale:alternate" content="${OG_LOCALE[code]}">`).join("\n")}`,
+  );
+  // hreflang: drop the template's hand-written pair, write the whole set.
+  out = out.replace(/<link rel="alternate" hreflang="[^"]*" href="[^"]*">\s*/g, "");
+  out = out.replace(/<\/head>/, `${altLinks(slug)}\n</head>`);
+
+  // 2. Body text: swap the Vietnamese fallback copy for the locale's own words.
+  const dict = dictFor(lang);
+  if (dict) {
+    out = out.replace(
+      /<([A-Za-z][\w-]*)([^>]*?)\sdata-i18n-html="([^"]+)"([^>]*)>([\s\S]*?)<\/\1>/g,
+      (_m, tag, before, k, _after, _inner) => {
+        const v = dict[k];
+        return typeof v === "string" && v ? `<${tag}${before}>${fillSingleBraces(v, lang)}</${tag}>` : _m;
+      },
+    );
+    out = out.replace(
+      /<([A-Za-z][\w-]*)([^>]*?)\sdata-i18n="([^"]+)"([^>]*)>([^<]*)<\/\1>/g,
+      // Rebuild the tag keeping data-i18n so the browser's dictionary still owns the live page.
+      (_m, tag, before, k, after, _inner) => {
+        const v = dict[k];
+        return typeof v === "string" && v
+          ? `<${tag}${before} data-i18n="${k}"${after}>${esc(fillSingleBraces(v, lang))}</${tag}>`
+          : _m;
+      },
+    );
+    out = out.replace(/<[A-Za-z][\w-]*[^>]*\sdata-i18n-attr="[^"]*"[^>]*>/g, (tag) => {
+      const m = tag.match(/data-i18n-attr="([^"]+)"/);
+      if (!m) return tag;
+      let result = tag;
+      for (const pair of m[1].split(",")) {
+        const [attr, k] = pair.split(":").map((s) => s.trim());
+        const v = k ? dict[k] : undefined;
+        const safeAttr = String(attr || "").replace(/[^a-zA-Z-]/g, "");
+        if (!safeAttr || typeof v !== "string") continue;
+        result = result.replace(
+          new RegExp(`(${safeAttr.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")})="[^"]*"`),
+          `$1="${esc(fillSingleBraces(v, lang))}"`,
+        );
+      }
+      return result;
+    });
+  }
+
+  // 3. Any {{...}} the dictionaries introduced, and the fill of {{brandName}} inside them.
+  if (values) out = fillPageTokens(out, values);
   return out;
 }
 
@@ -1012,7 +1222,7 @@ export function fillPageTokens(html, values) {
  * Values are percent-encoded because a support address contains "@" and a
  * payment window does not — the delimiter has to survive both.
  */
-export const tokenMeta = () => {
+export const tokenMeta = (lang = DEFAULT_LOCALE) => {
   // JSON rather than name=value pairs joined by a delimiter. The joined form
   // needs a separator no value can contain, and escaping it needs an escape
   // helper of its own — which is a third copy of esc() and exactly what the
@@ -1029,7 +1239,7 @@ export const tokenMeta = () => {
     // page. It travels with the page tokens so the policy date in the dictionary
     // and the one recorded on the order are filled from the same constant.
     policyUpdated: REFUND_POLICY_UPDATED,
-    policyUpdatedDisplay: policyUpdatedFor(REFUND_POLICY_UPDATED, "vi"),
+    policyUpdatedDisplay: policyUpdatedFor(REFUND_POLICY_UPDATED, lang),
     // The browser fills the English sentences from this too, so a language switch
     // shows the date written the way that language writes dates.
     policyUpdatedDisplayEn: policyUpdatedFor(REFUND_POLICY_UPDATED, "en"),

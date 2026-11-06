@@ -404,7 +404,10 @@ if(productStatusFilter)productStatusFilter.addEventListener('change',()=>loadPro
 if(productStatusFilter)productStatusFilter.addEventListener('change',()=>resetOrderPage());document.getElementById('login-form').onsubmit=loginSubmit;logout.onclick=()=>{stopPolling();sessionStorage.removeItem('sonvudev_admin');token='';hideAll();login.hidden=false;logout.hidden=true};document.getElementById('refresh').onclick=()=>{resetOrderPage();loadProducts()};// The list now starts visible; the button collapses it, so the label has to
 // describe the action rather than the destination.
 const productToggle=document.getElementById('toggle-products');productToggle.onclick=()=>{productList.hidden=!productList.hidden;productToggle.textContent=productList.hidden?'Xem danh sách ↓':'Ẩn danh sách ↑'};productForm.onsubmit=submitProduct;if(token){login.hidden=true;showAfterLogin();resetOrderPage();loadRevenue();loadProducts();checkMail();startPolling()}
-// Site age display: calculated from the repository's first commit so the owner
-// can see how long the shop has been live without opening git log.
-const SITE_CREATED=new Date('2026-09-26');const siteAgeEl=document.getElementById('site-age');if(siteAgeEl){const diff=Date.now()-SITE_CREATED.getTime();const days=Math.floor(diff/864e5);const months=Math.floor(days/30);const rem=days%30;const msg=months?'Trang web đã hoạt động '+months+' tháng '+rem+' ngày (từ 26/09/2026)':'Trang web đã hoạt động '+days+' ngày (từ 26/09/2026)';siteAgeEl.textContent=msg}
+// Site age: the launch date lives in configuration (SHOP_LAUNCHED_AT),
+// reported by /api/health as launchedAt. The date used to be a literal typed
+// into this file under a comment claiming it was derived from git history -
+// a literal is exactly the kind of fact that goes stale. If the owner has not
+// declared it, the line hides rather than guesses.
+const siteAgeEl=document.getElementById('site-age');if(siteAgeEl){api('/api/health').then(function(h){var launched=h&&h.launchedAt?String(h.launchedAt).slice(0,10):'';if(!launched){siteAgeEl.hidden=true;return}var at=new Date(launched+'T00:00:00Z').getTime();var diff=Date.now()-at;if(!Number.isFinite(at)||diff<0){siteAgeEl.hidden=true;return}var days=Math.floor(diff/864e5);var months=Math.floor(days/30);var rem=days%30;siteAgeEl.textContent=months?'Trang web đã hoạt động '+months+' tháng '+rem+' ngày (từ '+launched+')':'Trang web đã hoạt động '+days+' ngày (từ '+launched+')'}).catch(function(){siteAgeEl.hidden=true})}
 
