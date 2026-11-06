@@ -1554,37 +1554,29 @@ function renderLanguageCombobox() {
         const prev = current;
         I18N.set(code);
         closeCombobox(combobox);
-        // Server-rendered pages (product, blog) bake their copy into HTML, so a
+        // Server-rendered pages bake their copy into the HTML, so a
         // client-side dictionary swap is not enough. Navigate to the same page
         // in the selected language instead of leaving the old content behind.
-        // Only Vietnamese and English have server-rendered routes; any other
-        // language falls back to the English page.
+        // Every locale has a server-rendered homepage, legal pages, product
+        // pages and blog; other pages (order, lookup) translate client-side.
         if (code !== prev) {
           const path = window.location.pathname;
+          const prefixRe = /^\/(vi|en|de|es|fr|ja|zh-CN)(\/|$)/;
+          const m = path.match(prefixRe);
+          const rest = m ? (path === '/' + m[1] || path === '/' + m[1] + '/' ? '/' : path.slice(m[1].length + 1)) : path;
+          // Every internal route referenced here is localized by the server now:
+          // the homepage, the four legal pages, the catalogue and the blog.
+          const localizedRoutes = ['/', '/about', '/terms', '/privacy', '/refund'];
+          const productRe = /^\/product\/[^/]+\/?$/;
+          const blogRe = /^\/blog(\/[^/]+)?\/?$/;
           let target = null;
-          // Product pages: /product/:slug (vi), /en/product/:slug (en),
-          // /de/product/:slug, /es/product/:slug, /fr/product/:slug,
-          // /ja/product/:slug, /zh-CN/product/:slug. Any language switch on a
-          // product page navigates to the same slug in the target language.
-          const productMatch = path.match(/^(\/en)?\/product\/([^\/]+)$/);
-          if (productMatch) {
-            const [, , slug] = productMatch;
-            target = code === 'vi' ? `/product/${slug}` : `/${code}/product/${slug}`;
-          } else {
-            // Blog pages: /blog (vi), /en/blog (en), /de/blog, etc.
-            const blogIndexMatch = path.match(/^(\/en)?\/blog\/?$/);
-            if (blogIndexMatch) {
-              target = code === 'vi' ? '/blog' : `/${code}/blog`;
-            } else {
-              const blogMatch = path.match(/^(\/en)?\/blog\/([^\/]+)$/);
-              if (blogMatch) {
-                const [, , slug] = blogMatch;
-                target = code === 'vi' ? `/blog/${slug}` : `/${code}/blog/${slug}`;
-              }
-            }
+          if (localizedRoutes.includes(rest) || productRe.test(rest) || blogRe.test(rest)) {
+            const next = rest === '/' ? '/' : rest.replace(/\/+$/, '');
+            target = (code === 'vi' ? '' : '/' + code) + next;
+            if (rest === '/') target = (code === 'vi' ? '/' : '/' + code + '/');
           }
           if (target && target !== path) {
-            window.location.href = target;
+            window.location.href = target + window.location.search + window.location.hash;
           }
         }
       });
@@ -1620,25 +1612,35 @@ function closeCombobox(combobox) {
 }
 
 function boot() {
-  // Ensure the server-rendered HTML matches the stored language preference.
-  // Without this, switching to French on /fr/blog/:slug then clicking "Buy now"
-  // (which links to /?buy=...) lands on the Vietnamese homepage because the
-  // server sees no language prefix. Redirect to /fr/?buy=... so the server
-  // renders French.
-  if (current && current !== 'vi') {
-    const path = window.location?.pathname;
-    // Nếu URL đã có tiền tố ngôn ngữ (ví dụ /en/product/...), hãy thay thế bằng ngôn ngữ hiện tại
-    const langMatch = path?.match(/^\/([a-z]{2}(-[A-Z]{2})?)\//);
-    if (langMatch && ["vi", "en", "de", "es", "fr", "ja", "zh-CN"].includes(langMatch[1])) {
-      const target = path.replace(/^\/[a-z]{2}(-[A-Z]{2})?\//, `/${current}/`);
-      if (target !== path) {
-        window.location.href = target + window.location.search + window.location.hash;
-        return;
-      }
-    } else if (path && path !== `/${current}` && !path.startsWith(`/${current}/`)) {
-      const target = path === '/' ? `/${current}` : `/${current}${path}`;
+  // The URL is the contract. A server-rendered /de/ page is already German, so
+  // when the reader was sent to it we adopt what the URL says rather than the
+  // stored preference — overwriting store with URL used to send an English
+  // reader of /de/product/x to /en/product/x without being asked, and an English
+  // reader of /de/ straight into /en/, which did not exist and 404'd.
+  // A stored choice only steers the pages that carry no route for it.
+  const path = window.location?.pathname || '/';
+  const urlPrefix = path.match(/^\/([a-z]{2}(-[A-Za-z]{2})?)(\/|$)/);
+  if (urlPrefix && ['vi', 'en', 'de', 'es', 'fr', 'ja', 'zh-CN'].includes(urlPrefix[1])) {
+    if (urlPrefix[1] !== current) {
+      current = urlPrefix[1];
+      try { localStorage.setItem(STORAGE_KEY, current); } catch (_) { /* private mode keeps navigator default */ }
+    }
+  } else if (current && current !== 'vi') {
+    // Unprefixed URL whose reader prefers another language: send them to that
+    // language's route. Only routes the server actually serves in every locale
+    // get this treatment - a redirect to a 404 is worse than a page that
+    // translates client-side.
+    const localized =
+      path === '/' ||
+      ['/about', '/terms', '/privacy', '/refund'].includes(path) ||
+      /^\/product\/[^/]+\/?$/.test(path) ||
+      /^\/blog(\/[^/]+)?\/?$/.test(path);
+    if (localized) {
+      const target = path === '/' ? `/${current}/` : `/${current}${path}`;
       window.location.href = target + window.location.search + window.location.hash;
-      return;
+      // Fall through to apply(): the stored choice renders immediately, and the
+      // navigation takes over as soon as the browser is ready. A stored 'en'
+      // visitor who lands here keeps seeing English, not a vi flash.
     }
   }
   apply();

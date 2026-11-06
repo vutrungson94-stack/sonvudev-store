@@ -147,6 +147,15 @@ export async function ensureSeed() {
   // So the directory is created only by the code path that will write into it.
   if (local) {
     await fs.mkdir(path.join(root, "data"), { recursive: true });
+    // Sample products exist for development only. A production host without
+    // Supabase gets an empty catalogue, never six demo products whose copy
+    // says "Sample product. Replace this content" - an empty shop is honest,
+    // a shop selling five phantom products is not.
+    if (process.env.NODE_ENV === "production") {
+      if (!(await fs.stat(files.products).catch(() => null))) await writeJson(files.products, []);
+      if (!(await fs.stat(files.orders).catch(() => null))) await writeJson(files.orders, []);
+      return;
+    }
     if (!(await fs.stat(files.products).catch(() => null))) await writeJson(files.products, seedProducts);
     if (!(await fs.stat(files.orders).catch(() => null))) await writeJson(files.orders, []);
     return;

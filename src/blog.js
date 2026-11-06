@@ -60,7 +60,7 @@ export function getBlogPostBySlug(slug) {
 // means adding one entry to src/i18n-registry.mjs, not editing this file.
 const languageFlagClass = (code) => `flag-${String(code).toLowerCase().replace(/_/g, "-")}`;
 const BLOG_LANGS = SUPPORTED_LOCALES.map(({ code, name }) => ({ code, label: name }));
-export const BLOG_LOCALES = Object.freeze(BLOG_LANGS.map(({ code }) => code));
+const BLOG_LOCALES = Object.freeze(BLOG_LANGS.map(({ code }) => code));
 export const EXTRA_BLOG_LOCALES = Object.freeze(BLOG_LOCALES.filter((code) => code !== "vi" && code !== "en"));
 
 const blogUrl = (slug, lang = "vi") => {

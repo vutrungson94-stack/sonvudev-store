@@ -109,9 +109,9 @@ test('mọi trang đều mang meta sv-tokens', async () => {
   const app = await read('src/app.js');
   const pages = await read('src/pages.js');
 
-  assert.match(app, /\$\{tokenMeta\(\)\}/,
+  assert.match(app, /\$\{tokenMeta\(/,
     'renderPage phải chèn tokenMeta vào <head>');
-  assert.match(pages, /<head>\s*\$\{tokenMeta\(\)\}/s,
+  assert.match(pages, /<head>\s*\$\{tokenMeta\(/s,
     'renderProductPage phải chèn tokenMeta vào <head>');
 });
 

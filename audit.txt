@@ -3,5 +3,5 @@
 > node scripts/audit-web.mjs
 
 
-[audit] 32 nhóm kiểm tra, 0 vấn đề.
-[audit] PASS: không có domain gõ tay, route trùng, link gãy, tiếng Việt mất dấu hay khoá i18n mồ côi.
+[audit] 32 nh├│m kiß╗âm tra, 0 vß║Ñn ─æß╗ü.
+[audit] PASS: kh├┤ng c├│ domain g├╡ tay, route tr├╣ng, link g├úy, tiß║┐ng Viß╗çt mß║Ñt dß║Ñu hay kho├í i18n mß╗ô c├┤i.

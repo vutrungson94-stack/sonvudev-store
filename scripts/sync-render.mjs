@@ -55,6 +55,7 @@ const ALLOWED = [
   "RESEND_API_KEY", "RESEND_API_URL", "EMAIL_FROM", "SUPPORT_EMAIL",
   "BRAND_NAME", "BRAND_DESCRIPTION", "BRAND_LEGAL_ENTITY", "BRAND_FOUNDER_NAME", "BRAND_FOUNDER_URL", "BRAND_SOCIAL_LINKS",
   "RATES_SOURCE_URLS",
+  "SHOP_LAUNCHED_AT",
 ];
 
 // .env carries local-development values that are wrong on Render.

@@ -23,23 +23,25 @@
  *
  * Safety
  * ──────
- * - Dry-run by default: set `DRY_RUN=1` to print planned actions without
- *   touching Supabase.
+ * - Dry-run by default: pass `--apply` to actually write through the admin API.
+ *   (The old `DRY_RUN=1` check used to mean apply-by-default, which is exactly
+ *   the kind of surprise a sync script must never have.)
  * - Never sends secrets to the client: the admin token stays in the header.
  * - Skips products missing `id` and `slug` rather than inventing keys.
  *
  * Usage
  * ─────
- *   node scripts/sync-products-to-supabase.mjs           # dry-run
- *   DRY_RUN=0 node scripts/sync-products-to-supabase.mjs # apply
+ *   npm run ops:catalog                    # dry-run
+ *   npm run ops:catalog:apply   # apply
+ *   DRY_RUN=0 node scripts/sync-products-to-supabase.mjs  # legacy apply
  *
  * After this script finishes, run the usual workflow:
  *   _Tests → _Build → _Sync
  */
 
-import { readFileSync, writeFileSync } from "node:fs";
+import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
-import https from "node:https";
+import { env } from "../src/config.js";
 
 // ──────────────────────────────────────────────
 // 1. Load environment
@@ -51,37 +53,24 @@ import https from "node:https";
 // while `readFileSync` needs the real filesystem path with literal spaces.
 const projectRoot = fileURLToPath(new URL("..", import.meta.url));
 // The admin token authorises every write below. Keep it secret.
-const ADMIN_API_TOKEN = process.env.ADMIN_API_TOKEN || (() => {
-  try {
-    const env = readFileSync(`${projectRoot}/.env`, "utf8");
-    return env.match(/^ADMIN_API_TOKEN=(.+)$/m)?.[1]?.trim() || "";
-  } catch {
-    return "";
-  }
-})();
+// Central config is the single source: this used to re-parse .env by hand.
+const ADMIN_API_TOKEN = env.adminToken;
 
 if (!ADMIN_API_TOKEN) {
   console.error("[sync] ERROR: ADMIN_API_TOKEN is not set in .env or environment.");
   process.exit(1);
 }
 
-// The live site URL. Must come from the environment so the same script works
-// across dev, staging and production without editing source.
-const APP_URL = String(process.env.APP_URL || (() => {
-  try {
-    const env = readFileSync(`${projectRoot}/.env`, "utf8");
-    return env.match(/^APP_URL=(.+)$/m)?.[1]?.trim() || "";
-  } catch {
-    return "";
-  }
-})()).replace(/\/+$/, "");
+// The live site URL. Must come from env.appUrl so the same script works across
+// dev, staging and production without editing source.
+const APP_URL = env.appUrl.replace(/\/+$/, "");
 if (!APP_URL) {
   console.error("[sync] ERROR: APP_URL is not set. Export it or add it to .env.");
   process.exit(1);
 }
 
-// When true, the script only logs what it would do. No HTTP writes.
-const DRY_RUN = process.env.DRY_RUN === "1" || process.env.DRY_RUN === "true";
+// Default to dry-run. `--apply` (or legacy DRY_RUN=0) is the only way to write.
+const DRY_RUN = !(process.argv.includes("--apply") || process.env.DRY_RUN === "0" || process.env.DRY_RUN === "false");
 
 // ──────────────────────────────────────────────
 // 2. Load local catalogue
@@ -114,41 +103,25 @@ if (!Array.isArray(localProducts) || localProducts.length === 0) {
  * @param {object|null} body - JSON-serialisable payload; null for GET
  * @returns {Promise<any>} parsed response body
  */
-function request(method, path, body = null) {
-  return new Promise((resolve, reject) => {
+function request(method, pathName, body = null) {
+  return (async () => {
     const payload = body !== null ? JSON.stringify(body) : null;
-    const headers = {
-      Authorization: `Bearer ${ADMIN_API_TOKEN}`,
-      "Content-Type": "application/json",
-    };
-    if (payload) headers["Content-Length"] = Buffer.byteLength(payload);
-
-    const req = https.request(
-      `${APP_URL}${path}`,
-      { method, headers },
-      (res) => {
-        const chunks = [];
-        res.on("data", (chunk) => chunks.push(chunk));
-        res.on("end", () => {
-          const raw = Buffer.concat(chunks).toString("utf8");
-          if (res.statusCode >= 400) {
-            // Surface server errors so the operator can react.
-            reject(new Error(`HTTP ${res.statusCode}: ${raw.slice(0, 300)}`));
-            return;
-          }
-          try {
-            resolve(JSON.parse(raw));
-          } catch {
-            resolve(raw);
-          }
-        });
-      }
-    );
-
-    req.on("error", reject);
-    if (payload) req.write(payload);
-    req.end();
-  });
+    const url = pathName.startsWith("http://") || pathName.startsWith("https://")
+      ? pathName
+      : `${APP_URL}${pathName}`;
+    const response = await fetch(url, {
+      method,
+      headers: {
+        Authorization: `Bearer ${ADMIN_API_TOKEN}`,
+        "Content-Type": "application/json",
+      },
+      ...(payload ? { body: payload } : {}),
+      signal: AbortSignal.timeout(30000),
+    });
+    const raw = await response.text().catch(() => "");
+    if (!response.ok) throw new Error(`HTTP ${response.status}: ${raw.slice(0, 300)}`);
+    try { return JSON.parse(raw); } catch { return raw; }
+  })();
 }
 
 // ──────────────────────────────────────────────

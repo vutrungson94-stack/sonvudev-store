@@ -32,24 +32,12 @@
 <meta property="og:image:alt" content="{{brandName}} — phần mềm Windows cho công việc">
 <meta property="og:locale:alternate" content="en_US">
 <link rel="alternate" hreflang="vi" href="{{site}}/">
-<!--
-  No English alternate is declared here.
-
-  The English catalogue pages exist — /en/product/<slug> is rendered by the same
-  renderer and they carry correct reciprocal alternates — but there is no English
-  homepage and no English terms, so there was nothing at {{site}}/en to point at.
-  It answered 404. Telling a crawler in the markup that the English version of
-  this page lives at a broken URL is worse than saying nothing: it hands the
-  decision to the one party that cannot see the answer, and the homepage is then
-  read as having no English counterpart at all.
-
-  When an English homepage really exists, this line comes back with a route that
-  serves it, and the audit's hreflang check will hold it to that.
-
-  The sentence above avoids spelling the attribute out, because a reader — or a
-  script — cannot tell this paragraph from a declaration, and a checker that
-  matched the prose would report a link nobody made.
--->
+<link rel="alternate" hreflang="en" href="{{site}}/en/">
+<link rel="alternate" hreflang="de" href="{{site}}/de/">
+<link rel="alternate" hreflang="es" href="{{site}}/es/">
+<link rel="alternate" hreflang="fr" href="{{site}}/fr/">
+<link rel="alternate" hreflang="ja" href="{{site}}/ja/">
+<link rel="alternate" hreflang="zh-CN" href="{{site}}/zh-CN/">
 <link rel="alternate" hreflang="x-default" href="{{site}}/">
 <meta name="twitter:card" content="summary_large_image">
 <meta name="twitter:title" content="Bật macro Excel &amp; kiểm tra dung lượng USB | {{brandName}}">
@@ -58,7 +46,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="styles.css">
+<link rel="stylesheet" href="/styles.css">
 <!-- Structured data is what lets search results show a price, and what makes the
      FAQ section eligible for the expanded result. It is duplicated by
      src/pages.js on the product pages, where it is built from live product data
