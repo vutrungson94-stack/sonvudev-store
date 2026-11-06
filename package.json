@@ -60,7 +60,18 @@
     "provenance": "node scripts/provenance.mjs",
     "benchmark": "node scripts/benchmark.mjs",
     "trust:virustotal": "node scripts/set-virus-scan.mjs",
-    "merchant:feed": "node scripts/generate-merchant-feed.mjs"
+    "merchant:feed": "node scripts/generate-merchant-feed.mjs",
+    "ops:run": "node scripts/ops-run.mjs",
+    "ops:run:apply": "node scripts/ops-run.mjs --apply",
+    "ops:catalog": "node scripts/sync-products-to-supabase.mjs",
+    "ops:catalog:apply": "node scripts/sync-products-to-supabase.mjs --apply",
+    "ops:seo": "node scripts/update-seo.mjs",
+    "ops:seo:apply": "node scripts/update-seo.mjs --apply",
+    "ops:indexnow": "node scripts/ping-indexnow.mjs",
+    "ops:bing": "node scripts/submit-bing-sitemap.mjs",
+    "blog:translate": "node scripts/translate-blog.mjs",
+    "blog:translate:apply": "node scripts/translate-blog.mjs --apply",
+    "translate:smoke": "node scripts/translate-smoke.mjs"
   },
   "files": [
     "src",
