@@ -1,0 +1,7 @@
+
+> sonvudev-store@1.0.0 audit
+> node scripts/audit-web.mjs
+
+
+[audit] 32 nh├│m kiß╗âm tra, 0 vß║Ñn ─æß╗ü.
+[audit] PASS: kh├┤ng c├│ domain g├╡ tay, route tr├╣ng, link g├úy, tiß║┐ng Viß╗çt mß║Ñt dß║Ñu hay kho├í i18n mß╗ô c├┤i.
