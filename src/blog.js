@@ -20,6 +20,30 @@ function blogPath(slug) {
   return path.join(BLOG_DIR, `${slug}.json`);
 }
 
+// Resolve a product slug to its stable id so a blog CTA can deep-link the
+// buyer straight into checkout (/?buy=<id>) instead of the detail page.
+// Uses the tracked products file synchronously; on a store whose catalogue
+// only lives in Supabase (no local file), the slug is left alone and the link
+// falls back to the detail page.
+const productsJsonPath = path.join(dataDir, "products.json");
+let slugToId = null;
+const productIdForSlug = (slug) => {
+  if (!slug) return null;
+  if (slugToId) return slugToId.get(slug) || null;
+  try {
+    const items = JSON.parse(readFileSync(productsJsonPath, "utf8"));
+    slugToId = new Map((Array.isArray(items) ? items : []).map((p) => [String(p.slug || ""), p.id]));
+    return slugToId.get(slug) || null;
+  } catch {
+    slugToId = new Map();
+    return null;
+  }
+};
+const buyHref = (slug) => {
+  const id = productIdForSlug(slug);
+  return id ? absolute(`/?buy=${encodeURIComponent(id)}#products`) : absolute(`/product/${encodeURIComponent(slug)}`);
+};
+
 // Load all blog posts from disk and sort by date (newest first).
 export function loadBlogPosts() {
   let files;
@@ -198,6 +222,10 @@ export function renderBlogPost(post, lang = "vi") {
   const title = blogField(post, lang, "title");
   const description = blogField(post, lang, "description");
   const bodyContent = blogField(post, lang, "content");
+  // Deep-link every product URL in the article body straight into checkout,
+  // not the detail page: the CTA was built to convert a reader into a buyer,
+  // not to give them a product card to read twice.
+  const contentHtml = String(bodyContent || "").replace(/href="\/product\/([^"?#\s]+)"/g, (_m, slug) => `href="${buyHref(slug)}"`);
   const section = blogField(post, lang, "section");
   const dateDisplay = new Date(post.published || post.modified || Date.now())
     .toLocaleDateString(ui.dateLocale, {
@@ -214,10 +242,9 @@ export function renderBlogPost(post, lang = "vi") {
   const modified = new Date(post.modified || post.published || Date.now())
     .toISOString();
 
+  const buyLink = (slug) => buyHref(slug);
   const relatedHtml = post.relatedProductSlug
-    ? `<a class="blog-related-link" href="${absolute(
-        `/product/${post.relatedProductSlug}`
-      )}">${ui.related} →</a>`
+    ? `<a class="blog-related-link" href="${esc(buyLink(post.relatedProductSlug))}">${ui.related} →</a>`
     : "";
 
   const noticeHtml = !isVi && !isEn && ui.translationNotice
@@ -273,7 +300,7 @@ export function renderBlogPost(post, lang = "vi") {
       <p class="blog-lead">${esc(description)}</p>
     </header>
     <div class="blog-content">
-      ${noticeHtml}${bodyContent}
+      ${noticeHtml}${contentHtml}
     </div>
     <footer class="blog-footer">
       <div class="blog-related">

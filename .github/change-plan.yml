@@ -1,0 +1,30 @@
+# .github/change-plan.yml — example
+# The template to copy is docs/CHANGE-PLAN.md. This file exists so reviewers and
+# automation can find the contract without digging.
+#
+# Real plans live in the commit description or in docs/, not here. Do not edit
+# this file to describe a one-off change.
+
+example:
+  task: "Fix /<lang>/product/:slug so buyers reach checkout from product pages and blog CTAs"
+  scope:
+    - file: public/app.js
+      region: "?buy=<id> branch in loadProducts().then"
+    - file: src/blog.js
+      region: "related-product link + body CTA rewrite to /?buy= route"
+  why: "Product pages and blog CTAs leaked buyers into a dead end instead of checkout"
+  invariants_checked:
+    - "routing: /?buy= stays a 200 on / and on localized homepages"
+    - "i18n: URL prefix ownership preserved"
+  tests:
+    existing: "storefront-i18n.test.js, product-page tests"
+    added: ["test/buy-flow.test.js (missing-product → graceful detail)"]
+    changed: "none"
+  risk:
+    wrong_behavior: "checkout opens for the wrong product"
+    detection: "npm test order-status/api; live smoke /?buy=<id>"
+  verified:
+    - cmd: npm test
+      result: "PASS — 73 files"
+    - cmd: _Build/gbuild.ps1
+      result: "PASS"

@@ -654,7 +654,13 @@ loadProducts().then(() => {
     toastMsg(`${T('paypal.cancelled')}. ${T('paypal.cancelledHint')}`);
   }
   if (wanted) {
-    openProduct(wanted);
+    const target = products.find((p) => p.id === wanted || p.slug === wanted);
+    // A product page (or a blog CTA) links here as /?buy=<id> to land the buyer
+    // straight on checkout. Opening the detail modal instead showed them the
+    // same page they just came from and made them hunt for the buy button a
+    // second time. Only an unknown id falls back to the old behavior.
+    if (target) openCheckout(target);
+    else openProduct(wanted);
   }
   if (query.get('buy') || query.get('paypal')) history.replaceState(null, '', location.pathname + location.hash);
 });
