@@ -11,7 +11,7 @@ import { paypalEnvironmentIsSet } from "./config.js";
 import { createDownloadUrl, createUploadUrl } from "./r2.js";
 import { captureOrder, createOrder as createPayPalOrder, hashToken, newOrderId, newToken, paypalChargeForProduct, paymentMatchesOrder, readOrder, verifyWebhook } from "./paypal.js";
 import { paymentInstructions, paymentOptions } from "./payments.js";
-import { analyticsMeta, brandMeta, esc, fillCopy, fillPageTokens, localizeStaticHtml, pageTokenValues, renderFeed, renderIndexCount, renderIndexFilters, renderIndexGrid, renderLlmsTxt, renderMerchantFeed, renderOgImage, renderProductPage, renderStats, tokenMeta, verificationFile, verificationMeta, REFUND_POLICY_UPDATED } from "./pages.js";
+import { analyticsMeta, brandMeta, esc, fillCopy, fillPageTokens, pageTokenValues, renderFeed, renderIndexCount, renderIndexFilters, renderIndexGrid, renderLlmsTxt, renderMerchantFeed, renderOgImage, renderProductPage, renderStats, tokenMeta, verificationFile, verificationMeta, REFUND_POLICY_UPDATED } from "./pages.js";
 import { renderBlogPost, renderBlogIndex, renderBlogFeed, loadBlogPosts, getBlogPostBySlug, EXTRA_BLOG_LOCALES } from "./blog.js";
 import { hasPayment, isClosed, isUnpaid, markOrderDelivered, markOrderPaid, paymentDeadline, sweeperRunning, voidPayment } from "./orders.js";
 import { notifyOrder, notifyMode } from "./notify.js";
@@ -23,45 +23,26 @@ import { refuse } from "./refuse.js";
 import { renderRobotsTxt } from "./robots.js";
 import { adminThrottled, downloadThrottled, healthThrottled, tooManyAttempts, checkoutThrottled } from "./rate-limit.js";
 import { isConfigured as tIsConfigured, translateText, translateMissingKeys } from "./translate-service.mjs";
-import { LOCALE_CODES, DEFAULT_LOCALE, normalizeLocale, isSupportedLocale } from "./i18n-registry.mjs";
+import { LOCALE_CODES, FALLBACK_LOCALE, normalizeLocale } from "./i18n-registry.mjs";
 import { parseAdminTokens, matchAdminToken } from "./admin-auth.js";
 import { isEnabled } from "./feature-flags.js";
 import { otelEnabled, exportSpan, otelStats } from "./otel.js";
 import { canaryAssignment, canaryCookie, canaryClearCookie } from "./canary.js";
-import { gitCommand } from "./lib/git.mjs";
 
 const app = express();
 const publicDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "public");
 const json = express.json({ limit: "1mb" });
-// The commit a deploy is supposed to be serving. Render injects RENDER_GIT_COMMIT;
-// everywhere else we ask git once at boot. /api/health reports it so the CI
-// deployed-site gate can prove it is auditing THIS release and not the previous
-// one - before this, the gate raced the deploy and audited whatever happened to
-// be live.
-const DEPLOYED_COMMIT = String(process.env.RENDER_GIT_COMMIT || gitCommand(["rev-parse", "HEAD"]) || "").trim();
 
 // Language negotiation for first-time visitors.
 //
-// The storefront serves Vietnamese for an unprefixed URL that carries no stored
-// preference, and each additional language under its own prefix: /en/, /de/, etc.
-// When a visitor arrives without a stored preference we look at Accept-Language:
-// Vietnamese browsers get the root (Vietnamese) version, a recognised non-vi
-// locale gets redirected to its own prefixed homepage.
-//
-// A *missing* header is not a vote for English. The SEO gate and every crawler
-// that asks without one were being 308'd into /en/ - which nothing served - so
-// they followed the redirect into a 404. No header simply serves Vietnamese, the
-// source language of the site, and leaves the browser alone to make its own
-// choice. A crawler that wants English asks for it and gets it.
+// The storefront exposes / and /en/ for every public page. When a visitor arrives
+// without a stored preference we look at Accept-Language: Vietnamese browsers get
+// the root (Vietnamese) version, every other language is served the English one.
+// This keeps the URL space simple while still honouring the reader's locale.
 function preferredLanguage(req) {
   const header = String(req.headers["accept-language"] || "");
-  if (!header.trim()) return null;
+  if (!header.trim()) return FALLBACK_LOCALE;
   const first = header.split(",")[0].trim().split(";")[0].trim();
-  // Node fetch and some crawlers send a bare "*", which is no preference at all.
-  // Unknown tags are also not a request for the English fallback: the root page
-  // is Vietnamese and an unrecognized browser language gets the source page.
-  if (!first || first === "*") return null;
-  if (!isSupportedLocale(first)) return null;
   // Registry normalises case, region suffixes and zh-* -> zh-CN.
   return normalizeLocale(first);
 }
@@ -116,8 +97,7 @@ function redirectRootLangToEnglish(req, res, next) {
   const langMatch = req.path.match(/^\/([a-z]{2}(-[A-Za-z]{2})?)\//);
   if (langMatch && LOCALE_CODES.some((c) => c.toLowerCase() === langMatch[1].toLowerCase())) return next();
   const lang = preferredLanguage(req);
-  // No recognised preference (or Vietnamese): the root page answers in Vietnamese.
-  if (!lang || lang === DEFAULT_LOCALE) return next();
+  if (lang === "vi") return next();
   const qs = req.url.includes("?") ? req.url.slice(req.url.indexOf("?")) : "";
   return res.redirect(308, `/${lang}${req.path}${qs}`);
 }
@@ -442,9 +422,8 @@ const invalidatePages = () => {
   textCache.clear();
 };
 
-async function renderPage(file, lang = DEFAULT_LOCALE) {
-  const cacheKey = `${file}::${lang}`;
-  const cached = pageCache.get(cacheKey);
+async function renderPage(file) {
+  const cached = pageCache.get(file);
   if (cached && Date.now() - cached.at < PAGE_TTL_MS) return cached.html;
   const template = await fs.readFile(path.join(publicDir, file), "utf8");
   // Optional rather than assumed: a file missing from the table is rendered with
@@ -455,13 +434,8 @@ async function renderPage(file, lang = DEFAULT_LOCALE) {
   // the byte-level tests again. What follows the tokens is structure, not values:
   // verification tags, the catalogue and the counts, each derived from the same
   // product list the tokens describe.
-  //
-  // The language travels the same path for every static page, so a localized
-  // route serves a page whose chrome and metadata actually belong to its reader
-  // rather than a Vietnamese skeleton with a language prefix.
-  const values = pageTokenValues({ products, reviewLimits, page: file, lang });
-  const filled = fillPageTokens(template, values)
-    .replace("</head>", `${tokenMeta(lang)}\n${verificationMeta()}\n${brandMeta()}\n${analyticsMeta()}\n</head>`)
+  const html = fillPageTokens(template, pageTokenValues({ products, reviewLimits, page: file }))
+    .replace("</head>", `${tokenMeta()}\n${verificationMeta()}\n${brandMeta()}\n${analyticsMeta()}\n</head>`)
     .replace(/(<span[^>]*class="product-count"[^>]*id="product-count"[^>]*>)[\s\S]*?(<\/span>)/, `$1${esc(renderIndexCount(products))}$2`)
     .replace(/<!--filters:start-->[\s\S]*?<!--filters:end-->/, `<!--filters:start-->${renderIndexFilters(products)}<!--filters:end-->`)
     .replace(/(<section class="stats wrap" id="stats">)([\s\S]*?)(<\/section>)/, (_all, open, _body, close) => {
@@ -472,16 +446,13 @@ async function renderPage(file, lang = DEFAULT_LOCALE) {
       return `${open}<div data-stat="products"><strong><span id="stat-products">${stats.products}</span></strong><small data-i18n="stats.1">Sản phẩm đang bán</small></div><div data-stat="platforms"><strong><span id="stat-platforms">${stats.platforms}</span></strong><small data-i18n="stats.2">Nền tảng được hỗ trợ</small></div><div data-stat="releases"><strong><span id="stat-releases">${stats.releases}</span></strong><small data-i18n="stats.3">Bản phát hành đã xuất bản</small></div><div class="stats-note"><span class="spark">✦</span><p data-i18n="stats.note">Mỗi sản phẩm đều được làm ra để giải quyết một vấn đề thật.</p></div>${close}`;
     })
     .replace(/<!--catalog:start-->[\s\S]*?<!--catalog:end-->/, `<!--catalog:start-->${renderIndexGrid(products)}<!--catalog:end-->`);
-  // The stats strip carries data-i18n keys of its own; the localisation pass
-  // fills the same placeholders the dictionary already owns.
-  const html = localizeStaticHtml(filled, { file, lang, values });
-  pageCache.set(cacheKey, { at: Date.now(), html });
+  pageCache.set(file, { at: Date.now(), html });
   return html;
 }
 
-const sendPage = (file, lang = DEFAULT_LOCALE) => async (_req, res) => {
+const sendPage = (file) => async (_req, res) => {
   try {
-    res.set("Cache-Control", "public, max-age=300").type("html").send(await renderPage(file, lang));
+    res.set("Cache-Control", "public, max-age=300").type("html").send(await renderPage(file));
   } catch (error) {
     console.error(error);
     // A broken template must not take the storefront down with it.
@@ -513,30 +484,22 @@ for (const file of Object.keys(served)) {
   // where a person could paste the address bar they were given and get a different
   // page from the one they were looking at.
   if (file === "index.html") {
-    // Vietnamese homepage answers under the root, unprefixed.
-    app.get(["/", "/index.html"], sendPage(file, "vi"));
-    // One real homepage per supported locale, rendered by the server in that
-    // language: html lang, title, description, canonical, hreflang and the
-    // page's own words. /en/ exists too - the redirect sends English readers
-    // to it, and a redirect to a 404 is a deindexed homepage.
-    for (const lang of LOCALE_CODES.filter((code) => code !== "vi")) {
-      app.get(`/${lang}/`, sendPage(file, lang));
-      app.get(`/${lang}`, sendPage(file, lang));
+    // One homepage, one language at a time: i18n.js switches it in the browser and
+    // reads the stored choice before the first paint. The second argument this call
+    // used to pass ("vi") named nothing — sendPage takes one parameter — so it
+    // implied a server-side language that does not exist and would only ever be vi.
+    app.get(["/", "/index.html"], sendPage(file));
+    // Homepage in every supported language: /fr/, /de/, /es/, /ja/, /zh-CN/, etc.
+    // The server renders the page in that language; i18n.js then takes over on the
+    // client to apply the dictionary and any stored preference.
+    for (const lang of EXTRA_BLOG_LOCALES) {
+      app.get(`/${lang}/`, sendPage(file));
+      app.get(`/${lang}`, sendPage(file));
     }
     continue;
   }
   app.get(`/${file}`, sendPage(file));
   app.get(`/${file.replace(/\.html$/, "")}`, sendPage(file));
-  // The vi routes already answered above for every file in `served`. Only the
-  // indexable legal pages also answer under their locale prefix; support pages
-  // and the 404 stay unprefixed (they are vi/en runtime pages, and a localized
-  // URL pointing at Vietnamese bytes is worse than no localized URL).
-  if (["about.html", "terms.html", "privacy.html", "refund.html"].includes(file)) {
-    for (const lang of LOCALE_CODES.filter((code) => code !== "vi")) {
-      app.get(`/${lang}/${file}`, sendPage(file, lang));
-      app.get(`/${lang}/${file.replace(/\.html$/, "")}`, sendPage(file, lang));
-    }
-  }
 }
 // The recovery form, served by the renderer rather than by express.static: it
 // prints the support address, and the raw file leaves {{support}} in the markup
@@ -711,28 +674,10 @@ app.get("/og/:slug.svg", async (req, res, next) => {
 app.get("/sitemap.xml", async (_req, res, next) => {
   try {
   const base = env.appUrl.replace(/\/$/, "");
-  const staticPages = [
-    { file: "index.html", path: "", priority: "1.0", changefreq: "monthly" },
-    { file: "terms.html", path: "/terms", priority: "0.3", changefreq: "monthly" },
-    { file: "privacy.html", path: "/privacy", priority: "0.3", changefreq: "monthly" },
-    { file: "refund.html", path: "/refund", priority: "0.3", changefreq: "monthly" },
-    { file: "about.html", path: "/about", priority: "0.3", changefreq: "monthly" },
-  ];
-  // The five static pages exist in every supported language under their locale
-  // prefix - a German reader must find a German terms page, and the sitemap is
-  // how a crawler learns that exists. Each URL carries hreflang pointing at all
-  // sibling copies, with x-default = the Vietnamese page.
-  const urlFor = (slug, code) => `${base}${code === "vi" ? "" : `/${code}`}${slug || "/"}`;
-  const staticAlternates = (slug) => LOCALE_CODES
-    .map((code) => `<xhtml:link rel="alternate" hreflang="${code}" href="${urlFor(slug, code)}"/>`)
-    .join("") + `<xhtml:link rel="alternate" hreflang="x-default" href="${urlFor(slug, "vi")}"/>`;
-  const urls = [];
-  for (const entry of staticPages) {
-    for (const code of LOCALE_CODES) {
-      const priority = code === "vi" ? entry.priority : entry.priority === "1.0" ? "0.9" : "0.3";
-      urls.push(`<url><loc>${urlFor(entry.path, code)}</loc><changefreq>${entry.changefreq}</changefreq><priority>${priority}</priority>${staticAlternates(entry.path)}</url>`);
-    }
-  }
+  const pages = await fs.readdir(publicDir);
+  const urls = pages
+    .filter((file) => /^(index|terms|privacy|refund|about)\.html$/.test(file))
+    .map((file) => `<url><loc>${base}/${file === "index.html" ? "" : file.replace(/\.html$/, "")}</loc><changefreq>monthly</changefreq><priority>${file === "index.html" ? "1.0" : "0.3"}</priority></url>`);
   // A product that is not on the sitemap cannot be found, so this is built from
   // the live catalogue rather than from a list someone has to remember to edit.
   // The filter is the storefront's own (isSellable), so a page nobody can buy
@@ -975,9 +920,6 @@ app.get("/api/health", adminOrHealth, async (req, res) => {
     orderWindowHours: env.orders?.paymentWindowHours ?? null,
     sweeper: sweeperRunning(),
     search: searchState,
-    // Which commit is answering. The deploy gate refuses to certify a deploy it cannot identify.
-    commit: DEPLOYED_COMMIT || null,
-    launchedAt: env.site.launchedAt || null,
   };
   if (!req.owner) return res.status(ok ? 200 : 503).json(publicView);
   res.status(ok ? 200 : 503).json({

@@ -6,19 +6,16 @@
 // quality signal: a 100% pass rate with a high escape rate means tests don't
 // test what matters.
 //
-// The two counters never overlap:
-//   - production defects: commits whose subject starts with fix:, hotfix: or
-//     bug: (a defect was repaired - it shipped at some point)
-//   - caught defects: commits whose subject starts with test: (someone added
-//     or repaired a test - something that was caught before shipping)
-// An earlier version counted fix: on BOTH sides, so every production defect
-// was also counted as a caught defect and the rate was structurally ~50%.
-//
 //   npm run defect:escape   compute current escape rate and write baseline
-//   npm run defect:check    same, but fail when the rate is above threshold
+//   npm run defect:check    fail if escape rate rose above threshold
+//
+// Evidence sources:
+//   - production defects: issues/incidents tagged in git commit messages
+//     containing "fix:" or "hotfix:" since last release tag.
+//   - caught defects: tests added/fixed in commits containing "test:" or "fix:".
 //
 // Result stored in metrics-defect-escape.json.
-import { execFileSync } from 'node:child_process';
+import { execSync } from 'node:child_process';
 import { readFile, writeFile, mkdir } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -29,17 +26,20 @@ const escapeHistoryFile = path.join(root, 'metrics-defect-escape-history.json');
 
 const now = new Date().toISOString();
 
-const countCommits = (pattern) => {
+const gitLogMatching = (pattern) => {
   try {
-    const out = execFileSync('git', ['log', '-E', '--format=%s', `--grep=${pattern}`], { cwd: root, encoding: 'utf8' }).trim();
+    const out = execSync(
+      `git -C "${root}" log --format=%s --grep="${pattern}" --all`,
+      { encoding: 'utf8' },
+    ).trim();
     return out ? out.split('\n').filter(Boolean).length : 0;
   } catch {
     return 0;
   }
 };
 
-const productionDefects = countCommits('^(fix|hotfix|bug):');
-const caughtDefects = countCommits('^test:');
+const productionDefects = gitLogMatching('fix:|hotfix:|bug:');
+const caughtDefects = gitLogMatching('test:|fix:|chore:|refactor:');
 
 // Escape rate = production defects / (production + caught).
 let escapeRate = null;

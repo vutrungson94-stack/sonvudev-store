@@ -25,23 +25,32 @@ export const DEFAULT_LOCALE = "vi";
 export const FALLBACK_LOCALE = "en";
 
 /**
- * Recognizes a language tag (case-insensitive) or returns null when the shop
- * does not serve that language. Normalizing and recognizing are intentionally
- * different: an unknown browser language is not a request for English, but
- * app-layer call sites that truly need a fallback use normalizeLocale().
+ * Get locale config by code.
  */
-function recognizedLocale(code) {
-  if (!code) return null;
-  const lower = String(code).toLowerCase().split(";")[0].trim();
-  const exact = LOCALE_CODES.find((c) => c.toLowerCase() === lower);
-  if (exact) return exact;
-  const base = lower.split("-")[0];
-  if (base === "zh") return "zh-CN";
-  return LOCALE_CODES.find((c) => c.toLowerCase().split("-")[0] === base) || null;
+export function getLocale(code) {
+  return SUPPORTED_LOCALES.find((l) => l.code === code) || null;
 }
 
+/**
+ * Get fallback chain for a language: [target, fallback, fallback-of-fallback, ...]
+ */
+export function getLocaleChain(code) {
+  const chain = [];
+  let current = code;
+  while (current) {
+    chain.push(current);
+    const locale = getLocale(current);
+    current = locale ? locale.fallback : null;
+  }
+  return chain;
+}
+
+/**
+ * Check if a language code is supported (case-insensitive).
+ */
 export function isSupportedLocale(code) {
-  return Boolean(recognizedLocale(code));
+  const lower = String(code || "").toLowerCase();
+  return LOCALE_CODES.some((c) => c.toLowerCase() === lower);
 }
 
 /**
@@ -49,5 +58,12 @@ export function isSupportedLocale(code) {
  * Falls back to FALLBACK_LOCALE ("en") for unknown tags; zh* maps to zh-CN.
  */
 export function normalizeLocale(code) {
-  return recognizedLocale(code) || FALLBACK_LOCALE;
+  if (!code) return FALLBACK_LOCALE;
+  const lower = String(code).toLowerCase().split(";")[0].trim();
+  const exact = LOCALE_CODES.find((c) => c.toLowerCase() === lower);
+  if (exact) return exact;
+  const base = lower.split("-")[0];
+  if (base === "zh") return "zh-CN";
+  const byBase = LOCALE_CODES.find((c) => c.toLowerCase().split("-")[0] === base);
+  return byBase || FALLBACK_LOCALE;
 }

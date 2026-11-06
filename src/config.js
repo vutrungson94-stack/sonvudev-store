@@ -264,10 +264,6 @@ export const env = {
     // product change be pushed to Bing, Yandex and Naver the moment it happens
     // rather than waiting for the next crawl.
     indexNowKey: value("INDEXNOW_KEY"),
-    // The day the shop opened its doors to orders, e.g. 2026-09-26 (the date of
-    // the first commit). Reported by /api/health so the admin panel can show the
-    // age of the shop without a hardcoded date; empty means "don't show it".
-    launchedAt: value("SHOP_LAUNCHED_AT"),
   },
 };
 

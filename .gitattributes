@@ -19,10 +19,6 @@
 *.sh        text eol=lf
 *.service   text eol=lf
 Caddyfile   text eol=lf
-# Windows scripts run through PowerShell, which copes with either ending but is
-# happier with CRLF when invoked through a batch file.
-*.ps1       text eol=crlf
-*.bat       text eol=crlf
 
 # Source is checked out with native endings. Nothing in the build or the test
 # suite depends on either choice: the gates that read source as text already

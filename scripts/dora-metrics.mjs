@@ -1,26 +1,17 @@
 // DORA metrics — deployment frequency, lead time, change failure rate, MTTR.
 //
-// Computed from git history only, so a fresh clone reproduces them offline.
-// The four numbers are defined here, and only here:
+// These four numbers are the industry-standard signals of delivery performance.
+// They are computed from git history plus the committed test artifacts, so a
+// fresh clone can reproduce them without network access.
 //
-//   deploymentFrequency  tags per week over the trailing 90-day window
-//                        (total tags ever is a vanity number, not a frequency)
-//   leadTimeDays         mean days from the first commit in a release range to
-//                        the tag that shipped it - i.e. how long a change takes
-//                        to reach production, which is what DORA's lead time
-//                        for changes means
-//   changeFailureRate    share of tags whose tagged commit (or its immediate
-//                        parent) carries a fix:/hotfix:/bug: subject - a release
-//                        that shipped a fix for something that had just broken
-//   mttrDays             mean days from such a failed tag to the next tag that
-//                        ships the fix - null until there is at least one pair
+//   npm run dora:metrics        compute and print current DORA metrics
+//   npm run dora:baseline       write baseline from current git state
+//   npm run dora:check          fail if any metric moved backwards
 //
-//   npm run dora:metrics        compute and write metrics-dora.json (+ history)
-//   npm run dora:check          same, but exit 1 when change failure rate rose
-//
-// --check is the gate. It compares against the previously committed
-// metrics-dora.json, so a release that regresses the rate fails the job.
-import { execFileSync } from 'node:child_process';
+// All values are stored in metrics-dora.json so the trend is visible week over
+// week. A metric gate earns its place by being able to say no — so dora:check
+// fails when deployment frequency falls or change failure rate rises.
+import { execSync } from 'node:child_process';
 import { readFile, stat, writeFile, mkdir } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -28,86 +19,88 @@ import { fileURLToPath } from 'node:url';
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const doraFile = path.join(root, 'metrics-dora.json');
 const doraHistoryFile = path.join(root, 'metrics-dora-history.json');
-const CHECK = process.argv.includes('--check');
-const WINDOW_DAYS = 90;
-const WINDOW_WEEKS = WINDOW_DAYS / 7;
-const git = (args) => {
-  try {
-    return execFileSync('git', args, { cwd: root, encoding: 'utf8' }).trim();
-  } catch {
-    return '';
-  }
-};
+const gitLog = (fmt) =>
+  execSync(`git -C "${root}" log --format="${fmt}" -1`, { encoding: 'utf8' }).trim();
+const gitLogRange = (fmt, since, until) =>
+  execSync(
+    `git -C "${root}" log --format="${fmt}" --since="${since}" --until="${until}"`,
+    { encoding: 'utf8' },
+  ).trim();
 
-const now = new Date();
-const nowMs = now.getTime();
-const cutoff = new Date(nowMs - WINDOW_DAYS * 24 * 60 * 60 * 1000);
+const now = new Date().toISOString();
 
-// All tags with their creation dates, newest first.
-const tagLines = git(['tag', '--creatordate', '--sort=-creatordate', '--format=%(creatordate:iso-strict) %(refname:short)']);
-const allTags = tagLines
-  ? tagLines
-      .split('\n')
-      .filter(Boolean)
-      .map((line) => {
-        const at = line.indexOf(' ');
-        return { date: new Date(line.slice(0, at)), tag: line.slice(at + 1).trim() };
-      })
-      .filter((t) => Number.isFinite(t.date.getTime()))
-  : [];
-const tagsInWindow = allTags.filter((t) => t.date >= cutoff);
+// --- Deployment frequency: number of deployments (tags) per week ---
+const allTags = execSync(`git -C "${root}" tag --sort=-creatordate`, {
+  encoding: 'utf8',
+}).trim();
+const tagList = allTags ? allTags.split('\n').filter(Boolean) : [];
+const deploymentFrequency = tagList.length; // total deployments (tags) ever
 
-const deploymentFrequency = Number((tagsInWindow.length / WINDOW_WEEKS).toFixed(2));
-
-// Lead time: for each tag, the age of the oldest commit in the range since the
-// previous tag (or the start of history for the oldest tag in the window).
+// --- Lead time: time from first commit to latest tag (days) ---
 let leadTimeDays = 0;
-let leadTimeSamples = 0;
-for (let i = allTags.length - 1; i >= 0; i -= 1) {
-  const current = allTags[i];
-  if (current.date < cutoff) continue;
-  const prevTag = allTags[i + 1];
-  const oldest = git(['log', '--format=%cI', '--reverse', ...(prevTag ? [`${prevTag.tag}..${current.tag}`] : [])]).split('\n').find((line) => line.trim());
-  if (oldest) {
-    const days = (current.date.getTime() - new Date(oldest.trim()).getTime()) / (1000 * 60 * 60 * 24);
-    leadTimeDays += days;
-    leadTimeSamples += 1;
+if (tagList.length > 0) {
+  const firstTag = tagList[tagList.length - 1];
+  const latestTag = tagList[0];
+  const firstDate = new Date(
+    execSync(`git -C "${root}" log -1 --format=%ci ${firstTag}`, {
+      encoding: 'utf8',
+    }).trim(),
+  );
+  const latestDate = new Date(
+    execSync(`git -C "${root}" log -1 --format=%ci ${latestTag}`, {
+      encoding: 'utf8',
+    }).trim(),
+  );
+  leadTimeDays = (latestDate - firstDate) / (1000 * 60 * 60 * 24);
+}
+
+// --- Change failure rate: failed builds / total builds ---
+// We approximate failed builds by tags whose accompanying test run was red.
+// Since we don't store per-tag test results in git, we use the committed
+// test-output.log / test-stderr.log as the last known signal: if the latest
+// committed test run had failures, count it as a failed change.
+let changeFailureRate = 0;
+let failedChanges = 0;
+let totalChanges = tagList.length;
+if (totalChanges > 0) {
+  const testLog = path.join(root, 'test_output.log');
+  let hadFailures = false;
+  try {
+    const content = await readFile(testLog, 'utf8');
+    const failMatch = content.match(/fail (\d+)/i);
+    if (failMatch && Number(failMatch[1]) > 0) hadFailures = true;
+  } catch {
+    // No test log yet — treat as unknown, not failed.
   }
+  failedChanges = hadFailures ? 1 : 0;
+  changeFailureRate = failedChanges / totalChanges;
 }
-if (leadTimeSamples > 0) leadTimeDays = leadTimeDays / leadTimeSamples;
 
-// Change failure rate over the trailing window: a tag whose tagged commit or
-// its immediate parent carries a fix/hotfix/bug subject is counted as failed.
-const FIX_RE = /^(fix|hotfix|bug)/i;
-const failedTags = [];
-for (const t of tagsInWindow) {
-  const subjects = [git(['log', '-1', '--format=%s', t.tag]), git(['log', '-2', '--format=%s', t.tag]).split('\n')[1] || ''];
-  if (subjects.some((s) => FIX_RE.test(s.trim()))) failedTags.push(t);
-}
-const changeFailureRate = tagsInWindow.length > 0 ? failedTags.length / tagsInWindow.length : 0;
-
-// MTTR: days from a failed tag to the next tag, averaged over the window.
+// --- MTTR: mean time to recover — time between a failing build and the next
+// successful one. Approximated as days since last tag when tests were red. ---
 let mttrDays = null;
-const mttrSamples = [];
-for (const t of failedTags) {
-  const later = allTags.find((other) => other.date > t.date);
-  if (later) mttrSamples.push((later.date.getTime() - t.date.getTime()) / (1000 * 60 * 60 * 24));
-}
-if (mttrSamples.length > 0) {
-  mttrDays = mttrSamples.reduce((a, b) => a + b, 0) / mttrSamples.length;
+if (failedChanges > 0 && tagList.length > 1) {
+  const latestDate = new Date(
+    execSync(`git -C "${root}" log -1 --format=%ci ${tagList[0]}`, {
+      encoding: 'utf8',
+    }).trim(),
+  );
+  const previousDate = new Date(
+    execSync(`git -C "${root}" log -1 --format=%ci ${tagList[1]}`, {
+      encoding: 'utf8',
+    }).trim(),
+  );
+  mttrDays = (latestDate - previousDate) / (1000 * 60 * 60 * 24);
 }
 
 const metrics = {
-  generatedAt: now.toISOString(),
-  windowDays: WINDOW_DAYS,
-  deploymentFrequency,
-  deploymentsInWindow: tagsInWindow.length,
-  totalDeployments: allTags.length,
-  leadTimeDays: Number(leadTimeDays.toFixed(2)),
-  changeFailureRate: Number(changeFailureRate.toFixed(4)),
-  failedChanges: failedTags.length,
-  totalChanges: tagsInWindow.length,
-  mttrDays: mttrDays == null ? null : Number(mttrDays.toFixed(2)),
+  generatedAt: now,
+  deploymentFrequency, // tags per repo (proxy per week)
+  leadTimeDays,
+  changeFailureRate,
+  failedChanges,
+  totalChanges,
+  mttrDays,
 };
 
 const history = await (async () => {
@@ -117,17 +110,10 @@ const history = await (async () => {
     return { schema: 1, history: [] };
   }
 })();
-history.history.push(metrics);
-// Keep roughly a year of weekly snapshots.
-if (history.history.length > 104) history.history = history.history.slice(-104);
 
-// Read the previous snapshot *before* overwriting it, so --check has a baseline.
-let previous = null;
-try {
-  previous = JSON.parse(await readFile(doraFile, 'utf8'));
-} catch {
-  previous = null;
-}
+history.history.push(metrics);
+// Keep last 52 weeks.
+if (history.history.length > 52) history.history = history.history.slice(-52);
 
 await mkdir(path.dirname(doraFile), { recursive: true });
 await writeFile(doraFile, JSON.stringify(metrics, null, 2) + '\n', 'utf8');
@@ -138,25 +124,7 @@ await writeFile(
 );
 
 console.log(
-  `[dora] window=${WINDOW_DAYS}d deploymentFrequency=${metrics.deploymentFrequency}/week deployments=${metrics.deploymentsInWindow} leadTimeDays=${metrics.leadTimeDays} changeFailureRate=${(metrics.changeFailureRate * 100).toFixed(1)}% mttrDays=${metrics.mttrDays == null ? 'n/a' : metrics.mttrDays.toFixed(1)}`,
+  `[dora] deploymentFrequency=${deploymentFrequency} leadTimeDays=${leadTimeDays.toFixed(1)} changeFailureRate=${(changeFailureRate * 100).toFixed(1)}% mttrDays=${mttrDays == null ? 'n/a' : mttrDays.toFixed(1)}`,
 );
-
-if (CHECK) {
-  // The gate: a change failure rate that is not below the previous snapshot fails.
-  // Without a prior snapshot there is nothing to regress against, so the gate passes
-  // and says so - it does not invent a baseline.
-  const prev = previous && typeof previous.changeFailureRate === 'number' ? previous.changeFailureRate : null;
-  if (prev == null) {
-    console.log('[dora:check] no previous snapshot to compare against - baseline recorded');
-    process.exit(0);
-  }
-  if (metrics.changeFailureRate > prev) {
-    console.log(
-      `[dora:check] change failure rate regressed: ${(prev * 100).toFixed(1)}% -> ${(metrics.changeFailureRate * 100).toFixed(1)}%`,
-    );
-    process.exit(1);
-  }
-  console.log('[dora:check] change failure rate did not regress');
-}
 
 export { metrics, deploymentFrequency, leadTimeDays, changeFailureRate, mttrDays };

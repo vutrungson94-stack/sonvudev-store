@@ -9,23 +9,13 @@
  * any domain or secret.
  */
 
-import { pingIndexNow, isIndexNowConfigured } from '../src/indexnow.js';
+import { pingIndexNow, siteUrl } from '../src/indexnow.js';
 import { listProducts } from '../src/store.js';
-import { LOCALE_CODES, DEFAULT_LOCALE } from '../src/i18n-registry.mjs';
 
 const main = async () => {
-  if (!isIndexNowConfigured()) {
-    console.log('[ping-indexnow] Not sent: IndexNow is not configured (INDEXNOW_KEY).');
-    return { sent: false, reason: 'unconfigured' };
-  }
   const products = await listProducts();
-  const paths = new Set(['/']);
-  for (const locale of LOCALE_CODES) {
-    const base = locale === DEFAULT_LOCALE ? '' : `/${locale}`;
-    paths.add(`${base}/`);
-    for (const product of products) paths.add(`${base}/product/${product.slug}`);
-  }
-  const result = await pingIndexNow([...paths]);
+  const paths = ['/', ...products.map((p) => `/product/${p.slug}`)];
+  const result = await pingIndexNow(paths);
   if (result.sent) {
     console.log(`[ping-indexnow] Announced ${result.count} URL(s) to IndexNow.`);
   } else {

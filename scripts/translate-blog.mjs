@@ -1,21 +1,8 @@
-/**
- * Fill missing blog translations (title/description/section/content) for the
- * on-demand locales. Only missing fields are translated - existing human
- * translations are never overwritten, and a failed field never becomes a
- * broken null bolted into the JSON.
- *
- * Usage:
- *   npm run blog:translate                 # dry-run report
- *   npm run blog:translate:apply
- */
-import { readFileSync, writeFileSync, readdirSync } from "node:fs";
-import { join, basename, resolve, dirname } from "node:path";
-import { fileURLToPath } from "node:url";
+import { readFileSync, writeFileSync, readdirSync, existsSync, mkdirSync } from "node:fs";
+import { join, basename } from "node:path";
 import { translateText } from "../src/translate-service.mjs";
 
-const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
-const BLOG_DIR = join(root, "data", "blog");
-const DRY_RUN = !process.argv.includes("--apply");
+const BLOG_DIR = join(process.cwd(), "data", "blog");
 const TARGET_LANGS = ["de", "es", "fr", "ja", "zh-CN"];
 const SOURCE_LANG = "vi";
 
@@ -31,50 +18,80 @@ function sleep(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
-async function translateField(text, targetLang) {
-  if (!text || !String(text).trim()) return null;
+async function translateField(text, targetLang, fieldName) {
+  if (!text || !text.trim()) return text;
   try {
-    return await translateText(String(text), targetLang, SOURCE_LANG);
-  } catch (error) {
-    console.error(`  failed: ${error.message}`);
+    const result = await translateText(text, targetLang, SOURCE_LANG);
+    return result;
+  } catch (err) {
+    console.error(`  Failed to translate ${fieldName}:`, err.message);
     return null;
   }
 }
 
 async function translatePost(filePath) {
-  const post = JSON.parse(readFileSync(filePath, "utf8"));
+  const raw = readFileSync(filePath, "utf8");
+  const post = JSON.parse(raw);
   let changed = false;
 
   for (const lang of TARGET_LANGS) {
     const fields = FIELD_MAP[lang];
-    const jobs = [
-      ["title", fields.title, post.titleVi],
-      ["description", fields.description, post.descriptionVi],
-      ["section", fields.section, post.section],
-      ["content", fields.content, post.contentVi],
-    ];
-    for (const [fieldName, key, source] of jobs) {
-      if (post[key] || !source) continue;
-      console.log(`  ${basename(filePath)} -> ${lang}.${fieldName}${DRY_RUN ? " (dry-run)" : ""}`);
-      if (DRY_RUN) continue;
-      const translated = await translateField(source, lang);
-      if (translated) {
-        post[key] = translated;
-        changed = true;
-      }
-      await sleep(250);
+    console.log(`\nTranslating ${basename(filePath)} -> ${lang}`);
+
+    // Title
+    if (!post[fields.title] && post.titleVi) {
+      console.log(`  Translating title...`);
+      post[fields.title] = await translateField(post.titleVi, lang, "title");
+      if (post[fields.title]) changed = true;
+      await sleep(300);
+    }
+
+    // Description
+    if (!post[fields.description] && post.descriptionVi) {
+      console.log(`  Translating description...`);
+      post[fields.description] = await translateField(post.descriptionVi, lang, "description");
+      if (post[fields.description]) changed = true;
+      await sleep(300);
+    }
+
+    // Section
+    if (!post[fields.section] && post.section) {
+      console.log(`  Translating section...`);
+      post[fields.section] = await translateField(post.section, lang, "section");
+      if (post[fields.section]) changed = true;
+      await sleep(300);
+    }
+
+    // Content (HTML)
+    if (!post[fields.content] && post.contentVi) {
+      console.log(`  Translating content (${post.contentVi.length} chars)...`);
+      post[fields.content] = await translateField(post.contentVi, lang, "content");
+      if (post[fields.content]) changed = true;
+      await sleep(500);
     }
   }
 
-  if (changed && !DRY_RUN) {
+  if (changed) {
     writeFileSync(filePath, JSON.stringify(post, null, 2) + "\n", "utf8");
-    console.log(`Updated: ${filePath}`);
-  } else if (!changed) {
-    console.log(`No changes: ${filePath}`);
+    console.log(`\nUpdated: ${filePath}`);
+  } else {
+    console.log(`\nNo changes: ${filePath}`);
   }
 }
 
-const files = readdirSync(BLOG_DIR).filter((f) => f.endsWith(".json"));
-console.log(`Found ${files.length} blog posts${DRY_RUN ? " (dry-run)" : ""}`);
-for (const file of files) await translatePost(join(BLOG_DIR, file));
-console.log("\nDone!");
+async function main() {
+  const files = readdirSync(BLOG_DIR).filter((f) => f.endsWith(".json"));
+  console.log(`Found ${files.length} blog posts`);
+
+  for (const file of files) {
+    const filePath = join(BLOG_DIR, file);
+    await translatePost(filePath);
+  }
+
+  console.log("\nDone!");
+}
+
+main().catch((err) => {
+  console.error("Fatal:", err);
+  process.exit(1);
+});

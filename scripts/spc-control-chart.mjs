@@ -96,9 +96,7 @@ for (const key of allKeys) {
   };
 }
 
-const outOfControl = Object.entries(spc.metrics)
-  .filter(([, m]) => !m.inControl)
-  .map(([key]) => key);
+const outOfControl = Object.values(spc.metrics).filter((m) => !m.inControl);
 
 await mkdir(path.dirname(spcFile), { recursive: true });
 await writeFile(spcFile, JSON.stringify(spc, null, 2) + '\n', 'utf8');
@@ -106,7 +104,7 @@ await writeFile(spcFile, JSON.stringify(spc, null, 2) + '\n', 'utf8');
 let exitCode = 0;
 if (outOfControl.length > 0) {
   console.log(
-    `[spc] OUT OF CONTROL: ${outOfControl.length} metric(s) showing special-cause variation: ${outOfControl.join(', ')}`,
+    `[spc] OUT OF CONTROL: ${outOfControl.length} metric(s) showing special-cause variation: ${outOfControl.map((m) => m.key).join(', ')}`,
   );
   exitCode = 1;
 } else {

@@ -20,7 +20,6 @@ import { walkProjectFiles } from "./lib/files.mjs";
 import { stripComments } from "./lib/source.mjs";
 
 import { env } from "../src/config.js";
-import { LOCALE_CODES } from "../src/i18n-registry.mjs";
 
 const rootFlag = process.argv.indexOf("--root");
 const root = rootFlag > -1
@@ -1227,14 +1226,6 @@ for (const header of pagesSource.matchAll(/<a class="brand"[^>]*>([\s\S]*?)<\/a>
 // ---------------------------------------------------------------------------
 const routeMatches = [...serverSource.matchAll(/app\.(?:get|post|patch|put|delete)\(\s*(?:"([^"]*)"|\[([^\]]*)\])/g)];
 const routePaths = routeMatches.flatMap((m) => (m[2] ? [...m[2].matchAll(/"([^"]*)"/g)].map((x) => x[1]) : [m[1]])).filter(Boolean);
-// The static locale routes (/en/, /de/terms, ...) are registered by a loop over
-// LOCALE_CODES, not by literal app.get strings, so the literal regex above
-// cannot see them. Read the same registry the router reads - a new locale can
-// never drift past this check by being invisible to it.
-for (const code of LOCALE_CODES) {
-  if (code === "vi") continue;
-  routePaths.push(`/${code}`, `/${code}/`, `/${code}/about`, `/${code}/terms`, `/${code}/privacy`, `/${code}/refund`);
-}
 const toRouteRegex = (route) => new RegExp(`^${route.split("/").map((part) => (part.startsWith(":") ? "[^/]+" : part.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"))).join("\\/")}/?$`);
 const answers = (target) => isRealTarget(target) || routePaths.some((route) => toRouteRegex(route).test(target));
 

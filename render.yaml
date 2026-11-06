@@ -38,9 +38,10 @@ services:
     runtime: node
     plan: free
 
-    # `npm ci`, not `npm install`: the lockfile is the release. A free-tier
-    # dependency drift is not a thing a passing build should depend on.
-    buildCommand: npm ci --omit=dev
+    # The free tier is a Node default, not a build step. There is nothing to
+    # compile — 4 dependencies, no bundler — and a build that only ran `npm ci`
+    # would spend the account's 500 build minutes to produce the same tree.
+    buildCommand: npm install --omit=dev
 
     # `node src/server.js`, and PORT/HOST come from the platform. src/config.js
     # already defaults HOST to 0.0.0.0 and reads PORT, so no code change is needed
@@ -65,11 +66,6 @@ services:
         value: production
       - key: APP_URL
         sync: false
-      # Optional but recommended: the day the shop opened (the first commit in
-      # this repository, by convention). The admin panel shows the shop's age
-      # from it; an unset value simply hides that line instead of guessing.
-      - key: SHOP_LAUNCHED_AT
-        value: '2026-09-26'
       - key: BRAND_NAME
         value: SonVuDev
       - key: BRAND_DESCRIPTION
