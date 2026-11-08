@@ -92,9 +92,11 @@ for (const name of LEGAL_PAGES) {
   test(`${name} nói được cả hai ngôn ngữ`, async () => {
     const html = await page(name);
 
-    assert.match(html, /src="(?:format\.js|"\/format\.js)"/,
+    // Absolute path required for locale-prefixed routes (/en/, /de/…).
+    assert.match(html, /src="\/?format\.js"/,
       `${name} phải nạp format.js — i18n.js gọi window.SVDFormat.esc`);
-    assert.match(html, /src="i18n\.js"/,
+    // Absolute path required for locale-prefixed routes.
+    assert.match(html, /src="\/i18n\.js"/,
       `${name} phải nạp từ điển`);
     // No switch of its own: the language is chosen on the homepage and every page
     // reads it from localStorage before it paints. What matters here is that the page

@@ -119,6 +119,7 @@
   "products.onlyOne": "This is the only product right now.",
   "products.emptyTitle": "No product matches",
   "products.emptyText": "Try a different word, or clear the filter you picked.",
+  "products.loading": "Loading products...",
   "products.loadError": "Could not load products",
   "products.loadErrorText": "Failed to load data",
   "products.new": "New",

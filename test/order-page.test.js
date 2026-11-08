@@ -346,7 +346,8 @@ test('phi bản đơn dùng chung một nơi: khoá, khởi động, và báo đ
   // And the shared script is actually loaded by every page that needs it, or the
   // shared helpers are undefined at runtime and nothing here would say so.
   for (const page of ['index.html', 'order.html', 'lookup.html', 'paypal-return.html']) {
-    assert.match(read(page), /<script src="order-client\.js"><\/script>/, `${page} phai nap order-client.js`);
+    // Absolute paths required for locale-prefixed routes (/en/, /de/…).
+    assert.match(read(page), /<script src="\/order-client\.js"><\/script>/, `${page} phai nap order-client.js`);
   }
   assert.ok(!read('404.html').includes('order-client.js'), '404.html khong dung phien ban don, khong nen nap');
 });
@@ -391,7 +392,8 @@ test('trang đơn hàng đọc ngôn ngữ đã chọn ở trang chủ, không c
   // before it paints, so a control here would be a duplicate of a decision already
   // made — and the one screen where a buyer is watching a clock and a price.
   assert.ok(!/data-lang-switch|data-lang-toggle/.test(html), 'trang đơn hàng không có nút đổi ngôn ngữ riêng');
-  assert.match(html, /src="i18n\.js"/, 'trang đơn hàng phải nạp từ điển để đọc lựa chọn đã lưu');
+  // Absolute path required for locale-prefixed routes.
+  assert.match(html, /src="\/i18n\.js"/, 'trang đơn hàng phải nạp từ điển để đọc lựa chọn đã lưu');
   const order = read('order.js');
   assert.ok(/I18N\.onChange\(\(\)=>render\(\)\)/.test(order), 'doi ngon ngu thi ve tu dung loi chu khong doi chu');
 });

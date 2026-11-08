@@ -507,6 +507,7 @@
   "products.eyebrow": "ソフトウェアストア",
   "products.intro1": "無料ツールからプロ向けソリューションまで。",
   "products.intro2": "すべて簡単に始められます。",
+  "products.loading": "製品を読み込み中...",
   "products.loadError": "製品を読み込めませんでした",
   "products.loadErrorText": "データ読み込みエラー",
   "products.new": "新着",

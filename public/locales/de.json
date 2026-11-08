@@ -490,6 +490,7 @@
   "products.eyebrow": "Softwarelager",
   "products.intro1": "Von kostenlosen Tools bis hin zu professionellen Lösungspaketen.",
   "products.intro2": "Alles ist leicht zu starten.",
+  "products.loading": "Produkte werden geladen...",
   "products.loadError": "Das Produkt konnte nicht heruntergeladen werden",
   "products.loadErrorText": "Fehler beim Laden der Daten",
   "products.new": "Neu",

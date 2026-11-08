@@ -143,18 +143,19 @@ const rows = [
   // they had agreed to. Closing that was the point of counting it.
   //
   // The count moved from 5 to 9 while a note elsewhere in this file was still naming
-  // the 404 as untranslated. The 404 has carried <script src="i18n.js"> and a working
-  // toggle for some time, and public/related.js still claimed in a comment that it
-  // could not read the shared dictionary because the 404 has no switch — both facts
-  // false, and both about the page a visitor sees last. The number was right; the list
-  // beside it was not, which is the worse half, because a list is what someone reads to
-  // decide what to work on next. It now names admin.html and says why.
+  // the 404 as untranslated. The 404 has carried <script src="/i18n.js"> (absolute,
+  // required for locale-prefixed routes /en/, /de/…) and a working toggle for some
+  // time, and public/related.js still claimed in a comment that it could not read the
+  // shared dictionary because the 404 has no switch — both facts false, and both about
+  // the page a visitor sees last. The number was right; the list beside it was not,
+  // which is the worse half, because a list is what someone reads to decide what to
+  // work on next. It now names admin.html and says why.
   //
   // The direction is "up", so a page that loses its dictionary is a regression the same
   // way a deleted test is. Nothing stops the count reaching 10 — that would mean the
   // admin console had been translated too, which is a decision for the owner and not
   // for a metric.
-  ['localizedPages', publicHtmlText.filter((body) => /<script src="i18n\.js">/.test(body)).length, 'up', 'trang có từ điển'],
+  ['localizedPages', publicHtmlText.filter((body) => /<script src="\/?i18n\.js">/.test(body)).length, 'up', 'trang có từ điển'],
   // One route serving two languages. It was one, then two pages with a renderer
   // between them that only ever spoke Vietnamese, and the English copy sat unused
   // in the database the whole time.

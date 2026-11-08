@@ -180,7 +180,8 @@ test('trang pháp lý và trang đơn dùng chung một nguồn', async () => {
 // told, in Vietnamese, that nothing was there.
 test('trang 404 nói được cả hai ngôn ngữ', async () => {
   const html = await fetch(`${base}/khong-ton-tai`).then((r) => r.text());
-  assert.match(html, /<script src="i18n\.js"><\/script>/, 'trang 404 phải nạp từ điển');
+  // Absolute path required for locale-prefixed routes.
+  assert.match(html, /<script src="\/i18n\.js"><\/script>/, 'trang 404 phải nạp từ điển');
   // Every sentence on the page is a key, so switching language can reach it. A
   // Vietnamese sentence left as literal text here is a sentence the switch cannot
   // move.

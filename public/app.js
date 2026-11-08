@@ -180,8 +180,10 @@ function visibleProducts() {
 // Products carry an optional English copy. When the visitor switches to English
 // we prefer those fields but always fall back to the Vietnamese text, so a
 // product that has not been translated yet never shows an empty description.
+const currentLang = () => (window.I18N && window.I18N.lang) || 'vi';
+
 function localized(p) {
-  const lang = window.I18N.lang;
+  const lang = currentLang();
   // productLabel returns null when the catalogue value has no translation, so the
   // catalogue's own wording is the fallback here rather than an untranslated label
   // that looks translated.
@@ -304,7 +306,9 @@ function openPurchaseForm(idOrSlug) {
   // hydration). Queue the intent instead of failing or navigating away.
   if (!products || !products.length) {
     pendingBuyId = idOrSlug;
-    if (grid) toastMsg(T('products.loading') || 'Loading...');
+    // i18n key may be absent in older bundles; fall back to a clear message.
+    const loadingMsg = (window.I18N && window.I18N.t) ? window.I18N.t('products.loading', currentLang() === 'vi' ? 'Đang tải sản phẩm...' : 'Loading products...') : 'Loading products...';
+    if (grid) toastMsg(loadingMsg);
     return;
   }
   const raw = products.find((x) => x.id === idOrSlug || x.slug === idOrSlug);
@@ -362,6 +366,7 @@ function openProduct(id) {
     const container = document.getElementById('related-articles');
     if (!related.length) { container.remove(); return; }
     container.className = 'related-articles';
+    const lang = currentLang();
     container.innerHTML = `<div class="detail-requirements" style="border-top:1px solid var(--line);margin-top:18px;padding-top:15px"><b>${esc(T('product.relatedArticles'))}</b>${related.map(post => {
       const title = lang !== 'vi' ? (post.titleEn || post.titleVi || post.title || '') : (post.titleVi || post.title || post.titleEn || '');
       const href = lang !== 'vi' && post.slug ? `/en/blog/${post.slug}` : post.slug ? `/blog/${post.slug}` : '#';
@@ -719,6 +724,7 @@ loadPayOptions();
 const blogCards = document.getElementById('blog-cards');
 if (blogCards) {
   fetch('/blog.json').then(r => r.ok ? r.json() : []).then(posts => {
+    const lang = currentLang();
     const sorted = posts
       .filter(p => p.title || p.titleVi || p.titleEn)
       .sort((a, b) => new Date(b.published || b.modified || 0) - new Date(a.published || a.modified || 0))
@@ -737,6 +743,7 @@ if (blogCards) {
         }).join('')
       : `<p style="color:var(--muted);font-size:13px">${lang === 'vi' ? 'Chưa có bài viết nào.' : 'No posts yet.'}</p>`;
   }).catch(() => {
+    const lang = currentLang();
     blogCards.innerHTML = `<p style="color:var(--muted);font-size:13px">${lang === 'vi' ? 'Không thể tải bài viết.' : 'Could not load posts.'}</p>`;
   });
 }

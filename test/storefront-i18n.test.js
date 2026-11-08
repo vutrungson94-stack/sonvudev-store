@@ -53,8 +53,9 @@ async function boot({ lang = 'vi' } = {}) {
 
 test('index.html tai i18n.js truoc app.js', () => {
   const html = read('index.html');
-  assert.ok(html.includes('src="i18n.js"'), 'index.html phai tai i18n.js');
-  assert.ok(html.includes('src="app.js"'), 'index.html phai tai app.js');
+  // Absolute paths required for locale-prefixed routes (/en/, /de/…); relative src breaks to /en/*.js → 404 HTML.
+  assert.ok(/src="\/i18n\.js"/.test(html) || html.includes('src="i18n.js"'), 'index.html phai tai i18n.js');
+  assert.ok(/src="\/app\.js"/.test(html) || html.includes('src="app.js"'), 'index.html phai tai app.js');
   assert.ok(html.indexOf('i18n.js') < html.indexOf('app.js'), 'i18n.js phai chay truoc app.js');
 });
 
@@ -337,7 +338,8 @@ test('chỉ trang chủ mới có nút đổi ngôn ngữ', () => {
   // Every one of them still renders in the language the reader chose on the
   // homepage — which is the whole point of moving the button rather than dropping it.
   for (const name of pages) {
-    assert.match(read(name), /src="i18n\.js"/, `${name} phải vẫn nạp từ điển`);
+    // Absolute paths required for locale-prefixed routes.
+    assert.match(read(name), /src="\/?i18n\.js"/, `${name} phải vẫn nạp từ điển`);
   }
   // The classes that placed the removed buttons are gone with them.
   const css = read('styles.css');

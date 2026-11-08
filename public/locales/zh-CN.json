@@ -507,6 +507,7 @@
   "products.eyebrow": "软件商店",
   "products.intro1": "从免费工具到专业解决方案。",
   "products.intro2": "一切都简单易始。",
+  "products.loading": "正在加载产品...",
   "products.loadError": "无法加载产品",
   "products.loadErrorText": "加载数据失败",
   "products.new": "新品",

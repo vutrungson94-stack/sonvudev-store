@@ -490,6 +490,7 @@
   "products.eyebrow": "Entrepôt de logiciels",
   "products.intro1": "Des outils gratuits aux suites de solutions professionnelles.",
   "products.intro2": "Tout est facile pour commencer.",
+  "products.loading": "Chargement des produits...",
   "products.loadError": "Impossible de télécharger le produit",
   "products.loadErrorText": "Erreur de chargement des données",
   "products.new": "Nouveau",

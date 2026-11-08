@@ -796,7 +796,8 @@ for (const name of htmlFiles) {
   const withSwitch = [];
   for (const name of htmlFiles) {
     const source = await read(path.join("public", name));
-    const hasDictionary = /src="i18n\.js"/.test(source);
+    // Accept absolute (/i18n.js) or relative (i18n.js); locale-prefixed pages require absolute.
+    const hasDictionary = /src="\/?i18n\.js"/.test(source);
     const hasSwitch = /data-lang-switch|data-lang-toggle/.test(source);
     if (hasDictionary) withDictionary.push(name);
     if (hasSwitch) {

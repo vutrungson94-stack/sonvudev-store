@@ -197,6 +197,7 @@ const DICT = {
     // Một câu nói cả hai là ít phần nhất đúng.
     'products.emptyTitle': 'Không có sản phẩm nào khớp',
     'products.emptyText': 'Hãy thử từ khoá khác, hoặc bỏ bộ lọc đang chọn.',
+    'products.loading': 'Đang tải sản phẩm...',
     'products.loadError': 'Chưa thể tải sản phẩm',
     'products.loadErrorText': 'Lỗi tải dữ liệu',
     'products.new': 'Mới',
@@ -709,6 +710,7 @@ const DICT = {
     'products.onlyOne': 'This is the only product right now.',
     'products.emptyTitle': 'No product matches',
     'products.emptyText': 'Try a different word, or clear the filter you picked.',
+    'products.loading': 'Loading products...',
     'products.loadError': 'Could not load products',
     'products.loadErrorText': 'Failed to load data',
     'products.new': 'New',

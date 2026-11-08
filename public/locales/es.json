@@ -490,6 +490,7 @@
   "products.eyebrow": "almacén de software",
   "products.intro1": "Desde herramientas gratuitas hasta conjuntos de soluciones profesionales.",
   "products.intro2": "Todo es fácil para empezar.",
+  "products.loading": "Cargando productos...",
   "products.loadError": "No se puede descargar el producto",
   "products.loadErrorText": "Error al cargar datos",
   "products.new": "Nuevo",
