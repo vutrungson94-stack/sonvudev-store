@@ -40,6 +40,7 @@ Both were invisible to a single "it works on my machine" pass. Both were caught 
 - **`scripts/*.mjs`** — never reintroduce a self-certifying metric (`buildSuccessRate = 100`). Measure, or report `unknown`.
 - **`.github/checks.yml`** — `deployed-site` must wait for the deployed commit to match `github.sha` before running `seo:check`.
 - **`scripts/seo-check.mjs`** — the gate reads absolute URLs (`href="/styles.css"`). Do not make them relative.
+- **Purchase links/flow** — **BẮT BUỘC:** follow [`docs/PURCHASE-LINK-RULES.md`](docs/PURCHASE-LINK-RULES.md). Every “Mua hàng” action (store, blog, CTA, product page) must use `/?buy=<PRODUCT_ID>` and open the **purchase form directly** (`openPurchaseForm` / `?buy` handler in `public/app.js`). Never make `?buy` open only the detail modal; never use `/product/*` navigation as the primary buy action from grid/blog. Do the quick checks in that doc after any link/flow change.
 - **Tests** — never change a passing test to make it pass for the wrong reason. If you have to touch a test, prove the test was wrong by first demonstrating it fails on a tree that has your production fix and no test change.
 
 ## 5. The gates

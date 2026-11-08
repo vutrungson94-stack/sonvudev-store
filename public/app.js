@@ -243,7 +243,16 @@ function render() {
   grid.innerHTML = list.length
     ? list.map((p) => card(localized(p))).join('')
     : `<div class="empty-state"><b>${esc(T('products.emptyTitle'))}</b><p>${esc(T('products.emptyText'))}</p></div>`;
-  grid.querySelectorAll('.product-card').forEach((c) => { c.onclick = () => openProduct(c.dataset.id); });
+  // RULE: clicking a product opens the purchase form (docs/PURCHASE-LINK-RULES.md).
+  // Intercept in-card links so crawlable/no-JS hrefs never "jump away" for users.
+  grid.querySelectorAll('.product-card').forEach((c) => {
+    c.onclick = () => openPurchaseForm(c.dataset.id);
+    c.querySelectorAll('a').forEach((a) => a.addEventListener('click', (ev) => {
+      ev.preventDefault();
+      ev.stopPropagation();
+      openPurchaseForm(c.dataset.id);
+    }));
+  });
 }
 
 // The price on screen follows the language the reader chose, and only when the
@@ -281,6 +290,24 @@ function card(p) {
       </div>
     </div>
   </article>`;
+}
+
+// Purchase entrypoint used by store clicks and /?buy=<id|slug> (including blog/
+// external buy buttons). Opens the checkout/purchase form directly so the flow
+// never relies on navigating to a fragile product-page link. SINGLE buy action
+// (docs/PURCHASE-LINK-RULES.md). Accepts product id or slug.
+function openPurchaseForm(idOrSlug) {
+  const raw = products.find((x) => x.id === idOrSlug || x.slug === idOrSlug);
+  if (!raw) {
+    toastMsg(T('products.loadError'), true);
+    return;
+  }
+  currentOpenProduct = raw.id;
+  stopWatch();
+  stopCountdown();
+  openCheckout(localized(raw));
+  modal.hidden = false;
+  document.body.classList.add('modal-open');
 }
 
 function openProduct(id) {
@@ -641,9 +668,10 @@ window.addEventListener('online', () => { if (lastOrder && lastToken) checkOrder
 document.addEventListener('visibilitychange', () => { if (!document.hidden && lastOrder && lastToken) checkOrder(lastOrder.id, lastToken, true); });
 
 loadProducts().then(() => {
-  // A product page links here as /?buy=<id> so the buyer lands with the checkout
-  // already open. The product page itself carries no checkout code, which is
-  // what keeps a single implementation of the flow instead of two that drift.
+  // Canonical buy entry: /?buy=<productId> opens the purchase form directly.
+  // Used by store links, the server-rendered product page, and blog/external
+  // "Mua hàng" buttons. Do NOT change ?buy to open only the detail modal (see
+  // docs/PURCHASE-LINK-RULES.md).
   const query = new URLSearchParams(location.search);
   const wanted = query.get('buy');
   // PayPal sends a buyer who backed out to /?paypal=cancelled. Nothing used to
@@ -654,13 +682,9 @@ loadProducts().then(() => {
     toastMsg(`${T('paypal.cancelled')}. ${T('paypal.cancelledHint')}`);
   }
   if (wanted) {
-    const target = products.find((p) => p.id === wanted || p.slug === wanted);
-    // A product page (or a blog CTA) links here as /?buy=<id> to land the buyer
-    // straight on checkout. Opening the detail modal instead showed them the
-    // same page they just came from and made them hunt for the buy button a
-    // second time. Only an unknown id falls back to the old behavior.
-    if (target) openCheckout(target);
-    else openProduct(wanted);
+    // Opens the purchase form directly (localized, modal visible). Handles id or
+    // slug and unknown ids. Do not revert to openProduct/detail-only.
+    openPurchaseForm(wanted);
   }
   if (query.get('buy') || query.get('paypal')) history.replaceState(null, '', location.pathname + location.hash);
 });

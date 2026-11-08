@@ -1348,7 +1348,11 @@ const meta = ({ title, description, url, image = absolute(OG_IMAGE_PATH), type =
 export function renderIndexGrid(products) {
   const cards = (products || []).filter(isSellable).map((product) => {
     const art = esc(String(product.category || "khac").toLowerCase().replace(/\s+/g, "-"));
+    // RULE: purchase actions use /?buy=<id> and open the purchase form (never
+    // navigate to /product/* from store/blog buy affordances). See docs/PURCHASE-LINK-RULES.md.
+    // Keep an absolute product-page link for SEO/crawler discovery (no-JS fallback).
     const url = absolute(`/product/${encodeURIComponent(product.slug)}`);
+    const buyUrl = `/?buy=${encodeURIComponent(product.id)}`;
     const badgeRaw = String(product.badge || "").trim();
     const badgeFilled = fillCopy(badgeRaw);
     const badgeVi = badgeFilled || "Mới";
@@ -1377,12 +1381,12 @@ export function renderIndexGrid(products) {
     </div>
     <div class="product-info">
       <div class="product-meta"><span>${esc(product.platform || "Windows")} · v${esc(product.version || "1.0")}</span><span data-vi="${esc(categoryVi)}" data-en="${esc(categoryEn)}">${esc(categoryVi)}</span></div>
-      <h3><a href="${esc(url)}" data-vi="${nameVi}" data-en="${nameEn}">${nameVi}</a></h3>
+      <h3><a class="product-page-link" href="${esc(url)}" data-vi="${nameVi}" data-en="${nameEn}">${nameVi}</a></h3>
       <p data-vi="${descVi}" data-en="${descEn}">${descVi}</p>
       <ul>${features}</ul>
       <div class="product-buy">
         <strong>${esc(money(product.price, product.currency))}</strong>
-        <a class="round-arrow" href="${esc(url)}" data-i18n-attr="aria-label:products.buyAria" aria-label="Mua ${nameVi}">↗</a>
+        <a class="round-arrow" href="${esc(buyUrl)}" data-i18n-attr="aria-label:products.buyAria" aria-label="Mua ${nameVi}">↗</a>
       </div>
     </div>
   </article>`;
