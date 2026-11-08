@@ -12,6 +12,7 @@ let payOptions = null;
 let lastOrder = null;
 let lastToken = null;
 let currentOpenProduct = null;
+let pendingBuyId = null; // queued by pre-hydration/delegated clicks until catalog loads
 // One key per checkout attempt, so a retry after a dropped connection returns
 // the order that already exists instead of opening a second one for one
 // purchase. Cleared once an order is safely in hand.
@@ -117,6 +118,7 @@ async function loadProducts() {
     if (!res.ok) throw Error(I18N.apiError(data, 'products.loadError'));
     products = data.products || [];
     render();
+    if (pendingBuyId) { const id = pendingBuyId; pendingBuyId = null; openPurchaseForm(id); }
   } catch (error) {
     grid.innerHTML = `<div class="empty-state"><b>${esc(T('products.loadError'))}</b><p>${esc(error.message)}</p></div>`;
     count.textContent = T('products.loadErrorText');
@@ -297,14 +299,24 @@ function card(p) {
 // never relies on navigating to a fragile product-page link. SINGLE buy action
 // (docs/PURCHASE-LINK-RULES.md). Accepts product id or slug.
 function openPurchaseForm(idOrSlug) {
+  if (!idOrSlug) return;
+  // Catalog may still be loading (server-rendered cards are clickable before
+  // hydration). Queue the intent instead of failing or navigating away.
+  if (!products || !products.length) {
+    pendingBuyId = idOrSlug;
+    if (grid) toastMsg(T('products.loading') || 'Loading...');
+    return;
+  }
   const raw = products.find((x) => x.id === idOrSlug || x.slug === idOrSlug);
   if (!raw) {
     toastMsg(T('products.loadError'), true);
     return;
   }
+  pendingBuyId = null;
   currentOpenProduct = raw.id;
   stopWatch();
   stopCountdown();
+  if (!modal || !modalContent) return;
   openCheckout(localized(raw));
   modal.hidden = false;
   document.body.classList.add('modal-open');
@@ -654,12 +666,25 @@ document.querySelector('.modal-close')?.addEventListener('click', (e) => {
   closeModal();
 });
 
+// Delegated: works for server-rendered cards before hydration and after re-renders.
+// Opens purchase form (never navigates to /product/*). See docs/PURCHASE-LINK-RULES.md.
+if (grid) grid.addEventListener('click', (e) => {
+  const card = e.target.closest('.product-card[data-id]');
+  if (!card) return;
+  e.preventDefault();
+  openPurchaseForm(card.dataset.id);
+});
+
 // Repaint in place when the language flips so an open modal follows along.
 window.addEventListener('i18n:ready', () => { render(); });
 window.I18N.onChange(() => {
   if (lastOrder && lastToken) showOrder(lastOrder, lastToken, null, { serverTime: new Date(Date.now() + deadlineState.offset).toISOString(), expiresAt: deadlineState.expiresAt });
   else if (!modal.hidden && lastOrder) showOrder(lastOrder, lastToken, null);
-  else if (!modal.hidden && currentOpenProduct) openProduct(currentOpenProduct);
+  else if (!modal.hidden && currentOpenProduct) {
+    // Preserve the purchase-form flow (opened by click/?buy); only reopen detail when not in checkout.
+    if (document.getElementById('checkout-form')) openPurchaseForm(currentOpenProduct);
+    else openProduct(currentOpenProduct);
+  }
   else render();
 });
 // A connection that comes back should immediately re-check whatever order is

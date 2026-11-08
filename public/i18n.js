@@ -1539,21 +1539,25 @@ function renderLanguageCombobox() {
     const dropdown = combobox.querySelector('.lang-dropdown');
     if (!dropdown) return;
     dropdown.innerHTML = '';
-    for (const code of SUPPORTED) {
+    // Defensive: never render an empty dropdown (locale config may be missing).
+    const codes = (Array.isArray(SUPPORTED) && SUPPORTED.length)
+      ? SUPPORTED
+      : (typeof LANG_LABELS === 'object' && LANG_LABELS ? Object.keys(LANG_LABELS) : ['vi', 'en']);
+    for (const code of codes) {
       const li = document.createElement('li');
       li.role = 'option';
       li.dataset.langSet = code;
       li.setAttribute('aria-selected', code === current ? 'true' : 'false');
       const flagSpan = document.createElement('span');
-      flagSpan.className = `lang-flag ${flagClass(code)}`;
+      flagSpan.className = 'lang-flag ' + (typeof flagClass === 'function' ? flagClass(code) : ('flag-' + String(code).toLowerCase().replace(/_/g, '-')));
       const textSpan = document.createElement('span');
-      textSpan.textContent = LANG_LABELS[code] || code.toUpperCase();
+      textSpan.textContent = (LANG_LABELS && LANG_LABELS[code]) || String(code).toUpperCase();
       li.appendChild(flagSpan);
       li.appendChild(textSpan);
       li.addEventListener('click', () => {
         const prev = current;
         I18N.set(code);
-        closeCombobox(combobox);
+        if (typeof closeCombobox === 'function') closeCombobox(combobox);
         // Server-rendered pages bake their copy into the HTML, so a
         // client-side dictionary swap is not enough. Navigate to the same page
         // in the selected language instead of leaving the old content behind.
