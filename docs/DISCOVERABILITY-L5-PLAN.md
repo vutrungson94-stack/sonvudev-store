@@ -12,15 +12,17 @@ Mình/agent trong repo **không thể** cung cấp live ranking cá nhân hóa t
 
 ## 1) Đã cải thiện trong codebase (cần deploy + đo)
 - **Homepage SEO/intent alignment** (`public/index.html`, `public/i18n.js`): title/meta/OG/Twitter/alt phản ánh **toàn bộ catalog** (dọn RAM/PC, Excel/VBA, kiểm tra USB/thẻ nhớ, .NET SDK portable, đa nền tảng) thay vì chỉ 2 sản phẩm — giảm lệch intent, cải thiện CTR tiềm năng khi URL xuất hiện.
-- **On-site search L5 hooks** (`public/app.js`, `public/i18n.js`): trạng thái zero-result rõ ràng khi đang tìm/lọc + nút xoá tìm kiếm; phát `CustomEvent('sonvudev:search')` và `dataLayer` event `site_search` `{term, filter, results, lang}` để kết nối analytics/ghi nhận truy vấn không ra kết quả. Không gửi PII ngoài search intent do người dùng nhập.
+- **On-site search L5 hooks** (`public/app.js`, `public/i18n.js`): trạng thái zero-result rõ ràng khi đang tìm/lọc + nút xoá tìm kiếm; phát `CustomEvent('sonvudev:search')` và `dataLayer` event `site_search` `{term, search_term, filter, results, lang, page_path}` để kết nối analytics/ghi nhận truy vấn không ra kết quả (`search_term`/`page_path` giúp map GA4/custom analytics). Không gửi PII ngoài search intent do người dùng nhập; không cài script theo dõi bên thứ ba.
 - **Nền tảng có sẵn**: SSR/localized routes, `hreflang`/canonical, sitemap động, robots (có AI crawlers có chủ đích), JSON-LD merchant/organization (không tự phát `AggregateRating`), `/?buy=<id>` purchase flow, absolute `/styles.css`.
 
 ## 2) Việc chủ sở hữu phải làm (không thể tự động hóa từ code)
 - Cấu hình/xác minh **Google Search Console + Bing Webmaster Tools**, gửi sitemap, theo dõi index/lỗi/cải thiện.
 - Khắc phục **Merchant Center misrepresentation/methods/pricing** (xem `docs/MERCHANT-CENTER-MISREPRESENTATION-REMEDIATION.md`), chỉ dùng thông tin doanh nghiệp **thật, nhất quán, có thể xác minh**.
+- **Gắn analytics thực tế** (GA4/Matomo tùy chọn, có cơ chế consent phù hợp nếu áp dụng): nghe `sonvudev:search` hoặc `dataLayer` `site_search`; đo zero-result rate, query/filter, và funnel tới `/?buy=<id>`. Code chỉ phát event tùy chọn, không tự thu thập ngoài trình duyệt.
 - Tạo nội dung trung thực theo intent (how-to/so sánh an toàn/hạn chế/case dùng đúng), lịch xuất bản, internal link tới trang sản phẩm phù hợp (khám phá → trang sản phẩm; mua rõ ràng → `/?buy=<id>`).
 - Backlink/brand mentions thật (không spam/link scheme). Uy tín domain cần thời gian và bằng chứng.
 - Hỗ trợ khách hàng thực tế, hoàn tiền đúng policy, giá/phí/fulfillment khớp website-schema-feed-checkout.
+- **Quan trắc P2/P3 ngoài code**: Core Web Vitals/RUM, uptime, lỗi JS/checkout, A/B hoặc before-after có giả thuyết/rollback; cần hạ tầng/hosting/tooling thực.
 
 ## 3) Ưu tiên L5 (Optimizing) — vòng lặp đo được
 | Ưu tiên | Hành động | Số liệu | Ghi chú |

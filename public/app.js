@@ -240,8 +240,13 @@ function localized(p) {
 
 function emitSearchEvent(detail) {
   try {
-    window.dispatchEvent(new CustomEvent('sonvudev:search', { detail }));
-    if (Array.isArray(window.dataLayer)) window.dataLayer.push(Object.assign({ event: 'site_search' }, detail));
+    var payload = Object.assign({}, detail, {
+      // GA4-friendly alias; keep `term` for existing consumers.
+      search_term: detail && detail.term != null ? String(detail.term) : '',
+      page_path: (window.location && window.location.pathname) || ''
+    });
+    window.dispatchEvent(new CustomEvent('sonvudev:search', { detail: payload }));
+    if (Array.isArray(window.dataLayer)) window.dataLayer.push(Object.assign({ event: 'site_search' }, payload));
   } catch (_) { /* analytics is optional */ }
 }
 

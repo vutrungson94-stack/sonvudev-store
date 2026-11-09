@@ -15,6 +15,7 @@
 #   npm run build
 #   .\deploy\deploy.ps1
 # Optional: .\deploy\deploy.ps1 -HealthPort 3000 -ServiceName sonvudev-store
+[Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSAvoidUsingWriteHost', '', Justification = 'Interactive deployment status output is intentional for operator visibility.')]
 param(
   [string]$ArtifactDir = "$PSScriptRoot\..\publish-output\node",
   [string]$InstallRoot = "",
@@ -68,7 +69,8 @@ Copy-Item -Recurse -Force (Join-Path $ArtifactDir "*") $releaseDir
 Write-Host "[deploy] Installing dependencies..."
 push-location $releaseDir
 try {
-  npm ci --omit=dev --ignore-scripts
+  $npmArgs = @('ci', '--omit=dev', '--ignore-scripts')
+  & npm @npmArgs
   if ($LASTEXITCODE -ne 0) { Write-Error "npm ci failed - release not activated."; exit 1 }
 } finally {
   pop-location
@@ -92,6 +94,7 @@ for ($i = 0; $i -lt 30; $i++) {
     if ($resp.StatusCode -eq 200) { $ok = $true; break }
   } catch {
     # keep waiting - a restart takes a few seconds
+    $null = $_
   }
 }
 if (-not $ok) {
