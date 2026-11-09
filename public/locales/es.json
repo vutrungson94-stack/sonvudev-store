@@ -560,5 +560,8 @@
   "blog.title2": "para trabajar mejor.",
   "blog.more": "Ver todas las entradas",
   "blog.readMore": "Leer más",
-  "brand.supportEmail": "{{support}}"
+  "brand.supportEmail": "{{support}}",
+  "products.searchNoResultsTitle": "No se encontraron productos coincidentes",
+  "products.searchNoResultsText": "Pruebe una palabra clave más corta, un nombre de producto o borre la búsqueda/filtro.",
+  "products.searchClear": "Borrar búsqueda"
 }

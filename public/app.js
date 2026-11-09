@@ -238,15 +238,39 @@ function localized(p) {
   };
 }
 
+function emitSearchEvent(detail) {
+  try {
+    window.dispatchEvent(new CustomEvent('sonvudev:search', { detail }));
+    if (Array.isArray(window.dataLayer)) window.dataLayer.push(Object.assign({ event: 'site_search' }, detail));
+  } catch (_) { /* analytics is optional */ }
+}
+
 function render() {
   const list = visibleProducts();
+  const hasQuery = !!(searchTerm && String(searchTerm).trim());
+  const hasFilter = activeFilter !== 'all';
+  const narrowing = hasQuery || hasFilter;
   // A count that only exists when something is hidden would move the row under the
   // reader's cursor while they type. It appears only once the search is doing
   // something, so the page looks the same at rest.
   count.textContent = `${list.length.toString().padStart(2, '0')} ${T('products.count')}`;
-  grid.innerHTML = list.length
-    ? list.map((p) => card(localized(p))).join('')
-    : `<div class="empty-state"><b>${esc(T('products.emptyTitle'))}</b><p>${esc(T('products.emptyText'))}</p></div>`;
+  if (!list.length && narrowing) {
+    const q = String(searchTerm || '').trim();
+    grid.innerHTML = `<div class="empty-state" data-search-empty="1"><b>${esc(T('products.searchNoResultsTitle'))}</b><p>${esc(T('products.searchNoResultsText'))}${q ? `<br><small>${esc(q)}</small>` : ''}</p><button type="button" class="text-link" data-clear-product-search="1">${esc(T('products.searchClear'))}</button></div>`;
+    const clearBtn = grid.querySelector('[data-clear-product-search]');
+    if (clearBtn) clearBtn.addEventListener('click', () => {
+      searchTerm = '';
+      if (searchInput) { searchInput.value = ''; searchInput.focus(); }
+      render();
+    });
+  } else if (!list.length) {
+    grid.innerHTML = `<div class="empty-state"><b>${esc(T('products.emptyTitle'))}</b><p>${esc(T('products.emptyText'))}</p></div>`;
+  } else {
+    grid.innerHTML = list.map((p) => card(localized(p))).join('');
+  }
+  // L5 discoverability measurement hook (no PII beyond search intent term): lets owners
+  // connect analytics and observe zero-result queries / filter usage.
+  if (narrowing) emitSearchEvent({ term: String(searchTerm || '').slice(0, 120), filter: activeFilter, results: list.length, lang: currentLang() });
   // RULE: clicking a product opens the purchase form (docs/PURCHASE-LINK-RULES.md).
   // Intercept in-card links so crawlable/no-JS hrefs never "jump away" for users.
   grid.querySelectorAll('.product-card').forEach((c) => {

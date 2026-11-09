@@ -49,7 +49,7 @@ const DICT = {
     // come back to it. apply() walks the whole document, [data-i18n] on <title>
     // included, so these keys were the only thing missing; the pages each carried
     // a hardcoded Vietnamese string and no way to change it.
-    'title.home': 'Bật macro Excel & kiểm tra dung lượng USB | {brand}',
+    'title.home': 'Công cụ & tiện ích phần mềm Windows, Excel/VBA, đa nền tảng | {brand}',
     'title.about': 'Về chúng tôi — ai làm ra {brand} và vì sao',
     'title.terms': 'Điều khoản sử dụng — {brand}',
     'title.privacy': 'Chính sách bảo mật — {brand}',
@@ -197,6 +197,9 @@ const DICT = {
     // Một câu nói cả hai là ít phần nhất đúng.
     'products.emptyTitle': 'Không có sản phẩm nào khớp',
     'products.emptyText': 'Hãy thử từ khoá khác, hoặc bỏ bộ lọc đang chọn.',
+    'products.searchNoResultsTitle': 'Không tìm thấy sản phẩm phù hợp',
+    'products.searchNoResultsText': 'Thử từ khoá ngắn hơn, tên sản phẩm, hoặc xoá tìm kiếm/bộ lọc.',
+    'products.searchClear': 'Xoá tìm kiếm',
     'products.loading': 'Đang tải sản phẩm...',
     'products.loadError': 'Chưa thể tải sản phẩm',
     'products.loadErrorText': 'Lỗi tải dữ liệu',
@@ -596,7 +599,7 @@ const DICT = {
     // Tab titles, English side. Kept in the same order as the Vietnamese half so
     // the two tables can be read against each other line by line — which is what
     // the key-parity gate compares them with.
-    'title.home': 'Excel macros and USB capacity, sorted | {brand}',
+    'title.home': 'Software utilities for Windows, Excel/VBA, and cross-platform workflows | {brand}',
     'title.about': 'About us — who makes {brand} and why',
     'title.terms': 'Terms of use — {brand}',
     'title.privacy': 'Privacy policy — {brand}',
@@ -710,6 +713,9 @@ const DICT = {
     'products.onlyOne': 'This is the only product right now.',
     'products.emptyTitle': 'No product matches',
     'products.emptyText': 'Try a different word, or clear the filter you picked.',
+    'products.searchNoResultsTitle': 'No matching products',
+    'products.searchNoResultsText': 'Try a shorter keyword, a product name, or clear your search/filter.',
+    'products.searchClear': 'Clear search',
     'products.loading': 'Loading products...',
     'products.loadError': 'Could not load products',
     'products.loadErrorText': 'Failed to load data',

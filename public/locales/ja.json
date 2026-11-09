@@ -560,5 +560,8 @@
   "blog.title1": "テクニック",
   "blog.title2": "でもっと快適に。",
   "blog.more": "すべての記事を見る",
-  "blog.readMore": "続きを読む"
+  "blog.readMore": "続きを読む",
+  "products.searchNoResultsTitle": "一致する製品が見つかりません",
+  "products.searchNoResultsText": "短いキーワード、製品名を試すか、検索/フィルターをクリアしてください。",
+  "products.searchClear": "検索をクリア"
 }
