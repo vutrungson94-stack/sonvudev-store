@@ -107,6 +107,17 @@ for (const name of htmlFiles) {
     fail("link gãy", `public/${name}`, `"${href}" không có file tương ứng trong public/`);
   }
 }
+// Every HTML page must load the stylesheet directly (absolute /styles.css). A
+// stylesheet that lives only inside <link rel="preload" ... onload="..."> depends
+// on an inline event handler, which CSP blocks (script-src has no 'unsafe-inline'),
+// so the page ends up with no CSS at all. This pattern is not accepted as a
+// substitute for a real stylesheet, whether preload+onload or noscript-only.
+for (const name of htmlFiles) {
+  const source = await read(path.join("public", name));
+  if (!/<link[^>]*rel=["']stylesheet["'][^>]*href=["']\/styles\.css["']/.test(source)) {
+    fail("missing stylesheet", `public/${name}`, "must contain <link rel=\"stylesheet\" href=\"/styles.css\"> directly; not only in preload+onload (blocked by CSP) or noscript-only.");
+  }
+}
 // The HTML the server renders is held to the same rule as a file on disk.
 for (const match of pagesSource.matchAll(/(?:absolute|LOGO_PATH\s*=)\(\s*"(\/[^"]*)"/g)) {
   const href = match[1];
