@@ -13,6 +13,7 @@ When reality and this file disagree, reality does not silently win — update th
 
 - Read changed commit(s) since last release: `git log --oneline -5`, `git diff <last-release>`.
 - Find the **root cause**. The failing symptom (e.g. a 308 on `/`) is never the root cause; it is always two or three commits of drift upstream.
+- For quality/maturity work, perform a codebase-grounded audit per `AGENTS.md §4.1`: scan relevant files and flows for hardcode (keep non-dynamic hardcodes), orphans (remove only if inappropriate), duplication/reuse, cross-platform/multilingual independence, and evidence for CMMI L5/platform maturity.
 - Write the analysis down in the commit message or `docs/` — never in your head.
 
 ## 2. Baseline gate

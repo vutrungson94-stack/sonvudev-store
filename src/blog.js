@@ -20,11 +20,11 @@ function blogPath(slug) {
   return path.join(BLOG_DIR, `${slug}.json`);
 }
 
-// Resolve a product slug to its stable id so a blog CTA can deep-link the
-// buyer straight into checkout (/?buy=<id>) instead of the detail page.
-// Uses the tracked products file synchronously; on a store whose catalogue
-// only lives in Supabase (no local file), the slug is left alone and the link
-// falls back to the detail page.
+// Resolve a product slug to its stable id so an explicit "buy" CTA in blog
+// content can deep-link into checkout (/?buy=<id>). Uses the tracked products
+// file synchronously; when the catalogue only lives in Supabase (no local
+// file) or the slug is unknown, the CTA falls back to the locale product page
+// (discovery) rather than inventing a broken buy link.
 const productsJsonPath = path.join(dataDir, "products.json");
 let slugToId = null;
 const productIdForSlug = (slug) => {
@@ -39,9 +39,13 @@ const productIdForSlug = (slug) => {
     return null;
   }
 };
-const buyHref = (slug) => {
+const productPageHref = (slug, lang = "vi") => {
+  const prefix = lang && lang !== "vi" ? `/${lang}` : "";
+  return absolute(`${prefix}/product/${encodeURIComponent(String(slug || ""))}`);
+};
+const buyHref = (slug, lang = "vi") => {
   const id = productIdForSlug(slug);
-  return id ? absolute(`/?buy=${encodeURIComponent(id)}#products`) : absolute(`/product/${encodeURIComponent(slug)}`);
+  return id ? absolute(`/?buy=${encodeURIComponent(id)}#products`) : productPageHref(slug, lang);
 };
 
 // Load all blog posts from disk and sort by date (newest first).
@@ -242,9 +246,10 @@ export function renderBlogPost(post, lang = "vi") {
   const modified = new Date(post.modified || post.published || Date.now())
     .toISOString();
 
-  const buyLink = (slug) => buyHref(slug);
+  // "Related product" is a discovery/navigation affordance: link to the product
+  // page. Explicit "Mua hàng/Buy" CTAs use /?buy=<id> (see PURCHASE-LINK-RULES.md).
   const relatedHtml = post.relatedProductSlug
-    ? `<a class="blog-related-link" href="${esc(buyLink(post.relatedProductSlug))}">${ui.related} →</a>`
+    ? `<a class="blog-related-link" href="${esc(productPageHref(post.relatedProductSlug, lang))}">${ui.related} →</a>`
     : "";
 
   const noticeHtml = !isVi && !isEn && ui.translationNotice

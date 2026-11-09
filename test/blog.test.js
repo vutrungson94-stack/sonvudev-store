@@ -153,6 +153,31 @@ test('renderBlogPost thoát ký tự đặc biệt', async () => {
   assert.ok(html.includes('<p>Nội dung đã được soạn HTML sẵn.</p>'), 'nội dung HTML được giữ nguyên vì là nội dung đã soạn');
 });
 
+test('liên kết sản phẩm liên quan trên blog đi đến trang sản phẩm, không mở form thanh toán', async () => {
+  const post = {
+    slug: 'bai-viet',
+    titleVi: 'Bài viết',
+    titleEn: 'Post',
+    descriptionVi: 'Mô tả',
+    descriptionEn: 'Description',
+    contentVi: '<p>Nội dung</p>',
+    contentEn: '<p>Content</p>',
+    published: '2025-01-01T00:00:00.000Z',
+    modified: '2025-01-01T00:00:00.000Z',
+    section: 'Test',
+    sectionEn: 'Test',
+    tags: [],
+    relatedProductSlug: 'san-pham-lien-quan',
+  };
+  const vi = renderBlogPost(post, 'vi');
+  assert.ok(vi.includes('class="blog-related-link"'), 'phải render liên kết sản phẩm liên quan');
+  assert.ok(vi.includes('/product/san-pham-lien-quan'), 'liên kết liên quan phải trỏ tới trang sản phẩm');
+  assert.ok(!vi.includes('/?buy='), 'liên kết liên quan không được mở form thanh toán');
+  const en = renderBlogPost(post, 'en');
+  assert.ok(en.includes('/en/product/san-pham-lien-quan'), 'liên kết liên quan tiếng Anh phải giữ prefix locale');
+  assert.ok(!en.includes('/?buy='), 'liên kết liên quan tiếng Anh không được mở form thanh toán');
+});
+
 test('blog.json feed trả về cấu trúc hợp lệ', async () => {
   const data = await json('/blog.json');
   assert.ok(Array.isArray(data.items), 'phải có mảng items');

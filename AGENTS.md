@@ -40,8 +40,21 @@ Both were invisible to a single "it works on my machine" pass. Both were caught 
 - **`scripts/*.mjs`** — never reintroduce a self-certifying metric (`buildSuccessRate = 100`). Measure, or report `unknown`.
 - **`.github/checks.yml`** — `deployed-site` must wait for the deployed commit to match `github.sha` before running `seo:check`.
 - **`scripts/seo-check.mjs`** — the gate reads absolute URLs (`href="/styles.css"`). Do not make them relative.
-- **Purchase links/flow** — **BẮT BUỘC:** follow [`docs/PURCHASE-LINK-RULES.md`](docs/PURCHASE-LINK-RULES.md). Every “Mua hàng” action (store, blog, CTA, product page) must use `/?buy=<PRODUCT_ID>` and open the **purchase form directly** (`openPurchaseForm` / `?buy` handler in `public/app.js`). Never make `?buy` open only the detail modal; never use `/product/*` navigation as the primary buy action from grid/blog. Do the quick checks in that doc after any link/flow change.
+- **Purchase links/flow** — **BẮT BUỘC:** follow [`docs/PURCHASE-LINK-RULES.md`](docs/PURCHASE-LINK-RULES.md). Every explicit **“Mua hàng/Buy”** action (store buy affordance, blog buy CTA, product-page buy button) must use `/?buy=<PRODUCT_ID>` and open the **purchase form directly** (`openPurchaseForm` / `?buy` handler in `public/app.js`). Discovery/navigation links (e.g. “Sản phẩm liên quan/Related product”) must go to the product page, not checkout. Never make `?buy` open only the detail modal; never use `/product/*` navigation as the primary buy action from grid/blog buy affordances. Do the quick checks in that doc after any link/flow change.
 - **Tests** — never change a passing test to make it pass for the wrong reason. If you have to touch a test, prove the test was wrong by first demonstrating it fails on a tree that has your production fix and no test change.
+
+## 4.1. Codebase quality audit (when assessing or improving the platform)
+
+When asked to audit/improve SonVuDev or evaluate maturity, assess the **actual codebase** (not markdown/docs claims). Review file-by-file and flow-by-flow:
+
+- **Hardcode** — identify hardcoded values/paths/URLs/behavior. Replace with config, env, or shared constants only when safe and dynamic; **preserve hardcodes that cannot be made dynamic** (platform/runtime constraints, required literals, intentional fixed behavior) and document why.
+- **Orphans** — find unused exports, dead files/modules, unreachable branches, and stale assets. For each, judge whether it has a valid current/future use in the active architecture; **remove only when inappropriate** (truly dead/misleading). Do not delete code that is intentionally extensible or required by build/runtime contracts.
+- **Duplication & reuse** — detect repeated logic, copy-pasted flows, and parallel implementations. Consolidate through shared helpers/modules only when behavior stays identical and tests cover the path. Prefer reuse, but avoid risky abstractions that couple unrelated concerns.
+- **Independence & portability** — check that flows run independently where designed, avoid hidden machine-specific assumptions, and work across supported platforms/runtimes. Flag Windows-only paths/commands/shell assumptions when cross-platform support is claimed.
+- **Multilingual/i18n** — verify locale handling, fallbacks, URL/prefix ownership, translated content paths, and that new text/flows do not hard-wire a single language.
+- **Maturity lens (industrial)** — when requested, evaluate against **CMMI Level 5 Optimizing / enterprise platform maturity** criteria grounded in evidence from the codebase: repeatable gates, measurable quality/security, defect prevention, controlled change/rollback, automation, observability, traceability, governance, and continuous improvement. Report current level candidly with gaps and prioritized remediation.
+
+Quality fixes must follow §2: baseline, smallest safe change, fix-until-green, no regressions. Never “fix” by weakening gates/tests except when a gate is provably wrong (document the reason).
 
 ## 5. The gates
 
