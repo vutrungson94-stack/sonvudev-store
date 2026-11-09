@@ -91,14 +91,23 @@ test('bài viết blog tiếng Anh trả về 200', async () => {
   assert.ok(html.includes('English content'), 'nội dung tiếng Anh phải có');
 });
 
-test('blog index uses the stored publication date and a mobile-safe meta layout', async () => {
+test('blog index uses the stored publication date and a compact, mobile-safe language combobox layout', async () => {
   const html = await text('/blog');
   assert.ok(html.includes('15 thg 1, 2025'), 'the card must display the stored published date');
   assert.ok(!/class="blog-date"[^>]*>.*(26|2026)/.test(html), 'the card must not fall back to request time');
-  assert.ok(html.includes('class="blog-language-label"'), 'the language label must be part of the responsive layout');
+  // Intentional UX change: blog language switcher is a compact combobox (like homepage)
+  // instead of a 2-column grid of links, so it stays space-efficient on phones.
+  assert.ok(html.includes('class="blog-language-label'), 'the language control must include an accessible label');
+  assert.ok(html.includes('data-blog-lang-nav'), 'blog must render a self-contained combobox (blog pages do not load homepage i18n)');
+  assert.ok(html.includes('class="lang-combobox blog-lang-combobox"'), 'blog must use the shared compact combobox structure');
+  assert.ok(html.includes('class="lang-trigger"'), 'combobox must have a trigger button');
+  assert.ok(/data-blog-lang="vi"[^>]*aria-current="true"|aria-current="true"[^>]*data-blog-lang="vi"/.test(html), 'current blog locale must be marked selected/current');
+  assert.ok(html.includes('/blog-lang.js'), 'blog combobox behavior/persistence script must be loaded');
   const css = readFileSync(path.join(process.cwd(), 'public', 'styles.css'), 'utf8');
-  assert.ok(/\.blog-lang a\.active\{[^}]*background:var\(--brand\)/.test(css), 'the active language rule must not be swallowed by the mobile media query');
-  assert.ok(/@media\(max-width:700px\)\{\.blog-lang\{display:grid;grid-template-columns:repeat\(2,minmax\(0,1fr\)\)/.test(css), 'mobile must use a two-column grid');
+  assert.ok(/\.blog-lang a\.active\{[^}]*background:var\(--brand\)/.test(css), 'legacy active-link rule must remain available');
+  assert.ok(/@media\(max-width:700px\)\{\.blog-lang\{display:flex/.test(css), 'mobile must keep blog nav compact (home + combobox), not a grid of language links');
+  assert.ok(css.includes('.blog-lang-combobox-wrap'), 'combobox wrapper must have blog-specific layout styles');
+  assert.ok(css.includes('.blog-lang-option'), 'combobox options (real links) must be styled for tap targets');
   assert.ok(css.includes('.blog-date{flex:0 0 auto}'), 'dates must not shrink inside card metadata');
   assert.ok(css.includes('.blog-section{flex:1 1 auto;text-align:right}'), 'the section must stay aligned to the right');
 });

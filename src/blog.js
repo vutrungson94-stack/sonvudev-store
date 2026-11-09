@@ -96,12 +96,25 @@ const blogUrl = (slug, lang = "vi") => {
   return lang === "vi" ? `/blog/${slug}` : `/${lang}/blog/${slug}`;
 };
 const blogLangHref = (code, slug) => absolute(blogUrl(slug, code));
-const blogLangLinks = (slug, currentLang) =>
-  BLOG_LANGS.map(({ code, label }) => {
-    const active = code === currentLang ? ' active' : '';
+const blogLanguageCombobox = (slug, currentLang, languageLabel = "Language") => {
+  const current = BLOG_LANGS.find(({ code }) => code === currentLang) || BLOG_LANGS[0] || { code: currentLang, label: String(currentLang).toUpperCase() };
+  const options = BLOG_LANGS.map(({ code, label }) => {
+    const selected = code === currentLang ? 'true' : 'false';
     const flagSpan = `<span class="lang-flag ${languageFlagClass(code)}" aria-hidden="true"></span>`;
-    return `<a href="${esc(blogLangHref(code, slug))}" class="${active}" data-blog-lang="${code}">${flagSpan} ${label}</a>`;
+    return `<li role="option" aria-selected="${selected}"><a class="blog-lang-option" href="${esc(blogLangHref(code, slug))}" data-blog-lang="${code}" ${code === currentLang ? 'aria-current="true"' : ''}>${flagSpan}<span>${esc(label)}</span></a></li>`;
   }).join("");
+  return `<div class="lang-combobox-wrap blog-lang-combobox-wrap">
+  <span class="blog-language-label sr-only">${esc(languageLabel)}</span>
+  <div class="lang-combobox blog-lang-combobox" data-blog-lang-nav role="combobox" aria-label="${esc(languageLabel)}" aria-expanded="false">
+    <button type="button" class="lang-trigger" aria-haspopup="listbox" aria-expanded="false">
+      <span class="lang-flag ${languageFlagClass(current.code)}" data-blog-lang-flag aria-hidden="true"></span>
+      <span class="blog-lang-current">${esc(current.label)}</span>
+      <span class="lang-caret" aria-hidden="true">▾</span>
+    </button>
+    <ul class="lang-dropdown" role="listbox" aria-label="${esc(languageLabel)}" aria-hidden="true">${options}</ul>
+  </div>
+</div>`;
+};
 const blogField = (post, lang, base) => {
   const suffix = lang === 'vi' ? 'Vi'
     : lang === 'en' ? 'En'
@@ -302,8 +315,7 @@ export function renderBlogPost(post, lang = "vi") {
 <body>
   <nav class="blog-lang">
     <a href="${absolute("/")}" class="blog-home">← ${ui.home}</a>
-    <span class="blog-language-label">${ui.language}</span>
-    ${blogLangLinks(post.slug, lang)}
+    ${blogLanguageCombobox(post.slug, lang, ui.language)}
   </nav>
   <script src="/blog-lang.js"></script>
   <article class="blog-post">
@@ -399,8 +411,7 @@ export function renderBlogIndex(posts, lang = "vi") {
 <body>
   <nav class="blog-lang">
     <a href="${absolute("/")}" class="blog-home">← ${ui.home}</a>
-    <span class="blog-language-label">${ui.language}</span>
-    ${blogLangLinks("", lang)}
+    ${blogLanguageCombobox("", lang, ui.language)}
   </nav>
   <script src="/blog-lang.js"></script>
   <main class="wrap">
