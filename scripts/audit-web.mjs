@@ -568,7 +568,7 @@ for (const relative of emailBearing) {
     // file: it decides the canonical URL, which is what tells a search engine
     // which of two copies is the real page. index.html writes {{site}} and the
     // server fills it from APP_URL, so a domain change is one env var.
-    if (host === appHost || host === `www.${appHost}`) {
+    if (appHostRaw && (host === appHost || host === `www.${appHost}`)) {
       fail("domain gõ tay", relative, `https://${host} viết thẳng vào file — dùng {{site}} (index.html) hoặc site() (src/pages.js)`);
       continue;
     }
@@ -580,7 +580,7 @@ for (const relative of emailBearing) {
   // find a host, so prose like "áp dụng cho mọi giao dịch tại sonvudev.com" passed
   // straight through — and that is exactly the string a legal page shows a buyer
   // deciding whether the terms they are reading are the ones that apply.
-  if (appHost) {
+  if (appHostRaw) {
     for (const match of domainHits(source, appHost)) {
       const line = source.slice(0, match.index).split("\n").length;
       fail("domain gõ tay", `${relative}:${line}`, `${match[0]} — APP_URL là ${appUrl}`);
