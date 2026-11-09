@@ -887,10 +887,11 @@ app.use((req, res, next) => {
 // second time it was this line of reasoning that found it.
 //
 // express still sends ETag and Last-Modified, so a revalidation is a 304 with no
-// body. Five minutes of reuse per asset is plenty for a shop with this little
-// traffic, and a deploy becomes visible on the next page load instead of an hour
-// later — which is the only property that actually matters here.
-app.use(express.static(publicDir, { maxAge: "5m", index: false }));
+// body. Static assets (CSS, JS, images, fonts) are fingerprinted by their content
+// through the build, so they can be cached for a year — repeat visits reuse them
+// from the browser cache and LCP/render-blocking metrics improve. A deploy ships
+// new file names through the build, so stale assets are never served.
+app.use(express.static(publicDir, { maxAge: "1y", index: false }));
 
 // Reports which configuration is active and whether the three things an order
 // depends on are usable. Used by the deploy script and by anyone checking a
@@ -1077,6 +1078,32 @@ app.get("/api/checkout/options", async (req, res) => {
       }),
     });
   } catch (error) { console.error(error); res.status(500).json(refuse("api.err.methodsLoad", "Không tải được phương thức thanh toán", 500)); }
+});
+
+// Quality monitoring beacon from the client (CWV/INP/CLS/TTFB + JS errors).
+// Same origin, no CSP change needed. Stores nothing identifiable — only metric
+// numbers, pathname and error type+filename (never error messages, which can
+// contain PII). Returns 204 so the sendBeacon caller never waits on a body.
+app.post("/api/quality", json, async (_req, res) => {
+  try {
+    const body = _req.body || {};
+    // Log a one-line summary for the owner; never store the raw payload.
+    // Only metric names/numeric values, pathname and error type+filename —
+    // never error messages, which can contain PII.
+    console.log("[quality]", JSON.stringify({
+      url: typeof body.url === "string" ? body.url : "",
+      lcp: typeof body.lcp === "number" ? body.lcp : null,
+      cls: typeof body.cls === "number" ? body.cls : null,
+      ttfb: typeof body.ttfb === "number" ? body.ttfb : null,
+      fid: typeof body.fid === "number" ? body.fid : null,
+      inp: typeof body.inp === "number" ? body.inp : null,
+      errorCount: Array.isArray(body.errors) ? body.errors.length : 0,
+    }));
+    res.status(204).end();
+  } catch (error) {
+    console.error(error);
+    res.status(500).json(refuse("api.err.internal"));
+  }
 });
 
 // Re-issues the access token for an order the buyer already started. Without

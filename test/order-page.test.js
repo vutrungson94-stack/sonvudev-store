@@ -347,7 +347,7 @@ test('phi bản đơn dùng chung một nơi: khoá, khởi động, và báo đ
   // shared helpers are undefined at runtime and nothing here would say so.
   for (const page of ['index.html', 'order.html', 'lookup.html', 'paypal-return.html']) {
     // Absolute paths required for locale-prefixed routes (/en/, /de/…).
-    assert.match(read(page), /<script src="\/order-client\.js"><\/script>/, `${page} phai nap order-client.js`);
+    assert.match(read(page), /<script[^>]*src="\/order-client\.js"><\/script>/, `${page} phai nap order-client.js`);
   }
   assert.ok(!read('404.html').includes('order-client.js'), '404.html khong dung phien ban don, khong nen nap');
 });

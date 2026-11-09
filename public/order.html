@@ -1,7 +1,7 @@
 <!doctype html>
 <html lang="vi">
 <head>
-<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex,nofollow"><title data-i18n="title.order">Đơn hàng — {{brandName}}</title><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet"><link rel="stylesheet" href="/styles.css">
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex,nofollow"><title data-i18n="title.order">Đơn hàng — {{brandName}}</title><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet"><link rel="preload" href="/styles.css" as="style" onload="this.onload=null;this.rel='stylesheet'"><noscript><link rel="stylesheet" href="/styles.css"></noscript>
 {{iconLinks}}
 </head>
 <body data-support="{{support}}" data-review-min="{{reviewMinLength}}" data-review-max="{{reviewMaxLength}}">
@@ -16,7 +16,5 @@
 <div id="order-body" class="order-body"></div>
 </main>
 <footer class="site-footer wrap"><div class="brand">{{brandWordmark}}</div><p data-i18n="brand.tagline">Phần mềm tốt cho công việc tốt.</p><div class="footer-links">{{footerLinks}}</div><small data-i18n="brand.rights">© {{year}} · Đồng sở hữu</small></footer>
-<script src="/format.js"></script><script src="/i18n.js"></script>
-<script src="/order-client.js"></script>
-<script src="/order.js"></script>
+<script defer src="/format.js"></script><script defer src="/i18n.js"></script><script defer src="/order-client.js"></script><script defer src="/order.js"></script><script defer src="/quality.js"></script>
 </body></html>

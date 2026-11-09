@@ -174,14 +174,14 @@ test('CSP chặn script inline, và không trang nào còn script inline', async
   for (const match of notFound.matchAll(/<script(?![^>]*\bsrc=)(?![^>]*application\/ld\+json)[^>]*>/g)) {
     assert.fail(`404 có script inline, CSP sẽ chặn: ${match[0]}`);
   }
-  assert.match(notFound, /<script src="\/related\.js"/, '404 phải dùng loader ngoài');
+  assert.match(notFound, /<script[^>]*src="\/related\.js"/, '404 phải dùng loader ngoài');
 });
 
 test('script ngoài phải được phép chạy theo chính CSP đó', async () => {
   const { body } = await page(`/product/${product.slug}`);
   // script-src 'self' with no nonce allows same-origin scripts, so the loader has
   // to be a real file rather than a nonce the template forgot to pass.
-  assert.match(body, /<script src="\/related\.js"/, 'trang sản phẩm phải nạp loader ngoài');
+  assert.match(body, /<script[^>]*src="\/related\.js"/, 'trang sản phẩm phải nạp loader ngoài');
   assert.equal((await fetch(`${base}/related.js`)).status, 200, 'loader phải tồn tại');
   const loader = await (await fetch(`${base}/related.js`)).text();
   // Both the product page and the 404 page used to concatenate a product name

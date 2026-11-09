@@ -11,7 +11,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="/styles.css">
+<link rel="preload" href="/styles.css" as="style" onload="this.onload=null;this.rel='stylesheet'"><noscript><link rel="stylesheet" href="/styles.css"></noscript>
 </head>
 <!--
   This page speaks both languages.
@@ -44,7 +44,6 @@
   script-src 'self' with no 'unsafe-inline' refused to run it, so every 404 showed
   an empty box where the product list should have been. Same fix, same file.
 -->
-<script src="/format.js"></script><script src="/i18n.js"></script>
-<script src="/related.js" data-target="notfound-links"></script>
+<script defer src="/format.js"></script><script defer src="/i18n.js"></script><script defer src="/related.js" data-target="notfound-links"></script><script defer src="/quality.js"></script>
 </body>
 </html>

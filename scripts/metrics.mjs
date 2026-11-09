@@ -155,7 +155,7 @@ const rows = [
   // way a deleted test is. Nothing stops the count reaching 10 — that would mean the
   // admin console had been translated too, which is a decision for the owner and not
   // for a metric.
-  ['localizedPages', publicHtmlText.filter((body) => /<script src="\/?i18n\.js">/.test(body)).length, 'up', 'trang có từ điển'],
+  ['localizedPages', publicHtmlText.filter((body) => /<script[^>]*src="\/?i18n\.js">/.test(body)).length, 'up', 'trang có từ điển'],
   // One route serving two languages. It was one, then two pages with a renderer
   // between them that only ever spoke Vietnamese, and the English copy sat unused
   // in the database the whole time.

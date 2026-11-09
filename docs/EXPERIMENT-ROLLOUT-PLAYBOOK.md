@@ -79,6 +79,59 @@ Render redeploy commit cũ, tính năng biến mất ngay. Không `git reset --h
 
 ---
 
-## 6. Ghi lại
+## 6. Quy tắc sửa lỗi accessibility (a11y) từ các báo cáo Insights
+
+Áp dụng cho mọi lỗi báo từ Chrome DevTools / Lighthouse Accessibility:
+
+| Lỗi | Nguyên nhân thường gặp | Cách sửa |
+|---|---|---|
+| Buttons do not have an accessible name | Nút `<button>` không có text, `aria-label`, `title`, hoặc chỉ chứa icon/emoji | Thêm `aria-label="..."` hoặc `aria-labelledby="..."` cho mỗi nút (ví dụ `aria-label="Đóng cửa sổ"` cho nút `×`). |
+| Background and foreground colors do not have sufficient contrast ratio | Màu chữ `#9aa5a8`, `#8b979c`, `#5d6b72`, `#72808d` trên nền `#fff`/#`#f7f9f8` dưới ngưỡng 4.5:1 | Darken màu chữ thành `#5f6e79` hoặc tối hơn, kiểm tra contrast ratio ≥ 4.5:1. |
+| Accessibility tree is not well-formed | Phần tử `aria-labelledby` trỏ tới ID không tồn tại, hoặc nút đóng modal không có aria-label | Thay `aria-labelledby="modal-title"` bằng `aria-label="Chi tiết sản phẩm"` khi không có element có id đó. |
+
+Kiểm tra sau khi sửa: mở Chrome DevTools → Lighthouse → Accessibility, đảm bảo 0 lỗi critical.
+
+---
+
+## 7. Quy tắc sửa lỗi performance (Insights)
+
+Áp dụng cho các báo cáo Lighthouse Performance:
+
+| Lỗi | Nguyên nhân | Cách sửa |
+|---|---|---|
+| Use efficient cache lifetimes | Static assets (CSS, JS, hình ảnh) chỉ cache 5 phút (`maxAge: "5m"`) | Tăng `maxAge` lên `"1y"` trong `express.static()`, vì assets được fingerprint qua build, deploy mới sẽ có tên file mới. |
+| Render-blocking requests | `<link rel="stylesheet" href="/styles.css">` chặn render; các `<script>` không có `defer` | Chuyển CSS thành `<link rel="preload" ... as="style" onload="...">` + `<noscript>` fallback; thêm `defer` cho mọi `<script src="...">`. |
+| Avoid chaining critical requests | Nhiều tài nguyên tải tuần tự thay vì songsex | Preconnect tới các domain bên ngoài (`fonts.googleapis.com`, `fonts.gstatic.com`), tránh chain requests không cần thiết. |
+
+---
+
+## 8. Quy tắc triển khai Quality Monitoring (P3)
+
+Thêm `public/quality.js` để đo CWV/INP/CLS/TTFB và error rate client-side:
+
+- **File mới:** `public/quality.js` — sử dụng `PerformanceObserver` (LCP, CLS, FID/INP, TTFB), `window.onerror` + `unhandledrejection` (errors), gửi qua `navigator.sendBeacon` đến `/api/quality` (cùng origin, không cần thêm CSP host).
+- **Chỉ chạy trên production hostname** (`sonvudev.com`), không gửi PII (chỉ metric số, pathname, error type+filename, không ghi error message).
+- **Route mới:** `POST /api/quality` trong `src/app.js` — trả `204 No Content`, ghi log ngắn, không ghi PII.
+- **Chèn script:** `<script defer src="/quality.js"></script>` vào `public/index.html` và các trang static legal (`privacy.html`, `terms.html`, `refund.html`, `about.html`).
+- **CSP:** Không cần sửa vì cùng origin (`'self'` đã có trong `connect-src`).
+
+---
+
+## 9. Checklist trước khi push (tất cả thay đổi)
+
+- [ ] `npm test` — toàn bộ xanh (575+ tests, 75 files)
+- [ ] `npm run lint` — 173+ files xanh
+- [ ] `npm run audit` — 32 nhóm, 0 vấn đề
+- [ ] `npm run case` — case-sensitive imports xanh
+- [ ] `npm run workflow` — workflows parse xanh
+- [ ] `_Tests\gtest.ps1` — exit 0
+- [ ] `_Build\gbuild.ps1` — exit 0, SAST findings=0
+- [ ] Lighthouse Accessibility — 0 lỗi critical (nếu sửa a11y)
+- [ ] Lighthouse Performance — cache lifetime, render-blocking cải thiện (nếu sửa perf)
+- [ ] `_Sync\gsync.ps1 -NonInteractive -Yes` — push thành công
+
+---
+
+## 10. Ghi lại
 
 Mọi experiment phải có dấu vết trong commit message (theo AGENTS.md §7: *why* besides *what*) hoặc trong `docs/`. Nếu không có hypothesis và metric, thay đổi đó **không được deploy** — bỏ lại trong local cho đến khi có số liệu.
