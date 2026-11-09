@@ -138,12 +138,17 @@ export const env = {
   brand: {
     name: value("BRAND_NAME"),
     // One line about what the shop is. Read by the Organization schema and
-    // /llms.txt — the two places a crawler or an assistant learns the shop
-    // from — instead of being typed into the markup. A reword in one place
+    // /llms.txt - the two places a crawler or an assistant learns the shop
+    // from - instead of being typed into the markup. A reword in one place
     // reaches both.
     description: value("BRAND_DESCRIPTION"),
     // Shown on the legal pages, so a buyer has something to hold the shop to.
     legalEntity: value("BRAND_LEGAL_ENTITY", ""),
+    // Optional, owner-verified business contact details. Rendered only when set;
+    // never fabricated. Misrepresentation risk is higher with wrong details than
+    // with missing optional details.
+    address: value("BRAND_ADDRESS", ""),
+    phone: value("BRAND_PHONE", ""),
     // The person behind the shop. Models weight a named human far more heavily
     // than an anonymous storefront, and schema.org has a slot for exactly this.
     founderName: value("BRAND_FOUNDER_NAME", ""),

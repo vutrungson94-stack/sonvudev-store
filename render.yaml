@@ -74,6 +74,18 @@ services:
         value: SonVuDev
       - key: BRAND_DESCRIPTION
         sync: false
+      - key: BRAND_LEGAL_ENTITY
+        sync: false
+      - key: BRAND_ADDRESS
+        sync: false
+      - key: BRAND_PHONE
+        sync: false
+      - key: BRAND_FOUNDER_NAME
+        sync: false
+      - key: BRAND_FOUNDER_URL
+        sync: false
+      - key: BRAND_SOCIAL_LINKS
+        sync: false
       - key: SUPPORT_EMAIL
         sync: false
       - key: SUPABASE_URL

@@ -391,38 +391,35 @@ const OG_IMAGE = { path: OG_IMAGE_PATH, width: 1200, height: 630 };
 // here as functions, which is what they always were; the export was the orphan.
 const brand = () => env.brand.name;
 
-const organization = () => ({
-  "@type": "Organization",
-  "@id": `${site()}/#organization`,
-  name: brand(),
-  url: `${site()}/`,
-  logo: absolute(LOGO_PATH),
-  description: env.brand.description,
-  // Contact details for the Merchant Center misrepresentation check and for
-  // Google's knowledge graph: a brand with a real address and phone is treated
-  // as a verifiable entity, an anonymous one is not. Hardcoded here rather than
-  // read from env so the deploy contract (render.yaml/.env.example) does not
-  // gain five new variables; a solo developer changes them in this one place.
-  telephone: "+84348808045",
-  address: {
-    "@type": "PostalAddress",
-    streetAddress: "Đường XH3, Tổ 4, Khu Phố Phú Điền",
-    addressLocality: "Phường Chánh Phú Hòa",
-    addressRegion: "Thành Phố Hồ Chí Minh",
-    postalCode: "75913",
-    addressCountry: "VN",
-  },
-  ...(env.brand.socialLinks.length ? { sameAs: env.brand.socialLinks } : {}),
-  // A named person behind the shop. Anonymous storefronts get cited far less
-  // readily than a place with a human attached to it.
-  ...(env.brand.founderName ? {
-    founder: {
-      "@type": "Person",
-      name: env.brand.founderName,
-      ...(env.brand.founderUrl ? { url: env.brand.founderUrl } : {}),
-    },
-  } : {}),
-});
+const organization = () => {
+  const phone = String(env.brand.phone || '').trim();
+  const address = String(env.brand.address || '').trim();
+  const email = String(env.email.supportEmail || '').trim();
+  return {
+    "@type": "Organization",
+    "@id": `${site()}/#organization`,
+    name: brand(),
+    url: `${site()}/`,
+    logo: absolute(LOGO_PATH),
+    description: env.brand.description,
+    // Emit only owner-verified/configured contact details. Hardcoding or
+    // fabricating address/phone in templates/schema increases Merchant Center
+    // misrepresentation risk; missing optional fields are safer than wrong ones.
+    ...(phone ? { telephone: phone } : {}),
+    ...(email ? { contactPoint: [{ "@type": "ContactPoint", contactType: "customer support", email }] } : {}),
+    ...(address ? { address: { "@type": "PostalAddress", streetAddress: address } } : {}),
+    ...(env.brand.socialLinks.length ? { sameAs: env.brand.socialLinks } : {}),
+    // A named person behind the shop. Anonymous storefronts get cited far less
+    // readily than a place with a human attached to it.
+    ...(env.brand.founderName ? {
+      founder: {
+        "@type": "Person",
+        name: env.brand.founderName,
+        ...(env.brand.founderUrl ? { url: env.brand.founderUrl } : {}),
+      },
+    } : {}),
+  };
+};
 
 /**
  * SoftwareApplication is the schema.org type that matches a downloadable tool.
@@ -504,6 +501,28 @@ const productSchema = (product, lang = "vi") => ({
  * number printed on the page. It is never the converted figure: a price that
  * moves with the exchange rate is a price Google cannot match on the next crawl.
  */
+// Shared return/shipping policy nodes for the merchant listing graph.
+//
+// Google Search Console flags an Offer whose MerchantReturnPolicy omits
+// `applicableCountry`/`returnMethod`, and an Offer that omits `shippingDetails`.
+// The published policy at /refund is a 14-day, free-return policy under
+// Vietnamese jurisdiction, so those are the values a crawler is given. Digital
+// delivery has no carrier and no shipping cost, so the shipping rate is zero.
+const merchantReturnPolicy = () => ({
+  "@type": "MerchantReturnPolicy",
+  applicableCountry: ["VN"],
+  returnPolicyCategory: "https://schema.org/MerchantReturnFiniteReturnWindow",
+  merchantReturnDays: 14,
+  returnMethod: "https://schema.org/ReturnByMail",
+  returnFees: "https://schema.org/FreeReturn",
+});
+
+const digitalShippingDetails = () => ({
+  "@type": "OfferShippingDetails",
+  shippingRate: { "@type": "MonetaryAmount", value: 0, currency: "VND" },
+  shippingDestination: [{ "@type": "DefinedRegion", addressCountry: "VN" }],
+});
+
 const merchantProductSchema = (product, lang = "vi") => {
   const url = absolute(productUrl(product.slug, lang));
   const currency = String(product.currency || "VND").toUpperCase();
@@ -545,12 +564,8 @@ const merchantProductSchema = (product, lang = "vi") => {
       // The refund policy published at /refund: 14 days, no restocking fee. Stated
       // in the offer because Merchant Center reads it from here when the account
       // has no return policy configured.
-      hasMerchantReturnPolicy: {
-        "@type": "MerchantReturnPolicy",
-        returnPolicyCategory: "https://schema.org/MerchantReturnFiniteReturnWindow",
-        merchantReturnDays: 14,
-        returnFees: "https://schema.org/FreeReturn",
-      },
+      hasMerchantReturnPolicy: merchantReturnPolicy(),
+      shippingDetails: digitalShippingDetails(),
     },
   };
 };
@@ -898,7 +913,7 @@ export const footerBar = (route, copy, prefix = "") =>
  */
 export const PAGE_TOKENS = [
   "site", "brandName", "brandWordmark", "support", "paymentWindowHours",
-  "reviewMinLength", "reviewMaxLength", "year", "legalEntityLine", "jsonLd", "iconLinks", "cssVersion",
+  "reviewMinLength", "reviewMaxLength", "year", "legalEntityLine", "businessContactHtml", "jsonLd", "iconLinks", "cssVersion",
   "policyUpdated", "policyUpdatedDisplay", "headerNav", "footerLinks",
 ];
 /**
@@ -978,6 +993,7 @@ export function pageTokenValues({ products = [], reviewLimits = null, page = "",
     // was an entry in this object that nothing could ever read — the legal entity
     // reached the page through the line, which is what handles it being empty.
     legalEntityLine: legalEntityLine(),
+    businessContactHtml: businessContactHtml(lang),
     jsonLd: jsonLdGraph(products),
     // Rendered, not written into nine <head>s. The icon block is nine lines in ten
     // places otherwise, and the page that misses one is the page with no iOS icon.
@@ -1282,6 +1298,26 @@ const productUrl = (slug, lang = "vi") => `${localePrefix(lang)}/product/${slug}
 const legalEntityLine = (className = 'legal-entity') => {
   const name = String(env.brand.legalEntity || '').trim();
   return name ? `<p class="${className}">${esc(name)}</p>` : '';
+};
+
+// Owner-verified business contact details for transparency pages. Only values
+// explicitly configured are rendered; missing optional fields are omitted rather
+// than fabricated (fabricated identity details increase misrepresentation risk).
+const businessContactHtml = (lang = DEFAULT_LOCALE) => {
+  const labels = {
+    vi: { legal: 'Pháp nhân/đơn vị', address: 'Địa chỉ', phone: 'Điện thoại', email: 'Email hỗ trợ' },
+    en: { legal: 'Legal entity', address: 'Address', phone: 'Phone', email: 'Support email' },
+  }[lang] || { legal: 'Legal entity', address: 'Address', phone: 'Phone', email: 'Support email' };
+  const lines = [];
+  const legal = String(env.brand.legalEntity || '').trim();
+  const address = String(env.brand.address || '').trim();
+  const phone = String(env.brand.phone || '').trim();
+  const email = String(env.email.supportEmail || '').trim();
+  if (legal) lines.push(`<p><strong>${labels.legal}:</strong> ${esc(legal)}</p>`);
+  if (address) lines.push(`<p><strong>${labels.address}:</strong> ${esc(address)}</p>`);
+  if (phone) lines.push(`<p><strong>${labels.phone}:</strong> <a href="tel:${esc(phone.replace(/[^\d+]/g, ''))}">${esc(phone)}</a></p>`);
+  if (email) lines.push(`<p><strong>${labels.email}:</strong> <a href="mailto:${esc(email)}">${esc(email)}</a></p>`);
+  return lines.join('\n');
 };
 
 /**
@@ -2187,12 +2223,8 @@ export function renderFeed(products) {
         availability: "https://schema.org/InStock",
         url: absolute(productUrl(product.slug)),
         seller: { "@id": `${site()}/#organization` },
-        hasMerchantReturnPolicy: {
-          "@type": "MerchantReturnPolicy",
-          returnPolicyCategory: "https://schema.org/MerchantReturnFiniteReturnWindow",
-          merchantReturnDays: 14,
-          returnFees: "https://schema.org/FreeReturn",
-        },
+        hasMerchantReturnPolicy: merchantReturnPolicy(),
+        shippingDetails: digitalShippingDetails(),
       },
     },
   }));

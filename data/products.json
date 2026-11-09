@@ -171,15 +171,14 @@
     "requirementsEn": "Windows 10/11 (x64), Linux (glibc 2.31+) or macOS 10.15+; admin/root only for aggressive mode.",
     "featuresEn": [
       "All RAMCleaner Personal features",
-      "Introductory price for the first 100 customers",
-      "Only 100 copies available",
-      "Lifetime updates same as standard edition",
+      "Early Bird edition license terms as shown on this page",
+      "Lifetime updates included, as described for this edition",
       "Windows 10/11 (x64), Linux (x64), macOS (Intel and Apple Silicon) support"
     ],
-    "seoTitle": "RAMCleaner Early Bird — Giảm giá đặc biệt, dọn RAM | SonVuDev",
-    "seoDescription": "Giá Early Bird cho RAMCleaner Personal. Tất cả tính năng dọn RAM, nén bộ nhớ, cập nhật vĩnh viễn. Mua sớm, giá tốt.",
-    "seoTitleEn": "RAMCleaner Early Bird — Intro Pricing, Smart RAM Cleaner | SonVuDev",
-    "seoDescriptionEn": "Introductory Early Bird license for RAMCleaner Personal. All features: standby cleanup, memory compression, temp cleaning. Lifetime updates included."
+    "seoTitle": "RAMCleaner Early Bird — Dọn RAM, nén bộ nhớ | SonVuDev",
+    "seoDescription": "Phiên bản RAMCleaner Early Bird cho RAMCleaner Personal. Bao gồm tính năng dọn RAM, nén bộ nhớ, làm sạch file tạm; điều khoản và cập nhật theo mô tả trên trang sản phẩm.",
+    "seoTitleEn": "RAMCleaner Early Bird — RAM Cleaner for Windows, Linux, macOS | SonVuDev",
+    "seoDescriptionEn": "RAMCleaner Early Bird edition for RAMCleaner Personal. Includes standby cleanup, memory compression, and temp cleaning; terms and updates as described on the product page."
   },
   {
     "id": "7495919e-31e0-4f3d-86a2-2be4ba30c0dd",
