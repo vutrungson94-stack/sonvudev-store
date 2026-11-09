@@ -277,7 +277,6 @@ function renderSuggestions(term) {
     host.appendChild(suggestionsEl);
   }
   const q = String(term || '').trim();
-  suggestionsEl.children.splice(0, suggestionsEl.children.length);
   suggestionsEl.innerHTML = '';
   if (!q) {
     suggestionsEl.setAttribute('aria-hidden', 'true');
