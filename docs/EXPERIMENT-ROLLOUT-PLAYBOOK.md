@@ -100,7 +100,7 @@ Kiểm tra sau khi sửa: mở Chrome DevTools → Lighthouse → Accessibility,
 | Lỗi | Nguyên nhân | Cách sửa |
 |---|---|---|
 | Use efficient cache lifetimes | Static assets (CSS, JS, hình ảnh) chỉ cache 5 phút (`maxAge: "5m"`) | Tăng `maxAge` lên `"1y"` trong `express.static()`, vì assets được fingerprint qua build, deploy mới sẽ có tên file mới. |
-| Render-blocking requests | `<link rel="stylesheet" href="/styles.css">` chặn render; các `<script>` không có `defer` | Chuyển CSS thành `<link rel="preload" ... as="style" onload="...">` + `<noscript>` fallback; thêm `defer` cho mọi `<script src="...">`. |
+| Render-blocking requests | CSS chặn render nhưng preload+defer (`css-ready.js`) gây CLS ~0.5 vì vẽ chưa style trước | Giữ **`<link rel="stylesheet" href="/styles.min.css">` trực tiếp** (chặn render, CLS≈0, đúng chuẩn). Chỉ defer `<script>`. Không dùng preload CSS. |
 | Avoid chaining critical requests | Nhiều tài nguyên tải tuần tự thay vì songsex | Preconnect tới các domain bên ngoài (`fonts.googleapis.com`, `fonts.gstatic.com`), tránh chain requests không cần thiết. |
 
 ---
@@ -119,15 +119,17 @@ Kiểm tra sau khi sửa: mở Chrome DevTools → Lighthouse → Accessibility,
 
 ## 9. Checklist trước khi push (tất cả thay đổi)
 
-- [ ] `npm test` — toàn bộ xanh (575+ tests, 75 files)
-- [ ] `npm run lint` — 173+ files xanh
+- [ ] `npm test` — toàn bộ xanh
+- [ ] `npm run lint` — 178+ files xanh
 - [ ] `npm run audit` — 32 nhóm, 0 vấn đề
 - [ ] `npm run case` — case-sensitive imports xanh
 - [ ] `npm run workflow` — workflows parse xanh
+- [ ] `npm run build` — PASS (bao gồm `styles.min.css` được minify trước required gate)
+- [ ] `WORKFLOW.md §7.5` — đã đọc & cập nhật no-regress list trong cùng commit nếu đụng vào stylesheet/contrast/fonts/cache/test-env
 - [ ] `_Tests\gtest.ps1` — exit 0
 - [ ] `_Build\gbuild.ps1` — exit 0, SAST findings=0
 - [ ] Lighthouse Accessibility — 0 lỗi critical (nếu sửa a11y)
-- [ ] Lighthouse Performance — cache lifetime, render-blocking cải thiện (nếu sửa perf)
+- [ ] Lighthouse Performance — CLS ≈0 với stylesheet trực tiếp (chỉ chấp nhận render-blocking, không chấp nhận preload CSS)
 - [ ] `_Sync\gsync.ps1 -NonInteractive -Yes` — push thành công
 
 ---
