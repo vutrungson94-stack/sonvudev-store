@@ -564,5 +564,7 @@
   "blog.readMore": "続きを読む",
   "products.searchNoResultsTitle": "一致する製品が見つかりません",
   "products.searchNoResultsText": "短いキーワード、製品名を試すか、検索/フィルターをクリアしてください。",
-  "products.searchClear": "検索をクリア"
+  "products.searchClear": "検索をクリア",
+  "products.suggestions": "提案",
+  "products.didYouMean": "もしかして:"
 }

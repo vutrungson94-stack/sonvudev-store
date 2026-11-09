@@ -430,5 +430,7 @@
   "legal.refund.h7": "6. Cancelling an unpaid order",
   "legal.refund.p9": "Unpaid orders are automatically cancelled after {{paymentWindowHours}} hours from when they were placed. A cancelled order incurs no fee, so there is nothing to refund. If you have transferred money but the order has not been confirmed, send a screenshot of the receipt — we will reconcile and refund if there was an error.",
   "legal.refund.h8": "7. Contact",
-  "legal.refund.p10": "Send all refund requests to <a href=\"mailto:{{support}}\">{{support}}</a>. Please include the order id so we can look it up quickly. We do not handle complaints via social media, because we cannot verify the identity of the sender on those channels."
+  "legal.refund.p10": "Send all refund requests to <a href=\"mailto:{{support}}\">{{support}}</a>. Please include the order id so we can look it up quickly. We do not handle complaints via social media, because we cannot verify the identity of the sender on those channels.",
+  "products.suggestions": "Suggestions",
+  "products.didYouMean": "Did you mean:"
 }

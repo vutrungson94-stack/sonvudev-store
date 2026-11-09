@@ -146,6 +146,31 @@ async function loadProducts() {
 const searchInput = document.getElementById('product-search');
 let searchTerm = '';
 
+// Dropdown gợi ý khi tìm kiếm: giúp giảm zero-result rate và shortening
+// time-to-product — mỗi gợi ý sản phẩm là liên kết đến trang sản phẩm
+// (discovery → trang sản phẩm), còn nút/xóa tìm kiếm mở lại danh sách đầy đủ.
+// Không endpoint: toàn bộ catalogue đã nằm trong trang, gợi ý tính từ mảng
+// `products` đã có sẵn.
+let suggestionsEl = null;
+
+// Trả về các gợi ý sản phẩm khớp từ khóa (top 5), dùng cho dropdown tìm kiếm.
+const suggestionsFor = (term) => {
+  if (!term || !String(term).trim()) return [];
+  const q = foldDiacritics(String(term));
+  const seen = new Set();
+  const out = [];
+  for (const p of products) {
+    const local = localized(p);
+    const haystack = [p.name, p.shortDescription, p.shortDescriptionEn, local.name, local.shortDescription].filter(Boolean).join(' ');
+    if (foldDiacritics(haystack).includes(q) && !seen.has(p.id)) {
+      seen.add(p.id);
+      out.push(p);
+      if (out.length >= 5) break;
+    }
+  }
+  return out;
+};
+
 // Diacritics are folded so "trong tin cay" finds "Trong tin cây". A Vietnamese
 // keyboard is easier with accents switched on, a Latin one is not, and a customer
 // who cannot type the word they are looking for will not report that the search box
@@ -238,6 +263,57 @@ function localized(p) {
   };
 }
 
+// Hiển thị dropdown gợi ý sản phẩm khi người dùng đang gõ tìm kiếm. Không dùng
+// endpoint: toàn bộ catalogue đã nằm trong trang, gợi ý tính từ mảng `products`
+// đã có sẵn. Mỗi gợi ý là nút: bấm sẽ mở form mua của sản phẩm đó (/ ?buy=<id>,
+// theo PURCHASE-LINK-RULES.md) và xóa tìm kiếm.
+function renderSuggestions(term) {
+  if (!suggestionsEl) {
+    suggestionsEl = document.createElement('div');
+    suggestionsEl.className = 'search-suggestions';
+    suggestionsEl.setAttribute('aria-hidden', 'true');
+    const input = document.getElementById('product-search');
+    const host = input && input.parentNode ? input.parentNode : document.body;
+    host.appendChild(suggestionsEl);
+  }
+  const q = String(term || '').trim();
+  suggestionsEl.children.splice(0, suggestionsEl.children.length);
+  suggestionsEl.innerHTML = '';
+  if (!q) {
+    suggestionsEl.setAttribute('aria-hidden', 'true');
+    return;
+  }
+  const list = suggestionsFor(q);
+  if (!list.length) {
+    suggestionsEl.setAttribute('aria-hidden', 'true');
+    return;
+  }
+  suggestionsEl.setAttribute('aria-hidden', 'false');
+  const title = document.createElement('div');
+  title.className = 'suggestion-title';
+  title.textContent = T('products.suggestions', 'Gợi ý');
+  suggestionsEl.appendChild(title);
+  for (const p of list) {
+    const item = document.createElement('button');
+    item.className = 'suggestion-item';
+    item.type = 'button';
+    item.dataset.id = p.id;
+    item.dataset.slug = p.slug;
+    item.innerHTML = `<span class="suggestion-name">${esc(p.name)}</span><span class="suggestion-slug">${esc(p.slug)}</span>`;
+    item.addEventListener('click', () => {
+      searchTerm = '';
+      if (searchInput) { searchInput.value = ''; searchInput.focus(); }
+      activeFilter = 'all';
+      document.querySelectorAll('.filter').forEach((b) => b.classList.remove('active'));
+      const allBtn = document.querySelector('.filter[data-filter="all"]');
+      if (allBtn) allBtn.classList.add('active');
+      openPurchaseForm(p.id);
+      suggestionsEl.setAttribute('aria-hidden', 'true');
+    });
+    suggestionsEl.appendChild(item);
+  }
+}
+
 function emitSearchEvent(detail) {
   try {
     var payload = Object.assign({}, detail, {
@@ -262,11 +338,24 @@ function render() {
   count.textContent = `${list.length.toString().padStart(2, '0')} ${T('products.count')}`;
   if (!list.length && narrowing) {
     const q = String(searchTerm || '').trim();
-    grid.innerHTML = `<div class="empty-state" data-search-empty="1"><b>${esc(T('products.searchNoResultsTitle'))}</b><p>${esc(T('products.searchNoResultsText'))}${q ? `<br><small>${esc(q)}</small>` : ''}</p><button type="button" class="text-link" data-clear-product-search="1">${esc(T('products.searchClear'))}</button></div>`;
+    const first = products[0];
+    const suggest = first ? `<br><small>${esc(T('products.didYouMean', 'Bạn có muốn tìm:', { term: q }))} <a class="text-link suggestion-link" data-suggest-first="1">${esc(first.name)}</a></small>` : '';
+    grid.innerHTML = `<div class="empty-state" data-search-empty="1"><b>${esc(T('products.searchNoResultsTitle'))}</b><p>${esc(T('products.searchNoResultsText'))}${q ? `<br><small>${esc(q)}</small>${suggest}` : ''}</p><button type="button" class="text-link" data-clear-product-search="1">${esc(T('products.searchClear'))}</button></div>`;
     const clearBtn = grid.querySelector('[data-clear-product-search]');
     if (clearBtn) clearBtn.addEventListener('click', () => {
       searchTerm = '';
       if (searchInput) { searchInput.value = ''; searchInput.focus(); }
+      render();
+    });
+    const suggestLink = grid.querySelector('[data-suggest-first]');
+    if (suggestLink) suggestLink.addEventListener('click', () => {
+      searchTerm = '';
+      if (searchInput) { searchInput.value = ''; searchInput.focus(); }
+      activeFilter = 'all';
+      document.querySelectorAll('.filter').forEach((b) => b.classList.remove('active'));
+      const allBtn = document.querySelector('.filter[data-filter="all"]');
+      if (allBtn) allBtn.classList.add('active');
+      openPurchaseForm(first.id);
       render();
     });
   } else if (!list.length) {
@@ -277,6 +366,8 @@ function render() {
   // L5 discoverability measurement hook (no PII beyond search intent term): lets owners
   // connect analytics and observe zero-result queries / filter usage.
   if (narrowing) emitSearchEvent({ term: String(searchTerm || '').slice(0, 120), filter: activeFilter, results: list.length, lang: currentLang() });
+  // Search suggestions while typing (reduces zero-result rate, shortens time-to-product).
+  renderSuggestions(searchTerm);
   // RULE: clicking a product opens the purchase form (docs/PURCHASE-LINK-RULES.md).
   // Intercept in-card links so crawlable/no-JS hrefs never "jump away" for users.
   grid.querySelectorAll('.product-card').forEach((c) => {

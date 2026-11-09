@@ -218,6 +218,24 @@ test('Esc xoá ô tìm kiếm', async () => {
   assert.ok(event.defaultPrevented, 'phải chặn hành vi mặc định');
 });
 
+test('gợi ý sản phẩm hiện khi gõ tìm kiếm', async () => {
+  const { nodes, document } = await boot();
+  type(nodes.get('product-search'), 'capacity');
+  const hasDropdown = document.body.children.some((c) => String(c.className).includes('search-suggestions'));
+  assert.ok(hasDropdown, 'phải có dropdown gợi ý khi gõ tìm kiếm');
+  const items = document.body.querySelectorAll('.suggestion-item');
+  assert.ok(items.length > 0, 'phải có ít nhất một gợi ý sản phẩm');
+  assert.ok(items[0].dataset.id, 'gợi ý phải gắn id sản phẩm');
+});
+
+test('không có kết quả thì gợi ý sản phẩm đầu tiên', async () => {
+  const { nodes } = await boot();
+  type(nodes.get('product-search'), 'zzz-khong-co');
+  const empty = grid(nodes);
+  assert.match(empty, /empty-state/, 'phải có trạng thái rỗng');
+  assert.ok(empty.includes('data-suggest-first'), 'phải có gợi ý sản phẩm đầu tiên khi không có kết quả');
+});
+
 test('ô tìm kiếm có nhãn thật, không chỉ dựa vào placeholder', async () => {
   // A placeholder disappears the moment someone types, which leaves a screen reader
   // announcing an unnamed field — and it cannot be selected by anyone trying to copy

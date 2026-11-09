@@ -564,5 +564,7 @@
   "brand.supportEmail": "{{support}}",
   "products.searchNoResultsTitle": "No se encontraron productos coincidentes",
   "products.searchNoResultsText": "Pruebe una palabra clave más corta, un nombre de producto o borre la búsqueda/filtro.",
-  "products.searchClear": "Borrar búsqueda"
+  "products.searchClear": "Borrar búsqueda",
+  "products.suggestions": "Sugerencias",
+  "products.didYouMean": "¿Quisiste decir:"
 }
