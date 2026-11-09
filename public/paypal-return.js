@@ -1,5 +1,23 @@
 const state = window.OrderClient.read();
 const title=document.getElementById('title'),message=document.getElementById('message'),actions=document.getElementById('actions'),loader=document.getElementById('loader'),eyebrow=document.getElementById('eyebrow');
+function trackGa(eventName, params) {
+  try {
+    if (typeof window.gtag === 'function') window.gtag('event', eventName, params || {});
+    else if (Array.isArray(window.dataLayer)) window.dataLayer.push(Object.assign({ event: eventName }, params || {}));
+  } catch (e) {}
+}
+let purchaseTracked = false;
+function trackPurchase(order) {
+  if (purchaseTracked || !order || order.status !== 'paid') return;
+  purchaseTracked = true;
+  const item = order.items?.[0] || {};
+  trackGa('purchase', {
+    transaction_id: String(order.id || ''),
+    currency: String(order.currency || 'VND'),
+    value: Number(order.amount) || 0,
+    items: (item.productId || item.name) ? [{ item_id: String(item.productId || item.id || ''), item_name: String(item.name || ''), price: Number(item.price || order.amount) || 0, quantity: 1 }] : []
+  });
+}
 // PayPal buyers are the overseas half of the shop, so this page follows the same
 // dictionary as the storefront instead of carrying its own fixed copy.
 //
@@ -25,7 +43,7 @@ const wait=(ms)=>new Promise(r=>setTimeout(r,ms));
 // The webhook may have already marked the order paid while this tab had no
 // connection, so a failed capture is never proof the money did not arrive.
 async function alreadyPaid(){
-  try{const response=await fetch('/api/orders/'+encodeURIComponent(state.id),{headers:{'x-order-token':state.token}});if(!response.ok)return false;const data=await response.json();return data.order?.status==='paid'}catch(error){return false}
+  try{const response=await fetch('/api/orders/'+encodeURIComponent(state.id),{headers:{'x-order-token':state.token}});if(!response.ok)return null;const data=await response.json();return data.order?.status==='paid'?data.order:null}catch(error){return null}
 }
 async function start(){
   if(!state)return showMissing();
@@ -39,7 +57,7 @@ async function start(){
     try{
       const response=await fetch('/api/paypal/capture',{method:'POST',headers:{'content-type':'application/json','x-order-token':state.token},body:JSON.stringify({id:state.id})});
       const data=await response.json();
-      if(response.ok&&data.order?.status==='paid')return showPaid();
+      if(response.ok&&data.order?.status==='paid'){trackPurchase(data.order);return showPaid();}
       if(response.status===409)break;
       if(response.status===404)return showMissing();
     }catch(error){
@@ -47,10 +65,12 @@ async function start(){
     }
   }
   for(let attempt=0;attempt<8;attempt++){
-    if(await alreadyPaid())return showPaid();
+    const paidOrder=await alreadyPaid();
+    if(paidOrder){trackPurchase(paidOrder);return showPaid();}
     await wait(5000);
   }
-  if(await alreadyPaid())return showPaid();
+  const paidOrder=await alreadyPaid();
+  if(paidOrder){trackPurchase(paidOrder);return showPaid();}
   eyebrow.textContent=T('paypal.err');
   title.textContent=T('paypal.err');
   // The order id and the support address are the only two things that let a

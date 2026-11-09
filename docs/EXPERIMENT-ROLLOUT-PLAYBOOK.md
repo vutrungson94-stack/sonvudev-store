@@ -105,15 +105,15 @@ Kiểm tra sau khi sửa: mở Chrome DevTools → Lighthouse → Accessibility,
 
 ---
 
-## 8. Quy tắc triển khai Quality Monitoring (P3)
+## 8. Quality Monitoring (P3) — đã triển khai
 
-Thêm `public/quality.js` để đo CWV/INP/CLS/TTFB và error rate client-side:
+`public/quality.js` đo CWV/INP/CLS/TTFB và error rate client-side:
 
-- **File mới:** `public/quality.js` — sử dụng `PerformanceObserver` (LCP, CLS, FID/INP, TTFB), `window.onerror` + `unhandledrejection` (errors), gửi qua `navigator.sendBeacon` đến `/api/quality` (cùng origin, không cần thêm CSP host).
-- **Chỉ chạy trên production hostname** (`sonvudev.com`), không gửi PII (chỉ metric số, pathname, error type+filename, không ghi error message).
-- **Route mới:** `POST /api/quality` trong `src/app.js` — trả `204 No Content`, ghi log ngắn, không ghi PII.
-- **Chèn script:** `<script defer src="/quality.js"></script>` vào `public/index.html` và các trang static legal (`privacy.html`, `terms.html`, `refund.html`, `about.html`).
-- **CSP:** Không cần sửa vì cùng origin (`'self'` đã có trong `connect-src`).
+- **Client:** `public/quality.js` — `PerformanceObserver` (LCP, CLS, FID/INP, TTFB), `window.onerror` + `unhandledrejection`; gửi `navigator.sendBeacon` đến `POST /api/quality` (cùng origin, không cần thêm CSP host).
+- **Phạm vi gửi:** chỉ host production-like (không `localhost`/`127.0.0.1`/`::1`/`*.local`). Không gửi PII (chỉ metric số, pathname/url, error type+filename + errorCount; không ghi error message).
+- **Server:** `POST /api/quality` trong `src/app.js` — trả `204 No Content`, log tóm tắt `[quality]` (JSON), không lưu PII.
+- **Phân tích log:** `npm run quality:report` (đọc `[quality]` lines từ stdin hoặc file log) để xem count/avg/p75/max CWV và tổng lỗi JS.
+- **GA4 conversion (liên quan đo lường):** storefront/order/paypal-return gửi các event GA4 an toàn (không PII) khi có `gtag` (`view_item`, `begin_checkout`, `add_payment_info`, `purchase`). Owner cần cấu hình GA4 conversions/đánh dấu sự kiện phù hợp trong GA4 UI.
 
 ---
 

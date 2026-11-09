@@ -1,5 +1,20 @@
 // Storefront renderer. Every user-facing string goes through I18N so the
 // Vietnamese/English switch works without a reload.
+function trackGa(eventName, params) {
+  try {
+    if (typeof window.gtag === 'function') window.gtag('event', eventName, params || {});
+    else if (Array.isArray(window.dataLayer)) window.dataLayer.push(Object.assign({ event: eventName }, params || {}));
+  } catch (e) {}
+}
+function gaItem(p) {
+  if (!p) return null;
+  return { item_id: String(p.id || p.slug || ''), item_name: String(p.name || ''), item_category: String(p.category || ''), price: Number(p.price) || 0, quantity: 1 };
+}
+function trackGaItem(eventName, p) {
+  const item = gaItem(p);
+  if (!item || !item.item_id) return;
+  trackGa(eventName, { currency: 'VND', value: item.price, items: [item] });
+}
 const grid = document.getElementById('product-grid');
 const count = document.getElementById('product-count');
 const modal = document.getElementById('product-modal');
@@ -455,6 +470,7 @@ function openProduct(id) {
   stopWatch();
   stopCountdown();
   const p = localized(raw);
+  trackGaItem('view_item', raw);
   modalContent.innerHTML = `      <div class="detail-art">
       <div class="product-logo large">${initials(p.name)}</div>
       <span>${esc(p.badge || T('products.new'))}</span>
@@ -509,6 +525,7 @@ function closeModal() {
 function openCheckout(p) {
   stopWatch();
   stopCountdown();
+  trackGaItem('begin_checkout', p);
   modalContent.innerHTML = `<div class="checkout-head">
       <button class="back-button" id="back-product">← ${esc(T('cart.back'))}</button>
       <p class="eyebrow">${esc(T('cart.secureTitle'))}</p>
@@ -535,6 +552,7 @@ async function submitCheckout(event, p) {
   const form = event.currentTarget;
   const button = form.querySelector('button[type=submit]');
   const data = Object.fromEntries(new FormData(form));
+  trackGa('add_payment_info', { currency: 'VND', value: Number(p.price) || 0, payment_type: String(data.paymentMethod || ''), items: [gaItem(p)].filter(Boolean) });
   checkoutKey = checkoutKey || window.crypto?.randomUUID?.() || `k-${Date.now()}-${Math.random().toString(36).slice(2)}`;
   button.disabled = true;
   button.textContent = T('cart.paying');

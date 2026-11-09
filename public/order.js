@@ -1,4 +1,11 @@
 const title=document.getElementById('order-title'),lead=document.getElementById('order-lead'),body=document.getElementById('order-body');
+function trackGa(eventName, params) {
+  try {
+    if (typeof window.gtag === 'function') window.gtag('event', eventName, params || {});
+    else if (Array.isArray(window.dataLayer)) window.dataLayer.push(Object.assign({ event: eventName }, params || {}));
+  } catch (e) {}
+}
+let purchaseTrackedFor = null;
 // One dictionary, one set of formatters. This page used to define its own
 // escape helper, its own money format and its own status words, all of which
 // already existed in i18n.js — and the status words had drifted, so the same
@@ -189,6 +196,15 @@ async function render(){
   if(order.paymentProvider==='paypal'&&order.status!=='paid'&&order.status!=='refunded'&&!closed(order)&&order.providerOrderId&&await resumePayPalCapture()) return;
   title.textContent=T('order.title',{id:order.id});
   const paid=order.status==='paid',done=closed(order);
+  if (paid && order.id && purchaseTrackedFor !== order.id) {
+    purchaseTrackedFor = order.id;
+    trackGa('purchase', {
+      transaction_id: String(order.id),
+      currency: String(order.currency || 'VND'),
+      value: Number(order.amount) || 0,
+      items: item && (item.productId || item.name) ? [{ item_id: String(item.productId || item.id || ''), item_name: String(item.name || ''), price: Number(item.price || order.amount) || 0, quantity: 1 }] : []
+    });
+  }
   lead.textContent=done?T('order.completed'):statusLabel(order);
   const channel=(c)=>{const label=esc(c.label),qr=c.qrUrl||c.qrImage,alt=esc(T('order.channel.qr',{label:c.label}));return `<div class="order-channel"><b>${label}</b><span>${esc(T('order.channel.account'))}: <b>${esc(c.account)}</b></span><span>${esc(T('order.channel.amount'))}: <b>${money(c.amount,c.currency)}</b></span><span class="order-note">${esc(T('order.channel.note'))}: <code>${esc(c.transferNote)}</code></span>${qr?`<img class="order-qr" src="${esc(qr)}" alt="${alt}" width="220" height="220" referrerpolicy="no-referrer">`:''}</div>`};
   const channels=(data.payment?.channels||[]).map(channel).join('');
