@@ -112,6 +112,10 @@ services:
         sync: false
       - key: INDEXNOW_ENDPOINT
         sync: false
+      - key: GA_MEASUREMENT_ID
+        sync: false
+      - key: GA4_MEASUREMENT_ID
+        sync: false
       - key: ADMIN_API_TOKEN
         generateValue: true
       - key: ADMIN_API_TOKENS

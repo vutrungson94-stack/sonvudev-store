@@ -291,12 +291,17 @@ app.use((req, res, next) => {
   // API responses carry order data and one-time tokens; shared caches must not keep them.
   if (req.path.startsWith("/api/")) res.setHeader("Cache-Control", "no-store");
   res.setHeader("Permissions-Policy", "camera=(), microphone=(), geolocation=()");
-  // script-src and connect-src carry static.cloudflareinsights.com and
-// cloudflareinsights.com because analyticsMeta() in src/pages.js puts the Web
-// Analytics beacon on every page. Without the two entries the browser blocks
-// the tag and Cloudflare reports a confident zero, which is worse than not
-// measuring: the shop would look visited when nobody had been.
-res.setHeader("Content-Security-Policy", "default-src 'self'; script-src 'self' https://static.cloudflareinsights.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: https://img.vietqr.io; connect-src 'self' https://*.r2.cloudflarestorage.com https://cloudflareinsights.com; frame-ancestors 'none'; base-uri 'self'; form-action 'self'");
+  // Analytics beacons are external scripts/endpoints: Cloudflare Web Analytics
+  // always needs its hosts; GA4 (optional, env GA_MEASUREMENT_ID) is allowed only
+  // when configured so the default CSP stays as tight as before.
+  const gaOn = !!env.analytics.gaMeasurementId;
+  const scriptSrc = ["'self'", "https://static.cloudflareinsights.com"];
+  if (gaOn) scriptSrc.push("https://www.googletagmanager.com");
+  const connectSrc = ["'self'", "https://*.r2.cloudflarestorage.com", "https://cloudflareinsights.com"];
+  if (gaOn) connectSrc.push("https://www.google-analytics.com", "https://*.google-analytics.com", "https://*.analytics.google.com", "https://*.googletagmanager.com");
+  const imgSrc = ["'self'", "data:", "https://img.vietqr.io"];
+  if (gaOn) imgSrc.push("https://www.google-analytics.com", "https://*.google-analytics.com", "https://www.googletagmanager.com");
+  res.setHeader("Content-Security-Policy", `default-src 'self'; script-src ${scriptSrc.join(" ")}; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src ${imgSrc.join(" ")}; connect-src ${connectSrc.join(" ")}; frame-ancestors 'none'; base-uri 'self'; form-action 'self'`);
   if (req.secure) res.setHeader("Strict-Transport-Security", "max-age=15552000; includeSubDomains");
   next();
 });

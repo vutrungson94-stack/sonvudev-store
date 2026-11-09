@@ -247,6 +247,7 @@ function emitSearchEvent(detail) {
     });
     window.dispatchEvent(new CustomEvent('sonvudev:search', { detail: payload }));
     if (Array.isArray(window.dataLayer)) window.dataLayer.push(Object.assign({ event: 'site_search' }, payload));
+    if (typeof window.gtag === 'function') window.gtag('event', 'search', { search_term: payload.search_term, results: payload.results, page_path: payload.page_path, site_filter: payload.filter, site_lang: payload.lang });
   } catch (_) { /* analytics is optional */ }
 }
 

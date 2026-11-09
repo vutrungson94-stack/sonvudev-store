@@ -722,13 +722,21 @@ export const brandMeta = () => [
  * dashboard shows a confident zero.
  */
 export const analyticsMeta = () => {
+  const parts = [];
   const token = env.analytics.webAnalyticsToken;
-  if (!token) return "";
-  return [
-    "<!-- Cloudflare Web Analytics -->",
-    `<script type="module" src="https://static.cloudflareinsights.com/beacon.min.js" data-cf-beacon='{"token": "${esc(token)}"}'></script>`,
-    "<!-- End Cloudflare Web Analytics -->",
-  ].join("");
+  if (token) {
+    parts.push("<!-- Cloudflare Web Analytics -->");
+    parts.push(`<script type="module" src="https://static.cloudflareinsights.com/beacon.min.js" data-cf-beacon='{"token": "${esc(token)}"}'></script>`);
+    parts.push("<!-- End Cloudflare Web Analytics -->");
+  }
+  const gaId = env.analytics.gaMeasurementId;
+  if (gaId) {
+    // External same-origin loader keeps CSP strict (no inline script). public/ga.js
+    // reads the meta and loads gtag.js only when configured by the owner.
+    parts.push(`<meta name="ga-measurement-id" content="${esc(gaId)}">`);
+    parts.push(`<script defer src="/ga.js"></script>`);
+  }
+  return parts.join("");
 };
 
 /**

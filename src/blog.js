@@ -7,6 +7,7 @@ import { env } from "./config.js";
 import { dataDir } from "./store.js";
 import { esc } from "./format.js";
 import { SUPPORTED_LOCALES } from "./i18n-registry.mjs";
+import { analyticsMeta } from "./pages.js";
 
 // Directory where blog post JSON files live.
 const BLOG_DIR = path.join(dataDir, "blog");
@@ -311,6 +312,7 @@ export function renderBlogPost(post, lang = "vi") {
   <link rel="alternate" hreflang="en" href="${esc(enUrl)}">
   <link rel="alternate" hreflang="x-default" href="${esc(viUrl)}">
   <link rel="stylesheet" href="/styles.css">
+${analyticsMeta()}
 </head>
 <body>
   <nav class="blog-lang">
@@ -407,6 +409,7 @@ export function renderBlogIndex(posts, lang = "vi") {
   <link rel="alternate" hreflang="en" href="${esc(enUrl)}">
   <link rel="alternate" hreflang="x-default" href="${esc(viUrl)}">
   <link rel="stylesheet" href="/styles.css">
+${analyticsMeta()}
 </head>
 <body>
   <nav class="blog-lang">

@@ -178,6 +178,13 @@ export const env = {
     // checkout that is being run without the variable simply serves no tag
     // rather than one that fails to load.
     webAnalyticsToken: value("CF_WEB_ANALYTICS_TOKEN"),
+    // Optional GA4 Measurement ID (G-...). Set in hosting env when the owner has
+    // created a GA4 property; empty = no GA tag loaded. Validated to avoid
+    // injecting arbitrary script attributes.
+    gaMeasurementId: (() => {
+      const id = value("GA_MEASUREMENT_ID", value("GA4_MEASUREMENT_ID", "")).toUpperCase();
+      return /^G-[A-Z0-9]{4,20}$/.test(id) ? id : "";
+    })(),
   },
   geo: {
     // "off" disables the country lookup entirely and the storefront falls back
