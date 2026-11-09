@@ -1,3 +1,6 @@
+// The shared test environment, applied before anything imports src/ — config.js
+// reads the environment once at load, so this has to come first.
+import './helpers/env.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
