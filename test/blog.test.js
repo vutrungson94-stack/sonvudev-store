@@ -178,6 +178,36 @@ test('liên kết sản phẩm liên quan trên blog đi đến trang sản ph�
   assert.ok(!en.includes('/?buy='), 'liên kết liên quan tiếng Anh không được mở form thanh toán');
 });
 
+test('liên kết /product trong nội dung blog: xem chi tiết -> trang sản phẩm, CTA mua rõ ràng -> form mua', async () => {
+  await fs.mkdir(path.join(tempDir, 'data'), { recursive: true });
+  await fs.writeFile(path.join(tempDir, 'data', 'products.json'), JSON.stringify([
+    { id: 'sp-b-id', slug: 'san-pham-b', name: 'SP B' },
+  ]));
+  const post = {
+    slug: 'bai-viet',
+    titleVi: 'Bài viết',
+    titleEn: 'Post',
+    descriptionVi: 'Mô tả',
+    descriptionEn: 'Description',
+    contentVi: '<p><a class="blog-cta" href="/product/san-pham-a">Xem chi tiết sản phẩm</a> <a class="btn-buy" href="/product/san-pham-b">Mua ngay</a></p>',
+    contentEn: '<p><a href="/product/san-pham-a">View details</a> <a data-buy="1" href="/product/san-pham-b">Buy now</a></p>',
+    published: '2025-01-01T00:00:00.000Z',
+    modified: '2025-01-01T00:00:00.000Z',
+    section: 'Test',
+    sectionEn: 'Test',
+    tags: [],
+    relatedProductSlug: '',
+  };
+  const vi = renderBlogPost(post, 'vi');
+  assert.match(vi, /<a[^>]*href="[^"]*\/product\/san-pham-a"[^>]*>Xem chi tiết sản phẩm<\/a>/, 'liên kết xem chi tiết phải tới trang sản phẩm');
+  assert.ok(!vi.includes('/product/san-pham-a?buy=') && !/<a[^>]*href="[^"]*\/\?buy=[^"]*"[^>]*>Xem chi tiết/.test(vi), 'anchor xem chi tiết không được mở form mua');
+  assert.ok(vi.includes('/?buy=sp-b-id'), 'CTA mua rõ ràng phải mở luồng mua theo id sản phẩm');
+  assert.ok(vi.includes('Mua ngay'), 'giữ nội dung CTA mua');
+  const en = renderBlogPost(post, 'en');
+  assert.ok(en.includes('/en/product/san-pham-a'), 'liên kết xem chi tiết tiếng Anh phải giữ locale');
+  assert.ok(en.includes('/?buy=sp-b-id'), 'CTA mua data-buy phải mở luồng mua');
+});
+
 test('blog.json feed trả về cấu trúc hợp lệ', async () => {
   const data = await json('/blog.json');
   assert.ok(Array.isArray(data.items), 'phải có mảng items');

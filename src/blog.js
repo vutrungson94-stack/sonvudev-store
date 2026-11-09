@@ -226,10 +226,21 @@ export function renderBlogPost(post, lang = "vi") {
   const title = blogField(post, lang, "title");
   const description = blogField(post, lang, "description");
   const bodyContent = blogField(post, lang, "content");
-  // Deep-link every product URL in the article body straight into checkout,
-  // not the detail page: the CTA was built to convert a reader into a buyer,
-  // not to give them a product card to read twice.
-  const contentHtml = String(bodyContent || "").replace(/href="\/product\/([^"?#\s]+)"/g, (_m, slug) => `href="${buyHref(slug)}"`);
+  // Rewrite /product/<slug> links in authored blog HTML with explicit intent:
+  // - explicit buy CTAs (mua/buy/checkout/purchase/order/cart signals, or
+  //   data-buy/data-purchase) open checkout via /?buy=<id>;
+  // - discovery/reference links go to the localized product page.
+  // This avoids sending readers who click "view details" into checkout.
+  const contentHtml = String(bodyContent || "").replace(
+    /<a\b([^>]*\bhref="\/product\/([^"?#\s]+)"[^>]*)>([\s\S]*?)<\/a>/gi,
+    (m, _attrs, slug, inner) => {
+      const text = inner.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim().toLowerCase();
+      const hay = `${m} ${text}`.toLowerCase();
+      const isBuy = /\bdata-buy\b|\bdata-purchase\b|class="[^"]*\b(?:buy|purchase|checkout|btn-buy|btn-purchase|order-now|add-to-cart|cart)\b[^"]*"|\b(?:mua ngay|đặt mua|mua hàng|thanh toán ngay|buy now|purchase now|order now|checkout|add to cart)\b/i.test(hay);
+      const href = isBuy ? buyHref(slug, lang) : productPageHref(slug, lang);
+      return m.replace(/href="\/product\/[^"?#\s]+"/i, `href="${href}"`);
+    }
+  );
   const section = blogField(post, lang, "section");
   const dateDisplay = new Date(post.published || post.modified || Date.now())
     .toLocaleDateString(ui.dateLocale, {
