@@ -2048,7 +2048,7 @@ ${meta({ title, description, url, type: "product", lang, image: productImage(pro
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="/styles.css?v=${cssVersion}">
+<link rel="stylesheet" href="/styles.min.css?v=${cssVersion}">
 ${brandMeta()}
 ${analyticsMeta()}
 ${jsonLd({ "@graph": [organization(), websiteSchema(), productSchema(product, lang), merchantProductSchema(product, lang), breadcrumbSchema(product, lang), faq] })}

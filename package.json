@@ -6,6 +6,7 @@
   "type": "module",
   "scripts": {
     "build": "node scripts/build-web.mjs",
+    "css:minify": "node scripts/minify-css.mjs",
     "check:production": "node scripts/production-check.mjs",
     "check:publish-output": "node scripts/check-publish-output.mjs",
     "paypal:setup": "node scripts/setup-paypal.mjs",

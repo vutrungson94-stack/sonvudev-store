@@ -311,7 +311,7 @@ export function renderBlogPost(post, lang = "vi") {
   <link rel="alternate" hreflang="vi" href="${esc(viUrl)}">
   <link rel="alternate" hreflang="en" href="${esc(enUrl)}">
   <link rel="alternate" hreflang="x-default" href="${esc(viUrl)}">
-  <link rel="stylesheet" href="/styles.css">
+  <link rel="stylesheet" href="/styles.min.css">
 ${analyticsMeta()}
 </head>
 <body>
@@ -408,7 +408,7 @@ export function renderBlogIndex(posts, lang = "vi") {
   <link rel="alternate" hreflang="vi" href="${esc(viUrl)}">
   <link rel="alternate" hreflang="en" href="${esc(enUrl)}">
   <link rel="alternate" hreflang="x-default" href="${esc(viUrl)}">
-  <link rel="stylesheet" href="/styles.css">
+  <link rel="stylesheet" href="/styles.min.css">
 ${analyticsMeta()}
 </head>
 <body>

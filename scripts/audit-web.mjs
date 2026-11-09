@@ -107,15 +107,16 @@ for (const name of htmlFiles) {
     fail("link gãy", `public/${name}`, `"${href}" không có file tương ứng trong public/`);
   }
 }
-// Every HTML page must load the stylesheet directly (absolute /styles.css). A
-// stylesheet that lives only inside <link rel="preload" ... onload="..."> depends
-// on an inline event handler, which CSP blocks (script-src has no 'unsafe-inline'),
-// so the page ends up with no CSS at all. This pattern is not accepted as a
-// substitute for a real stylesheet, whether preload+onload or noscript-only.
+// Every HTML page must load the stylesheet directly (absolute /styles.min.css,
+// the minified build of styles.css). A stylesheet that lives only inside
+// <link rel="preload" ... onload="..."> depends on an inline event handler,
+// which CSP blocks (script-src has no 'unsafe-inline'), so the page ends up
+// with no CSS at all. This pattern is not accepted as a substitute for a real
+// stylesheet, whether preload+onload or noscript-only.
 for (const name of htmlFiles) {
   const source = await read(path.join("public", name));
-  if (!/<link[^>]*rel=["']stylesheet["'][^>]*href=["']\/styles\.css["']/.test(source)) {
-    fail("missing stylesheet", `public/${name}`, "must contain <link rel=\"stylesheet\" href=\"/styles.css\"> directly; not only in preload+onload (blocked by CSP) or noscript-only.");
+  if (!/<link[^>]*rel=["']stylesheet["'][^>]*href=["']\/styles\.min\.css["']/.test(source)) {
+    fail("missing stylesheet", `public/${name}`, "must contain <link rel=\"stylesheet\" href=\"/styles.min.css\"> directly; not only in preload+onload (blocked by CSP) or noscript-only.");
   }
 }
 // The HTML the server renders is held to the same rule as a file on disk.
@@ -884,11 +885,10 @@ for (const name of htmlFiles) {
 // ---------------------------------------------------------------------------
 for (const name of htmlFiles) {
   const source = await read(path.join("public", name));
-  // Both forms. public/about.html links "/styles.css" and every other page links
-  // "styles.css"; matching only one left the page with the absolute path — the
-  // one that had actually lost its fonts — unexamined by a check written to catch
-  // exactly that.
-  if (!/href="\/?styles\.css"/.test(source)) continue;
+  // Both forms. The page links the minified stylesheet "/styles.min.css";
+  // the source "styles.css" is only what the minify step reads. Matching only
+  // the source name left the page that actually lost its fonts unexamined.
+  if (!/href="\/?styles\.min\.css"/.test(source)) continue;
   if (!/Space\+Grotesk/.test(source)) {
     fail("thiếu font thương hiệu", `public/${name}`,
       "nạp styles.css nhưng không nạp Space Grotesk/DM Sans — chữ thương hiệu sẽ rơi về sans-serif mặc định");
