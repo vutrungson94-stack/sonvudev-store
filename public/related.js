@@ -14,6 +14,20 @@
   if (!script) return;
   var box = document.getElementById(script.getAttribute('data-target') || 'related');
   if (!box) return;
+  // The server renders these cards itself.
+  //
+  // On the product page the "Sản phẩm khác" strip is already in the HTML the
+  // server sent, and this loader used to fetch the whole catalogue again — 14 KB
+  // and 549 ms — to replace that list with the same one. It was the longest
+  // chain in the network tree of every product page: HTML -> related.js ->
+  // /api/products.
+  //
+  // So the loader only does its job where the server had nothing to show: the
+  // 404 page, whose product list is a loading line waiting to be replaced.
+  // The test is "are there already links in here", not "is the box empty" —
+  // the 404 page's box holds a <p> while it waits, and that is not a product
+  // list.
+  if (box.querySelector('a')) return;
   var selfId = script.getAttribute('data-self') || '';
 
   var text = function (value, fallback) {

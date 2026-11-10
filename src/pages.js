@@ -2051,6 +2051,20 @@ export function renderProductPage(rawProduct, lang = "vi", reviews = [], related
     || `${product.name} v${product.version} — ${product.platform || "Windows"} | ${brand()}`;
   const description = metaDescriptionFor(product, lang);
   const faq = faqSchema(product, lang);
+  // The header below closes the brand link before the navigation.
+  //
+  // It did not, and the cost was not visible in the markup: the HTML parser
+  // cannot have a link inside a link, so when it met the navigation's first
+  // link it ran the adoption agency algorithm and **re-created the brand link
+  // empty inside the nav**. The page ended up with two brand links, one of
+  // them empty and with no name at all — which is what axe reported as "Links
+  // do not have a discernible name" and what Lighthouse's agentic-browsing check
+  // reports as a malformed accessibility tree. A screen reader and an agent
+  // both get a nameless link.
+  //
+  // Nothing about the missing tag looks wrong in the source, which is why it
+  // survived every gate until something that reads the rendered DOM looked at
+  // it. The product-page test now reads the parsed page.
 
   return `<!doctype html>
 <html lang="${esc(SCHEMA_LANG[lang] || lang)}">
@@ -2069,7 +2083,7 @@ ${analyticsMeta()}
 ${jsonLd({ "@graph": [organization(), websiteSchema(), productSchema(product, lang), merchantProductSchema(product, lang), breadcrumbSchema(product, lang), faq] })}
 </head>
 <body class="product-page">
-<header class="site-header"><a class="brand" href="${homeUrl}">${brandWordmark()}${headerNav("", copy, homePrefix)}<a class="header-cta" href="${homePrefix}/#products"><span>${esc(copy.buyNow)}</span> <span>↗</span></a></header>
+<header class="site-header"><a class="brand" href="${homeUrl}">${brandWordmark()}</a>${headerNav("", copy, homePrefix)}<a class="header-cta" href="${homePrefix}/#products"><span>${esc(copy.buyNow)}</span> <span>↗</span></a></header>
 <main class="wrap">
 <nav class="crumbs" aria-label="${esc(copy.breadcrumbLabel)}"><a href="${homeUrl}">${esc(copy.home)}</a> <span>/</span> <a href="${homePrefix}/#products">${esc(copy.products)}</a> <span>/</span> <span aria-current="page">${esc(product.name)}</span></nav>
 <article class="product-detail">
