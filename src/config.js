@@ -173,15 +173,6 @@ export const env = {
     url: value("SUPABASE_URL").replace(/\/$/, ""),
     serviceRoleKey: value("SUPABASE_SERVICE_ROLE_KEY"),
   },
-  analytics: {
-    // Optional GA4 Measurement ID (G-...). Set in hosting env when the owner has
-    // created a GA4 property; empty = no GA tag loaded. Validated to avoid
-    // injecting arbitrary script attributes.
-    gaMeasurementId: (() => {
-      const id = value("GA_MEASUREMENT_ID", value("GA4_MEASUREMENT_ID", "")).toUpperCase();
-      return /^G-[A-Z0-9]{4,20}$/.test(id) ? id : "";
-    })(),
-  },
   geo: {
     // "off" disables the country lookup entirely and the storefront falls back
     // to listing every payment method without a recommendation.

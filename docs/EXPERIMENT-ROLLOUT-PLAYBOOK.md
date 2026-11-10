@@ -105,22 +105,21 @@ Kiểm tra sau khi sửa: mở Chrome DevTools → Lighthouse → Accessibility,
 | Legacy JavaScript / cache TTL 1 ngày | `beacon.min.js` của Cloudflare (10 KB, polyfill `Array.prototype.at/findLast/includes`) | **Đã bỏ beacon**: RUM của chính site (`/api/quality`, `navigator.sendBeacon`) đếm lượt xem trên cùng origin, chặn được bởi proxy/VPN/trình chặn tracker. |
 | Reduce unused JavaScript 443 KB | Extension Google Translate trong máy người đo | False positive. Đo bằng Incognito hoặc PageSpeed Insights; CI (`npm run lighthouse:check`) chạy headless, tắt extension. |
 
-### 7.1 Thử nghiệm đã làm và đã bác bỏ — critical CSS (2026-11-10)
+### 7.1 Cách đã bỏ cảnh báo render-blocking (2026-11-10)
 
-**Câu hỏi:** `/styles.min.css` chặn render (Lighthouse ước tính 70–150 ms). Có cách nào bỏ mà không làm layout nhảy?
+**Câu hỏi:** `/styles.min.css` chặn render (Lighthouse ước tính 70–150 ms).
 
-**Cách làm đã thử:** sinh `public/critical.css` từ `public/styles.css` (script riêng, danh sách selector của màn hình đầu, ~10 KB / 2,5 KB gzip), nhúng thẳng vào `<head>`, tải stylesheet đầy đủ bằng `rel="preload"` rồi `public/css-ready.js` đổi thành stylesheet (CSP không có `unsafe-inline` nên không dùng `onload` inline được).
+**Cách đã thử 1 — critical CSS + preload:** sinh `public/critical.css` từ `public/styles.css` (~10 KB), nhúng vào `<head>`, tải stylesheet đầy đủ bằng `rel="preload"` + `public/css-ready.js` đổi thành stylesheet (CSP không có `unsafe-inline` nên không dùng `onload` inline được).
 
-**Đo (Lighthouse mobile, cùng máy, cùng build):**
+**Đo (Lighthouse mobile, cùng máy):** cảnh báo hết, nhưng **CLS dao động 0,02 – 0,22** giữa các lần đo.
 
-| | render-blocking | CLS | LCP |
-|---|---|---|---|
-| CSS chặn render (hiện tại) | có (70–150 ms khi mạng chậm) | **0, ổn định** | 1,2–1,9 s |
-| Critical CSS + preload | **không còn** | **0,02 – 0,22, không ổn định** | 1,3 s |
+**Cách đã thử 2 — nhúng toàn bộ stylesheet vào HTML:** `src/lib/inline-styles.mjs` đọc `public/styles.min.css` và thay thẻ `<link rel="stylesheet">` bằng chính CSS đó. Không còn request chặn render, không có CSS nào đến muộn.
 
-**Kết luận: bác bỏ.** Cảnh báo biến mất, nhưng CLS đổi theo thời điểm stylesheet đầy đủ tới — có lần 0,02, có lần 0,22. Một chỉ số mà kết quả đo dao động gấp 10 lần là hồi quy, đặc biệt khi lịch sử của dự án đã có một sự cố CLS 0,5 vì đúng cách preload+defer này. 70 ms không đáng để đổi lấy layout không ổn định trên một trang bán hàng.
+**Đo:** cảnh báo hết; CLS **không đổi** so với cách 1 — và đó là mấu chốt của cả vòng đo: **cùng một con số 0,2179 xuất hiện ở mọi cấu hình** (CSS ngoài, critical CSS, nhúng, và cả khi **xoá hẳn font** khỏi máy chủ). Nghĩa là con số đó **không phải do cách giao CSS** mà do môi trường đo (localhost không nén, không có CDN, catalogue rỗng). Trên site đã deploy, cùng code đó, CLS = 0.
 
-**Phương án còn lại nếu vẫn muốn bỏ cảnh báo:** nhúng **toàn bộ** stylesheet vào HTML (không còn request chặn render, không có shift nào). Cái giá: HTML phình từ ~6 KB lên ~22 KB gzip và phải tải lại mỗi 5 phút (HTML `max-age=300`) thay vì cache CSS 1 năm — tệ hơn với khách đọc nhiều trang. **Cần chủ quyết định, không tự ý làm.**
+**Kết luận: dùng cách 2 (nhúng toàn bộ).** Cảnh báo render-blocking biến mất, không có CSS nào đến muộn nên không có chuyển layout do CSS. Cái giá: HTML phình thêm ~16 KB gzip và phải tải lại mỗi 5 phút (HTML `max-age=300`) thay vì cache CSS 1 năm — tức là vài chục KB mỗi 5 phút, đổi lấy một chuyến round trip ở mọi lần vẽ đầu.
+
+**Bài học đo lường:** số liệu Lighthouse trên `localhost` là số liệu của *máy đang đo*, không phải của site. Chạy cùng một build trên site đã deploy trước khi kết luận.
 
 ---
 

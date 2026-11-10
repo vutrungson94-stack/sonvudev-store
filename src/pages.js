@@ -6,6 +6,7 @@ import { isSellable } from "./store.js";
 import { esc, money, formatBytes, initials } from "./format.js";
 import { commitHash } from "./lib/git.mjs";
 import { assetUrl } from "./lib/assets.mjs";
+import { inlineStyles } from "./lib/inline-styles.mjs";
 import { loadBlogPosts, getBlogPostBySlug, renderBlogPost, renderBlogIndex, renderBlogFeed } from "./blog.js";
 import { LOCALE_CODES, DEFAULT_LOCALE } from "./i18n-registry.mjs";
 
@@ -727,31 +728,27 @@ export const brandMeta = () => [
  * dashboard shows a confident zero.
  */
 export const analyticsMeta = () => {
-  const parts = [];
-  // Cloudflare Web Analytics used to be here.
+  // Both third-party analytics tags used to be here: Cloudflare Web Analytics
+  // and GA4. Neither is any more.
   //
-  // It was 10 KB of third-party JavaScript on every page, it carried its own
-  // polyfills for Array.prototype.at/findLast/includes (which Lighthouse
-  // reports as "Legacy JavaScript"), it was cached for a single day (which
-  // Lighthouse reports as "Use efficient cache lifetimes"), and it was the last
-  // third-party script standing between the shop and a clean report.
+  // Cloudflare's beacon was 10 KB of third-party JavaScript carrying its own
+  // polyfills for Array.prototype.at/findLast/includes (Lighthouse: "Legacy
+  // JavaScript") and cached for a single day ("Use efficient cache lifetimes").
   //
-  // What it provided — page views — the shop already has, better: the RUM
-  // beacon in public/quality.js posts the URL and the Core Web Vitals to
-  // /api/quality on the same origin, with navigator.sendBeacon, so it survives
-  // the visitor leaving the page and no proxy or tracker blocker can stop it.
+  // GA4's gtag.js is blocked outright by every tracker blocker and privacy
+  // setting: the request failed with ERR_BLOCKED_BY_CLIENT in the visitor's
+  // own network tab, on every page, for every visitor who has one. A tag that
+  // fails for those visitors collects nothing for them and only produces a red
+  // line in their console.
   //
-  // Putting it back is one tag. What it costs is written down in
-  // docs/QUALITY-L4-L5-BACKLOG.md.
-  const gaId = env.analytics.gaMeasurementId;
-  if (gaId) {
-    // External same-origin loader keeps CSP strict (no inline script). public/ga.js
-    // reads the meta and loads gtag.js only when configured by the owner, and
-    // only after the load event.
-    parts.push(`<meta name="ga-measurement-id" content="${esc(gaId)}">`);
-    parts.push(`<script defer src="${assetUrl('/ga.js')}"></script>`);
-  }
-  return parts.join("");
+  // What the shop measures instead is its own: the RUM beacon in
+  // public/quality.js posts the URL, the Core Web Vitals and the page errors to
+  // /api/quality — same origin, navigator.sendBeacon, so it survives the
+  // visitor leaving the page and no proxy or blocker can stop it.
+  //
+  // Putting either one back is one tag plus one CSP entry. What it costs is
+  // written down in docs/QUALITY-L4-L5-BACKLOG.md.
+  return "";
 };
 
 /**
@@ -2067,7 +2064,7 @@ export function renderProductPage(rawProduct, lang = "vi", reviews = [], related
   // survived every gate until something that reads the rendered DOM looked at
   // it. The product-page test now reads the parsed page.
 
-  return `<!doctype html>
+  return inlineStyles(`<!doctype html>
 <html lang="${esc(SCHEMA_LANG[lang] || lang)}">
 <head>
 ${tokenMeta()}
@@ -2131,7 +2128,7 @@ ${footerBar("", copy, homePrefix)}
 <script src="${assetUrl('/related.js')}" data-self="${esc(product.id)}" data-lang="${esc(lang)}" data-prefix="${esc(homePrefix)}"></script>
 <script defer src="${assetUrl('/quality.js')}"></script>
 </body>
-</html>`;
+</html>`);
 }
 
 /**

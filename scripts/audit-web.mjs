@@ -517,8 +517,10 @@ const thirdParty = new Set(["www.w3.org", "schema.org", "www.sitemaps.org", "loc
   // they are constants by nature, and the audit's real target, a hand typed
   // sonvudev.com, still fails as it should.
   "static.cloudflareinsights.com", "cloudflareinsights.com",
-  // Optional GA4 (owner sets GA_MEASUREMENT_ID in env; tag/CSP/load only when set).
-  "www.googletagmanager.com", "google-analytics.com", "analytics.google.com"]);
+  // GA4 is gone from the site; the host stays out of the allow list on purpose, so
+  // a page that reaches for it again fails this gate instead of quietly
+  // adding a third-party script.
+  ]);
 // i18n.js is scanned too: brand.supportEmail is the configured default the pages
 // fall back to, so letting it drift away from .env would mean an empty mailto on
 // exactly the page a paying customer is reading.

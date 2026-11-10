@@ -13,6 +13,7 @@ import { captureOrder, createOrder as createPayPalOrder, hashToken, newOrderId, 
 import { paymentInstructions, paymentOptions } from "./payments.js";
 import { analyticsMeta, brandMeta, esc, fillCopy, fillPageTokens, localizeStaticHtml, pageTokenValues, renderFeed, renderIndexCount, renderIndexFilters, renderIndexGrid, renderLlmsTxt, renderMerchantFeed, renderOgImage, renderProductPage, renderStats, tokenMeta, verificationFile, verificationMeta, REFUND_POLICY_UPDATED } from "./pages.js";
 import { isVersionedRequest } from "./lib/assets.mjs";
+import { inlineStyles } from "./lib/inline-styles.mjs";
 import { renderBlogPost, renderBlogIndex, renderBlogFeed, loadBlogPosts, getBlogPostBySlug, EXTRA_BLOG_LOCALES } from "./blog.js";
 import { hasPayment, isClosed, isUnpaid, markOrderDelivered, markOrderPaid, paymentDeadline, sweeperRunning, voidPayment } from "./orders.js";
 import { notifyOrder, notifyMode } from "./notify.js";
@@ -292,20 +293,13 @@ app.use((req, res, next) => {
   // API responses carry order data and one-time tokens; shared caches must not keep them.
   if (req.path.startsWith("/api/")) res.setHeader("Cache-Control", "no-store");
   res.setHeader("Permissions-Policy", "camera=(), microphone=(), geolocation=()");
-  // Analytics beacons are external scripts/endpoints: GA4 (optional, env
-  // GA_MEASUREMENT_ID) is allowed only when configured so the default CSP stays
-  // as tight as before.
-  //
-  // Cloudflare Web Analytics is not in this list any more: the beacon was the
-  // last third-party script on the page, and a host that is allowed but never
-  // used is a hole with nothing behind it.
-  const gaOn = !!env.analytics.gaMeasurementId;
+  // No third-party script host is allowed any more. GA4 and Cloudflare Web
+  // Analytics are both gone (the reasons are written down in src/pages.js,
+  // analyticsMeta), and a host that is allowed but never used is a hole with
+  // nothing behind it.
   const scriptSrc = ["'self'"];
-  if (gaOn) scriptSrc.push("https://www.googletagmanager.com");
   const connectSrc = ["'self'", "https://*.r2.cloudflarestorage.com"];
-  if (gaOn) connectSrc.push("https://www.google-analytics.com", "https://*.google-analytics.com", "https://*.analytics.google.com", "https://*.googletagmanager.com");
   const imgSrc = ["'self'", "data:", "https://img.vietqr.io"];
-  if (gaOn) imgSrc.push("https://www.google-analytics.com", "https://*.google-analytics.com", "https://www.googletagmanager.com");
   res.setHeader("Content-Security-Policy", `default-src 'self'; script-src ${scriptSrc.join(" ")}; style-src 'self' 'unsafe-inline'; font-src 'self'; img-src ${imgSrc.join(" ")}; connect-src ${connectSrc.join(" ")}; frame-ancestors 'none'; base-uri 'self'; form-action 'self'`);
   if (req.secure) res.setHeader("Strict-Transport-Security", "max-age=15552000; includeSubDomains");
   next();
@@ -512,7 +506,7 @@ async function renderPage(file, lang = DEFAULT_LOCALE) {
     .replace(/<!--catalog:start-->[\s\S]*?<!--catalog:end-->/, `<!--catalog:start-->${renderIndexGrid(products)}<!--catalog:end-->`);
   // The stats strip carries data-i18n keys of its own; the localisation pass
   // fills the same placeholders the dictionary already owns.
-  const html = localizeStaticHtml(filled, { file, lang, values });
+  const html = inlineStyles(localizeStaticHtml(filled, { file, lang, values }));
   pageCache.set(cacheKey, { at: Date.now(), html });
   return html;
 }

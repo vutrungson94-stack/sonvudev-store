@@ -9,6 +9,7 @@ import { esc } from "./format.js";
 import { SUPPORTED_LOCALES } from "./i18n-registry.mjs";
 import { analyticsMeta } from "./pages.js";
 import { assetUrl } from "./lib/assets.mjs";
+import { inlineStyles } from "./lib/inline-styles.mjs";
 
 // Directory where blog post JSON files live.
 const BLOG_DIR = path.join(dataDir, "blog");
@@ -282,7 +283,7 @@ export function renderBlogPost(post, lang = "vi") {
     ? ui.translationNotice
     : "";
 
-  return `<!DOCTYPE html>
+  return inlineStyles(`<!DOCTYPE html>
 <html lang="${ui.htmlLang}">
 <head>
   <meta charset="UTF-8">
@@ -343,7 +344,7 @@ ${analyticsMeta()}
   <script src="${assetUrl('/lang-detect.js')}"></script>
   <script defer src="${assetUrl('/quality.js')}"></script>
 </body>
-</html>`;
+</html>`);
 }
 
 
@@ -385,7 +386,7 @@ export function renderBlogIndex(posts, lang = "vi") {
     ? `<div class="blog-translation-wrap">${ui.translationNotice}</div>`
     : "";
 
-  return `<!DOCTYPE html>
+  return inlineStyles(`<!DOCTYPE html>
 <html lang="${ui.htmlLang}">
 <head>
   <meta charset="UTF-8">
@@ -431,7 +432,7 @@ ${analyticsMeta()}
   <script src="${assetUrl('/lang-detect.js')}"></script>
   <script defer src="${assetUrl('/quality.js')}"></script>
 </body>
-</html>`;
+</html>`);
 }
 
 // Render JSON feed of blog posts for readers / SEO tools.

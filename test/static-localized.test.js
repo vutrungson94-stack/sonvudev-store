@@ -60,7 +60,14 @@ test('every locale answers its own homepage with its own words', async () => {
     // The templates once used href="styles.css", which a prefixed URL resolves
     // to /de/styles.css and /en/styles.css - both 404. Absolute is the only
     // shape that survives a language prefix.
-    assert.ok(body.includes('<link rel="stylesheet" href="/styles.min.css"'), `GET ${pathname} must use an absolute stylesheet URL`);
+    // The stylesheet travels inside the page (src/lib/inline-styles.mjs), so
+    // there is no stylesheet link to check — what has to be true is that the
+    // page carries the styles, and that nothing asset-shaped is relative: a
+    // prefixed page would resolve a relative URL to /de/<asset> and 404.
+    assert.ok(body.includes('<style id="site-styles">') || body.includes('<link rel="stylesheet" href="/styles.min.css"'),
+      `GET ${pathname} must carry the stylesheet (inline or as an absolute link)`);
+    assert.ok(!/href="(?!\/|#|https?:)[^"]+\.(css|js)"/.test(body),
+      `GET ${pathname} must not use a relative asset URL`);
     assert.ok(body.includes(needle), `GET ${pathname} must carry its own head copy (looking for "${needle}")`);
     assert.match(body, new RegExp(`<link rel="canonical" href="${escapeRe(APP)}/?(${escapeRe(lang)}/?)?"`),
       `GET ${pathname} canonical must name its own URL`);

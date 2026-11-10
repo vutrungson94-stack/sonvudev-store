@@ -283,7 +283,7 @@ test('trang chủ liệt kê sản phẩm ngay trong HTML, không cần chạy J
   // The grid used to hold three grey placeholders and nothing else, so the page
   // a visitor lands on told a crawler nothing about what is for sale, and linked
   // to no product at all. Internal links are how the rest of a site is found.
-  assert.ok(!html.includes('loading-card'), 'khung tải rỗng không được tới máy crawler');
+  assert.ok(!html.includes('class="loading-card"'), 'khung tải rỗng không được tới máy crawler');
   assert.ok(html.includes(`href="${ORIGIN}/product/${product.slug}"`), 'phải có link tuyệt đối tới trang sản phẩm');
   assert.ok(html.includes('SEO Tester Pro'), 'phải có tên sản phẩm trong HTML trang chủ');
   const live = (await getProduct(product.id)).price;
