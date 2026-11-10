@@ -13,6 +13,7 @@
 // environment is the test fixture (test/helpers/env.mjs) so that nothing here
 // can reach a real database, a real bucket or a real payment provider.
 import path from "node:path";
+import { existsSync } from "node:fs";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { createRequire } from "node:module";
 
@@ -27,7 +28,18 @@ const portFlag = process.argv.indexOf("--port");
 const port = portFlag !== -1 ? Number(process.argv[portFlag + 1]) : Number(process.env.PORT) || 4173;
 
 const artifact = path.join(root, "publish-output", "node");
-const { createApp } = await import(pathToFileURL(path.join(artifact, "src", "app.js")).href);
+const appFile = path.join(artifact, "src", "app.js");
+
+// Checked before the import, because the failure of a missing artifact is an
+// ERR_MODULE_NOT_FOUND pointing at a path — which says where the file should
+// have been but not that the fix is to build it.
+if (!existsSync(appFile)) {
+  console.error(`[serve-artifact] chưa có artifact: ${appFile}`);
+  console.error("[serve-artifact] chạy `npm run build` trước — thư mục publish-output/ không có trong git, mỗi job CI đều phải tự build.");
+  process.exit(1);
+}
+
+const { createApp } = await import(pathToFileURL(appFile).href);
 
 const app = await createApp();
 const server = app.listen(port, "127.0.0.1", () => {

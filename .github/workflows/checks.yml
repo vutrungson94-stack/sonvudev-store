@@ -264,6 +264,27 @@ jobs:
 
       - run: npm ci
 
+      # The artifact is not in the repository — publish-output/ is ignored, and
+      # every job gets its own checkout. So this job builds it, the same way
+      # deploy does, rather than trusting that another job left one behind.
+      # (No upload-artifact step: the account-wide artifact quota has already
+      # turned this repository's runs red for things that had nothing to do
+      # with the build.)
+      - name: build the artifact to measure
+        run: npm run build
+
+      # Fail here, with the reason, rather than forty seconds later with a
+      # generic "the server did not come up". The server imports one file that
+      # only exists after a build, and the failure mode of a missing artifact is
+      # an ERR_MODULE_NOT_FOUND that says where the file should have been.
+      - name: check the artifact is there
+        run: |
+          set -eu
+          if [ ! -f publish-output/node/src/app.js ]; then
+            echo "::error::Artifact chua duoc build (publish-output/node/src/app.js khong ton tai) - buoc 'npm run build' o job nay chua tao ra no."
+            exit 1
+          fi
+
       - name: measure the packaged artifact
         env:
           # Chrome is preinstalled on the runner; the path is named explicitly so
