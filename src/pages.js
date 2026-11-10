@@ -6,6 +6,7 @@ import { isSellable } from "./store.js";
 import { esc, money, formatBytes, initials } from "./format.js";
 import { commitHash } from "./lib/git.mjs";
 import { assetUrl } from "./lib/assets.mjs";
+import { CATEGORY_EN, normaliseCategory } from "./lib/categories.mjs";
 import { inlineStyles } from "./lib/inline-styles.mjs";
 import { loadBlogPosts, getBlogPostBySlug, renderBlogPost, renderBlogIndex, renderBlogFeed } from "./blog.js";
 import { LOCALE_CODES, DEFAULT_LOCALE } from "./i18n-registry.mjs";
@@ -1464,17 +1465,13 @@ export const renderIndexCount = (products) => {
 // The catalogue may store the category in either Vietnamese or English.
 // Normalise to Vietnamese so downstream renderers always have the same anchor
 // for both the button text and the data-en attribute.
-function normaliseCategory(raw) {
-  if (COPY_EN.categories[raw]) return raw;
-  const viEntry = Object.entries(COPY_EN.categories).find(([vi, en]) => en === raw);
-  if (viEntry) return viEntry[0];
-  return raw;
-}
-
 export const renderIndexFilters = (products) => {
   const counts = new Map();
   for (const product of products || []) {
-    const raw = String(product.category || "").trim();
+    // Canonical, so "Utility" (English, singular, typed in the admin panel) and
+    // "Tiện ích" are one filter with one label in every language, and the
+    // browser compares a canonical value with a canonical value.
+    const raw = normaliseCategory(product.category);
     if (!raw) continue;
     counts.set(raw, (counts.get(raw) || 0) + 1);
   }
@@ -1589,7 +1586,10 @@ export const COPY_EN = {
   software: "Software",
   // The Vietnamese values, translated. See the note on COPY_VI: the category and
   // badge are free-text columns written in one language and rendered in both.
-  categories: { "Công cụ": "Tools", "Tiện ích": "Utilities", "Phần mềm": "Software", "Khác": "Other" },
+  // The category list lives in src/lib/categories.mjs, because the catalogue's
+  // raw values have to be mapped onto it in more than one place — here, and in
+  // the store that reads the catalogue.
+  categories: CATEGORY_EN,
   badges: { "Mới": "New", "Bán chạy": "Best seller", "Cập nhật": "Updated", "Phát hành": "Release", "Phổ biến": "Popular", "Chuyên nghiệp": "Professional", "Tiết kiệm": "Value", "Doanh nghiệp": "Enterprise", "Ưu đãi sớm": "Early Bird", "Safe Edition v4.3": "Safe Edition v4.3", "Phát hành 1.4.0": "Release 1.4.0" },
   trustHeading: "Verification",
   trustScan: "Independent antivirus scan (VirusTotal)",

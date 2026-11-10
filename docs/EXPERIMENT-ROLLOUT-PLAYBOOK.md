@@ -121,6 +121,32 @@ Kiểm tra sau khi sửa: mở Chrome DevTools → Lighthouse → Accessibility,
 
 **Bài học đo lường:** số liệu Lighthouse trên `localhost` là số liệu của *máy đang đo*, không phải của site. Chạy cùng một build trên site đã deploy trước khi kết luận.
 
+## 7.2 Số liệu "field" — con số của người thật, không phải của phòng thí nghiệm
+
+Lighthouse đo trong **phòng thí nghiệm**: một máy, một đường mạng, một lần tải lạnh. Bảng **"Local metrics"** trong DevTools là số đó, và chính bảng đó ghi rõ:
+
+> *"Simulating a device after the page loads can affect LCP. Reload the page for accurate LCP."*
+
+Nếu Lighthouse chạy trong DevTools trên một trang **đã tải sẵn**, LCP đọc ra là thời điểm vẽ của lần tải trước (0,08–0,09 s) — số đó **không phải** của lần đo và cũng không phải của người thật.
+
+Số liệu quyết định là **field data**: p75 của những lượt xem thật. Xem [lab và field khác nhau thế nào](https://web.dev/articles/lab-and-field-data-differences).
+
+**Field data của chính shop** là beacon `public/quality.js` → `POST /api/quality` (mỗi lượt xem, `navigator.sendBeacon`). Đọc nó:
+
+```bash
+# log của host (Render) → báo cáo field data
+render logs --tail 5000 | node scripts/quality-report.mjs
+
+# hoặc từ một file log
+node scripts/quality-report.mjs path/to/log.log
+```
+
+Báo cáo in p75 của từng chỉ số **kèm ngưỡng "good"** của web.dev (LCP ≤ 2500 ms, CLS ≤ 0,1, INP ≤ 200 ms, TTFB ≤ 800 ms), và **thoát với mã 1** nếu có chỉ số vượt ngưỡng → dùng được như một gate, không chỉ để đọc.
+
+Mỗi lần chạy ghi thêm một mốc vào `metrics-quality-trends.json`, để field data thành **chuỗi** thay vì một lần đọc rồi quên. Một chuỗi là thứ control chart cần; một số đọc một lần là giai thoại.
+
+**Về `latin-ext` trong network tree:** khi trình dịch của trình duyệt (Google Translate) thay chữ trên trang, chữ mới có thể cần ký tự nằm ngoài `latin` và `vietnamese` → trình duyệt tải thêm subset `latin-ext`. Đo bằng trình duyệt sạch (không extension) thì trang sản phẩm chỉ tải **đúng 4 file font**, tất cả song song ở 425 ms. Không phải lỗi của site, và **không** preload `latin-ext` (37 KB cho mọi người) chỉ để phục vụ trường hợp chỉ xảy ra khi có extension.
+
 ---
 
 ## 8. Quality Monitoring (P3) — đã triển khai

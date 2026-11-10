@@ -61,6 +61,7 @@ const storefrontSource = await read(path.join("public", "app.js"));
 const serverSource = await read(path.join("src", "app.js"));
 const pagesSource = await read(path.join("src", "pages.js"));
 const i18nSource = await read(path.join("public", "i18n.js"));
+const categoriesSource = await read(path.join("src", "lib", "categories.mjs"));
 
 // ---------------------------------------------------------------------------
 // 1. A link or an asset pointing at a file that is not there.
@@ -457,8 +458,14 @@ for (const [name, label] of [["vi", "tiếng Việt"], ["en", "tiếng Anh"]]) {
 
   compare("badge", "badge",
     [...pagesSource.matchAll(/badges:\s*\{([\s\S]*?)\}/g)].map((match) => match[1]));
+  // The category table lives in src/lib/categories.mjs now: the catalogue's
+  // raw values are mapped onto it where the catalogue is read, so the page
+  // copy, the storefront cards and the store all use the same list. A gate
+  // that read the table from a file that no longer holds it would compare
+  // the Vietnamese identity map with the English one and report every
+  // category as mistranslated.
   compare("danh mục", "category",
-    [...pagesSource.matchAll(/categories:\s*\{([\s\S]*?)\}/g)].map((match) => match[1]));
+    [...categoriesSource.matchAll(/CATEGORY_EN\s*=\s*\{([\s\S]*?)\}/g)].map((match) => match[1]));
 }
 
 // ---------------------------------------------------------------------------
