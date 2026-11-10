@@ -344,6 +344,34 @@ app.get("/site.webmanifest", (_req, res) => {
       // mark filling the frame, so this points at the padded tile instead.
       { src: "/apple-touch-icon.png", sizes: "180x180", type: "image/png", purpose: "maskable" },
     ],
+    // The pictures the install dialog shows.
+    //
+    // Without them Chrome says so, in DevTools and in the install prompt:
+    // "Richer PWA install UI won't be available on desktop. Add at least one
+    // screenshot with the form_factor set to wide" and the same for mobile. The
+    // richer dialog shows the app's own pages instead of a plain icon.
+    //
+    // One wide and one narrow, because that is what the warning asks for: a
+    // desktop gets the desktop picture and a phone gets the phone picture. They
+    // are real screenshots of the storefront, taken by
+    // scripts/make-pwa-screenshots.mjs — a drawing of the shop would be a lie
+    // about what is being installed.
+    screenshots: [
+      {
+        src: "/screenshots/desktop-1280x800.png",
+        sizes: "1280x800",
+        type: "image/png",
+        form_factor: "wide",
+        label: "Cửa hàng SonVuDev trên máy tính",
+      },
+      {
+        src: "/screenshots/mobile-390x844.png",
+        sizes: "390x844",
+        type: "image/png",
+        form_factor: "narrow",
+        label: "Cửa hàng SonVuDev trên điện thoại",
+      },
+    ],
   }, null, 2));
 });
 

@@ -2060,7 +2060,9 @@ ${tokenMeta()}
 <meta name="viewport" content="width=device-width,initial-scale=1">
 ${meta({ title, description, url, type: "product", lang, image: productImage(product), alternates: Object.fromEntries(LOCALE_CODES.map((code) => [code, absolute(productUrl(product.slug, code))])) })}
 <link rel="preload" as="font" type="font/woff2" href="${assetUrl('/fonts/be-vietnam-pro-latin.woff2')}" crossorigin>
+<link rel="preload" as="font" type="font/woff2" href="${assetUrl('/fonts/be-vietnam-pro-vietnamese.woff2')}" crossorigin>
 <link rel="preload" as="font" type="font/woff2" href="${assetUrl('/fonts/space-grotesk-latin.woff2')}" crossorigin>
+<link rel="preload" as="font" type="font/woff2" href="${assetUrl('/fonts/space-grotesk-vietnamese.woff2')}" crossorigin>
 <link rel="stylesheet" href="${assetUrl('/styles.min.css')}">
 ${brandMeta()}
 ${analyticsMeta()}
