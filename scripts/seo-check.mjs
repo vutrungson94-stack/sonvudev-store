@@ -484,7 +484,18 @@ try {
   // and not one internal link from the page a visitor lands on.
   const grid = one(home.body, /<div class="product-grid" id="product-grid">([\s\S]*?)<\/div>\s*<\/section>/i) || one(home.body, /id="product-grid">([\s\S]*?)<div class="empty-state">/i);
   const cards = (home.body.match(/class="product-card"/g) || []).length;
-  record("Trang chủ có sản phẩm trong HTML", !/loading-card/.test(home.body) && cards === products.length, `${cards} thẻ sản phẩm, cửa hàng bán ${products.length}`);
+  // The placeholder is a MARKUP question, and the markup has to be asked with
+  // the markup's own words.
+  //
+  // It used to be asked with the bare word "loading-card", which was true of
+  // the three grey skeletons the template shipped. Then the stylesheet moved
+  // inside the page (src/lib/inline-styles.mjs), and the page started carrying
+  // the rule ".loading-card{...}" as well — so the check read the CSS as a
+  // skeleton and failed a homepage that was rendering all eight products
+  // correctly. `class="loading-card"` is the markup; `.loading-card` is the
+  // stylesheet, and only the first one is what a crawler is looking at.
+  const skeleton = /class="loading-card"/.test(home.body);
+  record("Trang chủ có sản phẩm trong HTML", !skeleton && cards === products.length, `${cards} thẻ sản phẩm, cửa hàng bán ${products.length}`);
   record("Sản phẩm trên trang chủ có link thật", !cards || /href="[^"]*\/product\/[^"]+"/.test(home.body), cards ? `${cards} thẻ` : "không có thẻ nào");
 } catch (error) {
   record("Đọc danh mục sản phẩm", false, error.message);
