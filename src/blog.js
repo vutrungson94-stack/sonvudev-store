@@ -375,7 +375,7 @@ export function renderBlogIndex(posts, lang = "vi") {
           <span class="blog-date">${esc(pDate)}</span>
           <span class="blog-section">${esc(blogField(post, lang, "section"))}</span>
         </div>
-        <h3>${esc(pTitle)}</h3>
+        <h2>${esc(pTitle)}</h2>
         <p>${esc(pDesc)}</p>
       </a>`;
     })

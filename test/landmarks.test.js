@@ -40,3 +40,15 @@ test('thẻ mua hàng không phải landmark lồng trong landmark', async () =>
   assert.ok(!/<aside class="buy-card"/.test(pages),
     'thẻ mua hàng không được là aside: nó nằm trong banner, không phải một vùng riêng');
 });
+
+// A heading that skips a level is a hole in the outline: the page title is an
+// h1, and the cards under it were h3, so the outline went h1 -> h3. axe reports
+// it as "heading-order", and an agent that reads the page by its outline never
+// hears about the level in between.
+test('tiêu đề trang danh sách bài viết không bỏ bậc', async () => {
+  const blog = await read(path.join('src', 'blog.js'));
+  assert.match(blog, /<h2>\$\{esc\(pTitle\)\}<\/h2>/,
+    'tiêu đề thẻ bài viết ở trang danh sách phải là h2 (sau h1 của trang)');
+  assert.ok(!/<h3>\$\{esc\(pTitle\)\}<\/h3>/.test(blog),
+    'h3 ngay sau h1 của trang là bỏ bậc tiêu đề');
+});
