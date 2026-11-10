@@ -9,9 +9,15 @@
 // Every SLO has a target, a measurement, and a remediation owner. A breach is
 // not a build failure by itself — it is a signal that the process must react.
 // The gate fails only when an SLO is breached AND no corrective action is on file.
+//
+// The targets, the units and the measurement live in scripts/lib/slo.mjs,
+// because this file and scripts/sla-monitor.mjs each used to carry their own
+// copy of them — and the two copies disagreed about the same objective. One
+// source, two reporters.
 import { readFile, writeFile, mkdir } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { SLOS, measureSLOs } from './lib/slo.mjs';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const sloFile = path.join(root, 'metrics-slo.json');
@@ -20,69 +26,6 @@ const correctiveFile = path.join(root, 'metrics-slo-corrective.json');
 
 const now = new Date().toISOString();
 
-// Every SLO is [id, name, target, measure, wantDirection, owner, remediation].
-//   target   number to reach
-//   measure  'percentage' | 'seconds' | 'count' | 'boolean'
-//   wantDirection 'up' | 'down' | 'exact' — higher is better / lower is better / exact match
-//   owner    who must act when breached
-const SLOs = [
-  {
-    id: 'availability',
-    name: 'Service availability',
-    target: 99.9,
-    measure: 'percentage',
-    want: 'up',
-    owner: 'platform-team',
-    remediation: 'PagerDuty escalation; runbook at docs/RUNBOOK.md#availability',
-  },
-  {
-    id: 'errorRate',
-    name: 'API error rate',
-    target: 1.0,
-    measure: 'percentage',
-    want: 'down',
-    owner: 'backend-team',
-    remediation: 'Check /api/health failures; rollback if > 1% for 15 min',
-  },
-  {
-    id: 'latencyP95',
-    name: 'API p95 latency',
-    target: 500,
-    measure: 'seconds',
-    want: 'down',
-    owner: 'backend-team',
-    remediation: 'Profile slow endpoints; add caching or scale instances',
-  },
-  {
-    id: 'testPassRate',
-    name: 'Test suite pass rate',
-    target: 100.0,
-    measure: 'percentage',
-    want: 'up',
-    owner: 'engineering-team',
-    remediation: 'Red test must block merge; fix before next deploy',
-  },
-  {
-    id: 'buildSuccessRate',
-    name: 'Build success rate',
-    target: 100.0,
-    measure: 'percentage',
-    want: 'up',
-    owner: 'platform-team',
-    remediation: 'Failed build blocks deploy; investigate CI logs',
-  },
-  {
-    id: 'deploySuccessRate',
-    name: 'Deploy success rate',
-    target: 100.0,
-    measure: 'percentage',
-    want: 'up',
-    owner: 'platform-team',
-    remediation: 'Failed deploy must be rolled back within 15 min',
-  },
-];
-
-// Read the last known values from committed evidence files.
 const readJsonOrDefault = async (file, def) => {
   try {
     return JSON.parse(await readFile(file, 'utf8'));
@@ -91,95 +34,7 @@ const readJsonOrDefault = async (file, def) => {
   }
 };
 
-const measurements = {};
-for (const slo of SLOs) {
-  let value = null;
-  switch (slo.id) {
-    case 'availability': {
-      // Availability from last health check. 100% if last /api/health was ok.
-      try {
-        const health = JSON.parse(
-          await readFile(path.join(root, 'logs', 'last-health.json'), 'utf8'),
-        );
-        value = health.ok ? 100 : 0;
-      } catch {
-        value = null;
-      }
-      break;
-    }
-    case 'errorRate': {
-      try {
-        const report = JSON.parse(
-          await readFile(path.join(root, 'logs', 'last-error-report.json'), 'utf8'),
-        );
-        value = report.errorRate ?? null;
-      } catch {
-        value = null;
-      }
-      break;
-    }
-    case 'latencyP95': {
-      try {
-        const report = JSON.parse(
-          await readFile(path.join(root, 'logs', 'last-latency.json'), 'utf8'),
-        );
-        value = report.p95Seconds ?? null;
-      } catch {
-        value = null;
-      }
-      break;
-    }
-    case 'testPassRate': {
-      try {
-        // test_output.log is plain text. Count pass/fail ourselves instead of
-        // JSON.parsing it (which threw on every run and left this SLO at null).
-        const text = await readFile(path.join(root, 'test_output.log'), 'utf8');
-        const passMatch = text.match(/pass (\d+)/i);
-        const failMatch = text.match(/fail (\d+)/i);
-        if (passMatch) {
-          const passes = Number(passMatch[1]);
-          const failures = failMatch ? Number(failMatch[1]) : 0;
-          const total = passes + failures;
-          if (total > 0) value = (passes / total) * 100;
-        }
-      } catch {
-        value = null;
-      }
-      break;
-    }
-    case 'buildSuccessRate': {
-      // No CI telemetry is wired in here yet. Reporting 100 would fabricate a
-      // measurement; leaving it unknown is the honest gap. Wire build-events
-      // in when the pipeline records them.
-      value = null;
-      break;
-    }
-    case 'deploySuccessRate': {
-      // Same: "the deploy just ran" says nothing about whether it succeeded.
-      value = null;
-      break;
-    }
-  }
-
-  let status = 'unknown';
-  let breached = false;
-  if (value !== null) {
-    let meets = false;
-    if (slo.want === 'up') meets = value >= slo.target;
-    if (slo.want === 'down') meets = value <= slo.target;
-    if (slo.want === 'exact') meets = value === slo.target;
-    status = meets ? 'ok' : 'breach';
-    breached = !meets;
-  }
-
-  measurements[slo.id] = {
-    ...slo,
-    value,
-    status,
-    breached,
-    measuredAt: now,
-  };
-}
+const measurements = await measureSLOs(root, SLOS);
 
 const corrective = (await readJsonOrDefault(correctiveFile, {}));
 const unresolvedBreaches = Object.values(measurements).filter(
@@ -208,12 +63,12 @@ if (unresolvedBreaches.length > 0) {
   const unknown = Object.values(measurements).filter((m) => m.value === null || m.value === undefined);
   if (unknown.length > 0) {
     console.log(
-      `[slo] OK with gaps: ${SLOs.length - unknown.length}/${SLOs.length} SLOs measured and within target; ${unknown.length} unknown: ${unknown.map((m) => m.id).join(', ')}`,
+      `[slo] OK with gaps: ${SLOS.length - unknown.length}/${SLOS.length} SLOs measured and within target; ${unknown.length} unknown: ${unknown.map((m) => m.id).join(', ')}`,
     );
   } else {
-    console.log(`[slo] OK: all ${SLOs.length} SLOs measured and within target`);
+    console.log(`[slo] OK: all ${SLOS.length} SLOs measured and within target`);
   }
 }
 
-export { result, SLOs, unresolvedBreachCount };
+export { result, SLOS, unresolvedBreachCount };
 process.exit(exitCode);

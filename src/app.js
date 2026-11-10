@@ -12,6 +12,7 @@ import { createDownloadUrl, createUploadUrl } from "./r2.js";
 import { captureOrder, createOrder as createPayPalOrder, hashToken, newOrderId, newToken, paypalChargeForProduct, paymentMatchesOrder, readOrder, verifyWebhook } from "./paypal.js";
 import { paymentInstructions, paymentOptions } from "./payments.js";
 import { analyticsMeta, brandMeta, esc, fillCopy, fillPageTokens, localizeStaticHtml, pageTokenValues, renderFeed, renderIndexCount, renderIndexFilters, renderIndexGrid, renderLlmsTxt, renderMerchantFeed, renderOgImage, renderProductPage, renderStats, tokenMeta, verificationFile, verificationMeta, REFUND_POLICY_UPDATED } from "./pages.js";
+import { isVersionedRequest } from "./lib/assets.mjs";
 import { renderBlogPost, renderBlogIndex, renderBlogFeed, loadBlogPosts, getBlogPostBySlug, EXTRA_BLOG_LOCALES } from "./blog.js";
 import { hasPayment, isClosed, isUnpaid, markOrderDelivered, markOrderPaid, paymentDeadline, sweeperRunning, voidPayment } from "./orders.js";
 import { notifyOrder, notifyMode } from "./notify.js";
@@ -294,6 +295,11 @@ app.use((req, res, next) => {
   // Analytics beacons are external scripts/endpoints: Cloudflare Web Analytics
   // always needs its hosts; GA4 (optional, env GA_MEASUREMENT_ID) is allowed only
   // when configured so the default CSP stays as tight as before.
+  //
+  // The fonts are served from this origin (public/fonts), so no font host is
+  // allowed any more. The Google Fonts stylesheet used to be a render-blocking
+  // request to a second origin, and the policy entry that opened for it would
+  // have been a hole with nothing behind it.
   const gaOn = !!env.analytics.gaMeasurementId;
   const scriptSrc = ["'self'", "https://static.cloudflareinsights.com"];
   if (gaOn) scriptSrc.push("https://www.googletagmanager.com");
@@ -301,7 +307,7 @@ app.use((req, res, next) => {
   if (gaOn) connectSrc.push("https://www.google-analytics.com", "https://*.google-analytics.com", "https://*.analytics.google.com", "https://*.googletagmanager.com");
   const imgSrc = ["'self'", "data:", "https://img.vietqr.io"];
   if (gaOn) imgSrc.push("https://www.google-analytics.com", "https://*.google-analytics.com", "https://www.googletagmanager.com");
-  res.setHeader("Content-Security-Policy", `default-src 'self'; script-src ${scriptSrc.join(" ")}; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src ${imgSrc.join(" ")}; connect-src ${connectSrc.join(" ")}; frame-ancestors 'none'; base-uri 'self'; form-action 'self'`);
+  res.setHeader("Content-Security-Policy", `default-src 'self'; script-src ${scriptSrc.join(" ")}; style-src 'self' 'unsafe-inline'; font-src 'self'; img-src ${imgSrc.join(" ")}; connect-src ${connectSrc.join(" ")}; frame-ancestors 'none'; base-uri 'self'; form-action 'self'`);
   if (req.secure) res.setHeader("Strict-Transport-Security", "max-age=15552000; includeSubDomains");
   next();
 });
@@ -891,7 +897,22 @@ app.use((req, res, next) => {
 // through the build, so they can be cached for a year — repeat visits reuse them
 // from the browser cache and LCP/render-blocking metrics improve. A deploy ships
 // new file names through the build, so stale assets are never served.
-app.use(express.static(publicDir, { maxAge: "1y", index: false }));
+//
+// The fingerprinted URL carries its version as a query string (?v=<content
+// hash>), so the file on disk keeps its name and the query is what busts the
+// cache. A request that carries such a version is immutable by definition: the
+// bytes behind that URL can never change again, because a change to the file
+// changes the hash and therefore the URL. An unversioned request keeps the
+// ordinary one-year policy, because nothing guarantees it will not change.
+app.use(express.static(publicDir, {
+  maxAge: "1y",
+  index: false,
+  setHeaders: (res) => {
+    if (isVersionedRequest(res.req?.originalUrl)) {
+      res.setHeader("Cache-Control", "public, max-age=31536000, immutable");
+    }
+  },
+}));
 
 // Reports which configuration is active and whether the three things an order
 // depends on are usable. Used by the deploy script and by anyone checking a

@@ -99,9 +99,9 @@ Kiểm tra sau khi sửa: mở Chrome DevTools → Lighthouse → Accessibility,
 
 | Lỗi | Nguyên nhân | Cách sửa |
 |---|---|---|
-| Use efficient cache lifetimes | Static assets (CSS, JS, hình ảnh) chỉ cache 5 phút (`maxAge: "5m"`) | Tăng `maxAge` lên `"1y"` trong `express.static()`, vì assets được fingerprint qua build, deploy mới sẽ có tên file mới. |
+| Use efficient cache lifetimes | Static assets (CSS, JS, hình ảnh) chỉ cache 5 phút (`maxAge: "5m"`) | Tăng `maxAge` lên `"1y"` trong `express.static()`, vì assets được version theo hash nội dung qua build: URL có `?v=<hash>`, deploy mới sinh hash mới nên cache cũ không còn dùng. |
 | Render-blocking requests | CSS chặn render nhưng preload+defer (`css-ready.js`) gây CLS ~0.5 vì vẽ chưa style trước | Giữ **`<link rel="stylesheet" href="/styles.min.css">` trực tiếp** (chặn render, CLS≈0, đúng chuẩn). Chỉ defer `<script>`. Không dùng preload CSS. |
-| Avoid chaining critical requests | Nhiều tài nguyên tải tuần tự thay vì songsex | Preconnect tới các domain bên ngoài (`fonts.googleapis.com`, `fonts.gstatic.com`), tránh chain requests không cần thiết. |
+| Avoid chaining critical requests | Nhiều tài nguyên tải tuần tự thay vì songsex | Font **tự host** trong `/fonts` (không còn `fonts.googleapis.com`): bỏ hẳn 2 request ra domain thứ hai và 2 bắt tay DNS/TLS. Preload đúng 2 file font dùng trên màn hình đầu (`dm-sans-latin`, `space-grotesk-latin`). Beacon analytics tải **sau sự kiện `load`** (public/cf-beacon.js) nên không còn nằm trên critical path. |
 
 ---
 

@@ -5,13 +5,18 @@ import { env } from "./config.js";
 import { isSellable } from "./store.js";
 import { esc, money, formatBytes, initials } from "./format.js";
 import { commitHash } from "./lib/git.mjs";
+import { assetUrl } from "./lib/assets.mjs";
 import { loadBlogPosts, getBlogPostBySlug, renderBlogPost, renderBlogIndex, renderBlogFeed } from "./blog.js";
 import { LOCALE_CODES, DEFAULT_LOCALE } from "./i18n-registry.mjs";
 
-// The commit that produced this process, for CSS cache-busting. This replaces a
-// private copy of the git call that scripts/build-web.mjs also carried, so the
-// live page and the packaged page could end up naming different stylesheet
-// versions. Both now read the single implementation in src/lib/git.mjs.
+// The commit that produced this process.
+//
+// It is no longer the version a page asks the browser to fetch: that is the
+// hash of the file's own bytes, written by the build and read by
+// src/lib/assets.mjs, so the version changes exactly when the file changes.
+// What is left here is the process-level fallback — a single value for this
+// run, so two pages rendered by the same process never disagree — and the
+// value of the {{cssVersion}} token.
 const cssVersion = commitHash().slice(0, 8);
 
 // Product pages are rendered on the server here, not in the browser. The
@@ -726,7 +731,16 @@ export const analyticsMeta = () => {
   const token = env.analytics.webAnalyticsToken;
   if (token) {
     parts.push("<!-- Cloudflare Web Analytics -->");
-    parts.push(`<script type="module" src="https://static.cloudflareinsights.com/beacon.min.js" data-cf-beacon='{"token": "${esc(token)}"}'></script>`);
+    // The beacon is loaded by a first-party script after the page has loaded,
+    // rather than being a module script in the head.
+    //
+    // In the head it was the longest branch of the critical path: the browser
+    // fetched static.cloudflareinsights.com while it was still deciding how to
+    // paint the page, and the request to the beacon endpoint outlived the
+    // paint. Analytics are not worth delaying a first paint for, so the tag now
+    // waits for the load event. The script itself stays external, so the CSP
+    // still needs no 'unsafe-inline'.
+    parts.push(`<script defer src="${assetUrl('/cf-beacon.js')}" data-cf-token="${esc(token)}"></script>`);
     parts.push("<!-- End Cloudflare Web Analytics -->");
   }
   const gaId = env.analytics.gaMeasurementId;
@@ -2045,10 +2059,9 @@ ${tokenMeta()}
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 ${meta({ title, description, url, type: "product", lang, image: productImage(product), alternates: Object.fromEntries(LOCALE_CODES.map((code) => [code, absolute(productUrl(product.slug, code))])) })}
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="/styles.min.css?v=${cssVersion}">
+<link rel="preload" as="font" type="font/woff2" href="${assetUrl('/fonts/be-vietnam-pro-latin.woff2')}" crossorigin>
+<link rel="preload" as="font" type="font/woff2" href="${assetUrl('/fonts/space-grotesk-latin.woff2')}" crossorigin>
+<link rel="stylesheet" href="${assetUrl('/styles.min.css')}">
 ${brandMeta()}
 ${analyticsMeta()}
 ${jsonLd({ "@graph": [organization(), websiteSchema(), productSchema(product, lang), merchantProductSchema(product, lang), breadcrumbSchema(product, lang), faq] })}
@@ -2089,8 +2102,9 @@ ${related && related.length ? `<section class="related"><h2>${esc(copy.related)}
 </main>
 ${footerBar("", copy, homePrefix)}
 <!-- related-loader: client fallback only; the server renders real cards above -->
-<script src="/format.js"></script>
-<script src="/related.js" data-self="${esc(product.id)}" data-lang="${esc(lang)}" data-prefix="${esc(homePrefix)}"></script>
+<script src="${assetUrl('/format.js')}"></script>
+<script src="${assetUrl('/related.js')}" data-self="${esc(product.id)}" data-lang="${esc(lang)}" data-prefix="${esc(homePrefix)}"></script>
+<script defer src="${assetUrl('/quality.js')}"></script>
 </body>
 </html>`;
 }

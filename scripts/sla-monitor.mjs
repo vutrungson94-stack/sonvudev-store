@@ -1,106 +1,25 @@
 // SLA (Service Level Agreement) monitor.
 //
-// Đo lường và báo cáo việc tuân thủ cam kết cấp độ dịch vụ theo file SLA.md.
-// Các chỉ số được đọc từ các file metrics đã sinh ra bởi các script khác.
+// Đo lường và báo cáo việc tuân thủ cam kết cấp độ dịch vụ theo docs/SLO.md.
 //
 //   npm run sla:check   đánh giá tất cả SLO/SLA và báo cáo sai sót
-//   npm run sla:baseline ghi baseline từ trạng thái hiện tại
-import { readFile, writeFile, mkdir } from 'node:fs/promises';
+//
+// The objectives, their units and the way they are measured live in
+// scripts/lib/slo.mjs. This file used to carry a second copy of them — and the
+// copy disagreed with the first: it reported build and deploy success as 100
+// because a report file existed, while scripts/slo-monitor.mjs reported the
+// same two objectives as unknown. One definition, two reporters, no more.
+import { writeFile, mkdir } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { SLOS, measureSLOs } from './lib/slo.mjs';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const slaFile = path.join(root, 'metrics-sla.json');
 
 const now = new Date().toISOString();
 
-// Mục tiêu SLA từ SLA.md
-const SLOS = [
-  { id: 'availability', name: 'Sẵn sàng dịch vụ', target: 99.9, unit: '%', want: 'up', owner: 'platform-team' },
-  { id: 'errorRate', name: 'Tỷ lệ lỗi API', target: 1.0, unit: '%', want: 'down', owner: 'backend-team' },
-  { id: 'latencyP95', name: 'API p95 latency', target: 500, unit: 'ms', want: 'down', owner: 'backend-team' },
-  { id: 'testPassRate', name: 'Tỷ lệ test pass', target: 100.0, unit: '%', want: 'up', owner: 'engineering-team' },
-  { id: 'buildSuccessRate', name: 'Tỷ lệ build thành công', target: 100.0, unit: '%', want: 'up', owner: 'platform-team' },
-  { id: 'deploySuccessRate', name: 'Tỷ lệ triển khai thành công', target: 100.0, unit: '%', want: 'up', owner: 'platform-team' },
-  { id: 'escapeRate', name: 'Lỗi thoát test', target: 5.0, unit: '%', want: 'down', owner: 'engineering-team' },
-];
-
-const readJsonOrDefault = async (file, def) => {
-  try {
-    return JSON.parse(await readFile(file, 'utf8'));
-  } catch { return def; }
-};
-
-const measurements = {};
-for (const slo of SLOS) {
-  let value = null;
-  switch (slo.id) {
-    case 'availability': {
-      try {
-        const health = JSON.parse(await readFile(path.join(root, 'logs', 'last-health.json'), 'utf8'));
-        value = health.ok ? 100 : 0;
-      } catch { value = null; }
-      break;
-    }
-    case 'errorRate': {
-      try {
-        const report = JSON.parse(await readFile(path.join(root, 'logs', 'last-error-report.json'), 'utf8'));
-        value = report.errorRate ?? null;
-      } catch { value = null; }
-      break;
-    }
-    case 'latencyP95': {
-      try {
-        const report = JSON.parse(await readFile(path.join(root, 'logs', 'last-latency.json'), 'utf8'));
-        value = report.p95Seconds != null ? report.p95Seconds * 1000 : null;
-      } catch { value = null; }
-      break;
-    }
-    case 'testPassRate': {
-      try {
-        const text = await readFile(path.join(root, 'test_output.log'), 'utf8');
-        const passMatch = text.match(/pass (\d+)/i);
-        const totalMatch = text.match(/tests (\d+)/i);
-        if (passMatch && totalMatch) value = (Number(passMatch[1]) / Number(totalMatch[1])) * 100;
-      } catch { value = null; }
-      break;
-    }
-    case 'buildSuccessRate': {
-      // Evidence, not optimism: the report exists only if the last build ran to
-      // completion. No report at all is "unknown", not "100% passing".
-      try {
-        const report = JSON.parse(await readFile(path.join(root, 'build-reports', 'web-build.json'), 'utf8'));
-        value = report && report.generatedAt ? 100 : null;
-      } catch { value = null; }
-      break;
-    }
-    case 'deploySuccessRate': {
-      // No local evidence source for deploys yet. Report unknown rather than a
-      // fabricated 100%; wire this to the deploy pipeline when it emits a marker.
-      value = null;
-      break;
-    }
-    case 'escapeRate': {
-      try {
-        const defect = JSON.parse(await readFile(path.join(root, 'metrics-defect-escape.json'), 'utf8'));
-        value = defect.escapeRate != null ? defect.escapeRate * 100 : null;
-      } catch { value = null; }
-      break;
-    }
-  }
-
-  let status = 'unknown';
-  let breached = false;
-  if (value !== null) {
-    let meets = false;
-    if (slo.want === 'up') meets = value >= slo.target;
-    if (slo.want === 'down') meets = value <= slo.target;
-    status = meets ? 'ok' : 'breach';
-    breached = !meets;
-  }
-
-  measurements[slo.id] = { ...slo, value, status, breached, measuredAt: now };
-}
+const measurements = await measureSLOs(root, SLOS);
 
 const result = {
   generatedAt: now,

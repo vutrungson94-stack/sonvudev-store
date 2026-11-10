@@ -54,12 +54,30 @@
   });
 
   // Time to first byte from navigation timing.
-  if (window.performance && window.performance.timing) {
-    var nav = window.performance.timing;
-    if (nav.responseStart && nav.requestStart) {
-      metrics.ttfb = Math.round(nav.responseStart - nav.requestStart);
+  //
+  // `responseStart - requestStart` leaves out everything before the request was
+  // sent: the redirect, the DNS lookup, the TLS handshake. On a page that
+  // redirects (the language redirect sends an English browser to /en/) that is
+  // most of the wait, so the number this reported was smaller than the wait a
+  // visitor actually had.
+  //
+  // Navigation Timing Level 2 measures from the start of the navigation, so the
+  // whole chain is included. The old expression stays as the fallback for the
+  // browsers that only have performance.timing.
+  var ttfb = null;
+  if (window.performance && typeof window.performance.getEntriesByType === "function") {
+    var entries = window.performance.getEntriesByType("navigation");
+    if (entries && entries.length && entries[0].responseStart > 0) {
+      ttfb = Math.round(entries[0].responseStart - entries[0].startTime);
     }
   }
+  if (ttfb === null && window.performance && window.performance.timing) {
+    var nav = window.performance.timing;
+    if (nav.responseStart && nav.requestStart) {
+      ttfb = Math.round(nav.responseStart - nav.requestStart);
+    }
+  }
+  if (ttfb !== null) metrics.ttfb = ttfb;
 
   function send() {
     var payload = JSON.stringify({

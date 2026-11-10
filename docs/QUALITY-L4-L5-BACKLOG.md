@@ -2,6 +2,10 @@
 
 Đánh giá dựa trên **codebase + gate/test/build hiện tại**, không dựa vào tuyên bố trong MD. Mục tiêu: từng bước từ **L3 cao / tiệm cận L4** lên **L4**, tạo nền cho **L5 (Optimizing, mức tổ chức)**.
 
+> Lộ trình nâng cấp chi tiết theo giai đoạn (kèm tiêu chí nghiệm thu đo được) nằm ở
+> [`CMMI-L5-ROADMAP.md`](CMMI-L5-ROADMAP.md). File này giữ danh sách việc cụ thể;
+> file kia giữ mức trưởng thành và thứ tự nâng cấp.
+
 ## Đã hoàn thành (đợt này)
 - [x] **GSC merchant listings**: bổ sung `applicableCountry` + `returnMethod` trong `MerchantReturnPolicy` và `shippingDetails` (`OfferShippingDetails`, phí 0 cho sản phẩm số) cho `Product`/`Offer`; có contract test. Giữ nguyên quyết định **không** phát `AggregateRating`/sao (self-collected không đủ điều kiện rich result, test `review.test.js` chặn).
 - [x] Phân biệt **CTA mua** (`/?buy=<PRODUCT_ID>` + `openPurchaseForm`) vs **khám phá/liên quan** (trang sản phẩm locale). Sửa blog “Sản phẩm liên quan” → trang sản phẩm.

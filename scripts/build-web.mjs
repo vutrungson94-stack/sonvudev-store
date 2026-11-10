@@ -1,5 +1,6 @@
 import { access, cp, mkdir, readdir, readFile, rm, writeFile } from 'node:fs/promises';
 import { constants } from 'node:fs';
+import { createHash } from 'node:crypto';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
@@ -16,10 +17,14 @@ import {
 import { commitHash } from '../src/lib/git.mjs';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
-// The commit stamped into the packaged HTML for CSS cache-busting. src/pages.js
-// stamps the same value into the server-rendered pages from the same module, so
-// the build and the live page cannot name different stylesheet versions. It used
-// to be a second, byte-identical copy of the git call.
+// The commit this artifact was built from. It is recorded in the build report so
+// a shipped artifact can be traced back to the source tree it came from.
+//
+// It is not the cache-busting version any more. That used to be the commit,
+// which meant a deploy could not invalidate an asset unless the commit changed,
+// and the packaged HTML and the rendered pages had to agree on it. Both now
+// carry the hash of the file's own bytes, so the version changes exactly when
+// the file changes.
 const commit = commitHash(root);
 // The build refuses to package without each of these. Every one was added because
 // the site worked but something on it was quietly broken: og.png because every
@@ -34,7 +39,11 @@ const commit = commitHash(root);
 // discovered by a buyer. public/order-client.js is here for the same reason as
 // the rest: four pages load it, and it holds the access token and the download
 // handshake they all share.
-const required = ['package.json', 'src/server.js', 'src/app.js', 'src/store.js', 'src/r2.js', 'src/paypal.js', 'src/paypal-environment.js', 'src/payments.js', 'src/rates.js', 'src/geo.js', 'src/indexnow.js', 'src/pages.js', 'src/reviews.js', 'src/format.js', 'src/config.js', 'src/notify.js', 'src/supabase-http.js', 'src/refuse.js', 'src/robots.js', 'src/rate-limit.js', 'src/admin-auth.js', 'public/index.html', 'public/i18n.js', 'public/styles.css', 'public/styles.min.css', 'public/format.js', 'public/order-client.js', 'public/app.js', 'public/admin.html', 'public/admin.js', 'public/paypal-return.html', 'public/paypal-return.js', 'public/lookup.html', 'public/lookup.js', 'public/order.html', 'public/order.js', 'public/terms.html', 'public/privacy.html', 'public/refund.html', 'public/404.html', 'public/about.html', 'public/css-ready.js', 'public/related.js', 'public/lang-detect.js', 'public/favicon.svg', 'public/favicon.ico', 'public/mask-icon.png', 'public/apple-touch-icon.png', 'public/logo-1024.png', 'public/logo-ink-64.png', 'public/logo-mint-512.png', 'public/icon-16.png', 'public/icon-32.png', 'public/icon-192.png', 'public/icon-512.png', 'public/img/sonvudev.logo.png', 'public/og.png', 'scripts/production-check.mjs', 'scripts/audit-web.mjs', 'scripts/case-check.mjs', 'scripts/seo-check.mjs', 'scripts/r2-cors.mjs', 'scripts/run-tests.mjs', 'scripts/provenance.mjs', 'scripts/prune-logs.mjs', 'scripts/backup.mjs', 'scripts/lib/artifact.mjs', 'scripts/lib/cors.mjs', 'scripts/lib/files.mjs', 'cloudflare/r2-cors.json', 'Dockerfile', 'render.yaml'];
+//
+// The fonts are here for the same reason as the stylesheet: a page whose font
+// files are missing falls back to a system face, which is a visual change that
+// no gate would otherwise notice.
+const required = ['package.json', 'src/server.js', 'src/app.js', 'src/store.js', 'src/r2.js', 'src/paypal.js', 'src/paypal-environment.js', 'src/payments.js', 'src/rates.js', 'src/geo.js', 'src/indexnow.js', 'src/pages.js', 'src/reviews.js', 'src/format.js', 'src/config.js', 'src/notify.js', 'src/supabase-http.js', 'src/refuse.js', 'src/robots.js', 'src/rate-limit.js', 'src/admin-auth.js', 'public/index.html', 'public/i18n.js', 'public/styles.css', 'public/styles.min.css', 'public/format.js', 'public/order-client.js', 'public/app.js', 'public/admin.html', 'public/admin.js', 'public/paypal-return.html', 'public/paypal-return.js', 'public/lookup.html', 'public/lookup.js', 'public/order.html', 'public/order.js', 'public/terms.html', 'public/privacy.html', 'public/refund.html', 'public/404.html', 'public/about.html', 'public/css-ready.js', 'public/related.js', 'public/lang-detect.js', 'public/cf-beacon.js', 'public/favicon.svg', 'public/favicon.ico', 'public/mask-icon.png', 'public/apple-touch-icon.png', 'public/logo-1024.png', 'public/logo-ink-64.png', 'public/logo-mint-512.png', 'public/icon-16.png', 'public/icon-32.png', 'public/icon-192.png', 'public/icon-512.png', 'public/img/sonvudev.logo.png', 'public/fonts/be-vietnam-pro-latin.woff2', 'public/fonts/be-vietnam-pro-latin-ext.woff2', 'public/fonts/be-vietnam-pro-vietnamese.woff2', 'public/fonts/OFL-Be-Vietnam-Pro.txt', 'public/fonts/space-grotesk-latin.woff2', 'public/fonts/space-grotesk-latin-ext.woff2', 'public/fonts/space-grotesk-vietnamese.woff2', 'public/fonts/OFL-Space-Grotesk.txt', 'public/og.png', 'scripts/production-check.mjs', 'scripts/audit-web.mjs', 'scripts/case-check.mjs', 'scripts/seo-check.mjs', 'scripts/r2-cors.mjs', 'scripts/run-tests.mjs', 'scripts/provenance.mjs', 'scripts/prune-logs.mjs', 'scripts/backup.mjs', 'scripts/minify-js.mjs', 'scripts/lib/artifact.mjs', 'scripts/lib/cors.mjs', 'scripts/lib/files.mjs', 'cloudflare/r2-cors.json', 'Dockerfile', 'render.yaml'];
 // One walk, shared with lint and metrics, so all three measure the same source.
 // This used to keep a private copy of the directory list that did not exclude
 // publish-output, which meant the build re-checked the artifact it had just
@@ -170,16 +179,94 @@ const pruneScratch = async (dir) => {
 };
 await pruneScratch(publishRoot);
 
+// The browser scripts are minified in the artifact, not in the source tree. The
+// source of public/app.js and public/i18n.js is read as text by the audit, the
+// metrics and the tests, so the readable file has to stay readable; what ships
+// is the minified copy. Lighthouse charged the site for the difference:
+// /app.js was 45.9 KB raw and public/i18n.js was 127.2 KB raw.
+const minifyJs = spawnSync(process.execPath, [path.join(root, 'scripts', 'minify-js.mjs'), '--dir', path.join(publishRoot, 'public')], { encoding: 'utf8' });
+if (minifyJs.status !== 0) throw new Error(`JS minify failed:\n${minifyJs.stdout}${minifyJs.stderr}`);
+process.stdout.write(minifyJs.stdout);
+
 await mkdir(path.join(root, 'build-reports'), { recursive: true });
 const artifactFiles = (await walkProjectFiles(publishRoot)).map((file) => path.relative(root, file).replaceAll('\\', '/'));
 
-// Inject cache-busting version into CSS links in all HTML files
-const cssVersion = commit.slice(0, 8);
+// Every asset the pages load is versioned by the hash of its own bytes.
+//
+// The reason this exists: the server answers /app.js and /styles.min.css with
+// `max-age=31536000`, and the pages that link them did not say which version
+// they meant. A browser that visited before a deploy kept the old file for a
+// year, so a deploy that fixed a bug was invisible to the visitors the bug was
+// hurting.
+//
+// The version is written twice on purpose, in two places that must agree: the
+// packaged HTML is rewritten here, and src/lib/assets.mjs reads the same
+// manifest when it renders the pages the server builds at request time. A
+// manifest in one place and a rewrite in the other would be two answers to
+// "which file does this page mean", and the second one to be written is the one
+// that ships.
+//
+// This block used to rewrite /styles.css — a file no page loads — and nothing
+// else, which is why the real stylesheet and the real scripts were cached for a
+// year with nothing to invalidate them.
+const publicRoot = path.join(publishRoot, 'public');
+const hashFile = async (file) => createHash('sha256').update(await readFile(file)).digest('hex').slice(0, 12);
+
+// The fonts first, and the stylesheet second, because the stylesheet names the
+// fonts.
+//
+// A font referenced from the stylesheet and preloaded from the HTML has to be
+// the SAME url, or the preload is wasted: the browser fetches the preloaded
+// bytes, cannot use them for a face whose src is a different url, and starts
+// the file again from the stylesheet. The font then arrives after the first
+// paint, Chrome applies it late, and the page shifts — 0.272 of layout shift
+// on the homepage, measured, on a site whose own no-regress list says the font
+// must not move the text.
+//
+// So the font urls inside the packaged stylesheet carry the font's own hash,
+// exactly like the preload in the HTML does, and the browser reuses one
+// download for both.
+const fontFiles = artifactFiles.filter((f) => f.endsWith('.woff2'));
+const fontVersions = new Map();
+for (const file of fontFiles) {
+  const absolute = path.join(root, file);
+  const url = `/${path.relative(publicRoot, absolute).replaceAll('\\', '/')}`;
+  fontVersions.set(url, await hashFile(absolute));
+}
+for (const file of artifactFiles.filter((f) => f.endsWith('.css'))) {
+  const absolute = path.join(root, file);
+  let css = await readFile(absolute, 'utf8');
+  let changed = false;
+  for (const [url, version] of fontVersions) {
+    const versioned = `${url}?v=${version}`;
+    // Strip whatever version was there, then write this one: the result is the
+    // same whether the stylesheet came from the source (no version) or from a
+    // previous packaging (an older version).
+    const updated = css.split(versioned).join(url).replaceAll(url, versioned);
+    if (updated === css) continue;
+    css = updated;
+    changed = true;
+  }
+  if (changed) await writeFile(absolute, css, 'utf8');
+}
+
+const assetManifest = {};
+for (const file of artifactFiles) {
+  const absolute = path.join(root, file);
+  if (!absolute.startsWith(publicRoot)) continue;
+  const relative = path.relative(publicRoot, absolute).replaceAll('\\', '/');
+  if (!['.css', '.js', '.woff2'].includes(path.extname(relative))) continue;
+  assetManifest[`/${relative}`] = await hashFile(absolute);
+}
+await writeFile(path.join(publicRoot, 'asset-manifest.json'), `${JSON.stringify(assetManifest, null, 2)}\n`, 'utf8');
+
 for (const htmlFile of artifactFiles.filter((f) => f.endsWith('.html'))) {
   const abs = path.join(root, htmlFile);
   let content = await readFile(abs, 'utf8');
-  content = content.replace(/(href=["'])\/styles\.css(["'])/g, `$1/styles.css?v=${cssVersion}$2`);
-  content = content.replace(/(href=["'])styles\.css(["'])/g, `$1styles.css?v=${cssVersion}$2`);
+  content = content.replace(/(href|src)=(["'])([^"'?#:]+)(?:\?v=[^"']*)?\2/g, (match, attribute, quote, url) => {
+    const version = assetManifest[url];
+    return version ? `${attribute}=${quote}${url}?v=${version}${quote}` : match;
+  });
   await writeFile(abs, content, 'utf8');
 }
 
@@ -214,6 +301,6 @@ if (shippedEnv.length) {
 // scripts/provenance.mjs writes its report from. It used to be a literal here,
 // so the two reports describing one build could name two different shops, and
 // neither would have failed a gate.
-const report = { application: manifest.name, mode: 'web-node', generatedAt: new Date().toISOString(), javascriptFilesChecked: jsFiles.length, requiredFilesChecked: required.length, audit: auditSummary, caseCheck: caseSummary, metrics: metricsSummary, provenance: provenanceSummary, artifactFiles: artifactFiles.length, artifactPath: ARTIFACT_PATH, status: 'passed' };
+const report = { application: manifest.name, mode: 'web-node', generatedAt: new Date().toISOString(), commit, javascriptFilesChecked: jsFiles.length, requiredFilesChecked: required.length, audit: auditSummary, caseCheck: caseSummary, metrics: metricsSummary, provenance: provenanceSummary, versionedAssets: Object.keys(assetManifest).length, artifactFiles: artifactFiles.length, artifactPath: ARTIFACT_PATH, status: 'passed' };
 await writeFile(path.join(root, 'build-reports', 'web-build.json'), JSON.stringify(report, null, 2));
 console.log(`[build] PASS: ${required.length} required files, ${jsFiles.length} JavaScript files checked, ${auditSummary}, ${caseSummary}, ${metricsSummary}, ${provenanceSummary}, ${artifactFiles.length} deploy files packaged into ${ARTIFACT_PATH}.`);

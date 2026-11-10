@@ -503,7 +503,12 @@ const skipped = [];
 if (!appUrlRaw) skipped.push("domain gõ tay (cần APP_URL)");
 if (!supportEmailRaw) skipped.push("địa chỉ hỗ trợ gõ tay (cần SUPPORT_EMAIL)");
 
-const thirdParty = new Set(["www.w3.org", "schema.org", "www.sitemaps.org", "localhost", "img.vietqr.io", "fonts.googleapis.com", "fonts.gstatic.com", "resend.com", "supabase.com", "supabase.co", "paypal.com", "google.com", "cloudflare.com", "render.com", "ipapi.co", "ipwho.is", "er-api.com", "exchangerate-api.com", "indexnow.org",
+// The fonts used to be listed here: fonts.googleapis.com served the stylesheet
+// and fonts.gstatic.com the woff2 files. Both are gone — the fonts are served
+// from this origin (public/fonts) — and the hosts were deliberately not left in
+// the list, so a page that reaches for a webfont again fails this gate instead
+// of quietly adding a render-blocking request to a second origin.
+const thirdParty = new Set(["www.w3.org", "schema.org", "www.sitemaps.org", "localhost", "img.vietqr.io", "resend.com", "supabase.com", "supabase.co", "paypal.com", "google.com", "cloudflare.com", "render.com", "ipapi.co", "ipwho.is", "er-api.com", "exchangerate-api.com", "indexnow.org",
   // Cloudflare Web Analytics. Both hosts are named because the match above is
   // exact rather than by suffix, and they are two different hosts: the first
   // serves the beacon script (src/pages.js), the second receives what the beacon
@@ -849,7 +854,16 @@ for (const name of htmlFiles) {
 // ---------------------------------------------------------------------------
 {
   const css = await read(path.join("public", "styles.css"));
-  const rootBlock = css.slice(0, css.search(/:root\s*\{/) === -1 ? css.length : css.indexOf("}") + 1);
+  // The :root block, taken from the place :root actually starts to the brace that
+  // closes it.
+  //
+  // It used to be "everything up to the first }", which was the same thing only
+  // while :root was the first rule in the file. The self-hosted @font-face rules
+  // now come first, so that expression measured the font declarations and
+  // concluded that every variable in the stylesheet was undeclared — the gate
+  // reporting twenty variables missing while the page rendered them all.
+  const rootStart = css.search(/:root\s*\{/);
+  const rootBlock = rootStart === -1 ? "" : css.slice(rootStart, css.indexOf("}", rootStart) + 1);
   const declared = new Set([...rootBlock.matchAll(/(--[a-z0-9-]+)\s*:/gi)].map((m) => m[1]));
   const used = new Map();
   for (const match of css.matchAll(/var\(\s*(--[a-z0-9-]+)/gi)) {
@@ -882,16 +896,46 @@ for (const name of htmlFiles) {
 //     problem than a token every page has to resolve before its CSS applies, and
 //     the check below is what makes the copies safe: a new page that forgets gets
 //     told, instead of quietly rendering in Arial.
+//
+//     The fonts moved: they are served from this origin now (public/fonts), and
+//     the @font-face rules travel inside the stylesheet every page already
+//     loads. So the check has two halves. The stylesheet has to declare both
+//     families, or a page that loads it has no brand typeface at all; and no
+//     page may reach for a webfont host again, because that stylesheet was a
+//     render-blocking request to a second origin and cost about 260 ms.
 // ---------------------------------------------------------------------------
-for (const name of htmlFiles) {
-  const source = await read(path.join("public", name));
-  // Both forms. The page links the minified stylesheet "/styles.min.css";
-  // the source "styles.css" is only what the minify step reads. Matching only
-  // the source name left the page that actually lost its fonts unexamined.
-  if (!/href="\/?styles\.min\.css"/.test(source)) continue;
-  if (!/Space\+Grotesk/.test(source)) {
-    fail("thiếu font thương hiệu", `public/${name}`,
-      "nạp styles.css nhưng không nạp Space Grotesk/DM Sans — chữ thương hiệu sẽ rơi về sans-serif mặc định");
+{
+  const css = await readFileSync(path.join("public", "styles.css"), "utf8");
+  const faces = [...css.matchAll(/@font-face\s*\{([^}]*)\}/g)].map((m) => m[1]);
+  for (const family of ["Space Grotesk", "Be Vietnam Pro"]) {
+    const own = faces.filter((body) => body.includes(`font-family:'${family}'`));
+    if (!own.length) {
+      fail("thiếu khai báo @font-face", "public/styles.css",
+        `không có @font-face cho '${family}' — mọi trang nạp stylesheet sẽ rơi về sans-serif mặc định`);
+      continue;
+    }
+    // A font family without the Vietnamese block is not a font for this shop.
+    //
+    // DM Sans shipped latin and latin-ext only, and latin-ext stops at U+1E9F —
+    // the Vietnamese block starts at U+1EA0. Every accented character in the
+    // body copy was therefore rendered by the fallback while the unaccented
+    // characters stayed in the brand face: a Vietnamese paragraph in two
+    // typefaces, and nothing in the build said so.
+    if (!own.some((body) => /unicode-range:[^}]*U\+1EA0/i.test(body))) {
+      fail("thiếu khai báo @font-face", "public/styles.css",
+        `font '${family}' không có subset tiếng Việt (unicode-range phải chứa U+1EA0) — mọi chữ có dấu sẽ rơi về font hệ thống`);
+    }
+  }
+  for (const name of htmlFiles) {
+    const source = await read(path.join("public", name));
+    // Both forms. The page links the minified stylesheet "/styles.min.css";
+    // the source "styles.css" is only what the minify step reads. Matching only
+    // the source name left the page that actually lost its fonts unexamined.
+    if (!/href="\/?styles\.min\.css"/.test(source)) continue;
+    if (/fonts\.(?:googleapis|gstatic)\.com/.test(source)) {
+      fail("font thương hiệu từ bên ngoài", `public/${name}`,
+        "trang vẫn nạp webfont từ fonts.googleapis.com — phải dùng font tự host trong /fonts");
+    }
   }
 }
 
@@ -1414,7 +1458,7 @@ const DECLARED = [
   "thương hiệu khai báo hai lần", "placeholder lạ",
   "schema chặn", "tiếng Việt không dấu", "tiếng Việt ở phía máy chủ", "token chưa nối",
   "trang chưa render", "hreflang chết", "thương hiệu gõ cứng", "trang mồ côi",
-  "trùng tên toàn cục", "chữ rỗng", "thiếu font thương hiệu",
+  "trùng tên toàn cục", "chữ rỗng", "thiếu khai báo @font-face", "font thương hiệu từ bên ngoài",
   "lỗi tiếng Việt cho trình duyệt", "ngôn ngữ khai báo sai",
   // A file the scan listed and could not open. This one was missing while it was
   // already being produced, which is the shape of rot the reverse guard below

@@ -1,19 +1,23 @@
 {
-  "generatedAt": "2026-11-04T11:32:25.419Z",
+  "generatedAt": "2026-11-10T04:28:51.041Z",
   "overall": "ok",
   "measurements": {
     "availability": {
       "id": "availability",
       "name": "Service availability",
-      "target": 99.9,
+      "target": 99.5,
       "measure": "percentage",
       "want": "up",
+      "unit": "%",
+      "basis": "window",
+      "source": "logs/last-availability.json — 30-day window from the edge access log",
       "owner": "platform-team",
-      "remediation": "PagerDuty escalation; runbook at docs/RUNBOOK.md#availability",
+      "remediation": "Check the deploy history and the incident log; runbook at docs/RUNBOOK.md",
       "value": null,
       "status": "unknown",
       "breached": false,
-      "measuredAt": "2026-11-04T11:32:25.419Z"
+      "sampleSize": 0,
+      "measuredAt": "2026-11-10T04:28:51.042Z"
     },
     "errorRate": {
       "id": "errorRate",
@@ -21,25 +25,33 @@
       "target": 1,
       "measure": "percentage",
       "want": "down",
+      "unit": "%",
+      "basis": "window",
+      "source": "logs/last-error-report.json",
       "owner": "backend-team",
-      "remediation": "Check /api/health failures; rollback if > 1% for 15 min",
+      "remediation": "Check /api/health failures; roll back if the rate holds for 15 minutes",
       "value": null,
       "status": "unknown",
       "breached": false,
-      "measuredAt": "2026-11-04T11:32:25.419Z"
+      "sampleSize": 0,
+      "measuredAt": "2026-11-10T04:28:51.042Z"
     },
     "latencyP95": {
       "id": "latencyP95",
       "name": "API p95 latency",
-      "target": 500,
-      "measure": "seconds",
+      "target": 400,
+      "measure": "milliseconds",
       "want": "down",
+      "unit": "ms",
+      "basis": "window",
+      "source": "logs/last-latency.json (p95Seconds, converted to milliseconds)",
       "owner": "backend-team",
-      "remediation": "Profile slow endpoints; add caching or scale instances",
+      "remediation": "Profile the slow endpoints; add caching or scale the instances",
       "value": null,
       "status": "unknown",
       "breached": false,
-      "measuredAt": "2026-11-04T11:32:25.419Z"
+      "sampleSize": 0,
+      "measuredAt": "2026-11-10T04:28:51.042Z"
     },
     "testPassRate": {
       "id": "testPassRate",
@@ -47,12 +59,16 @@
       "target": 100,
       "measure": "percentage",
       "want": "up",
+      "unit": "%",
+      "basis": "last-run",
+      "source": "test_output.log",
       "owner": "engineering-team",
-      "remediation": "Red test must block merge; fix before next deploy",
-      "value": null,
-      "status": "unknown",
+      "remediation": "A red test must block the merge; fix it before the next deploy",
+      "value": 100,
+      "status": "ok",
       "breached": false,
-      "measuredAt": "2026-11-04T11:32:25.419Z"
+      "sampleSize": 513,
+      "measuredAt": "2026-11-10T04:28:51.044Z"
     },
     "buildSuccessRate": {
       "id": "buildSuccessRate",
@@ -60,12 +76,16 @@
       "target": 100,
       "measure": "percentage",
       "want": "up",
+      "unit": "%",
+      "basis": "last-run",
+      "source": "build-reports/web-build.json — the outcome of the last build, not a rate",
       "owner": "platform-team",
-      "remediation": "Failed build blocks deploy; investigate CI logs",
+      "remediation": "A failed build blocks the deploy; read the CI log",
       "value": 100,
       "status": "ok",
       "breached": false,
-      "measuredAt": "2026-11-04T11:32:25.419Z"
+      "sampleSize": 1,
+      "measuredAt": "2026-11-10T04:28:51.044Z"
     },
     "deploySuccessRate": {
       "id": "deploySuccessRate",
@@ -73,12 +93,33 @@
       "target": 100,
       "measure": "percentage",
       "want": "up",
+      "unit": "%",
+      "basis": "last-run",
+      "source": "logs/last-deploy.json — written by the deploy step after it finishes",
       "owner": "platform-team",
-      "remediation": "Failed deploy must be rolled back within 15 min",
-      "value": 100,
-      "status": "ok",
+      "remediation": "A failed deploy must be rolled back within 15 minutes",
+      "value": null,
+      "status": "unknown",
       "breached": false,
-      "measuredAt": "2026-11-04T11:32:25.419Z"
+      "sampleSize": 0,
+      "measuredAt": "2026-11-10T04:28:51.044Z"
+    },
+    "escapeRate": {
+      "id": "escapeRate",
+      "name": "Escaped defect rate",
+      "target": 5,
+      "measure": "percentage",
+      "want": "down",
+      "unit": "%",
+      "basis": "window",
+      "source": "metrics-defect-escape.json",
+      "owner": "engineering-team",
+      "remediation": "Every escaped defect gets a root cause; see docs/CMMI-L5-ROADMAP.md",
+      "value": null,
+      "status": "unknown",
+      "breached": false,
+      "sampleSize": 0,
+      "measuredAt": "2026-11-10T04:28:51.044Z"
     }
   },
   "unresolvedBreachCount": 0

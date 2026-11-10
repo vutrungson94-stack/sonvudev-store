@@ -44,7 +44,14 @@ const nowMs = now.getTime();
 const cutoff = new Date(nowMs - WINDOW_DAYS * 24 * 60 * 60 * 1000);
 
 // All tags with their creation dates, newest first.
-const tagLines = git(['tag', '--creatordate', '--sort=-creatordate', '--format=%(creatordate:iso-strict) %(refname:short)']);
+//
+// `git for-each-ref`, not `git tag --creatordate`: the listing form of
+// --creatordate is not available on every git this repository is opened with,
+// and the failure is silent — the helper returns an empty string, every tag
+// disappears, and the metrics report "no deployments" for a repository that has
+// deployed hundreds of times. A measurement that cannot tell the difference
+// between "no tags" and "wrong git flag" is not a measurement.
+const tagLines = git(['for-each-ref', '--sort=-creatordate', '--format=%(creatordate:iso-strict) %(refname:short)', 'refs/tags']);
 const allTags = tagLines
   ? tagLines
       .split('\n')
@@ -57,7 +64,9 @@ const allTags = tagLines
   : [];
 const tagsInWindow = allTags.filter((t) => t.date >= cutoff);
 
-const deploymentFrequency = Number((tagsInWindow.length / WINDOW_WEEKS).toFixed(2));
+const deploymentFrequency = tagsInWindow.length > 0
+  ? Number((tagsInWindow.length / WINDOW_WEEKS).toFixed(2))
+  : null;
 
 // Lead time: for each tag, the age of the oldest commit in the range since the
 // previous tag (or the start of history for the oldest tag in the window).
@@ -84,7 +93,7 @@ for (const t of tagsInWindow) {
   const subjects = [git(['log', '-1', '--format=%s', t.tag]), git(['log', '-2', '--format=%s', t.tag]).split('\n')[1] || ''];
   if (subjects.some((s) => FIX_RE.test(s.trim()))) failedTags.push(t);
 }
-const changeFailureRate = tagsInWindow.length > 0 ? failedTags.length / tagsInWindow.length : 0;
+const changeFailureRate = tagsInWindow.length > 0 ? failedTags.length / tagsInWindow.length : null;
 
 // MTTR: days from a failed tag to the next tag, averaged over the window.
 let mttrDays = null;
@@ -100,14 +109,25 @@ if (mttrSamples.length > 0) {
 const metrics = {
   generatedAt: now.toISOString(),
   windowDays: WINDOW_DAYS,
+  // Where the numbers come from, and how much data they are made of.
+  //
+  // A number without its sample size is a claim; a number with one is a
+  // measurement. When there is nothing to measure — no release has been
+  // tagged, which is the normal state of a repository that never tags its
+  // deploys — the value is null, not 0. Zero says "we deployed and failed
+  // every time"; null says "we do not know", which is what is true.
+  source: 'git tags (one tag per release, created by CI after a deploy)',
+  sampleSize: tagsInWindow.length,
   deploymentFrequency,
   deploymentsInWindow: tagsInWindow.length,
   totalDeployments: allTags.length,
-  leadTimeDays: Number(leadTimeDays.toFixed(2)),
-  changeFailureRate: Number(changeFailureRate.toFixed(4)),
+  leadTimeDays: leadTimeSamples > 0 ? Number(leadTimeDays.toFixed(2)) : null,
+  leadTimeSamples,
+  changeFailureRate: changeFailureRate == null ? null : Number(changeFailureRate.toFixed(4)),
   failedChanges: failedTags.length,
   totalChanges: tagsInWindow.length,
   mttrDays: mttrDays == null ? null : Number(mttrDays.toFixed(2)),
+  mttrSamples: mttrSamples.length,
 };
 
 const history = await (async () => {
@@ -137,16 +157,23 @@ await writeFile(
   'utf8',
 );
 
+const show = (value, suffix = '') => (value == null ? 'n/a' : `${value}${suffix}`);
 console.log(
-  `[dora] window=${WINDOW_DAYS}d deploymentFrequency=${metrics.deploymentFrequency}/week deployments=${metrics.deploymentsInWindow} leadTimeDays=${metrics.leadTimeDays} changeFailureRate=${(metrics.changeFailureRate * 100).toFixed(1)}% mttrDays=${metrics.mttrDays == null ? 'n/a' : metrics.mttrDays.toFixed(1)}`,
+  `[dora] window=${WINDOW_DAYS}d deploymentFrequency=${show(metrics.deploymentFrequency)}/week deployments=${metrics.deploymentsInWindow} `
+  + `leadTimeDays=${show(metrics.leadTimeDays)} changeFailureRate=${show(metrics.changeFailureRate == null ? null : (metrics.changeFailureRate * 100).toFixed(1) + '%')} `
+  + `mttrDays=${show(metrics.mttrDays == null ? null : metrics.mttrDays.toFixed(1))} samples=${metrics.sampleSize}`,
 );
 
 if (CHECK) {
   // The gate: a change failure rate that is not below the previous snapshot fails.
   // Without a prior snapshot there is nothing to regress against, so the gate passes
   // and says so - it does not invent a baseline.
+  //
+  // A snapshot with no samples is not a baseline either. Comparing a rate of
+  // zero releases against a rate of two releases is not a measurement of a
+  // regression; it is comparing the absence of data with the presence of it.
   const prev = previous && typeof previous.changeFailureRate === 'number' ? previous.changeFailureRate : null;
-  if (prev == null) {
+  if (prev == null || metrics.changeFailureRate == null) {
     console.log('[dora:check] no previous snapshot to compare against - baseline recorded');
     process.exit(0);
   }

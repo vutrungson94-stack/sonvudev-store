@@ -8,6 +8,7 @@ import { dataDir } from "./store.js";
 import { esc } from "./format.js";
 import { SUPPORTED_LOCALES } from "./i18n-registry.mjs";
 import { analyticsMeta } from "./pages.js";
+import { assetUrl } from "./lib/assets.mjs";
 
 // Directory where blog post JSON files live.
 const BLOG_DIR = path.join(dataDir, "blog");
@@ -311,7 +312,7 @@ export function renderBlogPost(post, lang = "vi") {
   <link rel="alternate" hreflang="vi" href="${esc(viUrl)}">
   <link rel="alternate" hreflang="en" href="${esc(enUrl)}">
   <link rel="alternate" hreflang="x-default" href="${esc(viUrl)}">
-  <link rel="stylesheet" href="/styles.min.css">
+  <link rel="stylesheet" href="${assetUrl('/styles.min.css')}">
 ${analyticsMeta()}
 </head>
 <body>
@@ -319,7 +320,7 @@ ${analyticsMeta()}
     <a href="${absolute("/")}" class="blog-home">← ${ui.home}</a>
     ${blogLanguageCombobox(post.slug, lang, ui.language)}
   </nav>
-  <script src="/blog-lang.js"></script>
+  <script src="${assetUrl('/blog-lang.js')}"></script>
   <article class="blog-post">
     <header class="blog-header">
       <div class="blog-meta">
@@ -339,7 +340,8 @@ ${analyticsMeta()}
       </div>
     </footer>
   </article>
-  <script src="/lang-detect.js"></script>
+  <script src="${assetUrl('/lang-detect.js')}"></script>
+  <script defer src="${assetUrl('/quality.js')}"></script>
 </body>
 </html>`;
 }
@@ -408,7 +410,7 @@ export function renderBlogIndex(posts, lang = "vi") {
   <link rel="alternate" hreflang="vi" href="${esc(viUrl)}">
   <link rel="alternate" hreflang="en" href="${esc(enUrl)}">
   <link rel="alternate" hreflang="x-default" href="${esc(viUrl)}">
-  <link rel="stylesheet" href="/styles.min.css">
+  <link rel="stylesheet" href="${assetUrl('/styles.min.css')}">
 ${analyticsMeta()}
 </head>
 <body>
@@ -416,7 +418,7 @@ ${analyticsMeta()}
     <a href="${absolute("/")}" class="blog-home">← ${ui.home}</a>
     ${blogLanguageCombobox("", lang, ui.language)}
   </nav>
-  <script src="/blog-lang.js"></script>
+  <script src="${assetUrl('/blog-lang.js')}"></script>
   <main class="wrap">
     <header class="blog-index-header">
       <h1>${esc(ui.pageTitle)}</h1>
@@ -426,7 +428,8 @@ ${analyticsMeta()}
       ${noticeHtml}${cards || `<p>${esc(ui.empty)}</p>`}
     </div>
   </main>
-  <script src="/lang-detect.js"></script>
+  <script src="${assetUrl('/lang-detect.js')}"></script>
+  <script defer src="${assetUrl('/quality.js')}"></script>
 </body>
 </html>`;
 }

@@ -21,6 +21,20 @@ const artifact = path.join(root, ARTIFACT_PATH);
 // links), so it is compared by existence rather than by hash.
 const sourceDirs = ['src', 'scripts', 'public'];
 
+// Two files are minified by the build, in the artifact only. The source stays
+// readable because the audit, the metrics and the tests read it as text — the
+// dictionary in public/i18n.js is parsed, and public/app.js is executed in a
+// stubbed DOM — so what ships is a different byte sequence from what is
+// committed, by design.
+//
+// The two stylesheets differ for the same kind of reason: the build rewrites
+// the font urls inside them so that the stylesheet and the HTML preload name
+// the same font file (one download, and no late font swap that shifts the
+// page). The committed source keeps the plain urls; the artifact carries the
+// versioned ones.
+const artifactOnlyMinified = new Set(['public/app.js', 'public/i18n.js']);
+const artifactOnlyRewritten = new Set(['public/styles.css', 'public/styles.min.css']);
+
 const hashFile = async (file) => crypto.createHash('sha256').update(await readFile(file)).digest('hex');
 
 let drifted = 0;
@@ -31,6 +45,7 @@ for (const dir of sourceDirs) {
   for (const file of files) {
     if (file.endsWith('.html')) continue;
     const rel = path.relative(root, file).replaceAll('\\', '/');
+    if (artifactOnlyMinified.has(rel) || artifactOnlyRewritten.has(rel)) continue;
     const target = path.join(artifact, rel);
     try {
       const sourceHash = await hashFile(file);

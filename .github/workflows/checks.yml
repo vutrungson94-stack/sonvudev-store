@@ -230,3 +230,97 @@ jobs:
         run: npm run seo:check -- "${{ secrets.APP_URL }}"
         env:
           GOOGLE_SITE_VERIFICATION: ${{ secrets.GOOGLE_SITE_VERIFICATION }}
+
+  # The page, measured the way a shopper's browser sees it.
+  #
+  # The Lighthouse numbers this project reacted to came from a browser with
+  # extensions installed: "unused JavaScript: 443 KB" was the Google Translate
+  # extension, and a finding nobody can act on is a finding that teaches people
+  # to ignore the report. This job runs headless with extensions disabled and
+  # asserts on the site's own numbers — its scores, its metrics, and its own
+  # assets. Third-party bytes are reported, never failed on.
+  #
+  # It runs after `deployed-site`, which waits until the live host serves this
+  # exact commit. Measuring anything else measures the previous release.
+  lighthouse:
+    needs: [checks, deployed-site]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 12
+    if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master'
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: '22'
+          cache: npm
+
+      - run: npm ci
+
+      # The secret is checked here rather than inside the script: `secrets` is
+      # not available in an `if:` expression, and a gate that quietly measures
+      # nothing and reports green is the failure this repository keeps undoing.
+      - name: measure the live site
+        env:
+          APP_URL: ${{ secrets.APP_URL }}
+        run: |
+          if [ -z "$APP_URL" ]; then
+            echo "::error::secrets.APP_URL chua duoc dat, nen bo do khong do gi ca."
+            echo "::error::Dat no trong Settings > Secrets and variables > Actions > Repository secrets, ten APP_URL, gia tri https://<domain-cua-ban>"
+            exit 1
+          fi
+          npm run lighthouse:check
+
+  # A tag per deploy, which is the only thing the DORA numbers can be computed
+  # from.
+  #
+  # `git tag` was empty in this repository while the DORA report said "0
+  # deployments per week, lead time 0 days". The report was not wrong about the
+  # repository; it was measuring the absence of releases, because nothing ever
+  # recorded one. A release tag is that record: it is created after the live
+  # host is confirmed to be serving this commit, so a tag means "this was
+  # deployed", not "this was committed".
+  release-tag:
+    needs: [checks, deployed-site]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master'
+    # The one job that writes to the repository. Least privilege: the workflow
+    # itself stays read-only, and only this job may push a tag.
+    permissions:
+      contents: write
+    steps:
+      # Full history: the lead time is the age of the oldest commit in the
+      # range, so a shallow checkout would measure nothing.
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: '22'
+          cache: npm
+
+      - run: npm ci
+
+      - name: tag the release
+        run: |
+          set -eu
+          tag="v${GITHUB_RUN_NUMBER}.${GITHUB_SHA::8}"
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git tag -a "$tag" -m "release $tag (${GITHUB_SHA})"
+          git push origin "$tag"
+          echo "tagged $tag"
+
+      - name: record the DORA metrics from the tag
+        run: |
+          set -eu
+          npm run dora:metrics
+          {
+            echo "### DORA (sau khi gắn tag)"
+            echo
+            echo '```json'
+            cat metrics-dora.json
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"

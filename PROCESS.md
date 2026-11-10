@@ -14,11 +14,17 @@ any team can pick up and run without tribal knowledge.
 | Audit | `npm run audit` | No hardcoded domains, broken links, orphan i18n keys, missing Vietnamese diacritics | Fix reported issues, re-run |
 | Case Sensitivity | `npm run case` | All filesystem references match actual casing | Fix imports/paths, re-run |
 | Metrics | `npm run metrics` | No metric regressed vs baseline | If intentional: `npm run metrics:update` |
-| Tests | `npm test` | 429 tests pass (unit + integration + contract) | Fix failing tests, re-run |
-| Lint | `npm run lint` | Code style, no unused vars, consistent patterns | Fix lint errors, re-run |
+| Tests | `npm test` | Full suite green (unit + integration + contract); the exact count lives in `metrics-baseline.json`, not in prose | Fix failing tests, re-run |
+| Lint | `npm run lint` | Parse check of every JavaScript file in the project | Fix syntax errors, re-run |
 | Build | `npm run build` | Produce deployable artifact in `publish-output/` | Fix build errors, re-run |
 
 **All gates must pass locally before push.** CI runs the same sequence.
+
+> Note on `npm run lint`: it is a **parse check**, not a style linter. It proves a
+> file parses; it does not prove the code is tidy. Style, unused variables and
+> dead code are currently caught by `npm run audit` (its 33 groups) and by the
+> metrics gate, which counts duplicated helpers. Claiming more than that in this
+> table is how a reader ends up believing a check exists that does not.
 
 ---
 

@@ -122,3 +122,77 @@ Tiêu chí promote (đề xuất, ghi rõ trong ticket):
 
 Một SLO không được đo là một khẩu hiệu. Nếu không ai đọc bảng này trong một tháng,
 hoặc xóa nó, hoặc biến nó thành một bước trong checklist trực ca.
+
+## 7. Ai đo cái gì, và từ bằng chứng nào
+
+Mục tiêu trong bảng ở mục 2 giờ có **một** nơi định nghĩa trong code:
+`scripts/lib/slo.mjs`. Trước đó có hai bản sao — `scripts/slo-monitor.mjs` và
+`scripts/sla-monitor.mjs` — và chúng **không đồng ý** với nhau: cùng một chỉ số
+`buildSuccessRate` được một bên báo "unknown" (không có bằng chứng), bên kia báo
+"100" (tệp báo cáo tồn tại). Hai câu trả lời cho cùng một câu hỏi, cả hai đều
+được commit.
+
+Hai script giờ chỉ còn là hai **người báo cáo**, dùng chung một danh sách mục tiêu,
+chung một cách đo, chung một đơn vị:
+
+| Chỉ số | Nguồn bằng chứng | Cơ sở | Trạng thái |
+| --- | --- | --- | --- |
+| `availability` | `logs/last-availability.json` — cửa sổ 30 ngày từ access log của edge | window | **unknown** (chưa có ai sinh file này) |
+| `errorRate` | `logs/last-error-report.json` | window | **unknown** |
+| `latencyP95` | `logs/last-latency.json` (`p95Seconds` → **ms**) | window | **unknown** |
+| `testPassRate` | `test_output.log` | lần chạy gần nhất | đo được khi có log |
+| `buildSuccessRate` | `build-reports/web-build.json` — kết quả build gần nhất, **không phải tỉ lệ** | lần chạy gần nhất | đo được |
+| `deploySuccessRate` | `logs/last-deploy.json` — do bước deploy ghi sau khi xong | lần chạy gần nhất | **unknown** |
+| `escapeRate` | `metrics-defect-escape.json` | window | **unknown** |
+
+Nguyên tắc: **không có bằng chứng thì báo `unknown`, không báo 0 và không báo 100.**
+0 là một phép đo; `null` là sự vắng mặt của phép đo. `sampleSize` đi kèm mỗi giá
+trị để người đọc biết con số được làm từ bao nhiêu mẫu.
+
+Hai lỗi đơn vị đã sửa:
+
+- `latencyP95` trước đây có `target: 500` với `measure: 'seconds'` trong khi tài
+  liệu nói 400 **ms** — cùng một con số, hai đơn vị. Giờ đo bằng ms, đúng như bảng
+  ở mục 2.
+- `availability` không còn lấy từ một lần probe sức khoẻ ("đang lên hay không" là
+  câu hỏi khác với "99,5% trong 30 ngày"). Probe sức khoẻ là câu hỏi khác, và nó
+  không được dùng để đứng ra một tuyên bố 99,9%.
+
+## 8. Chất lượng trang, đo bằng Lighthouse và RUM
+
+Hai gate mới, cùng nguyên tắc: **đo trang thật, bằng trình duyệt sạch, và fail
+đúng chỗ**.
+
+- `npm run lighthouse:check -- <url>` — chạy Lighthouse headless, **tắt extension**
+  (chính extension Google Translate đã tạo ra cảnh báo "unused JavaScript 443 KB"
+  cho trang này), và kiểm tra: performance ≥ 0,85, accessibility/SEO/best-practices
+  ≥ 0,90, LCP ≤ 2500 ms, CLS ≤ 0,1, không tài nguyên nào của site bị cache ngắn
+  hạn, không script nào của site bị chưa minify. Byte của bên thứ ba (beacon
+  Cloudflare) **được báo, không bị fail** — không phải của site thì không sửa được.
+  CI chạy job `lighthouse` sau khi `deployed-site` xác nhận host đang phục vụ đúng
+  commit.
+- `public/quality.js` (RUM) — đo LCP/CLS/TTFB/INP và lỗi JS trong trình duyệt
+  thật rồi gửi về `/api/quality`. Nó **giờ được nạp trên mọi trang**, kể cả trang
+  chủ, trang sản phẩm và blog — trước đó thiếu đúng ba trang quan trọng nhất, nên
+  số liệu hiện trường vắng mặt ở nơi cần nhất. Công thức TTFB đổi sang Navigation
+  Timing Level 2 (`responseStart - startTime`), vì cách cũ bỏ sót redirect, DNS và
+  TLS: trên trang có redirect, đó gần như toàn bộ thời gian chờ.
+
+## 9. DORA: chỉ đo được khi có dấu vết của một lần deploy
+
+`scripts/dora-metrics.mjs` đọc **git tag**. Trong repo này `git tag` rỗng, nên báo
+cáo DORA từng nói "0 lần deploy, lead time 0 ngày" — nó không sai, nó đo sự vắng
+mặt của dữ liệu.
+
+CI giờ gắn **một tag cho mỗi lần deploy** (job `release-tag`, chạy sau
+`deployed-site`, tức là sau khi host đã xác nhận phục vụ đúng commit). Một tag khi
+đó có nghĩa là "đã deploy", không phải "đã commit".
+
+Khi chưa có mẫu nào, các giá trị là `null` kèm `sampleSize: 0` — không phải 0.
+Và `--check` không so một tỉ lệ 0 mẫu với một tỉ lệ 2 mẫu để tuyên bố hồi quy.
+
+Lưu ý kỹ thuật: `git tag --creatordate` không chạy trên mọi phiên bản git, và lỗi
+đó **im lặng** — mọi tag biến mất và báo cáo nói "không có deploy nào". Script giờ
+dùng `git for-each-ref`, và `sampleSize` cho phép phân biệt "không có tag" với
+"đọc sai cách".
+
