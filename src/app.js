@@ -292,18 +292,17 @@ app.use((req, res, next) => {
   // API responses carry order data and one-time tokens; shared caches must not keep them.
   if (req.path.startsWith("/api/")) res.setHeader("Cache-Control", "no-store");
   res.setHeader("Permissions-Policy", "camera=(), microphone=(), geolocation=()");
-  // Analytics beacons are external scripts/endpoints: Cloudflare Web Analytics
-  // always needs its hosts; GA4 (optional, env GA_MEASUREMENT_ID) is allowed only
-  // when configured so the default CSP stays as tight as before.
+  // Analytics beacons are external scripts/endpoints: GA4 (optional, env
+  // GA_MEASUREMENT_ID) is allowed only when configured so the default CSP stays
+  // as tight as before.
   //
-  // The fonts are served from this origin (public/fonts), so no font host is
-  // allowed any more. The Google Fonts stylesheet used to be a render-blocking
-  // request to a second origin, and the policy entry that opened for it would
-  // have been a hole with nothing behind it.
+  // Cloudflare Web Analytics is not in this list any more: the beacon was the
+  // last third-party script on the page, and a host that is allowed but never
+  // used is a hole with nothing behind it.
   const gaOn = !!env.analytics.gaMeasurementId;
-  const scriptSrc = ["'self'", "https://static.cloudflareinsights.com"];
+  const scriptSrc = ["'self'"];
   if (gaOn) scriptSrc.push("https://www.googletagmanager.com");
-  const connectSrc = ["'self'", "https://*.r2.cloudflarestorage.com", "https://cloudflareinsights.com"];
+  const connectSrc = ["'self'", "https://*.r2.cloudflarestorage.com"];
   if (gaOn) connectSrc.push("https://www.google-analytics.com", "https://*.google-analytics.com", "https://*.analytics.google.com", "https://*.googletagmanager.com");
   const imgSrc = ["'self'", "data:", "https://img.vietqr.io"];
   if (gaOn) imgSrc.push("https://www.google-analytics.com", "https://*.google-analytics.com", "https://www.googletagmanager.com");

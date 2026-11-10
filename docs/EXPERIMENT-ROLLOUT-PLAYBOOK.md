@@ -101,7 +101,26 @@ Kiểm tra sau khi sửa: mở Chrome DevTools → Lighthouse → Accessibility,
 |---|---|---|
 | Use efficient cache lifetimes | Static assets (CSS, JS, hình ảnh) chỉ cache 5 phút (`maxAge: "5m"`) | Tăng `maxAge` lên `"1y"` trong `express.static()`, vì assets được version theo hash nội dung qua build: URL có `?v=<hash>`, deploy mới sinh hash mới nên cache cũ không còn dùng. |
 | Render-blocking requests | CSS chặn render nhưng preload+defer (`css-ready.js`) gây CLS ~0.5 vì vẽ chưa style trước | Giữ **`<link rel="stylesheet" href="/styles.min.css">` trực tiếp** (chặn render, CLS≈0, đúng chuẩn). Chỉ defer `<script>`. Không dùng preload CSS. |
-| Avoid chaining critical requests | Nhiều tài nguyên tải tuần tự thay vì songsex | Font **tự host** trong `/fonts` (không còn `fonts.googleapis.com`): bỏ hẳn 2 request ra domain thứ hai và 2 bắt tay DNS/TLS. Preload đúng 2 file font dùng trên màn hình đầu (`dm-sans-latin`, `space-grotesk-latin`). Beacon analytics tải **sau sự kiện `load`** (public/cf-beacon.js) nên không còn nằm trên critical path. |
+| Avoid chaining critical requests | Nhiều tài nguyên tải tuần tự thay vì songsex | Font **tự host** trong `/fonts` (không còn `fonts.googleapis.com`): bỏ hẳn 2 request ra domain thứ hai và 2 bắt tay DNS/TLS. Preload **4 file font** thực sự dùng (`be-vietnam-pro-latin`, `be-vietnam-pro-vietnamese`, `space-grotesk-latin`, `space-grotesk-vietnamese`) → font tải song song với CSS, không chờ CSS. Beacon analytics tải **sau sự kiện `load`**. |
+| Legacy JavaScript / cache TTL 1 ngày | `beacon.min.js` của Cloudflare (10 KB, polyfill `Array.prototype.at/findLast/includes`) | **Đã bỏ beacon**: RUM của chính site (`/api/quality`, `navigator.sendBeacon`) đếm lượt xem trên cùng origin, chặn được bởi proxy/VPN/trình chặn tracker. |
+| Reduce unused JavaScript 443 KB | Extension Google Translate trong máy người đo | False positive. Đo bằng Incognito hoặc PageSpeed Insights; CI (`npm run lighthouse:check`) chạy headless, tắt extension. |
+
+### 7.1 Thử nghiệm đã làm và đã bác bỏ — critical CSS (2026-11-10)
+
+**Câu hỏi:** `/styles.min.css` chặn render (Lighthouse ước tính 70–150 ms). Có cách nào bỏ mà không làm layout nhảy?
+
+**Cách làm đã thử:** sinh `public/critical.css` từ `public/styles.css` (script riêng, danh sách selector của màn hình đầu, ~10 KB / 2,5 KB gzip), nhúng thẳng vào `<head>`, tải stylesheet đầy đủ bằng `rel="preload"` rồi `public/css-ready.js` đổi thành stylesheet (CSP không có `unsafe-inline` nên không dùng `onload` inline được).
+
+**Đo (Lighthouse mobile, cùng máy, cùng build):**
+
+| | render-blocking | CLS | LCP |
+|---|---|---|---|
+| CSS chặn render (hiện tại) | có (70–150 ms khi mạng chậm) | **0, ổn định** | 1,2–1,9 s |
+| Critical CSS + preload | **không còn** | **0,02 – 0,22, không ổn định** | 1,3 s |
+
+**Kết luận: bác bỏ.** Cảnh báo biến mất, nhưng CLS đổi theo thời điểm stylesheet đầy đủ tới — có lần 0,02, có lần 0,22. Một chỉ số mà kết quả đo dao động gấp 10 lần là hồi quy, đặc biệt khi lịch sử của dự án đã có một sự cố CLS 0,5 vì đúng cách preload+defer này. 70 ms không đáng để đổi lấy layout không ổn định trên một trang bán hàng.
+
+**Phương án còn lại nếu vẫn muốn bỏ cảnh báo:** nhúng **toàn bộ** stylesheet vào HTML (không còn request chặn render, không có shift nào). Cái giá: HTML phình từ ~6 KB lên ~22 KB gzip và phải tải lại mỗi 5 phút (HTML `max-age=300`) thay vì cache CSS 1 năm — tệ hơn với khách đọc nhiều trang. **Cần chủ quyết định, không tự ý làm.**
 
 ---
 

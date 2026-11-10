@@ -728,27 +728,28 @@ export const brandMeta = () => [
  */
 export const analyticsMeta = () => {
   const parts = [];
-  const token = env.analytics.webAnalyticsToken;
-  if (token) {
-    parts.push("<!-- Cloudflare Web Analytics -->");
-    // The beacon is loaded by a first-party script after the page has loaded,
-    // rather than being a module script in the head.
-    //
-    // In the head it was the longest branch of the critical path: the browser
-    // fetched static.cloudflareinsights.com while it was still deciding how to
-    // paint the page, and the request to the beacon endpoint outlived the
-    // paint. Analytics are not worth delaying a first paint for, so the tag now
-    // waits for the load event. The script itself stays external, so the CSP
-    // still needs no 'unsafe-inline'.
-    parts.push(`<script defer src="${assetUrl('/cf-beacon.js')}" data-cf-token="${esc(token)}"></script>`);
-    parts.push("<!-- End Cloudflare Web Analytics -->");
-  }
+  // Cloudflare Web Analytics used to be here.
+  //
+  // It was 10 KB of third-party JavaScript on every page, it carried its own
+  // polyfills for Array.prototype.at/findLast/includes (which Lighthouse
+  // reports as "Legacy JavaScript"), it was cached for a single day (which
+  // Lighthouse reports as "Use efficient cache lifetimes"), and it was the last
+  // third-party script standing between the shop and a clean report.
+  //
+  // What it provided — page views — the shop already has, better: the RUM
+  // beacon in public/quality.js posts the URL and the Core Web Vitals to
+  // /api/quality on the same origin, with navigator.sendBeacon, so it survives
+  // the visitor leaving the page and no proxy or tracker blocker can stop it.
+  //
+  // Putting it back is one tag. What it costs is written down in
+  // docs/QUALITY-L4-L5-BACKLOG.md.
   const gaId = env.analytics.gaMeasurementId;
   if (gaId) {
     // External same-origin loader keeps CSP strict (no inline script). public/ga.js
-    // reads the meta and loads gtag.js only when configured by the owner.
+    // reads the meta and loads gtag.js only when configured by the owner, and
+    // only after the load event.
     parts.push(`<meta name="ga-measurement-id" content="${esc(gaId)}">`);
-    parts.push(`<script defer src="/ga.js"></script>`);
+    parts.push(`<script defer src="${assetUrl('/ga.js')}"></script>`);
   }
   return parts.join("");
 };

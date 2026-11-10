@@ -66,15 +66,27 @@ test('public/ga.js chỉ hỏi gtag sau khi trang đã load', async () => {
   assert.match(loading.requested[0], /googletagmanager\.com\/gtag\/js/);
 });
 
-test('public/cf-beacon.js chỉ nạp beacon sau khi trang đã load', async () => {
-  const source = await readFile(new URL('../public/cf-beacon.js', import.meta.url), 'utf8');
+test('trang không nạp script analytics của bên thứ ba nào', async () => {
+  // Cloudflare Web Analytics is gone.
+  //
+  // Its beacon was 10 KB of third-party JavaScript carrying its own polyfills
+  // for Array.prototype.at/findLast/includes — which is exactly what Lighthouse
+  // lists under "Legacy JavaScript" — and it was cached for a single day, which
+  // is the "Use efficient cache lifetimes" finding. It was the last third-party
+  // script on the page.
+  //
+  // The shop measures itself instead: public/quality.js posts the URL and the
+  // Core Web Vitals to /api/quality on this origin, with sendBeacon, so no
+  // proxy, tracker blocker or corporate network can stop it.
+  const pages = await readFile(new URL('../src/pages.js', import.meta.url), 'utf8');
+  assert.ok(!/cloudflareinsights\.com/.test(pages),
+    'không được nạp beacon của Cloudflare — nó là 10 KB legacy JS cache 1 ngày');
+  assert.ok(!/cf-beacon\.js/.test(pages),
+    'không được tham chiếu public/cf-beacon.js');
 
-  const loading = runLoader(source, { readyState: 'loading' });
-  assert.equal(loading.requested.length, 0,
-    'không được gọi static.cloudflareinsights.com trước khi trang load xong');
-  assert.equal(typeof loading.listeners.load, 'function', 'phải chờ sự kiện load');
-
-  loading.listeners.load();
-  assert.equal(loading.requested.length, 1, 'sau load thì phải nạp beacon đúng một lần');
-  assert.match(loading.requested[0], /static\.cloudflareinsights\.com\/beacon\.min\.js/);
+  const app = await readFile(new URL('../src/app.js', import.meta.url), 'utf8');
+  assert.ok(!/static\.cloudflareinsights\.com/.test(app),
+    'CSP không được mở cho static.cloudflareinsights.com khi không có script nào dùng nó');
+  assert.ok(!/cloudflareinsights\.com/.test(app),
+    'CSP không được mở cho cloudflareinsights.com khi không có script nào dùng nó');
 });

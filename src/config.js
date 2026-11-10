@@ -174,10 +174,6 @@ export const env = {
     serviceRoleKey: value("SUPABASE_SERVICE_ROLE_KEY"),
   },
   analytics: {
-    // Cloudflare Web Analytics token. Empty disables the beacon entirely, so a
-    // checkout that is being run without the variable simply serves no tag
-    // rather than one that fails to load.
-    webAnalyticsToken: value("CF_WEB_ANALYTICS_TOKEN"),
     // Optional GA4 Measurement ID (G-...). Set in hosting env when the owner has
     // created a GA4 property; empty = no GA tag loaded. Validated to avoid
     // injecting arbitrary script attributes.
