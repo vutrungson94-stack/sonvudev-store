@@ -228,7 +228,32 @@ for (const [id, label] of [["legacy-javascript", "legacy JS"], ["unused-javascri
     notes.push(`${label}: ${foreign.length} mục của bên thứ ba (${foreign.map((i) => i.url).split("/").slice(0, 3).join("/")}).join(", ")}) — không phải của site`);
   }
   if (mine.length > 0) {
-    warnings.push(`${label}: ${mine.length} mục thuộc site (${mine.map((i) => i.url).join(", ")})`);
+    // First-party unused JavaScript IS ours to fix: a script the page loads and
+    // never uses is bytes the shopper waits for. The third-party ones above are
+    // reported and left alone.
+    warnings.push(`${label}: ${mine.length} mục thuộc site (${mine.map((i) => i.url).join(", ")}) — cần tách phần chỉ chạy khi khách tương tác, xem docs/CMMI-L5-ROADMAP.md`);
+  }
+}
+
+// The fonts the page's own text needed.
+//
+// A Vietnamese page needs two subsets per family: latin and vietnamese. If the
+// browser also fetches "latin-ext", then some character on the page falls
+// outside both — a stray letter, a symbol nobody noticed — and the page pays
+// 14-19 KB for it, late, on the critical path.
+//
+// The same finding appears in a browser with a translation extension, because
+// the translated text is not the site's text any more. That is the extension's
+// doing, not the site's, so the check below reads the fonts the page asked for
+// and reports them; the failure it raises is the site's own.
+{
+  const requests = (lhr.audits?.["network-requests"]?.details?.items) || [];
+  const fonts = requests.filter((item) => item.resourceType === "Font").map((item) => item.url);
+  const latinExt = fonts.filter((url) => /latin-ext/i.test(url));
+  if (latinExt.length > 0) {
+    errors.push(`font: trang tải subset latin-ext (${latinExt.map((u) => u.split("/").pop()).join(", ")}) — nội dung của trang có ký tự nằm ngoài tiếng Việt và tiếng Latin`);
+  } else {
+    notes.push(`font: chỉ subset latin và tiếng Việt (${fonts.length} file)`);
   }
 }
 

@@ -313,7 +313,11 @@ export function renderBlogPost(post, lang = "vi") {
   <link rel="alternate" hreflang="vi" href="${esc(viUrl)}">
   <link rel="alternate" hreflang="en" href="${esc(enUrl)}">
   <link rel="alternate" hreflang="x-default" href="${esc(viUrl)}">
-  <link rel="stylesheet" href="${assetUrl('/styles.min.css')}">
+  <link rel="preload" as="font" type="font/woff2" href="${assetUrl('/fonts/be-vietnam-pro-latin.woff2')}" crossorigin>
+<link rel="preload" as="font" type="font/woff2" href="${assetUrl('/fonts/be-vietnam-pro-vietnamese.woff2')}" crossorigin>
+<link rel="preload" as="font" type="font/woff2" href="${assetUrl('/fonts/space-grotesk-latin.woff2')}" crossorigin>
+<link rel="preload" as="font" type="font/woff2" href="${assetUrl('/fonts/space-grotesk-vietnamese.woff2')}" crossorigin>
+<link rel="stylesheet" href="${assetUrl('/styles.min.css')}">
 ${analyticsMeta()}
 </head>
 <body>
@@ -411,7 +415,11 @@ export function renderBlogIndex(posts, lang = "vi") {
   <link rel="alternate" hreflang="vi" href="${esc(viUrl)}">
   <link rel="alternate" hreflang="en" href="${esc(enUrl)}">
   <link rel="alternate" hreflang="x-default" href="${esc(viUrl)}">
-  <link rel="stylesheet" href="${assetUrl('/styles.min.css')}">
+  <link rel="preload" as="font" type="font/woff2" href="${assetUrl('/fonts/be-vietnam-pro-latin.woff2')}" crossorigin>
+<link rel="preload" as="font" type="font/woff2" href="${assetUrl('/fonts/be-vietnam-pro-vietnamese.woff2')}" crossorigin>
+<link rel="preload" as="font" type="font/woff2" href="${assetUrl('/fonts/space-grotesk-latin.woff2')}" crossorigin>
+<link rel="preload" as="font" type="font/woff2" href="${assetUrl('/fonts/space-grotesk-vietnamese.woff2')}" crossorigin>
+<link rel="stylesheet" href="${assetUrl('/styles.min.css')}">
 ${analyticsMeta()}
 </head>
 <body>

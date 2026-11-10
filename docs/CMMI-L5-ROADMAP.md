@@ -124,6 +124,21 @@ không, đừng đụng.
   **không** trở thành dependency, mà được gọi qua `npx` ở phiên bản ghim. Bề mặt
   dependency của storefront không đổi, và gate license giữ nguyên giá trị.
 
+### 3.3 Việc còn mở (P1) — tách `app.js`
+
+`npm run lighthouse:check` báo: **21.493 byte trong 26.970 byte của `public/app.js`
+không chạy lúc tải trang**. Đó là luồng mua hàng, modal chi tiết sản phẩm, tìm
+kiếm gợi ý và dựng thẻ bài viết — những phần chỉ chạy khi khách tương tác.
+
+Tách ra (`dynamic import` khi khách bấm) tiết kiệm ~7 KB gzip mỗi lượt xem, nhưng nó
+**đụng vào luồng mua** — đường đi quan trọng nhất của cửa hàng — nên cần một đợt
+riêng: tách theo ranh giới hành vi, giữ nguyên hợp đồng `/?buy=`, và có test cho
+đường mua trước và sau. Không làm trong một đợt sửa hiệu năng.
+
+**Tiêu chí nghiệm thu:** `unused-javascript` của first-party = 0 KB,
+`test/purchase-link-contract.test.js` và toàn bộ test vẫn xanh, và luồng mua được
+kiểm thử tay trên staging trước khi đưa lên `main`.
+
 
 ---
 
