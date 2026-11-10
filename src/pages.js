@@ -2093,12 +2093,20 @@ ${jsonLd({ "@graph": [organization(), websiteSchema(), productSchema(product, la
 <h1>${esc(product.name)} <em>v${esc(product.version)}</em></h1>
 <p class="product-lede">${esc(product.shortDescription || "")}</p>
 </div>
-<aside class="buy-card" id="mua">
+<div class="buy-card" id="mua">
+<!--
+  A div, not an aside.
+
+  A complementary landmark nested inside the banner landmark is two regions
+  overlapping, which is what axe's "landmark-complementary-is-top-level"
+  reports and what an agent walking the page's landmarks has to untangle. The
+  buy card is a purchase panel inside the header, not a region of its own.
+-->
 <div class="buy-price">${esc(priceLabel)}</div>
 <p class="buy-note">${esc(copy.buyNote)}</p>
 <a class="button button-primary button-wide" href="${homePrefix}/?buy=${encodeURIComponent(product.id)}#products">${esc(copy.buyNow)} <span>→</span></a>
 <ul class="buy-points"><li>${esc(copy.pointDownload)}</li><li>${esc(copy.pointLookup)}</li><li>${esc(copy.pointRefund)}</li></ul>
-</aside>
+</div>
 </header>
 ${features.length ? `<section class="detail-block"><h2>${esc(copy.features)}</h2><ul class="feature-grid">${features.map((item) => `<li>${esc(item)}</li>`).join("")}</ul></section>` : ""}
 ${product.requirements ? `<section class="detail-block"><h2>${esc(copy.requirements)}</h2><p>${esc(product.requirements).replace(/\n/g, "<br>")}</p></section>` : ""}
