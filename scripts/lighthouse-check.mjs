@@ -248,12 +248,21 @@ for (const [id, label] of [["legacy-javascript", "legacy JS"], ["unused-javascri
 // and reports them; the failure it raises is the site's own.
 {
   const requests = (lhr.audits?.["network-requests"]?.details?.items) || [];
-  const fonts = requests.filter((item) => item.resourceType === "Font").map((item) => item.url);
-  const latinExt = fonts.filter((url) => /latin-ext/i.test(url));
-  if (latinExt.length > 0) {
-    errors.push(`font: trang tải subset latin-ext (${latinExt.map((u) => u.split("/").pop()).join(", ")}) — nội dung của trang có ký tự nằm ngoài tiếng Việt và tiếng Latin`);
+  const fonts = [...new Set(requests.filter((item) => item.resourceType === "Font").map((item) => item.url.split("/").pop().split("?")[0]))];
+  // The shop ships two subsets per family and no more. Any other font file the
+  // page fetches is a subset that was added without anyone deciding whether it
+  // is needed — and it is fetched late, on the critical path.
+  const known = new Set([
+    "be-vietnam-pro-latin.woff2",
+    "be-vietnam-pro-vietnamese.woff2",
+    "space-grotesk-latin.woff2",
+    "space-grotesk-vietnamese.woff2",
+  ]);
+  const unexpected = fonts.filter((name) => !known.has(name));
+  if (unexpected.length > 0) {
+    errors.push(`font: trang tải subset không nằm trong danh sách (${unexpected.join(", ")}) — mỗi subset thừa là 14-19 KB tải muộn trên critical path`);
   } else {
-    notes.push(`font: chỉ subset latin và tiếng Việt (${fonts.length} file)`);
+    notes.push(`font: đúng 4 subset của shop (${fonts.length} file)`);
   }
 }
 
