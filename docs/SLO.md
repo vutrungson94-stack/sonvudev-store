@@ -177,6 +177,12 @@ Hai gate mới, cùng nguyên tắc: **đo trang thật, bằng trình duyệt s
   số liệu hiện trường vắng mặt ở nơi cần nhất. Công thức TTFB đổi sang Navigation
   Timing Level 2 (`responseStart - startTime`), vì cách cũ bỏ sót redirect, DNS và
   TLS: trên trang có redirect, đó gần như toàn bộ thời gian chờ.
+- **Hai script analytics tải sau sự kiện `load`** (`public/ga.js`,
+  `public/cf-beacon.js`): request ra bên thứ ba không được cạnh tranh với lần vẽ
+  đầu tiên, và không bị hủy khi khách rời trang sớm. Dấu hiệu của việc "đã hủy" là
+  mã **499** ("client đã đóng request") trong Network tab — không phải lỗi của site.
+  Số liệu đáng tin của chính shop là RUM `/api/quality`, vì nó dùng
+  `navigator.sendBeacon` nên an toàn khi trang kết thúc.
 
 ## 9. DORA: chỉ đo được khi có dấu vết của một lần deploy
 
