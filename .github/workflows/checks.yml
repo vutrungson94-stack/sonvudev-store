@@ -240,10 +240,17 @@ jobs:
   # asserts on the site's own numbers — its scores, its metrics, and its own
   # assets. Third-party bytes are reported, never failed on.
   #
-  # It runs after `deployed-site`, which waits until the live host serves this
-  # exact commit. Measuring anything else measures the previous release.
+  # It measures the PACKAGED ARTIFACT served on localhost, not the live site.
+  # A runner on another continent measures the distance to the server as much
+  # as it measures the page: the same build scored 100 from the build machine
+  # and failed the LCP threshold on the runner, which said nothing about the
+  # page and everything about the network. The artifact is the exact bytes
+  # deploy/deploy.sh ships, and on localhost the number belongs to the page.
+  #
+  # The live site is checked by the `deployed-site` job; the two together cover
+  # "the page is good" and "the live site is the page".
   lighthouse:
-    needs: [checks, deployed-site]
+    needs: [checks]
     runs-on: ubuntu-24.04
     timeout-minutes: 12
     if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master'
@@ -257,19 +264,24 @@ jobs:
 
       - run: npm ci
 
-      # The secret is checked here rather than inside the script: `secrets` is
-      # not available in an `if:` expression, and a gate that quietly measures
-      # nothing and reports green is the failure this repository keeps undoing.
-      - name: measure the live site
+      - name: measure the packaged artifact
         env:
-          APP_URL: ${{ secrets.APP_URL }}
+          # Chrome is preinstalled on the runner; the path is named explicitly so
+          # the run does not depend on what chrome-launcher guesses.
+          CHROME_PATH: /usr/bin/google-chrome-stable
         run: |
-          if [ -z "$APP_URL" ]; then
-            echo "::error::secrets.APP_URL chua duoc dat, nen bo do khong do gi ca."
-            echo "::error::Dat no trong Settings > Secrets and variables > Actions > Repository secrets, ten APP_URL, gia tri https://<domain-cua-ban>"
+          set -eu
+          node scripts/serve-artifact.mjs &
+          ready=""
+          for i in $(seq 1 40); do
+            if curl -sf -o /dev/null http://127.0.0.1:4173/; then ready=1; break; fi
+            sleep 1
+          done
+          if [ -z "$ready" ]; then
+            echo "::error::artifact server khong len duoc tren cong 4173"
             exit 1
           fi
-          npm run lighthouse:check
+          npm run lighthouse:check -- http://127.0.0.1:4173/
 
   # A tag per deploy, which is the only thing the DORA numbers can be computed
   # from.

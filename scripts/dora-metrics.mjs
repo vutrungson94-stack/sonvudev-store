@@ -70,13 +70,24 @@ const deploymentFrequency = tagsInWindow.length > 0
 
 // Lead time: for each tag, the age of the oldest commit in the range since the
 // previous tag (or the start of history for the oldest tag in the window).
+//
+// The first release is the exception, and it is a real one. With no previous
+// tag there is no "this release" to measure: the range would be every commit
+// since the repository began, and the number would be the age of the project
+// wearing the name of a lead time. It is reported as unknown until there is a
+// second release to measure against.
 let leadTimeDays = 0;
 let leadTimeSamples = 0;
+let leadTimeBasis = 'previous-tag';
 for (let i = allTags.length - 1; i >= 0; i -= 1) {
   const current = allTags[i];
   if (current.date < cutoff) continue;
   const prevTag = allTags[i + 1];
-  const oldest = git(['log', '--format=%cI', '--reverse', ...(prevTag ? [`${prevTag.tag}..${current.tag}`] : [])]).split('\n').find((line) => line.trim());
+  if (!prevTag) {
+    leadTimeBasis = 'needs-a-previous-tag';
+    continue;
+  }
+  const oldest = git(['log', '--format=%cI', '--reverse', `${prevTag.tag}..${current.tag}`]).split('\n').find((line) => line.trim());
   if (oldest) {
     const days = (current.date.getTime() - new Date(oldest.trim()).getTime()) / (1000 * 60 * 60 * 24);
     leadTimeDays += days;
@@ -123,6 +134,7 @@ const metrics = {
   totalDeployments: allTags.length,
   leadTimeDays: leadTimeSamples > 0 ? Number(leadTimeDays.toFixed(2)) : null,
   leadTimeSamples,
+  leadTimeBasis,
   changeFailureRate: changeFailureRate == null ? null : Number(changeFailureRate.toFixed(4)),
   failedChanges: failedTags.length,
   totalChanges: tagsInWindow.length,

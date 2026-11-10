@@ -70,7 +70,14 @@ test('bước kiểm tra site vẫn chạy seo:check với secret, không tự g
   const noHardcodedHost = yaml
     .replace(/\$\{\{\s*secrets\.APP_URL\s*\}\}/g, '')
     .replace(/^\s*#.*$/gm, '');
-  const RESERVED = /\.(example|test|invalid|localhost)\b/;
+  // Reserved names, plus the machine's own loopback.
+  //
+  // The loopback is not a domain: it points at the machine running the job, so
+  // it cannot outlive the thing it defaults for — which is the whole point of
+  // this rule. The Lighthouse job starts the packaged artifact on 127.0.0.1
+  // and measures it there, because a runner on another continent measures the
+  // network rather than the page.
+  const RESERVED = /\.(example|test|invalid|localhost)\b|^https?:\/\/(127\.0\.0\.1|localhost|\[::1\])([:/]|$)/;
   for (const found of noHardcodedHost.match(/https?:\/\/[^\s'"`]+/gi) || []) {
     // A template placeholder is not an address. The guard step's own error
     // message contains `https://<domain-cua-ban>` to show where the value comes

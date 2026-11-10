@@ -86,6 +86,39 @@
       "totalChanges": 0,
       "mttrDays": null,
       "mttrSamples": 0
+    },
+    {
+      "generatedAt": "2026-11-10T04:53:48.172Z",
+      "windowDays": 90,
+      "source": "git tags (one tag per release, created by CI after a deploy)",
+      "sampleSize": 1,
+      "deploymentFrequency": 0.08,
+      "deploymentsInWindow": 1,
+      "totalDeployments": 1,
+      "leadTimeDays": 44.91,
+      "leadTimeSamples": 1,
+      "changeFailureRate": 0,
+      "failedChanges": 0,
+      "totalChanges": 1,
+      "mttrDays": null,
+      "mttrSamples": 0
+    },
+    {
+      "generatedAt": "2026-11-10T04:54:23.545Z",
+      "windowDays": 90,
+      "source": "git tags (one tag per release, created by CI after a deploy)",
+      "sampleSize": 1,
+      "deploymentFrequency": 0.08,
+      "deploymentsInWindow": 1,
+      "totalDeployments": 1,
+      "leadTimeDays": null,
+      "leadTimeSamples": 0,
+      "leadTimeBasis": "needs-a-previous-tag",
+      "changeFailureRate": 0,
+      "failedChanges": 0,
+      "totalChanges": 1,
+      "mttrDays": null,
+      "mttrSamples": 0
     }
   ]
 }

@@ -25,6 +25,7 @@
 // fetched at a pinned version instead, so the measurement is reproducible and
 // the dependency surface of the storefront does not change.
 import { spawn } from "node:child_process";
+import { existsSync } from "node:fs";
 import { mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
@@ -96,18 +97,25 @@ const run = (command, args) => new Promise((resolve, reject) => {
   child.on("close", (code) => resolve({ code, stderr }));
 });
 
-const npx = process.platform === "win32" ? "npx.cmd" : "npx";
-const lighthouseRun = await run(npx, [
-  "--yes",
-  `lighthouse@${LIGHTHOUSE_VERSION}`,
-  url,
+// How to reach a pinned Lighthouse without making it a dependency.
+//
+// `npx` is a .cmd on Windows, and spawning a .cmd without a shell throws
+// EINVAL — the check then fails on the machine that runs it and passes in CI,
+// which is the worst kind of difference. So the npm CLI is run through node
+// directly, which is the same npm, on every platform.
+const npmCli = path.join(path.dirname(process.execPath), "node_modules", "npm", "bin", "npm-cli.js");
+const lighthouseArgs = [
   "--output=json",
   `--output-path=${reportPath}`,
   "--only-categories=performance,accessibility,best-practices,seo",
   "--preset=desktop",
   `--chrome-flags=${chromeFlags}`,
   "--quiet",
-]);
+];
+
+const lighthouseRun = existsSync(npmCli)
+  ? await run(process.execPath, [npmCli, "exec", "--yes", `--package=lighthouse@${LIGHTHOUSE_VERSION}`, "--", "lighthouse", url, ...lighthouseArgs])
+  : await run("npx", ["--yes", `lighthouse@${LIGHTHOUSE_VERSION}`, url, ...lighthouseArgs]);
 
 let lhr = null;
 try {
@@ -120,6 +128,14 @@ await rm(reportPath, { force: true });
 if (!lhr) {
   console.error(`[lighthouse] FAIL: không lấy được báo cáo từ ${url}`);
   console.error(lighthouseRun.stderr.trim().split("\n").slice(-8).join("\n"));
+  process.exit(1);
+}
+
+// A report without categories is a report about a page that did not load —
+// an unreachable URL, a redirect to nothing. It must never be read as "the
+// scores were fine".
+if (!lhr.categories || !lhr.categories.performance) {
+  console.error(`[lighthouse] FAIL: không có điểm trong báo cáo — trang không tải được (${url}).`);
   process.exit(1);
 }
 
