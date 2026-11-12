@@ -41,9 +41,14 @@ const walk = (dir, out = []) => walkProjectFiles(dir).then((found) => {
 });
 
 const files = await walk(root);
-const inSrc = (f) => f.includes(`${path.sep}src${path.sep}`);
-const inPublic = (f) => f.includes(`${path.sep}public${path.sep}`);
-const inTest = (f) => f.includes(`${path.sep}test${path.sep}`);
+// Relative to the project root, never a substring of the absolute path. On a
+// host whose checkout directory is itself named `src` (Render checks out to
+// /opt/render/project/src), `f.includes('/src/')` matched every file in the
+// repository, so the duplication counters counted the test suite as source
+// and the build failed on Render while passing locally.
+const inSrc = (f) => relative(f).startsWith('src/');
+const inPublic = (f) => relative(f).startsWith('public/');
+const inTest = (f) => relative(f).startsWith('test/');
 
 const srcFiles = files.filter((f) => inSrc(f) && f.endsWith('.js'));
 const publicJs = files.filter((f) => inPublic(f) && f.endsWith('.js'));
