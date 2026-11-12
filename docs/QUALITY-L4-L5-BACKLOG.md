@@ -14,6 +14,17 @@
 - [x] Cập nhật `AGENTS.md §4.1`, `WORKFLOW.md`, `docs/PURCHASE-LINK-RULES.md`.
 - [x] Gates xanh: lint/case/workflow/audit, `npm test` (568/74), `_Tests/gtest.ps1`, `_Build/gbuild.ps1`, `_Sync`.
 
+## Đợt 2026-11-12 — GSC trùng lặp + nền L4/L5
+- [x] **GSC trùng lặp**: `rel="nofollow"` cho mọi `/?buy=` (byte-identical với `/`),
+      308 chuẩn hoá trailing slash `/x/` → `/x`. Test `test/trailing-slash.test.js`.
+      RCA: `docs/rca/2026-11-12-gsc-duplicate-urls.md`; ADR: `docs/ADR/0001`.
+- [x] **Coverage gate**: `npm run coverage` (lines 70 / branches 60 / functions 70;
+      đo được 89,3 / 73,2 / 81,5). CI chạy sau `test`.
+- [x] **Bỏ metric tự chứng nhận**: `defect-escape.mjs` báo `unknown`; `metrics.mjs`
+      không đưa `null` về `0`.
+- [x] **Quản trị**: `.github/CODEOWNERS`, `.github/pull_request_template.md`, `SECURITY.md`.
+- [x] **ADR + RCA**: `docs/ADR/` (3), `docs/rca/` (template + 1 RCA).
+
 ## GSC / Merchant Center theo dõi
 - **“Đã thu thập dữ liệu – hiện chưa được lập chỉ mục” (Crawled – currently not indexed), 0 trang bị ảnh hưởng**: không phải lỗi code; là tín hiệu Google đã crawl nhưng chưa chọn index. Theo dõi thêm trong GSC; nếu số trang tăng, kiểm tra canonical/noindex/nội dung mỏng/trùng lặp và internal links. Không “sửa” bằng cách thêm trang mỏng hoặc gỡ noindex sai.
 - **“Cải thiện giao diện mục”**: `aggregateRating`/`review` là **tùy chọn**; codebase chủ động không phát star rating. Chỉ xem lại nếu có nguồn review đủ điều kiện và quyết định sản phẩm mới.

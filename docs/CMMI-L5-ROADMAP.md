@@ -12,9 +12,9 @@ người khác chứ không phải bởi người viết báo cáo.
 | Mức | Yêu cầu của CMMI | Bằng chứng trong repo | Trạng thái |
 | --- | --- | --- | --- |
 | L2 Managed | Quy trình cho từng dự án, theo dõi được | Gate chạy được, checklist, log | Đạt |
-| L3 Defined | Quy trình tổ chức hoá, dùng chung cho mọi thay đổi | `PROCESS.md`, `WORKFLOW.md`, `OPS.md`, `AGENTS.md`; `scripts/*.mjs` dùng chung; 577 test / 76 file; audit 33 nhóm | **Đạt vững** |
-| L4 Quantitatively Managed | Số liệu ổn định, baseline, control chart, dùng số liệu để quyết định | `scripts/slo-monitor.mjs`, `dora-metrics.mjs`, `defect-escape.mjs`, `spc-control-chart.mjs`, `metrics-trends.json` | **Có hình thức, chưa có dữ liệu** |
-| L5 Optimizing | Cải tiến liên tục dựa trên nguyên nhân gốc; quy trình được đo và tối ưu | Không có RCA thật, không có control limit thật, không có quyết định nào dựa trên số liệu | **Chưa đạt** |
+| L3 Defined | Quy trình tổ chức hoá, dùng chung cho mọi thay đổi | `PROCESS.md`, `WORKFLOW.md`, `OPS.md`, `AGENTS.md`; `scripts/*.mjs` dùng chung; 601 test / 85 file; audit 33 nhóm | **Đạt vững** |
+| L4 Quantitatively Managed | Số liệu ổn định, baseline, control chart, dùng số liệu để quyết định | `scripts/slo-monitor.mjs`, `dora-metrics.mjs`, `defect-escape.mjs`, `spc-control-chart.mjs`, `metrics-trends.json`; coverage gate (lines 70 / branches 60 / functions 70; đo được 89,3 / 73,2 / 81,5) | **Có hình thức, dữ liệu một phần** |
+| L5 Optimizing | Cải tiến liên tục dựa trên nguyên nhân gốc; quy trình được đo và tối ưu | Đã có `docs/ADR/` (3 ADR), `docs/rca/` (1 RCA), `CODEOWNERS`, `SECURITY.md`, PR template. Chưa có control limit thật (SPC n=5), chưa có defect-prevention action đo được | **Nền đã dựng, chưa có chu kỳ đo được** |
 
 Vì sao L4 chưa đạt, bằng chứng cụ thể:
 
@@ -139,6 +139,22 @@ riêng: tách theo ranh giới hành vi, giữ nguyên hợp đồng `/?buy=`, v
 `test/purchase-link-contract.test.js` và toàn bộ test vẫn xanh, và luồng mua được
 kiểm thử tay trên staging trước khi đưa lên `main`.
 
+### 3.4 Đã xong trong đợt 2026-11-12
+
+- [x] **Coverage thành gate** (`npm run coverage`): lines ≥ 70%, branches ≥ 60%,
+      functions ≥ 70%. Đo thật trước khi chốt: 89,3% / 73,2% / 81,5%. CI chạy
+      `coverage` ngay sau `test`.
+- [x] **Bỏ metric tự chứng nhận**: `defect-escape.mjs` không còn suy ra escape rate
+      từ tiền tố commit. Giờ báo `status: unknown`, `escapeRate: null`, kèm một
+      proxy được ghi rõ là proxy. `metrics.mjs` không còn đưa `null` về `0` —
+      một metric chưa đo không được hiển thị như mức tốt nhất.
+- [x] **Hạ tầng quản trị L5**: `.github/CODEOWNERS`, `.github/pull_request_template.md`,
+      `SECURITY.md`.
+- [x] **ADR**: `docs/ADR/` với 3 quyết định đã đi qua (canonical URL, không analytics
+      bên thứ ba, merchant schema không rating tự thu thập).
+- [x] **RCA**: `docs/rca/` với template và một RCA thật cho lỗi GSC trùng lặp.
+- [x] **Sửa GSC trùng lặp**: `rel="nofollow"` cho `/?buy=`, 308 chuẩn hoá trailing
+      slash; xem `docs/ADR/0001` và `docs/rca/2026-11-12-gsc-duplicate-urls.md`.
 
 ---
 

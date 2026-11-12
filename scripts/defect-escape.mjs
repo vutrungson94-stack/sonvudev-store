@@ -6,13 +6,15 @@
 // quality signal: a 100% pass rate with a high escape rate means tests don't
 // test what matters.
 //
-// The two counters never overlap:
-//   - production defects: commits whose subject starts with fix:, hotfix: or
-//     bug: (a defect was repaired - it shipped at some point)
-//   - caught defects: commits whose subject starts with test: (someone added
-//     or repaired a test - something that was caught before shipping)
-// An earlier version counted fix: on BOTH sides, so every production defect
-// was also counted as a caught defect and the rate was structurally ~50%.
+// THE SOURCE IS THE MEASUREMENT. The rate must come from a place where a real
+// person labels a defect "escaped": an issue tracker with an `escaped` label, a
+// support inbox, a postmortem file. This repo has none of those wired up.
+//
+// The old version counted commit subjects (`fix:`/`hotfix:`/`bug:` vs `test:`).
+// That is not a measurement: anyone writing a commit message moves the number,
+// and a defect repaired in a commit titled "update files" is invisible. So the
+// metric is reported as `unknown`, and the prefix count is kept only as a
+// clearly-labelled proxy — never as the metric.
 //
 //   npm run defect:escape   compute current escape rate and write baseline
 //   npm run defect:check    same, but fail when the rate is above threshold
@@ -38,24 +40,30 @@ const countCommits = (pattern) => {
   }
 };
 
-const productionDefects = countCommits('^(fix|hotfix|bug):');
-const caughtDefects = countCommits('^test:');
-
-// Escape rate = production defects / (production + caught).
-let escapeRate = null;
-const total = productionDefects + caughtDefects;
-if (total > 0) {
-  escapeRate = productionDefects / total;
-}
+// Labelled proxy, not the metric. Kept so the trend is visible while the real
+// source is being wired up, and so nobody mistakes it for a measurement.
+const proxyProduction = countCommits('^(fix|hotfix|bug):');
+const proxyCaught = countCommits('^test:');
+const proxyTotal = proxyProduction + proxyCaught;
+const proxyRate = proxyTotal > 0 ? proxyProduction / proxyTotal : null;
 
 const metrics = {
   generatedAt: now,
-  productionDefects,
-  caughtDefects,
-  total,
-  escapeRate,
-  threshold: 0.05, // 5% escape rate target
-  withinThreshold: escapeRate == null || escapeRate <= 0.05,
+  status: 'unknown',
+  source: 'no defect tracker; commit subjects are not a measurement',
+  productionDefects: null,
+  caughtDefects: null,
+  total: null,
+  escapeRate: null,
+  threshold: 0.05, // 5% escape rate target, applied when a real rate exists
+  withinThreshold: null,
+  proxy: {
+    basis: 'git commit subjects: ^(fix|hotfix|bug): vs ^test:',
+    productionDefects: proxyProduction,
+    caughtDefects: proxyCaught,
+    escapeRate: proxyRate,
+    warning: 'proxy only — a commit message is not a defect record',
+  },
 };
 
 const history = await (async () => {
@@ -80,16 +88,15 @@ await writeFile(
 let exitCode = 0;
 if (metrics.withinThreshold === false) {
   console.log(
-    `[defect] ESCAPE RATE HIGH: ${(escapeRate * 100).toFixed(1)}% (${productionDefects} production / ${total} total) — above 5% target`,
+    `[defect] ESCAPE RATE HIGH: ${(metrics.escapeRate * 100).toFixed(1)}% — above 5% target`,
   );
   exitCode = 1;
-} else if (escapeRate == null) {
-  console.log(`[defect] no defect data available yet — skipping`);
+} else if (metrics.escapeRate == null) {
+  console.log('[defect] escape rate: unknown — no defect tracker wired up. The commit-prefix count is a proxy, not the metric.');
 } else {
-  console.log(
-    `[defect] escape rate ${(escapeRate * 100).toFixed(1)}% — within 5% target`,
-  );
+  console.log(`[defect] escape rate ${(metrics.escapeRate * 100).toFixed(1)}% — within 5% target`);
 }
 
+const { escapeRate, productionDefects, caughtDefects } = metrics;
 export { metrics, escapeRate, productionDefects, caughtDefects };
 process.exit(exitCode);

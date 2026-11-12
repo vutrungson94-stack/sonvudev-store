@@ -1,0 +1,20 @@
+# CODEOWNERS — ai phê duyệt thay đổi nào.
+#
+# Danh sách này là bằng chứng quản trị ở mức tổ chức: mỗi nhóm file có một chủ sở
+# hữu rõ ràng, và một pull request không thể được merge khi chưa có người đó duyệt.
+#
+# Chủ sở hữu mặc định của toàn repo.
+* @vutrungson94-stack
+
+# Đường thanh toán và triển khai: một lỗi ở đây là mất tiền hoặc mất dịch vụ,
+# nên yêu cầu review của chủ sở hữu trước khi merge.
+src/paypal.js        @vutrungson94-stack
+src/payments.js      @vutrungson94-stack
+src/orders.js        @vutrungson94-stack
+render.yaml          @vutrungson94-stack
+.github/workflows/    @vutrungson94-stack
+
+# Cấu hình bảo mật: CSP, CORS, chữ ký, secret.
+src/app.js           @vutrungson94-stack
+src/r2.js            @vutrungson94-stack
+src/admin-auth.js    @vutrungson94-stack

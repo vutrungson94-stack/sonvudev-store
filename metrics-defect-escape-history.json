@@ -36,6 +36,24 @@
       "escapeRate": null,
       "threshold": 0.05,
       "withinThreshold": true
+    },
+    {
+      "generatedAt": "2026-11-12T03:08:22.599Z",
+      "status": "unknown",
+      "source": "no defect tracker; commit subjects are not a measurement",
+      "productionDefects": null,
+      "caughtDefects": null,
+      "total": null,
+      "escapeRate": null,
+      "threshold": 0.05,
+      "withinThreshold": null,
+      "proxy": {
+        "basis": "git commit subjects: ^(fix|hotfix|bug): vs ^test:",
+        "productionDefects": 67,
+        "caughtDefects": 1,
+        "escapeRate": 0.9852941176470589,
+        "warning": "proxy only — a commit message is not a defect record"
+      }
     }
   ]
 }

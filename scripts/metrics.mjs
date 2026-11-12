@@ -183,7 +183,9 @@ let sloBreachCount = 0;
 try {
   const dora = JSON.parse(await readFile(path.join(root, 'metrics-dora.json'), 'utf8'));
   deploymentFrequency = dora.deploymentFrequency ?? 0;
-  leadTimeDays = dora.leadTimeDays ?? 0;
+  // A null lead time is unknown, not zero. Zero would read as "instant", which
+  // is the best possible answer and therefore the most misleading one.
+  leadTimeDays = dora.leadTimeDays ?? null;
   changeFailureRate = dora.changeFailureRate ?? 0;
 } catch { /* dora baseline not yet written */ }
 
@@ -194,7 +196,9 @@ try {
 
 try {
   const defect = JSON.parse(await readFile(path.join(root, 'metrics-defect-escape.json'), 'utf8'));
-  escapeRate = defect.escapeRate ?? 0;
+  // null means "not measured". Coercing it to 0 would report a perfect escape
+  // rate on a project that has never counted a defect.
+  escapeRate = defect.escapeRate ?? null;
 } catch { /* defect baseline not yet written */ }
 
 rows.push(
@@ -245,8 +249,10 @@ console.log(`[metrics] so voi baseline ${baseline.generatedAt}`);
 const regressions = [];
 for (const [key, entry] of Object.entries(measurements)) {
   const before = baseline.measurements[key];
-  if (!before) {
-    console.log(`  ${key.padEnd(19)}    ? -> ${String(entry.value).padStart(4)}   moi`);
+  // An unknown value is not zero: comparing null to a number would report a
+  // huge improvement on a metric that was simply never measured.
+  if (!before || entry.value == null || before.value == null) {
+    console.log(`  ${key.padEnd(19)}    ? -> ${entry.value == null ? 'null' : String(entry.value).padStart(4)}   chua do duoc`);
     continue;
   }
   const delta = entry.value - before.value;
@@ -274,7 +280,7 @@ async function hasRegressionsAgainstBaseline(measurements) {
   const baseline = JSON.parse(await readFile(baselineFile, 'utf8'));
   for (const [key, entry] of Object.entries(measurements)) {
     const before = baseline.measurements[key];
-    if (!before) continue;
+    if (!before || entry.value == null || before.value == null) continue;
     const delta = entry.value - before.value;
     const worse = entry.direction === 'up' ? delta < 0 : delta > 0;
     if (worse) return true;
