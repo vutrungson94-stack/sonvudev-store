@@ -541,6 +541,9 @@ body.modal-open{overflow:hidden}
 .buy-points li::before{content:'✓';position:absolute;left:0;color:var(--green);font-weight:700}
 .detail-block{margin:0 0 44px}
 .detail-block h2{font:600 22px 'Space Grotesk';letter-spacing:-.02em;margin:0 0 18px}
+.detail-block.disclaimer{background:#fff;border:1px solid var(--line);border-radius:12px;padding:16px 20px;border-left:4px solid var(--green)}
+.detail-block.disclaimer h2{margin:0 0 10px;color:#16302a}
+.detail-block.disclaimer p{margin:0;line-height:1.7;color:#4b6159;font-size:14px}
 .feature-grid{list-style:none;padding:0;margin:0;display:grid;grid-template-columns:repeat(auto-fit,minmax(min(280px,100%),1fr));gap:12px}
 .feature-grid li{background:#fff;border:1px solid var(--line);border-radius:12px;padding:15px 17px;font-size:13.5px;line-height:1.62;color:#41544c}
 .feature-grid li::before{content:'✓';color:var(--green);font-weight:700;margin-right:9px}

@@ -1300,7 +1300,7 @@ const routePaths = routeMatches.flatMap((m) => (m[2] ? [...m[2].matchAll(/"([^"]
 // never drift past this check by being invisible to it.
 for (const code of LOCALE_CODES) {
   if (code === "vi") continue;
-  routePaths.push(`/${code}`, `/${code}/`, `/${code}/about`, `/${code}/terms`, `/${code}/privacy`, `/${code}/refund`);
+  routePaths.push(`/${code}`, `/${code}/`, `/${code}/about`, `/${code}/terms`, `/${code}/privacy`, `/${code}/refund`, `/${code}/contact`);
 }
 const toRouteRegex = (route) => new RegExp(`^${route.split("/").map((part) => (part.startsWith(":") ? "[^/]+" : part.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"))).join("\\/")}/?$`);
 const answers = (target) => isRealTarget(target) || routePaths.some((route) => toRouteRegex(route).test(target));

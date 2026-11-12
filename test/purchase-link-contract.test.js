@@ -20,7 +20,7 @@ test('store grid: CTA mua dùng /?buy=<id>, liên kết khám phá dùng trang s
       status: 'active',
     },
   ]);
-  assert.match(html, /class="round-arrow"[^>]*href="\/\?buy=p-123"/, 'nút mua trên store phải mở luồng /?buy=<id>');
+  assert.match(html, /class="round-arrow buy-btn"[^>]*href="\/\?buy=p-123"/, 'nút mua trên store phải mở luồng /?buy=<id>');
   assert.match(html, /rel="nofollow"[^>]*href="\/\?buy=p-123"|href="\/\?buy=p-123"[^>]*rel="nofollow"/,
     'link mua phải có rel="nofollow" — /?buy= là bản trùng của /');
   assert.match(html, /class="product-page-link"[^>]*href="[^"]*\/product\/san-pham-demo"/, 'tên/liên kết khám phá sản phẩm phải tới trang sản phẩm');
@@ -46,7 +46,7 @@ test('trang sản phẩm SSR: nút mua chính dùng /?buy=<id>, sản phẩm kh�
     { id: 'p-rel', slug: 'san-pham-khac', name: 'Sản phẩm khác', version: '2.0.0', platform: 'Windows', price: 2000, currency: 'VND' },
   ];
   const vi = renderProductPage(product, 'vi', [], related);
-  assert.match(vi, /class="button button-primary button-wide"[^>]*href="(?:https?:\/\/[^"]+)?\/\?buy=p-main#products"/, 'nút mua chính trang sản phẩm phải dùng /?buy=<id>');
+  assert.match(vi, /class="button button-primary button-wide buy-btn"[^>]*href="(?:https?:\/\/[^"]+)?\/\?buy=p-main#products"/, 'nút mua chính trang sản phẩm phải dùng /?buy=<id>');
   assert.match(vi, /rel="nofollow"[^>]*href="(?:https?:\/\/[^"]+)?\/\?buy=p-main#products"|href="(?:https?:\/\/[^"]+)?\/\?buy=p-main#products"[^>]*rel="nofollow"/,
     'nút mua chính phải có rel="nofollow"');
   assert.match(vi, /class="related-card"[^>]*href="[^"]*\/product\/san-pham-khac"/, 'sản phẩm khác/liên quan (khám phá) phải đi tới trang sản phẩm');
@@ -64,7 +64,7 @@ test('public/related.js fallback: thẻ sản phẩm khác là discovery (trang 
   assert.doesNotMatch(src, /\/\?buy=|openPurchaseForm|openCheckout/, 'related.js fallback discovery không được mở luồng mua');
 });
 
-test('structured data merchant listing: Offer có applicableCountry/returnMethod/shippingDetails', () => {
+test('structured data merchant listing: Offer có applicableCountry/returnMethod/shippingDetails cho digital products', () => {
   const product = {
     id: 'p-schema',
     slug: 'schema-probe',
@@ -87,8 +87,8 @@ test('structured data merchant listing: Offer có applicableCountry/returnMethod
   assert.ok(!('aggregateRating' in merchant), 'không tự thêm AggregateRating (không đủ điều kiện rich result)');
   assert.ok(Array.isArray(merchant.offers.hasMerchantReturnPolicy.applicableCountry), 'return policy phải có applicableCountry');
   assert.ok(merchant.offers.hasMerchantReturnPolicy.applicableCountry.includes('VN'), 'return policy áp dụng VN');
-  assert.equal(merchant.offers.hasMerchantReturnPolicy.returnMethod, 'https://schema.org/ReturnByMail', 'returnMethod phải là ReturnByMail');
-  assert.ok(merchant.offers.shippingDetails, 'Offer phải có shippingDetails');
-  assert.equal(merchant.offers.shippingDetails['@type'], 'OfferShippingDetails');
-  assert.equal(merchant.offers.shippingDetails.shippingRate.value, 0, 'sản phẩm số: phí vận chuyển 0');
+  // Digital products: no returnMethod (no physical return by mail)
+  assert.ok(!merchant.offers.hasMerchantReturnPolicy.returnMethod, 'sản phẩm số: không có returnMethod ReturnByMail');
+  // Digital products: no shippingDetails (no physical shipping)
+  assert.ok(!merchant.offers.shippingDetails, 'sản phẩm số: không có shippingDetails');
 });

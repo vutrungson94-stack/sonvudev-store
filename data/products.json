@@ -3,8 +3,8 @@
     "id": "ce569ec6-03f7-46c4-8e68-e1b2c20cc42d",
     "slug": "pc-cleanup",
     "name": "PC Cleanup",
-    "shortDescription": "Cross-platform desktop cleaner for temp, cache, and system junk.",
-    "description": "PC Cleanup is a cross-platform desktop application (Windows, macOS, Linux) with selectable deep cleanup tasks.",
+    "shortDescription": "Công cụ dọn dẹp đa nền tảng cho temp, cache, và rác hệ thống.",
+    "description": "PC Cleanup là ứng dụng máy tính để bàn đa nền tảng (Windows, macOS, Linux) với các tác vụ dọn dẹp sâu có thể chọn lọc. Dọn dẹp file tạm, cache trình duyệt, cache npm/NuGet, cache cập nhật OS, thùng rác. Giao diện tiếng Việt / English. Chạy portable, không cần cài đặt.",
     "category": "UtilitiesApplication",
     "platform": "Windows, macOS, Linux",
     "version": "1.0.0",
@@ -13,33 +13,34 @@
     "currency": "VND",
     "badge": "",
     "features": [
-      "Temp cleanup",
-      "Browser cache cleanup",
-      "npm/NuGet cache",
-      "OS update cache",
-      "Recycle bin/trash cleanup",
-      "Cross-platform"
+      "Dọn file tạm (Temp)",
+      "Dọn cache trình duyệt",
+      "Dọn cache npm/NuGet",
+      "Dọn cache cập nhật OS",
+      "Dọn thùng rác",
+      "Đa nền tảng"
     ],
-    "requirements": "Windows 10+, macOS 11+, or Linux with .NET 10 runtime (self-contained builds included).",
+    "requirements": "Windows 10+, macOS 11+, hoặc Linux với .NET 10 runtime (đã bao gồm bản self-contained).",
     "status": "active",
     "fileKey": "products/pc-cleanup/1.0.0/1792327242657-PC-Cleanup-1.0.0-all-platforms.zip",
     "featured": false,
     "nameEn": "PC Cleanup",
     "shortDescriptionEn": "Cross-platform desktop cleaner for temp, cache, and system junk.",
-    "descriptionEn": "PC Cleanup is a cross-platform desktop application (Windows, macOS, Linux) with selectable deep cleanup tasks.",
+    "descriptionEn": "PC Cleanup is a cross-platform desktop application (Windows, macOS, Linux) with selectable deep cleanup tasks. Cleans temp files, browser cache, npm/NuGet cache, OS update cache, recycle bin/trash. Vietnamese/English interface. Portable, no installation needed.",
     "requirementsEn": "Windows 10+, macOS 11+, or Linux with .NET 10 runtime (self-contained builds included).",
     "featuresEn": [
       "Temp cleanup",
       "Browser cache cleanup",
-      "npm/NuGet cache",
-      "OS update cache",
+      "npm/NuGet cache cleanup",
+      "OS update cache cleanup",
       "Recycle bin/trash cleanup",
       "Cross-platform"
     ],
     "seoTitle": "PC Cleanup — Dọn dẹp máy tính, tăng tốc Windows | SonVuDev",
     "seoDescription": "Công cụ dọn dẹp temp, cache, junk trên Windows/macOS/Linux. Tăng tốc máy tính, giải phóng dung lượng ổ cứng. Tải ngay.",
     "seoTitleEn": "PC Cleanup — Clean Junk Files & Speed Up Windows | SonVuDev",
-    "seoDescriptionEn": "Cross-platform desktop cleaner for temp, cache, and system junk. Free up disk space and speed up Windows, macOS, Linux. Buy once, use forever."
+    "seoDescriptionEn": "Cross-platform desktop cleaner for temp, cache, and system junk. Free up disk space and speed up Windows, macOS, Linux. Buy once, use forever.",
+    "disclaimer": "SonVuDev là công cụ độc lập, không được bảo trợ, tài trợ hoặc liên kết với Microsoft Corporation. Windows là thương hiệu của Microsoft Corporation."
   },
   {
     "id": "mousewheel-vba",
@@ -94,7 +95,8 @@
     "seoTitle": "MouseWheel for VBA — Cuộn chuột trong ListBox, ComboBox | SonVuDev",
     "seoDescription": "Module VBA duy nhất bật cuộn con lăn chuột cho ListBox, ComboBox, Frame, UserForm. Chỉ 1 file, 2 dòng code. Mua một lần dùng vĩnh viễn.",
     "seoTitleEn": "MouseWheel for VBA — Enable Mouse Scroll in ListBox & ComboBox | SonVuDev",
-    "seoDescriptionEn": "Single VBA module adds mouse-wheel scrolling to ListBox, ComboBox, Frame, UserForm. Just 1 file, 2 lines of code. Lifetime license."
+    "seoDescriptionEn": "Single VBA module adds mouse-wheel scrolling to ListBox, ComboBox, Frame, UserForm. Just 1 file, 2 lines of code. Lifetime license.",
+    "disclaimer": "SonVuDev là công cụ độc lập, không được bảo trợ, tài trợ hoặc liên kết với Microsoft Corporation. Excel, Access, Word, PowerPoint, VBA là thương hiệu của Microsoft Corporation."
   },
   {
     "id": "721383af-e2ca-41a6-8f7b-b175fe288f9e",
@@ -140,7 +142,9 @@
     "seoTitle": "RAMCleaner Personal — Dọn RAM, tăng tốc Windows | SonVuDev",
     "seoDescription": "Phần mềm dọn RAM thông minh cho Windows. Giải phóng Standby/Modified memory, nén bộ nhớ, dọn file tạm. License cá nhân 1 máy, cập nhật vĩnh viễn.",
     "seoTitleEn": "RAMCleaner Personal — Smart RAM Cleaner for Windows | SonVuDev",
-    "seoDescriptionEn": "Intelligent memory cleaner for Windows. Frees standby/modified memory, compresses RAM, cleans temp files. Personal license, 1 device, lifetime updates."
+    "seoDescriptionEn": "Intelligent memory cleaner for Windows. Frees standby/modified memory, compresses RAM, cleans temp files. Personal license, 1 device, lifetime updates.",
+    "itemGroupId": "ramcleaner",
+    "disclaimer": "SonVuDev là công cụ độc lập, không được bảo trợ, tài trợ hoặc liên kết với Microsoft Corporation. Windows là thương hiệu của Microsoft Corporation."
   },
   {
     "id": "e2df7b07-010f-4cbe-8110-762c8b94811b",
@@ -178,7 +182,9 @@
     "seoTitle": "RAMCleaner Early Bird — Dọn RAM, nén bộ nhớ | SonVuDev",
     "seoDescription": "Phiên bản RAMCleaner Early Bird cho RAMCleaner Personal. Bao gồm tính năng dọn RAM, nén bộ nhớ, làm sạch file tạm; điều khoản và cập nhật theo mô tả trên trang sản phẩm.",
     "seoTitleEn": "RAMCleaner Early Bird — RAM Cleaner for Windows, Linux, macOS | SonVuDev",
-    "seoDescriptionEn": "RAMCleaner Early Bird edition for RAMCleaner Personal. Includes standby cleanup, memory compression, and temp cleaning; terms and updates as described on the product page."
+    "seoDescriptionEn": "RAMCleaner Early Bird edition for RAMCleaner Personal. Includes standby cleanup, memory compression, and temp cleaning; terms and updates as described on the product page.",
+    "itemGroupId": "ramcleaner",
+    "disclaimer": "SonVuDev là công cụ độc lập, không được bảo trợ, tài trợ hoặc liên kết với Microsoft Corporation. Windows là thương hiệu của Microsoft Corporation."
   },
   {
     "id": "7495919e-31e0-4f3d-86a2-2be4ba30c0dd",
@@ -223,7 +229,9 @@
     "seoTitle": "RAMCleaner Business — Dọn RAM doanh nghiệp, 10 thiết bị | SonVuDev",
     "seoDescription": "Giải pháp dọn RAM doanh nghiệp cho 10 thiết bị. Triển khai tập trung, config file chung, hỗ trợ ưu tiên. Tối ưu bộ nhớ cho team.",
     "seoTitleEn": "RAMCleaner Business — Enterprise RAM Cleaner, 10 Devices | SonVuDev",
-    "seoDescriptionEn": "Enterprise memory cleaner for up to 10 devices. Centralized deployment, shared config, priority support. Optimize RAM across your team."
+    "seoDescriptionEn": "Enterprise memory cleaner for up to 10 devices. Centralized deployment, shared config, priority support. Optimize RAM across your team.",
+    "itemGroupId": "ramcleaner",
+    "disclaimer": "SonVuDev là công cụ độc lập, không được bảo trợ, tài trợ hoặc liên kết với Microsoft Corporation. Windows là thương hiệu của Microsoft Corporation."
   },
   {
     "id": "b2507fa1-55a0-4a9a-b8d1-2b5493fb2c06",
@@ -277,45 +285,54 @@
     "seoTitle": ".NET SDK Portable Updater — Cài .NET không cần Admin | SonVuDev",
     "seoDescription": "Cài .NET SDK mà không cần quyền Administrator. Tự đặt DOTNET_ROOT, PATH, xác minh SHA-512. Dành cho máy bị khóa quyền.",
     "seoTitleEn": ".NET SDK Portable Updater — Install .NET Without Admin Rights | SonVuDev",
-    "seoDescriptionEn": "Install the .NET SDK on machines with no admin rights. Sets DOTNET_ROOT and PATH, verifies SHA-512, prunes old SDKs. No system-wide changes."
+    "seoDescriptionEn": "Install the .NET SDK on machines with no admin rights. Sets DOTNET_ROOT and PATH, verifies SHA-512, prunes old SDKs. No system-wide changes.",
+    "disclaimer": "SonVuDev là công cụ độc lập, không được bảo trợ, tài trợ hoặc liên kết với Microsoft Corporation. .NET, .NET SDK là thương hiệu của Microsoft Corporation."
   },
-  {
+{
     "id": "19524885-1453-486e-9f20-4d157b63089e",
     "slug": "excel-trusted-locations-setup",
     "name": "Excel Trusted Locations Setup",
-    "shortDescription": "Adds selected folders to Excel Trusted Locations with dry-run preview, undo and audit log.",
-    "description": "Run this utility to resolve Excel macro blocking in .xlsm files. It adds your chosen folders to Trusted Locations, enables the feature for your Excel version, and cleans up its own registry entries. Includes dry-run preview, undo support and an audit log.",
+    "shortDescription": "Adds selected folders to Excel Trusted Locations with dry-run preview, undo, audit log, and live trusted-locations list display.",
+    "description": "Run this utility to resolve Excel macro blocking in .xlsm files. It adds your chosen folders to Trusted Locations, enables the feature for your Excel version, and cleans up its own registry entries. Includes dry-run preview, undo support, audit log, and live trusted-locations list display after every operation.\n\nv4.4 highlights:\n- Cross-platform launchers: Windows (.bat/.ps1), macOS (.sh/.command), Linux (bash)\n- ANSI escape codes fixed (PowerShell $ESC = [char]27)\n- No hardcoded branding: descriptionPrefix in .ini (default \"Excel Trusted Locations Tool:\")\n- PowerShell /auto bug fixed; /undo CLI support added\n- Trusted-locations list shown after every add/delete with [tool]/[legacy]/[other] tags\n- Runtime artifacts (.log, .snapshot.reg.*) excluded via .gitignore\n\nThree modes:\n1. Auto — reads folder list from .ini (silent, great for deployment)\n2. Drive — scans a drive, asks per folder (default NO)\n3. Folder — pick a specific folder, auto-detects Excel version\n\nSafety gates:\n- System directories (Windows, Program Files) blocked\n- Downloads never auto-trusted (red warning, explicit confirm)\n- Network drives asked one-by-one, default NO\n- Only removes entries with tool's fingerprint (SV_ prefix or custom Description)\n- IT admin entries preserved\n- Leftover folders go to Recycle Bin\n- Registry snapshot before every real run; /undo to revert\n- Refuses to run while Excel is open",
     "category": "UtilitiesApplication",
     "platform": "Windows",
-    "version": "4.3",
+    "version": "4.4",
     "price": 169000,
     "priceUsd": 7,
     "currency": "VND",
     "badge": "",
     "features": [
-      "Three modes: Auto, Drive, Folder",
-      "Downloads never trusted automatically",
-      "Network drives asked individually, default no",
-      "Removes only its own registry entries",
-      "IT admin entries preserved",
+      "Three modes: Auto (from .ini), Drive, Folder",
+      "Cross-platform launchers: .bat, .ps1, .sh, .command",
+      "Live trusted-locations list after every add/delete",
+      "Shows [tool]/[legacy]/[other] tags for each entry",
+      "Downloads never trusted automatically (explicit confirm required)",
+      "Network drives asked individually, default NO",
+      "Removes only its own registry entries (SV_ prefix or custom Description)",
+      "IT admin entries preserved (including older tool versions)",
       "Recycle Bin for cleanup, never permanent delete",
-      "Registry snapshot and undo support",
-      "Dry-run preview mode",
-      "System directories refused",
+      "Registry snapshot and /undo support",
+      "Dry-run preview mode (/dryrun or /auto with dry-run)",
+      "System directories refused (Windows, Program Files)",
       "Refuses to run while Excel is open",
       "Auto-detects Excel 16.0, 15.0, 14.0, 12.0",
-      "Audit log for every action"
+      "Audit log for every action",
+      "No hardcoded branding — descriptionPrefix in .ini",
+      "No administrator rights needed — writes to HKCU only"
     ],
     "requirements": "Windows 10/11, Microsoft Excel đã cài. Không cần quyền Administrator. Phải thoát hoàn toàn Excel trước khi chạy.",
     "status": "active",
-    "fileKey": "products/excel-trusted-locations-setup/4.3/1791629825947-excel_trusted_locations_v4.3.zip",
+    "fileKey": "products/excel-trusted-locations-setup/4.4/1794470725137-trusted_locations_excel_v4.4.zip",
     "featured": false,
     "nameEn": "Excel Trusted Locations Setup",
-    "shortDescriptionEn": "Excel blocking macros in .xlsm files? Adds the folders you pick to Trusted Locations, with a dry-run preview, undo and an audit log. Never deletes files, never touches settings an IT admin set, no administrator rights needed.",
-    "descriptionEn": "Run this file to make your Excel workspace stop blocking macros.\n\nExcel blocks macros and files arriving from internal shares and mapped drives by default. Editing the settings by hand means nobody remembers what was changed, and the guides you find online switch off Protected View entirely. This script only adds the folders you pick to the trusted-locations list — exactly where trust is needed, without widening the attack surface.\n\nWHEN YOU NEED IT\n\n- Opening a .xlsm or .xlsb at work reports that macros are disabled\n- Files on a mapped drive (Z:, or a network path) open blocked\n- You do not want to edit Excel Options by hand or drop Protected View\n\nWHAT THIS TOOL DOES\n\n1. Adds the folder you choose to Excel Trusted Locations\n2. Enables Trusted Locations for the Excel version installed\n3. Cleans entries carrying this tool's own fingerprints, including the ones older releases left behind\n4. Records every action to a log for later review\n\nWHAT THIS TOOL DOES NOT DO\n\n- Does not create macros\n- Does not disable Protected View, unless the ini says disable-network\n- Does not trust Downloads or Temp automatically\n- Does not delete files or folders permanently\n- Never removes entries an IT administrator configured\n\nSAFETY MAP: FOUR GATES\n\nGate 1, system directories are blocked. C:\\Windows, C:\\Program Files, C:\\Program Files (x86) and everything underneath them. Choosing any of those is refused outright, even with /yes.\n\nGate 2, Downloads is never trusted automatically. Downloads is where malware is most often delivered. Trusting it means every .xlsm dropped there runs macros immediately, including files sent by strangers. A silent run refuses completely; an interactive run shows a red warning and requires you to type y before it continues.\n\nGate 3, network drives are asked for one at a time, default no. Every mapped drive found is asked about separately, and the default answer is no. Only autoTrustMapped=1 in the ini skips the question, and that choice is yours to own.\n\nGate 4, Excel running means the run is refused. Excel writes its Security settings back when it exits, so an entry added while it runs gets overwritten. A real run is refused when EXCEL.EXE is detected, even with /yes.\n\nOPERATION: THREE MODES\n\nAuto reads the folder list from the folders section of the ini, then asks about each mapped network drive. No paths or server addresses are hardcoded in the script.\n\nDrive trusts an entire drive. This is the broadest action possible, so it always requires confirmation: a silent run without /yes is refused.\n\nFolder trusts one specific folder, and handles paths that contain spaces.\n\nPREVIEW IT BEFORE YOU COMMIT\n\nType the command trusted_locations_excel_safe.bat /auto /dryrun\n\nThe /dryrun mode prints what would change and writes nothing: no registry keys, no log entry, no snapshot. Drop /dryrun once you are happy. This is the mode to use when evaluating the tool before an enterprise rollout.\n\nUNDO: THREE SECONDS, NOTHING LOST\n\nEvery real run snapshots the registry before writing anything. To roll back, double-click undo_trusted_locations.bat or run the command trusted_locations_excel_safe.bat /undo.\n\nOnly the keys that were snapshotted are restored. No folders are deleted, no files are touched and no entries are created or removed — it is a clean restore of the previous state.\n\nLEFTOVER FOLDERS GO TO THE RECYCLE BIN, NEVER DELETED\n\nWith cleanupJunk=1 in the ini, folders named in the junk section are sent to the Windows Recycle Bin, so they can be restored the normal way. If the move cannot be completed, the folder is left untouched and the failure is reported.\n\nThe previous release used rmdir /s /q, which destroyed data irrecoverably. That is why cleanupJunk is off by default and reads folder names from the ini.\n\nLOGGING: EVERY ACTION LEAVES A TRACE\n\nEach run appends a line with the date, time, user and machine name: which folder was trusted, what was refused and when the undo ran. Enough for IT to reconcile the change when it matters.\n\nWHAT CHANGED SINCE THE PREVIOUS RELEASE\n\n1. An entry is removed only when it carries a fingerprint this tool leaves: the SV_ prefix, or a Trust_ name with a Description this tool wrote. Entries an IT admin configured survive, including the earlier entries this same tool created.\n2. Leftover folders go to the Recycle Bin; rmdir /s /q is gone.\n3. A Downloads gate and an Excel-running gate were added.\n4. /dryrun exists for evaluation before rollout.\n5. Network drives need individual approval instead of bulk trust.\n6. Excel 16.0, 15.0, 14.0 and 12.0 are detected automatically.\n7. A dedicated undo file is included, no command to memorise.\n\nUPGRADING FROM AN OLDER RELEASE\n\nOlder releases named their entries Trust_, current ones use SV_. After an upgrade both can be present at once. Nothing breaks, Excel merges them, but the duplicate looks untidy.\n\nRun the tool once and it cleans up after itself: only entries carrying its own fingerprints are removed, while anything an IT admin set stays put. Every run prints how many entries it removed and how many it left, so you can see the difference before and after.\n\nTHINGS YOU SHOULD KNOW\n\n- A trusted folder runs the macros of every .xlsm placed in it, including files sent by someone you do not know. That is how Trusted Locations works.\n- Do not trust Downloads, and do not trust a company-wide file share unless you have to.\n- Do not trust a whole drive, Drive mode, on a shared machine.\n- The tool writes only to HKCU; standard user rights are enough, no admin needed.\n- The package contains no credentials, tokens or login details.\n\nSYSTEM REQUIREMENTS\n\n- Windows 10 or 11\n- Microsoft Excel installed, version detected automatically\n- No administrator rights required\n- Excel must be closed completely before running",
-    "requirementsEn": "Windows 10/11, Microsoft Excel đã cài. Không cần quyền Administrator. Phải thoát hoàn toàn Excel trước khi chạy.",
+    "shortDescriptionEn": "Excel blocking macros in .xlsm files? Adds the folders you pick to Trusted Locations, with dry-run preview, undo, audit log, and live trusted-locations list. No hardcoded branding, cross-platform launchers, no admin rights needed.",
+    "descriptionEn": "Run this file to make your Excel workspace stop blocking macros.\n\nExcel blocks macros and files arriving from internal shares and mapped drives by default. Editing the settings by hand means nobody remembers what was changed, and the guides you find online switch off Protected View entirely. This script only adds the folders you pick to the trusted-locations list — exactly where trust is needed, without widening the attack surface.\n\nv4.4 highlights:\n- Cross-platform launchers: Windows (.bat/.ps1), macOS (.sh/.command), Linux (bash)\n- ANSI escape codes fixed (PowerShell $ESC = [char]27)\n- No hardcoded branding: descriptionPrefix in .ini (default \"Excel Trusted Locations Tool:\")\n- PowerShell /auto bug fixed; /undo CLI support added\n- Trusted-locations list shown after every add/delete with [tool]/[legacy]/[other] tags\n- Runtime artifacts (.log, .snapshot.reg.*) excluded via .gitignore\n\nWHEN YOU NEED IT\n\n- Opening a .xlsm or .xlsb at work reports that macros are disabled\n- Files on a mapped drive (Z:, or a network path) open blocked\n- You do not want to edit Excel Options by hand or drop Protected View\n\nWHAT THIS TOOL DOES\n\n1. Adds the folder you choose to Excel Trusted Locations\n2. Enables Trusted Locations for the Excel version installed\n3. Cleans entries carrying this tool's own fingerprints, including the ones older releases left behind\n4. Records every action to a log for later review\n5. Shows live trusted-locations list after every operation\n\nWHAT THIS TOOL DOES NOT DO\n\n- Does not create macros\n- Does not disable Protected View, unless the ini says disable-network\n- Does not trust Downloads or Temp automatically\n- Does not delete files or folders permanently\n- Never removes entries an IT administrator configured\n\nSAFETY MAP: FOUR GATES\n\nGate 1, system directories are blocked. C:\\Windows, C:\\Program Files, C:\\Program Files (x86) and everything underneath them. Choosing any of those is refused outright, even with /yes.\n\nGate 2, Downloads is never trusted automatically. Downloads is where malware is most often delivered. Trusting it means every .xlsm dropped there runs macros immediately, including files sent by strangers. A silent run refuses completely; an interactive run shows a red warning and requires you to type y before it continues.\n\nGate 3, network drives are asked for one at a time, default no. Every mapped drive found is asked about separately, and the default answer is no. Only autoTrustMapped=1 in the ini skips the prompt, and that is a choice you explicitly own.\n\nGate 4, Excel must be closed. Excel writes back its security settings on exit, so any entries added while Excel is running get overwritten. The tool detects EXCEL.EXE and refuses to run if it is still open.\n\nOPERATION MODES\n\nAuto mode (from .ini): Create trusted_locations_excel_safe.ini with a [TrustedLocations] section listing paths. Run the launcher with /auto. Great for silent deployment.\n\nDrive mode: Pick a drive letter (D:, E:, ...). The tool scans common folders and asks about each one. Default answer is NO — you stay in control.\n\nFolder mode: Pick a specific folder containing your .xlsm files. The tool auto-detects the installed Excel version (16.0, 15.0, 14.0, 12.0) and writes to the correct registry key.\n\nLIVE TRUSTED-LOCATIONS LIST (v4.4+)\n\nAfter every add/delete (including dry-run), the tool displays the current Trusted Locations list with tags:\n- [tool] — entries added by this tool (SV_ prefix or matching Description)\n- [legacy] — entries from older versions of this tool (Trust_* with old Description)\n- [other] — entries from IT admin or manual setup\n\nThis makes it trivial to audit what the tool manages vs. what your IT department manages.\n\nUNDO & SNAPSHOT\n\nBefore every real run, the tool snapshots the registry keys it will touch. Use /undo to revert the last run, or run the generated undo helper file. The audit log records how many entries were added, removed, and left intact.",
+    "requirementsEn": "Windows 10/11, Microsoft Excel installed. No administrator rights needed. Must exit Excel completely before running.",
     "featuresEn": [
-      "Three modes: Auto (from ini), Drive, Folder — you pick the target",
+      "Three modes: Auto (from .ini), Drive, Folder — you pick the target",
+      "Cross-platform launchers: .bat, .ps1, .sh, .command",
+      "Live trusted-locations list after every add/delete",
+      "Shows [tool]/[legacy]/[other] tags for each entry",
       "Downloads is never trusted silently: red warning, explicit confirmation",
       "Network drives are asked for one at a time, default NO, unless autoTrustMapped=1",
       "Removes an entry only when it carries this tool's fingerprint: the SV_ prefix, or a Trust_ name with the tool's own Description",
@@ -327,12 +344,14 @@
       "Refuses to run while Excel is still open (Excel overwrites the changes)",
       "Detects Excel 16.0, 15.0, 14.0, 12.0 automatically",
       "Audit log reports how many entries were removed and how many were left",
+      "No hardcoded branding — descriptionPrefix in .ini (default \"Excel Trusted Locations Tool:\")",
       "No administrator rights needed — writes to HKCU only"
     ],
     "seoTitle": "Excel Trusted Locations Setup — Mở macro .xlsm bị chặn | SonVuDev",
-    "seoDescription": "Thêm thư mục vào Trusted Locations của Excel. Giải quyết macro bị chặn trong .xlsm. Xem trước dry-run, hoàn tác, audit log.",
+    "seoDescription": "Thêm thư mục vào Trusted Locations của Excel v4.4. Giải quyết macro bị chặn trong .xlsm. Xem trước dry-run, hoàn tác, audit log, danh sách trusted-locations trực tiếp.",
     "seoTitleEn": "Excel Trusted Locations Setup — Fix Blocked Excel Macros | SonVuDev",
-    "seoDescriptionEn": "Add folders to Excel Trusted Locations to unblock macros in .xlsm files. Dry-run preview, undo, audit log. Fix macro security warnings."
+    "seoDescriptionEn": "Add folders to Excel Trusted Locations to unblock macros in .xlsm files v4.4. Dry-run preview, undo, audit log, live trusted-locations list. Cross-platform, no hardcoded branding.",
+    "disclaimer": "SonVuDev là công cụ độc lập, không được bảo trợ, tài trợ hoặc liên kết với Microsoft Corporation. Excel và Windows là thương hiệu của Microsoft Corporation."
   },
   {
     "id": "369294db-2a75-40a5-b5ee-e6ce76dc9c35",
@@ -376,6 +395,7 @@
     "seoTitle": "Spark Capacity Tester — Kiểm tra dung lượng USB thật | SonVuDev",
     "seoDescription": "Phát hiện USB giả, kiểm tra dung lượng thực tế của USB, thẻ nhớ, ổ cứng. Test nhanh 1GB, kiểm tra sector lỗi. Mua một lần dùng vĩnh viễn.",
     "seoTitleEn": "Spark Capacity Tester — Detect Fake USB & Check Real Capacity | SonVuDev",
-    "seoDescriptionEn": "Detect fake USB drives and verify the real capacity of USB sticks, SD cards, and disks. Quick Size Test, bad sector detection. Lifetime license."
+    "seoDescriptionEn": "Detect fake USB drives and verify the real capacity of USB sticks, SD cards, and disks. Quick Size Test, bad sector detection. Lifetime license.",
+    "disclaimer": "SonVuDev là công cụ độc lập, không được bảo trợ, tài trợ hoặc liên kết với Microsoft Corporation. Windows là thương hiệu của Microsoft Corporation."
   }
 ]

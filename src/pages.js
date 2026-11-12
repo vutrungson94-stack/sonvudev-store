@@ -513,26 +513,40 @@ const productSchema = (product, lang = "vi") => ({
  * moves with the exchange rate is a price Google cannot match on the next crawl.
  */
 // Shared return/shipping policy nodes for the merchant listing graph.
-//
-// Google Search Console flags an Offer whose MerchantReturnPolicy omits
-// `applicableCountry`/`returnMethod`, and an Offer that omits `shippingDetails`.
-// The published policy at /refund is a 14-day, free-return policy under
-// Vietnamese jurisdiction, so those are the values a crawler is given. Digital
-// delivery has no carrier and no shipping cost, so the shipping rate is zero.
-const merchantReturnPolicy = () => ({
-  "@type": "MerchantReturnPolicy",
-  applicableCountry: ["VN"],
-  returnPolicyCategory: "https://schema.org/MerchantReturnFiniteReturnWindow",
-  merchantReturnDays: 14,
-  returnMethod: "https://schema.org/ReturnByMail",
-  returnFees: "https://schema.org/FreeReturn",
-});
+ //
+ // Google Search Console flags an Offer whose MerchantReturnPolicy omits
+ // `applicableCountry`/`returnMethod`, and an Offer that omits `shippingDetails`.
+ // The published policy at /refund is a 14-day, free-return policy under
+ // Vietnamese jurisdiction, so those are the values a crawler is given. Digital
+ // delivery has no carrier and no shipping cost, so the shipping rate is zero.
+ const merchantReturnPolicy = (isDigital = true) => {
+   const policy = {
+     "@type": "MerchantReturnPolicy",
+     applicableCountry: ["VN"],
+     returnPolicyCategory: "https://schema.org/MerchantReturnFiniteReturnWindow",
+     merchantReturnDays: 14,
+     returnFees: "https://schema.org/FreeReturn",
+   };
+   // Digital products don't have a physical return method; omit returnMethod
+   // for digital goods. Physical goods would use ReturnByMail.
+   if (!isDigital) {
+     policy.returnMethod = "https://schema.org/ReturnByMail";
+   }
+   return policy;
+ };
 
-const digitalShippingDetails = () => ({
-  "@type": "OfferShippingDetails",
-  shippingRate: { "@type": "MonetaryAmount", value: 0, currency: "VND" },
-  shippingDestination: [{ "@type": "DefinedRegion", addressCountry: "VN" }],
-});
+ const digitalShippingDetails = (isDigital = true) => {
+   // Digital products have no shipping; omit shippingDetails entirely
+   // to avoid OfferShippingDetails which implies physical delivery.
+   if (isDigital) {
+     return null;
+   }
+   return {
+     "@type": "OfferShippingDetails",
+     shippingRate: { "@type": "MonetaryAmount", value: 0, currency: "VND" },
+     shippingDestination: [{ "@type": "DefinedRegion", addressCountry: "VN" }],
+   };
+ };
 
 const merchantProductSchema = (product, lang = "vi") => {
   const url = absolute(productUrl(product.slug, lang));
@@ -546,6 +560,8 @@ const merchantProductSchema = (product, lang = "vi") => {
   const rawDescription = String(product.description || product.shortDescription || "").replace(/\s+/g, " ").trim();
   const kept = rawDescription.split(/(?<=[.!?])\s+/).filter((sentence) => !PROMO_IN_TEXT.test(sentence)).join(" ").trim();
   const description = (kept || derivedDescription(product)).slice(0, 5000);
+  const isDigital = true; // All products are digital downloads
+  const shippingDetails = digitalShippingDetails(isDigital);
   return {
     "@type": "Product",
     "@id": `${url}#product`,
@@ -575,8 +591,8 @@ const merchantProductSchema = (product, lang = "vi") => {
       // The refund policy published at /refund: 14 days, no restocking fee. Stated
       // in the offer because Merchant Center reads it from here when the account
       // has no return policy configured.
-      hasMerchantReturnPolicy: merchantReturnPolicy(),
-      shippingDetails: digitalShippingDetails(),
+      hasMerchantReturnPolicy: merchantReturnPolicy(isDigital),
+      ...(shippingDetails ? { shippingDetails } : {}),
     },
   };
 };
@@ -850,7 +866,8 @@ const FOOTER_LINKS = [
   { href: "/refund", route: "/refund", key: "nav.refund", copy: "refund", vi: "Hoàn tiền", page: true },
   { href: "/about", route: "/about", key: "nav.about", copy: "about", vi: "Về chúng tôi", page: true },
   { href: "/lookup", route: "/lookup", key: "nav.lookup", copy: "lookup", vi: "Tra cứu đơn", page: true },
-  { mail: true, route: null, key: "nav.contact", copy: "contact", vi: "Liên hệ" },
+  { href: "/contact", route: "/contact", key: "nav.contact", copy: "contact", vi: "Liên hệ", page: true },
+  { mail: true, route: null, key: "nav.contactEmail", copy: "contactEmail", vi: "Email hỗ trợ" },
 ];
 
 /**
@@ -913,10 +930,13 @@ export const footerLinks = (route, copy = null, prefix = "") =>
  * wordmark and the tagline stay in the markup; this is the same bar without the
  * two strings that live only in the dictionary.
  */
-export const footerBar = (route, copy, prefix = "") =>
-  `<footer class="site-footer wrap"><div class="brand">${brandWordmark()}</div>` +
-  `<div class="footer-links">${footerLinks(route, copy, prefix)}</div>` +
-  `<small>© ${new Date().getFullYear()} ${esc(brand())} · ${esc(copy.tagline)}</small></footer>`;
+export const footerBar = (route, copy, prefix = "") => {
+  const contactHtml = businessContactHtml(copy ? 'vi' : 'vi');
+  return `<footer class="site-footer wrap"><div class="brand">${brandWordmark()}</div>` +
+    (contactHtml ? `<div class="footer-contact">${contactHtml}</div>` : '') +
+    `<div class="footer-links">${footerLinks(route, copy, prefix)}</div>` +
+    `<small>© ${new Date().getFullYear()} ${esc(brand())} · ${esc(copy.tagline)}</small></footer>`;
+};
 
 /**
  * Every {{token}} a static page template is allowed to carry, in one place.
@@ -939,7 +959,7 @@ export const footerBar = (route, copy, prefix = "") =>
 export const PAGE_TOKENS = [
   "site", "brandName", "brandWordmark", "support", "paymentWindowHours",
   "reviewMinLength", "reviewMaxLength", "year", "legalEntityLine", "businessContactHtml", "jsonLd", "iconLinks", "cssVersion",
-  "policyUpdated", "policyUpdatedDisplay", "headerNav", "footerLinks",
+  "policyUpdated", "policyUpdatedDisplay", "headerNav", "footerLinks", "founder",
 ];
 /**
  * The date printed at the top of the refund policy.
@@ -1030,6 +1050,7 @@ export function pageTokenValues({ products = [], reviewLimits = null, page = "",
     headerNav: headerNav(route, null, prefix),
     footerLinks: footerLinks(route, null, prefix),
     cssVersion,
+    founder: esc(env.brand.founderName || env.brand.name),
   };
 }
 
@@ -1447,7 +1468,7 @@ export function renderIndexGrid(products) {
       <ul>${features}</ul>
       <div class="product-buy">
         <strong>${esc(money(product.price, product.currency))}</strong>
-        <a class="round-arrow" href="${esc(buyUrl)}" rel="nofollow" data-i18n-attr="aria-label:products.buyAria" aria-label="Mua ${nameVi}">↗</a>
+        <a class="round-arrow buy-btn" href="${esc(buyUrl)}" rel="nofollow" data-buy-id="${esc(product.id)}" data-i18n-attr="aria-label:products.buyAria" aria-label="Mua ${nameVi}">↗</a>
       </div>
     </div>
   </article>`;
@@ -1577,6 +1598,7 @@ export const COPY_VI = {
   terms: "Điều khoản",
   refund: "Hoàn tiền",
   privacy: "Bảo mật",
+  disclaimerHeading: "Thông báo pháp lý",
 };
 
 export const COPY_EN = {
@@ -1617,6 +1639,7 @@ export const COPY_EN = {
   terms: "Terms",
   refund: "Refunds",
   privacy: "Privacy",
+  disclaimerHeading: "Legal Disclaimer",
 };
 
 // The chrome for the five on-demand locales. The scalar strings live here;
@@ -1655,6 +1678,30 @@ const COPY_DE = {
   terms: "AGB",
   refund: "Erstattung",
   privacy: "Datenschutz",
+  disclaimerHeading: "Rechtlicher Hinweis",
+  nav: { contactEmail: "Support-E-Mail" },
+  contact: {
+    h1: "Kontakt",
+    lede: "Jede Frage zu Bestellungen, Erstattungen oder vor dem Kauf wird direkt vom Entwickler beantwortet. Keine Chatbots, keine Weiterleitungen.",
+    h2: "Kontaktinformationen",
+    email: "Support-E-Mail",
+    emailNote: "Antworten innerhalb von 24 Geschäftsstunden. Bitte Bestellnummer angeben, falls vorhanden.",
+    phone: "Telefon",
+    phoneNote: "Geschäftszeiten: Mo–Fr, 9:00–18:00 (GMT+7).",
+    address: "Adresse",
+    h3: "Bestell-Support",
+    li1: "Bestell-Nachschlagen: /lookup — Bestellcode und E-Mail eingeben, um Status anzuzeigen, Download-Link neu zu generieren.",
+    li2: "Erstattungen: Richtlinie unter /refund. Defekte Dateien oder versehentliche Käufe werden innerhalb von 14 Tagen unterstützt.",
+    li3: "Zahlung: Inlandsüberweisung (Vietcombank), PayPal (international), MoMo, ZaloPay.",
+    li4: "Rechnung: Elektronische Rechnung wird automatisch nach erfolgreicher Zahlung ausgestellt.",
+    h4: "Bevor Sie uns kontaktieren",
+    li5: "Spam-/Junk-Ordner prüfen — Bestellcodes und Download-Links werden manchmal gefiltert.",
+    li6: "Stellen Sie sicher, dass Excel/Office vollständig geschlossen ist, bevor Sie das Trusted Locations Reparatur-Tool ausführen.",
+    li7: "FAQ und About-Seite lesen — die Antwort steht oft schon dort.",
+    h5: "Rechtliches",
+    legal: "SonVuDev ist der Handelsname von Vũ Trung Sơn. Keine Firma, keine Agenten, keine Mitarbeiter. Alle Transaktionen werden persönlich vom Inhaber abgewickelt.",
+  },
+  title: { contact: "Kontakt — {brand}" },
 };
 
 const COPY_ES = {
@@ -1688,6 +1735,30 @@ const COPY_ES = {
   terms: "Términos",
   refund: "Reembolso",
   privacy: "Privacidad",
+  disclaimerHeading: "Aviso legal",
+  nav: { contactEmail: "Email de soporte" },
+  contact: {
+    h1: "Contacto",
+    lede: "Todas las preguntas sobre pedidos, reembolsos o pre-venta son respondidas directamente por el desarrollador. Sin chatbots, sin transferencias.",
+    h2: "Información de contacto",
+    email: "Email de soporte",
+    emailNote: "Respuestas en 24 horas hábiles. Incluya su código de pedido si tiene uno.",
+    phone: "Teléfono",
+    phoneNote: "Horario de atención: Lun–Vie, 9:00–18:00 (GMT+7).",
+    address: "Dirección",
+    h3: "Soporte de pedidos",
+    li1: "Búsqueda de pedidos: /lookup — introduzca el código de pedido y el email para ver el estado, regenerar enlace de descarga.",
+    li2: "Reembolsos: Ver política en /refund. Archivos rotos o compras accidentales soportados dentro de 14 días.",
+    li3: "Pago: Transferencia bancaria nacional (Vietcombank), PayPal (internacional), MoMo, ZaloPay.",
+    li4: "Factura: Factura electrónica emitida automáticamente tras el pago exitoso.",
+    h4: "Antes de contactarnos",
+    li5: "Revise la carpeta Spam/Junk — los códigos de pedido y enlaces de descarga a veces se filtran.",
+    li6: "Asegúrese de que Excel/Office esté completamente cerrado antes de ejecutar la herramienta de reparación de Trusted Locations.",
+    li7: "Revise la FAQ y la página About — la respuesta a menudo ya está ahí.",
+    h5: "Legal",
+    legal: "SonVuDev es el nombre comercial de Vũ Trung Sơn. No es una empresa, no hay agentes, no hay empleados. Todas las transacciones son gestionadas personalmente por el propietario.",
+  },
+  title: { contact: "Contacto — {brand}" },
 };
 
 const COPY_FR = {
@@ -1721,6 +1792,30 @@ const COPY_FR = {
   terms: "Conditions",
   refund: "Remboursement",
   privacy: "Confidentialité",
+  disclaimerHeading: "Avertissement légal",
+  nav: { contactEmail: "Email de support" },
+  contact: {
+    h1: "Contact",
+    lede: "Toutes les questions sur les commandes, les remboursements ou la pré-vente sont répondues directement par le développeur. Pas de chatbots, pas de transfert.",
+    h2: "Informations de contact",
+    email: "Email de support",
+    emailNote: "Réponses sous 24 heures ouvrées. Veuillez inclure votre code de commande si vous en avez un.",
+    phone: "Téléphone",
+    phoneNote: "Heures d'ouverture : Lun–Ven, 9:00–18:00 (GMT+7).",
+    address: "Adresse",
+    h3: "Support commande",
+    li1: "Recherche de commande : /lookup — saisissez le code de commande et l'email pour voir le statut, régénérer le lien de téléchargement.",
+    li2: "Remboursements : Voir la politique sur /refund. Fichiers corrompus ou achats accidentels pris en charge sous 14 jours.",
+    li3: "Paiement : Virement bancaire national (Vietcombank), PayPal (international), MoMo, ZaloPay.",
+    li4: "Facture : Facture électronique émise automatiquement après paiement réussi.",
+    h4: "Avant de nous contacter",
+    li5: "Vérifiez le dossier Spam/Courrier indésirable — les codes de commande et liens de téléchargement sont parfois filtrés.",
+    li6: "Assurez-vous qu'Excel/Office est complètement fermé avant d'exécuter l'outil de réparation Trusted Locations.",
+    li7: "Consultez la FAQ et la page À propos — la réponse s'y trouve souvent.",
+    h5: "Mentions légales",
+    legal: "SonVuDev est le nom commercial de Vũ Trung Sơn. Pas une entreprise, pas d'agents, pas d'employés. Toutes les transactions sont gérées personnellement par le propriétaire.",
+  },
+  title: { contact: "Contact — {brand}" },
 };
 
 const COPY_JA = {
@@ -1754,6 +1849,30 @@ const COPY_JA = {
   terms: "利用規約",
   refund: "返金",
   privacy: "プライバシー",
+  disclaimerHeading: "法的免責事項",
+  nav: { contactEmail: "サポートメール" },
+  contact: {
+    h1: "お問い合わせ",
+    lede: "注文、返金、購入前の質問すべてに開発者が直接お答えします。チャットボットなし、たらい回しなし。",
+    h2: "連絡先情報",
+    email: "サポートメール",
+    emailNote: "営業時間内24時間以内に返信。ご注文コードがあれば併記してください。",
+    phone: "電話",
+    phoneNote: "営業時間：月〜金、9:00〜18:00 (GMT+7)。",
+    address: "住所",
+    h3: "注文サポート",
+    li1: "注文検索: /lookup — 注文コードとメールアドレスを入力してステータス確認、ダウンロードリンク再生成。",
+    li2: "返金: /refund のポリシーを参照。ファイル破損や誤購入は 14 日以内に対応。",
+    li3: "支払い: 国内銀行振込 (Vietcombank)、PayPal (海外)、MoMo、ZaloPay。",
+    li4: "請求書: 支払い成功後に電子請求書を自動発行。",
+    h4: "お問い合わせ前に",
+    li5: "迷惑メールフォルダを確認 — 注文コードとダウンロードリンクがフィルタされることがあります。",
+    li6: "Trusted Locations 修復ツールを実行する前に、Excel/Office が完全に終了していることを確認してください。",
+    li7: "FAQ と About ページを確認 — 答えがすでにあることが多いです。",
+    h5: "法的事項",
+    legal: "SonVuDev は Vũ Trung Sơn の商標名です。会社ではなく、代理店も従業員もいません。すべての取引はオーナーが個人的に処理し責任を負います。",
+  },
+  title: { contact: "お問い合わせ — {brand}" },
 };
 
 const COPY_ZH = {
@@ -1787,6 +1906,30 @@ const COPY_ZH = {
   terms: "条款",
   refund: "退款",
   privacy: "隐私",
+  disclaimerHeading: "法律声明",
+  nav: { contactEmail: "支持邮箱" },
+  contact: {
+    h1: "联系我们",
+    lede: "关于订单、退款或售前咨询的所有问题，均由开发者直接解答。无聊天机器人，无推诿。",
+    h2: "联系信息",
+    email: "支持邮箱",
+    emailNote: "24 个工作小时内回复。如有订单号请附上。",
+    phone: "电话",
+    phoneNote: "工作时间：周一至周五，9:00-18:00 (GMT+7)。",
+    address: "地址",
+    h3: "订单支持",
+    li1: "订单查询: /lookup — 输入订单号和邮箱查看状态，重新生成下载链接。",
+    li2: "退款: 查看 /refund 政策。文件损坏或误购可在 14 天内处理。",
+    li3: "支付: 国内银行转账 (Vietcombank)、PayPal (国际)、MoMo、ZaloPay。",
+    li4: "发票: 支付成功后自动开具电子发票。",
+    h4: "联系我们前",
+    li5: "检查垃圾箱 — 订单号和下载链接有时会被拦截。",
+    li6: "运行 Trusted Locations 修复工具前，请确保 Excel/Office 已完全关闭。",
+    li7: "查看 FAQ 和关于页面 — 答案通常已在那里。",
+    h5: "法律声明",
+    legal: "SonVuDev 是 Vũ Trung Sơn 的商标名。非公司，无代理，无员工。所有交易由所有者亲自处理并负责。",
+  },
+  title: { contact: "联系我们 — {brand}" },
 };
 
 const SCALAR_COPY = { vi: COPY_VI, en: COPY_EN, de: COPY_DE, es: COPY_ES, fr: COPY_FR, ja: COPY_JA, "zh-CN": COPY_ZH };
@@ -2106,7 +2249,7 @@ ${jsonLd({ "@graph": [organization(), websiteSchema(), productSchema(product, la
 -->
 <div class="buy-price">${esc(priceLabel)}</div>
 <p class="buy-note">${esc(copy.buyNote)}</p>
-<a class="button button-primary button-wide" href="${homePrefix}/?buy=${encodeURIComponent(product.id)}#products" rel="nofollow">${esc(copy.buyNow)} <span>→</span></a>
+<a class="button button-primary button-wide buy-btn" href="${homePrefix}/?buy=${encodeURIComponent(product.id)}#products" rel="nofollow" data-buy-id="${esc(product.id)}">${esc(copy.buyNow)} <span>→</span></a>
 <ul class="buy-points"><li>${esc(copy.pointDownload)}</li><li>${esc(copy.pointLookup)}</li><li>${esc(copy.pointRefund)}</li></ul>
 </div>
 </header>
@@ -2114,6 +2257,7 @@ ${features.length ? `<section class="detail-block"><h2>${esc(copy.features)}</h2
 ${product.requirements ? `<section class="detail-block"><h2>${esc(copy.requirements)}</h2><p>${esc(product.requirements).replace(/\n/g, "<br>")}</p></section>` : ""}
 ${(product.fileSize || product.file_size) ? `<section class="detail-block"><h2>${esc(copy.fileSizeLabel)}</h2><p>${esc(formatBytes(product.fileSize || product.file_size))}</p></section>` : ""}
 ${trustBlock(product, copy)}
+${product.disclaimer ? `<section class="detail-block disclaimer"><h2>${esc(copy.disclaimerHeading || 'Thông báo pháp lý')}</h2><p>${esc(product.disclaimer)}</p></section>` : ''}
 ${intro ? `<section class="detail-block prose">${paragraphBlocks(intro)}</section>` : ""}
 ${groups.map((group) => `<section class="detail-block prose">${paragraphBlocks(group)}</section>`).join("")}
 <section class="detail-block">
@@ -2271,8 +2415,8 @@ export function renderFeed(products) {
         availability: "https://schema.org/InStock",
         url: absolute(productUrl(product.slug)),
         seller: { "@id": `${site()}/#organization` },
-        hasMerchantReturnPolicy: merchantReturnPolicy(),
-        shippingDetails: digitalShippingDetails(),
+        hasMerchantReturnPolicy: merchantReturnPolicy(true),
+        ...(digitalShippingDetails(true) ? { shippingDetails: digitalShippingDetails(true) } : {}),
       },
     },
   }));

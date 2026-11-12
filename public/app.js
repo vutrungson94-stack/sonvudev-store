@@ -810,13 +810,22 @@ document.querySelector('.modal-close')?.addEventListener('click', (e) => {
 });
 
 // Delegated: works for server-rendered cards before hydration and after re-renders.
-// Opens purchase form (never navigates to /product/*). See docs/PURCHASE-LINK-RULES.md.
-if (grid) grid.addEventListener('click', (e) => {
-  const card = e.target.closest('.product-card[data-id]');
-  if (!card) return;
-  e.preventDefault();
-  openPurchaseForm(card.dataset.id);
-});
+ // Opens purchase form (never navigates to /product/*). See docs/PURCHASE-LINK-RULES.md.
+ if (grid) grid.addEventListener('click', (e) => {
+   const card = e.target.closest('.product-card[data-id]');
+   if (!card) return;
+   e.preventDefault();
+   openPurchaseForm(card.dataset.id);
+ });
+
+ // Delegated: buy buttons on product page and other server-rendered pages.
+ // Prevents navigation and opens purchase form directly.
+ document.addEventListener('click', (e) => {
+   const btn = e.target.closest('.buy-btn[data-buy-id]');
+   if (!btn) return;
+   e.preventDefault();
+   openPurchaseForm(btn.dataset.buyId);
+ });
 
 // Repaint in place when the language flips so an open modal follows along.
 window.addEventListener('i18n:ready', () => { render(); });

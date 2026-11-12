@@ -460,6 +460,7 @@ const indexablePages = {
   "privacy.html": {},
   "refund.html": {},
   "about.html": {},
+  "contact.html": {},
 };
 // The pages a buyer reaches after paying. Not indexable, so no ownership tag and
 // no catalogue, but they quote the support address and that has to come from
@@ -587,7 +588,7 @@ for (const file of Object.keys(served)) {
   // indexable legal pages also answer under their locale prefix; support pages
   // and the 404 stay unprefixed (they are vi/en runtime pages, and a localized
   // URL pointing at Vietnamese bytes is worse than no localized URL).
-  if (["about.html", "terms.html", "privacy.html", "refund.html"].includes(file)) {
+  if (["about.html", "terms.html", "privacy.html", "refund.html", "contact.html"].includes(file)) {
     for (const lang of LOCALE_CODES.filter((code) => code !== "vi")) {
       app.get(`/${lang}/${file}`, sendPage(file, lang));
       app.get(`/${lang}/${file.replace(/\.html$/, "")}`, sendPage(file, lang));
@@ -773,6 +774,7 @@ app.get("/sitemap.xml", async (_req, res, next) => {
     { file: "privacy.html", path: "/privacy", priority: "0.3", changefreq: "monthly" },
     { file: "refund.html", path: "/refund", priority: "0.3", changefreq: "monthly" },
     { file: "about.html", path: "/about", priority: "0.3", changefreq: "monthly" },
+    { file: "contact.html", path: "/contact", priority: "0.3", changefreq: "monthly" },
   ];
   // The five static pages exist in every supported language under their locale
   // prefix - a German reader must find a German terms page, and the sitemap is
