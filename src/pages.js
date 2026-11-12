@@ -362,21 +362,31 @@ export const ICON_LINKS = [
   { rel: 'icon', href: '/icon-512.png', type: 'image/png', sizes: '512x512' },
   { rel: 'apple-touch-icon', href: '/apple-touch-icon.png', sizes: '180x180' },
   { rel: 'mask-icon', href: '/mask-icon.png', color: '#0f2a22' },
-  // The web app manifest is deliberately NOT here. A <link rel="manifest"> in
-  // the head is discovered while the HTML is parsed and fetched as a
-  // high-priority request, which puts it on the critical request chain
-  // (Lighthouse: "Network dependency tree", 781 ms for a 1 KiB file). It is
-  // added after the page loads instead — see public/quality.js.
+  // The manifest registration is deliberately NOT here: a <link rel="manifest"> in
+  // the head is discovered while the HTML is parsed, and quality.js appends it after
+  // load so it is not the page's own critical request. iconLinkMarkup() does emit a
+  // <link rel="preload" as="manifest"> hint so the fetch runs in parallel with the
+  // HTML rather than chaining after quality.js — see the note there.
 ];
 
 /** The <link> lines for every icon slot, one per line, ready to drop into a <head>. */
-export const iconLinkMarkup = () => ICON_LINKS.map((link) => {
-  const attrs = [`rel="${link.rel}"`, `href="${link.href}"`];
-  if (link.type) attrs.push(`type="${link.type}"`);
-  if (link.sizes) attrs.push(`sizes="${link.sizes}"`);
-  if (link.color) attrs.push(`color="${link.color}"`);
-  return `<link ${attrs.join(' ')}>`;
-});
+export const iconLinkMarkup = () => {
+  const lines = ICON_LINKS.map((link) => {
+    const attrs = [`rel="${link.rel}"`, `href="${link.href}"`];
+    if (link.type) attrs.push(`type="${link.type}"`);
+    if (link.sizes) attrs.push(`sizes="${link.sizes}"`);
+    if (link.color) attrs.push(`color="${link.color}"`);
+    return `<link ${attrs.join(' ')}>`;
+  });
+  // Preload the manifest so the browser fetches it in parallel with the HTML
+  // instead of chaining it after quality.js runs (HTML -> quality.js -> manifest).
+  // This is a preload hint, not the manifest registration itself: quality.js still
+  // appends the real <link rel="manifest"> for PWA install, and the browser reuses
+  // the preloaded response. The preload removes the "Network dependency tree"
+  // chain Lighthouse reports for the deferred injection.
+  lines.push('<link rel="preload" href="/site.webmanifest" as="manifest" crossorigin="use-credentials">');
+  return lines;
+};
 
 /**
  * The raster card for link previews.

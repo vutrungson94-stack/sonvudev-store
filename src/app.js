@@ -341,7 +341,13 @@ app.get("/site.webmanifest", (_req, res) => {
   // written into a JSON file is a second place to forget to change it. A manifest is
   // also what makes the shop installable and what names its icon on an Android home
   // screen, which is a slot the logo otherwise never reaches.
-  res.set("Cache-Control", "public, max-age=3600").type("application/manifest+json").send(JSON.stringify({
+  //
+  // Cached for a day rather than an hour: the content is the brand name, tagline and
+  // icons, which change on the order of months, and a 1 KiB file that costs 611 ms
+  // to regenerate on every cold request is the "Network dependency tree" cost the
+  // preload hint in iconLinkMarkup() was added to remove. stale-while-revalidate
+  // lets a repeat visit paint from cache while the next copy is fetched.
+  res.set("Cache-Control", "public, max-age=86400, stale-while-revalidate=604800").type("application/manifest+json").send(JSON.stringify({
     name: env.brand.name,
     short_name: env.brand.name,
     description: env.brand.description,

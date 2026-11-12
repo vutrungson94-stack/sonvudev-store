@@ -82,9 +82,12 @@ test('mọi trang đều nhận đủ bộ icon, không viết tay link nào', a
   }
 });
 
-test('iconLinks render ra đủ 9 link, mỗi link một dòng', () => {
+test('iconLinks render đủ icon link + 1 preload manifest, mỗi link một dòng', () => {
   const markup = iconLinkMarkup();
-  assert.equal(markup.length, ICON_LINKS.length);
+  // ICON_LINKS carries the icon slots; iconLinkMarkup() appends one preload hint
+  // for the manifest so the fetch is parallel with the HTML instead of chaining
+  // after quality.js. 8 icon slots + 1 preload = 9 lines.
+  assert.equal(markup.length, ICON_LINKS.length + 1);
   for (const line of markup) {
     assert.match(line, /^<link rel="[a-z-]+" href="\//);
     assert.ok(line.endsWith('>'));
