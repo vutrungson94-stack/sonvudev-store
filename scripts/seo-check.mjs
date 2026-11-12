@@ -14,6 +14,7 @@
 // Exit code is non-zero on any failure so it can gate a deploy — but only when there
 // was something to check. See the missing-URL case below.
 import dns from "node:dns/promises";
+import { readFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { AI_CRAWLERS, ROBOTS_DISALLOW } from "../src/robots.js";
@@ -499,6 +500,35 @@ try {
   record("Sản phẩm trên trang chủ có link thật", !cards || /href="[^"]*\/product\/[^"]+"/.test(home.body), cards ? `${cards} thẻ` : "không có thẻ nào");
 } catch (error) {
   record("Đọc danh mục sản phẩm", false, error.message);
+}
+
+// ---------------------------------------------------------------------------
+// 4d. The deployed JavaScript is the minified artifact, not the source.
+//
+//    The build minifies public/app.js and public/i18n.js into the artifact. A
+//    deploy that serves the source tree instead ships the unminified bytes,
+//    which Lighthouse charges for ("Minify JavaScript") and which the local
+//    Lighthouse gate cannot catch, because it measures the artifact on
+//    localhost rather than the live site. Compare the live bytes with the
+//    source: close in size means the source is being served.
+// ---------------------------------------------------------------------------
+for (const [name, sourcePath] of [["/app.js", "public/app.js"], ["/i18n.js", "public/i18n.js"]]) {
+  let liveBody = "";
+  try { liveBody = (await get(`${base}${name}`)).body; } catch { /* reported below */ }
+  let sourceBody = "";
+  try { sourceBody = await readFile(path.join(root, sourcePath), "utf8"); } catch { /* ignore */ }
+  const liveBytes = liveBody.length;
+  const sourceBytes = sourceBody.length;
+  // A minified file is smaller than its source and carries no leading comment
+  // (the minifier runs with legalComments: "none"). The source starts with a
+  // "//" header; the minified starts with code.
+  const ratio = sourceBytes ? liveBytes / sourceBytes : 0;
+  const looksMinified = liveBytes > 0 && sourceBytes > 0 && ratio < 0.9 && !/^\s*\/\//.test(liveBody);
+  record(
+    `JS ${name} đã minify`,
+    looksMinified,
+    sourceBytes ? `live ${liveBytes} B / nguồn ${sourceBytes} B (${(ratio * 100).toFixed(0)}%)` : `live ${liveBytes} B`,
+  );
 }
 
 // ---------------------------------------------------------------------------

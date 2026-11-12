@@ -41,11 +41,13 @@ test('có đủ các slot mà một trình duyệt hoặc hệ điều hành th�
   //   apple-touch-icon  iOS discards the alpha channel and composites on black, so
   //                    without this an installed app is a black square
   //   favicon.ico       Windows and anything that predates SVG favicons
-  //   manifest          names the icon for an Android launcher and makes the shop
-  //                    installable at all
   //   mask-icon         Safari pinned tabs recolour a single-colour silhouette and
   //                    render a full-colour mark invisible there
-  for (const required of ['/apple-touch-icon.png', '/favicon.ico', '/site.webmanifest', '/mask-icon.png']) {
+  //
+  // The manifest is not in this list on purpose: it is added after the page loads
+  // (public/quality.js) so it does not sit on the critical request chain, which
+  // Lighthouse charged 781 ms for. The injection is asserted in its own test.
+  for (const required of ['/apple-touch-icon.png', '/favicon.ico', '/mask-icon.png']) {
     assert.ok(hrefs.includes(required), `thiếu slot ${required}`);
   }
   // And the sizes attribute, which is what the browser uses to choose. Chrome warns
@@ -54,6 +56,18 @@ test('có đủ các slot mà một trình duyệt hoặc hệ điều hành th�
   for (const link of ICON_LINKS.filter((l) => l.href.endsWith('.png') && l.rel !== 'mask-icon')) {
     assert.ok(link.sizes, `${link.href} phải khai báo sizes`);
   }
+});
+
+test('manifest được chèn sau khi tải, không nằm trên critical request chain', async () => {
+  const quality = await read('public/quality.js');
+  assert.match(quality, /rel\s*=\s*'manifest'/,
+    'quality.js phải chèn <link rel="manifest">');
+  assert.match(quality, /href\s*=\s*'\/site\.webmanifest'/,
+    'manifest phải trỏ /site.webmanifest');
+  // And it must not be a <link> in the head any more.
+  const markup = iconLinkMarkup();
+  assert.ok(!markup.some((line) => line.includes('rel="manifest"')),
+    'manifest không được nằm trong <head> — nó nằm trên critical request chain');
 });
 
 test('mọi trang đều nhận đủ bộ icon, không viết tay link nào', async () => {

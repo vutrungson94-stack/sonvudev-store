@@ -40,12 +40,19 @@ services:
 
     # `npm ci`, not `npm install`: the lockfile is the release. A free-tier
     # dependency drift is not a thing a passing build should depend on.
-    buildCommand: npm ci --omit=dev
+    #
+    # `--include=dev` is required: the build uses esbuild to minify the browser
+    # scripts, and a production-only install leaves `npm run build` unable to run.
+    # Without this build step the server falls back to the source `public/`
+    # directory and ships unminified JavaScript — which no local gate catches,
+    # because the local Lighthouse run measures the artifact, not the live site.
+    buildCommand: npm ci --include=dev && npm run build
 
-    # `node src/server.js`, and PORT/HOST come from the platform. src/config.js
-    # already defaults HOST to 0.0.0.0 and reads PORT, so no code change is needed
-    # for the service to be reachable.
-    startCommand: npm start
+    # Runs the artifact the build just produced, not the working tree. The
+    # artifact's src/app.js resolves publicDir to publish-output/node/public,
+    # which is where the minified bytes live; the working tree's public/ holds
+    # the readable source the audit, the metrics and the tests read.
+    startCommand: cd publish-output/node && npm start
 
     # The repository keeps development environment variables in .env, and .env is
     # gitignored, so they are not deployed. They are declared here so a fresh
@@ -112,8 +119,6 @@ services:
         sync: false
       - key: INDEXNOW_ENDPOINT
         sync: false
-              sync: false
-              sync: false
       - key: ADMIN_API_TOKEN
         generateValue: true
       - key: ADMIN_API_TOKENS

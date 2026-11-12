@@ -362,7 +362,11 @@ export const ICON_LINKS = [
   { rel: 'icon', href: '/icon-512.png', type: 'image/png', sizes: '512x512' },
   { rel: 'apple-touch-icon', href: '/apple-touch-icon.png', sizes: '180x180' },
   { rel: 'mask-icon', href: '/mask-icon.png', color: '#0f2a22' },
-  { rel: 'manifest', href: '/site.webmanifest' },
+  // The web app manifest is deliberately NOT here. A <link rel="manifest"> in
+  // the head is discovered while the HTML is parsed and fetched as a
+  // high-priority request, which puts it on the critical request chain
+  // (Lighthouse: "Network dependency tree", 781 ms for a 1 KiB file). It is
+  // added after the page loads instead — see public/quality.js.
 ];
 
 /** The <link> lines for every icon slot, one per line, ready to drop into a <head>. */
