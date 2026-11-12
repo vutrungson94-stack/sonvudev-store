@@ -521,9 +521,11 @@ for (const [name, sourcePath] of [["/app.js", "public/app.js"], ["/i18n.js", "pu
   const sourceBytes = sourceBody.length;
   // A minified file is smaller than its source and carries no leading comment
   // (the minifier runs with legalComments: "none"). The source starts with a
-  // "//" header; the minified starts with code.
+  // "//" header; the minified starts with code. The 0.95 bar is deliberate:
+  // i18n.js is mostly dictionary data, so minifying it only removes ~7% — a
+  // tighter bar failed a correct deploy, while the unminified file is 100%.
   const ratio = sourceBytes ? liveBytes / sourceBytes : 0;
-  const looksMinified = liveBytes > 0 && sourceBytes > 0 && ratio < 0.9 && !/^\s*\/\//.test(liveBody);
+  const looksMinified = liveBytes > 0 && sourceBytes > 0 && ratio < 0.95 && !/^\s*\/\//.test(liveBody);
   record(
     `JS ${name} đã minify`,
     looksMinified,
