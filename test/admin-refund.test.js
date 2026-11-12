@@ -179,7 +179,7 @@ test('trang thanh toán bắt tích đồng ý, và từ điển nói đúng đi
   const source = await fs.readFile(path.join(root, 'public', 'app.js'), 'utf8');
   assert.ok(/name="acceptPolicy"/.test(source), 'form thanh toán phải có ô tích đồng ý');
   const vi = await fs.readFile(path.join(root, 'public', 'i18n.js'), 'utf8');
-  assert.match(vi, /'cart\.agree': 'Tôi đã đọc .*không được hoàn tiền sau khi đã tải\.'/, 'câu đồng ý phải nói rõ phần mềm không hoàn sau khi tải');
+  assert.match(vi, /'cart\.agree': 'Tôi đã đọc .*hoàn tiền chỉ áp dụng theo các trường hợp nêu trong Chính sách hoàn tiền\.'/, 'câu đồng ý phải nói rõ hoàn tiền áp dụng theo chính sách');
   for (const key of ['api.err.policyNotAccepted', 'api.err.refundCategoryRequired', 'api.err.refundPartialAmountRequired']) {
     assert.ok(vi.includes(`'${key}'`), `từ điển thiếu ${key}`);
   }

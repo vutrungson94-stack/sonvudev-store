@@ -54,7 +54,11 @@ try {
 
   test('price includes currency', () => {
     const dataLine = lines[1];
-    assert.match(dataLine, /\d+\.\d+\s+USD/);
+    // The feed price is the product's own shelf price in its own currency (VND),
+    // matching the JSON-LD Offer and the Vietnamese landing page. It is not a
+    // converted USD figure: a converted figure is a second price for the same
+    // product, which is what Merchant Center flags as a price mismatch.
+    assert.match(dataLine, /\d+\.\d+\s+VND/);
   });
 
   test('no raw tabs or newlines inside fields', () => {

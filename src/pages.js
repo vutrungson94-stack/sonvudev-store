@@ -623,16 +623,16 @@ const breadcrumbSchema = (product, lang = "vi") => {
 const faqSchema = (product, lang = "vi") => {
   const window = env.orders.paymentWindowHours;
   const entries = lang === "vi" ? [
-    ["Tôi nhận hàng bằng cách nào?", "Thanh toán xong là mã tra cứu gửi qua email ngay, kèm link tải trực tiếp. Không cần chờ ai duyệt."],
+    ["Tôi nhận hàng bằng cách nào?", "PayPal: mã tra cứu và link tải gửi qua email ngay. Chuyển khoản: gửi sau khi giao dịch được xác nhận, thường trong giờ làm việc."],
     ["Tải được mấy lần?", "Bạn tự tạo link tải mới bất cứ lúc nào bằng mã tra cứu. Link có thời hạn ngắn nhưng không giới hạn số lần tạo."],
     ["Phần mềm chạy trên nền tảng nào?", `${product.platform || "Windows"}. ${product.requirements || ""}`.trim()],
-    ["Nếu file lỗi hoặc tôi mua nhầm?", `Liên hệ ${env.email.supportEmail} kèm mã đơn. Chúng tôi hoàn tiền hoặc gửi lại bản sửa.`],
+    ["Nếu file lỗi?", `Liên hệ ${env.email.supportEmail} kèm mã đơn. Chúng tôi hoàn tiền hoặc gửi lại bản sửa theo chính sách hoàn tiền.`],
     ["Tôi có bao lâu để thanh toán?", `Đơn chưa thanh toán bị hủy sau ${window} giờ, nên thanh toán trong khoảng đó là an toàn.`],
   ] : [
-    ["How do I receive the file?", "Pay by bank transfer or PayPal and the download link is emailed to you straight away. Nothing is queued for manual approval."],
+    ["How do I receive the file?", "PayPal: the lookup code and download link are emailed immediately. Bank transfer: sent once the transfer is confirmed, usually within business hours."],
     ["How many times can I download it?", "As many as you like. The lookup code in your email makes a fresh download link on demand; links expire quickly, the number of downloads does not."],
     ["Which platforms does it run on?", `${product.platform || "Windows"}. ${product.requirements || ""}`.trim()],
-    ["What if the file is broken or I bought the wrong thing?", `Email ${env.email.supportEmail} with your order code and the file is replaced or refunded.`],
+    ["What if the file is broken?", `Email ${env.email.supportEmail} with your order code and the file is replaced or refunded under the Refund Policy.`],
     ["How long do I have to pay?", `An unpaid order is cancelled after ${window} hours, so pay inside that window and nothing happens to it.`],
   ];
   return {
@@ -959,7 +959,7 @@ export const footerBar = (route, copy, prefix = "") => {
 export const PAGE_TOKENS = [
   "site", "brandName", "brandWordmark", "support", "paymentWindowHours",
   "reviewMinLength", "reviewMaxLength", "year", "legalEntityLine", "businessContactHtml", "jsonLd", "iconLinks", "cssVersion",
-  "policyUpdated", "policyUpdatedDisplay", "headerNav", "footerLinks", "founder",
+  "policyUpdated", "policyUpdatedDisplay", "headerNav", "footerLinks", "founder", "brandPhone", "brandAddress",
 ];
 /**
  * The date printed at the top of the refund policy.
@@ -1051,6 +1051,8 @@ export function pageTokenValues({ products = [], reviewLimits = null, page = "",
     footerLinks: footerLinks(route, null, prefix),
     cssVersion,
     founder: esc(env.brand.founderName || env.brand.name),
+    brandPhone: esc(env.brand.phone || ''),
+    brandAddress: esc(env.brand.address || ''),
   };
 }
 
@@ -1599,6 +1601,7 @@ export const COPY_VI = {
   refund: "Hoàn tiền",
   privacy: "Bảo mật",
   disclaimerHeading: "Thông báo pháp lý",
+  trademarkNote: "SonVuDev là nhà phát triển độc lập. Không liên kết với, được xác nhận bởi, hoặc được tài trợ bởi Microsoft. Windows, Excel và .NET là nhãn hiệu của Microsoft Corporation.",
 };
 
 export const COPY_EN = {
@@ -1640,6 +1643,7 @@ export const COPY_EN = {
   refund: "Refunds",
   privacy: "Privacy",
   disclaimerHeading: "Legal Disclaimer",
+  trademarkNote: "SonVuDev is an independent developer. Not affiliated with, endorsed by, or sponsored by Microsoft. Windows, Excel and .NET are trademarks of Microsoft Corporation.",
 };
 
 // The chrome for the five on-demand locales. The scalar strings live here;
@@ -1679,6 +1683,7 @@ const COPY_DE = {
   refund: "Erstattung",
   privacy: "Datenschutz",
   disclaimerHeading: "Rechtlicher Hinweis",
+  trademarkNote: "SonVuDev ist ein unabhängiger Entwickler. Nicht mit Microsoft verbunden, von Microsoft unterstützt oder gesponsert. Windows, Excel und .NET sind Marken der Microsoft Corporation.",
   nav: { contactEmail: "Support-E-Mail" },
   contact: {
     h1: "Kontakt",
@@ -1736,6 +1741,7 @@ const COPY_ES = {
   refund: "Reembolso",
   privacy: "Privacidad",
   disclaimerHeading: "Aviso legal",
+  trademarkNote: "SonVuDev es un desarrollador independiente. No está afiliado, respaldado ni patrocinado por Microsoft. Windows, Excel y .NET son marcas comerciales de Microsoft Corporation.",
   nav: { contactEmail: "Email de soporte" },
   contact: {
     h1: "Contacto",
@@ -1793,6 +1799,7 @@ const COPY_FR = {
   refund: "Remboursement",
   privacy: "Confidentialité",
   disclaimerHeading: "Avertissement légal",
+  trademarkNote: "SonVuDev est un développeur indépendant. Non affilié, approuvé ou sponsorisé par Microsoft. Windows, Excel et .NET sont des marques de Microsoft Corporation.",
   nav: { contactEmail: "Email de support" },
   contact: {
     h1: "Contact",
@@ -1850,6 +1857,7 @@ const COPY_JA = {
   refund: "返金",
   privacy: "プライバシー",
   disclaimerHeading: "法的免責事項",
+  trademarkNote: "SonVuDev は独立した開発者です。Microsoft と提携、承認、後援されていません。Windows、Excel、.NET は Microsoft Corporation の商標です。",
   nav: { contactEmail: "サポートメール" },
   contact: {
     h1: "お問い合わせ",
@@ -1907,6 +1915,7 @@ const COPY_ZH = {
   refund: "退款",
   privacy: "隐私",
   disclaimerHeading: "法律声明",
+  trademarkNote: "SonVuDev 是独立开发者。与 Microsoft 无关联、未获 Microsoft 认可或赞助。Windows、Excel 和 .NET 是 Microsoft Corporation 的商标。",
   nav: { contactEmail: "支持邮箱" },
   contact: {
     h1: "联系我们",
@@ -2257,7 +2266,7 @@ ${features.length ? `<section class="detail-block"><h2>${esc(copy.features)}</h2
 ${product.requirements ? `<section class="detail-block"><h2>${esc(copy.requirements)}</h2><p>${esc(product.requirements).replace(/\n/g, "<br>")}</p></section>` : ""}
 ${(product.fileSize || product.file_size) ? `<section class="detail-block"><h2>${esc(copy.fileSizeLabel)}</h2><p>${esc(formatBytes(product.fileSize || product.file_size))}</p></section>` : ""}
 ${trustBlock(product, copy)}
-${product.disclaimer ? `<section class="detail-block disclaimer"><h2>${esc(copy.disclaimerHeading || 'Thông báo pháp lý')}</h2><p>${esc(product.disclaimer)}</p></section>` : ''}
+${product.disclaimer ? `<section class="detail-block disclaimer"><h2>${esc(copy.disclaimerHeading || 'Thông báo pháp lý')}</h2><p>${esc(product.disclaimer)}</p><p class="trademark-note">${esc(copy.trademarkNote)}</p></section>` : `<section class="detail-block disclaimer"><h2>${esc(copy.disclaimerHeading || 'Thông báo pháp lý')}</h2><p class="trademark-note">${esc(copy.trademarkNote)}</p></section>`}
 ${intro ? `<section class="detail-block prose">${paragraphBlocks(intro)}</section>` : ""}
 ${groups.map((group) => `<section class="detail-block prose">${paragraphBlocks(group)}</section>`).join("")}
 <section class="detail-block">
@@ -2469,17 +2478,25 @@ export function renderMerchantFeed(products) {
 
   const rows = sellable.map((product) => {
     const title = escape(product.name + (product.version ? ` v${product.version}` : ""));
-    const description = escape(
-      (product.shortDescriptionEn || product.shortDescription || product.description || "")
-        .replace(/\s+/g, " ")
-        .trim()
-    );
+    // The description is the product's own factual prose. Promotional sentences
+    // (price, discount, deadline) are stripped the same way the Product schema
+    // strips them: a feed description is a product description, not a sale notice.
+    const rawDescription = String(product.shortDescriptionEn || product.shortDescription || product.description || "").replace(/\s+/g, " ").trim();
+    const keptDescription = rawDescription.split(/(?<=[.!?])\s+/).filter((sentence) => !PROMO_IN_TEXT.test(sentence)).join(" ").trim();
+    const description = escape(keptDescription || derivedDescription(product));
     const link = absolute(productUrl(product.slug));
     const image = product.imageUrl
       ? product.imageUrl
       : absolute(`/og/${product.slug}.png`);
-    const vndToUsd = 26000;
-    const price = `${((Number(product.price) || 0) / vndToUsd).toFixed(2)} USD`;
+    // The feed price is the product's own shelf price, in the product's own
+    // currency. This is the number the JSON-LD Offer and the Vietnamese landing
+    // page publish; converting it to a second currency here is what made the feed
+    // disagree with the page (GMC: price mismatch / dishonest pricing). Google
+    // accepts the product's currency as long as the account supports it, and a
+    // number that never moves is a number Merchant Center can match on the next
+    // crawl.
+    const currency = String(product.currency || "VND").toUpperCase();
+    const price = `${(Number(product.price) || 0).toFixed(2)} ${currency}`;
     const mpn = String(product.id || product.slug);
 
     return [
