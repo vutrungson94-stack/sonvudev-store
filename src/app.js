@@ -304,6 +304,30 @@ app.use((req, res, next) => {
   if (req.secure) res.setHeader("Strict-Transport-Security", "max-age=15552000; includeSubDomains");
   next();
 });
+
+// Trailing-slash normalization. Every page had two addresses, /x and /x/, both
+// answering 200 with byte-identical content, which Google read as duplicate pages
+// and reported as "trang trùng lặp". The canonical tag on the slash version already
+// pointed at the non-slash one, but a canonical is a hint; a 308 is a fact.
+// Locale roots are the exception: /en and /en/ are both registered routes and
+// /en/ is the canonical, so neither form is redirected — the canonical tag
+// consolidates them. Registered before the page routes so no route ever renders
+// a slash variant a second time.
+app.use((req, res, next) => {
+  if (req.method !== "GET" && req.method !== "HEAD") return next();
+  const p = req.path;
+  if (p === "/") return next();
+  const qs = req.url.includes("?") ? req.url.slice(req.url.indexOf("?")) : "";
+  const localeRoot = /^\/([a-z]{2}(?:-[A-Za-z]{2})?)\/?$/i.exec(p);
+  if (localeRoot && LOCALE_CODES.some((c) => c.toLowerCase() === localeRoot[1].toLowerCase())) {
+    return next();
+  }
+  if (p.endsWith("/")) {
+    return res.redirect(308, `${p.slice(0, -1)}${qs}`);
+  }
+  next();
+});
+
 app.get("/robots.txt", (_req, res) => {
   // Built by src/robots.js, which is also what scripts/seo-check.mjs asserts the
   // live file against. The list used to be written here and there, and /paypal-return

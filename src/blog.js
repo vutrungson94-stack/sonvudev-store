@@ -254,7 +254,14 @@ export function renderBlogPost(post, lang = "vi") {
       const hay = `${m} ${text}`.toLowerCase();
       const isBuy = /\bdata-buy\b|\bdata-purchase\b|class="[^"]*\b(?:buy|purchase|checkout|btn-buy|btn-purchase|order-now|add-to-cart|cart)\b[^"]*"|\b(?:mua ngay|đặt mua|mua hàng|thanh toán ngay|buy now|purchase now|order now|checkout|add to cart)\b/i.test(hay);
       const href = isBuy ? buyHref(slug, lang) : productPageHref(slug, lang);
-      return m.replace(/href="\/product\/[^"?#\s]+"/i, `href="${href}"`);
+      const rewritten = m.replace(/href="\/product\/[^"?#\s]+"/i, `href="${href}"`);
+      // A buy CTA opens /?buy=<id>, which serves the homepage bytes under a query
+      // string. For a crawler that is a duplicate of /, so the link must not invite
+      // a crawl or pass PageRank; the canonical tag already consolidates the two.
+      if (!isBuy) return rewritten;
+      return /\brel="/i.test(rewritten)
+        ? rewritten.replace(/\brel="[^"]*"/i, 'rel="nofollow"')
+        : rewritten.replace(/<a\b/i, '<a rel="nofollow"');
     }
   );
   const section = blogField(post, lang, "section");

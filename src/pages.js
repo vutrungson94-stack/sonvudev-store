@@ -1443,7 +1443,7 @@ export function renderIndexGrid(products) {
       <ul>${features}</ul>
       <div class="product-buy">
         <strong>${esc(money(product.price, product.currency))}</strong>
-        <a class="round-arrow" href="${esc(buyUrl)}" data-i18n-attr="aria-label:products.buyAria" aria-label="Mua ${nameVi}">↗</a>
+        <a class="round-arrow" href="${esc(buyUrl)}" rel="nofollow" data-i18n-attr="aria-label:products.buyAria" aria-label="Mua ${nameVi}">↗</a>
       </div>
     </div>
   </article>`;
@@ -2102,7 +2102,7 @@ ${jsonLd({ "@graph": [organization(), websiteSchema(), productSchema(product, la
 -->
 <div class="buy-price">${esc(priceLabel)}</div>
 <p class="buy-note">${esc(copy.buyNote)}</p>
-<a class="button button-primary button-wide" href="${homePrefix}/?buy=${encodeURIComponent(product.id)}#products">${esc(copy.buyNow)} <span>→</span></a>
+<a class="button button-primary button-wide" href="${homePrefix}/?buy=${encodeURIComponent(product.id)}#products" rel="nofollow">${esc(copy.buyNow)} <span>→</span></a>
 <ul class="buy-points"><li>${esc(copy.pointDownload)}</li><li>${esc(copy.pointLookup)}</li><li>${esc(copy.pointRefund)}</li></ul>
 </div>
 </header>

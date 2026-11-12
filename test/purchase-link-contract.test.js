@@ -21,6 +21,8 @@ test('store grid: CTA mua dùng /?buy=<id>, liên kết khám phá dùng trang s
     },
   ]);
   assert.match(html, /class="round-arrow"[^>]*href="\/\?buy=p-123"/, 'nút mua trên store phải mở luồng /?buy=<id>');
+  assert.match(html, /rel="nofollow"[^>]*href="\/\?buy=p-123"|href="\/\?buy=p-123"[^>]*rel="nofollow"/,
+    'link mua phải có rel="nofollow" — /?buy= là bản trùng của /');
   assert.match(html, /class="product-page-link"[^>]*href="[^"]*\/product\/san-pham-demo"/, 'tên/liên kết khám phá sản phẩm phải tới trang sản phẩm');
   assert.doesNotMatch(html, /product-page-link[^>]*href="[^"]*\/\?buy=/, 'liên kết khám phá không được mở form mua');
 });
@@ -45,6 +47,8 @@ test('trang sản phẩm SSR: nút mua chính dùng /?buy=<id>, sản phẩm kh�
   ];
   const vi = renderProductPage(product, 'vi', [], related);
   assert.match(vi, /class="button button-primary button-wide"[^>]*href="(?:https?:\/\/[^"]+)?\/\?buy=p-main#products"/, 'nút mua chính trang sản phẩm phải dùng /?buy=<id>');
+  assert.match(vi, /rel="nofollow"[^>]*href="(?:https?:\/\/[^"]+)?\/\?buy=p-main#products"|href="(?:https?:\/\/[^"]+)?\/\?buy=p-main#products"[^>]*rel="nofollow"/,
+    'nút mua chính phải có rel="nofollow"');
   assert.match(vi, /class="related-card"[^>]*href="[^"]*\/product\/san-pham-khac"/, 'sản phẩm khác/liên quan (khám phá) phải đi tới trang sản phẩm');
   assert.doesNotMatch(vi, /class="related-card"[^>]*href="[^"]*\/\?buy=/, 'sản phẩm khác không được mở form thanh toán');
 
