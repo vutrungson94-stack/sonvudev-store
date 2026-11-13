@@ -728,15 +728,18 @@ body.modal-open{overflow:hidden}#modal-content{display:flex;flex-direction:colum
 .admin-product-list .admin-product-row:last-child{border-bottom:0}
 .admin-product-list .table-empty{padding:22px 0;font-size:12px}
 .admin-panel-count{color:var(--muted);font-size:11px;font-weight:500;margin-left:auto;white-space:nowrap}
-.site-footer{display:flex;flex-wrap:wrap;align-items:center;gap:10px 28px;position:sticky;bottom:0;z-index:15;background:rgba(247,249,248,.92);-webkit-backdrop-filter:blur(8px);backdrop-filter:blur(8px);border-top:1px solid var(--line);padding:10px 0}
+.site-footer{display:flex;flex-wrap:wrap;align-items:flex-start;gap:18px 40px;background:rgba(247,249,248,.92);border-top:1px solid var(--line);padding:26px 0 20px}
+.site-footer .brand{align-self:center}
 .site-footer p{flex:1 1 220px;max-width:340px;margin:0}
-.footer-links{flex:1 1 auto;justify-content:flex-end;flex-wrap:wrap;white-space:normal;row-gap:16px;column-gap:24px}
+.footer-contact{flex:1 1 460px;display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:4px 28px;align-content:start}
+.footer-contact p{flex:none;max-width:none;line-height:1.55;overflow-wrap:anywhere}
+.footer-links{flex:1 1 300px;display:grid;grid-template-columns:repeat(2,minmax(0,max-content));justify-content:end;gap:6px 24px;font-size:12px;white-space:normal}
 .footer-links a{display:inline-flex;align-items:center;min-height:24px;padding:2px 0}
 .site-footer p a{display:inline-flex;align-items:center;min-height:24px}
-.site-footer small{flex:1 1 100%;border-top:1px solid var(--line);padding-top:8px;margin-top:2px}
-@media(max-width:800px){.footer-links{justify-content:flex-start}
-.site-footer{gap:6px 16px}
-.site-footer small{flex:1 1 auto;border-top:0;padding-top:0;margin-top:0}}
+.site-footer small{flex:1 1 100%;border-top:1px solid var(--line);padding-top:12px;margin-top:2px}
+@media(max-width:800px){.site-footer{gap:16px}
+.footer-contact{flex-basis:100%;grid-template-columns:1fr}
+.footer-links{flex-basis:100%;justify-content:start;grid-template-columns:repeat(2,minmax(0,1fr))}}
 .about-copy h1~*{padding-left:24px}
 .about-copy h1~ul{padding-left:24px}
 .about-copy h2~*:not(h2){padding-left:48px}

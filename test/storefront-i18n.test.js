@@ -417,18 +417,17 @@ test('mọi trang đều đổi được tiêu đề tab', async () => {
   // shared, and that is the part a reader sees on every page.
   assert.match(css, /\.admin-page \.site-header\{[^}]*height:58px/, 'admin giữ chiều cao header riêng');
 
-  // The footer is pinned the same way, on the same principle: one shared rule,
-  // not a body class one page happens to carry. It is the last element in the
-  // document, so its z-index has to sit under the header (20) and the checkout
-  // sheet (20, later in the DOM, which is what decides a tie) — at the header's
-  // own z-index the footer would paint over the sheet a buyer is paying in.
+  // The footer used to be pinned like the header, back when it was a single line
+  // of links. It now carries the identity block (legal entity, address, phone,
+  // email) on every page; pinning four lines would take a quarter of a phone
+  // viewport from the content on every scroll, and the taller panel is why the
+  // pin came off. It is an ordinary footer at the end of the document, so it
+  // needs neither z-index nor a backdrop — only its separating line.
   const footer = css.match(/^\.site-footer\{([^}]*)\}/m);
   assert.ok(footer, 'cần có rule .site-footer cơ bản');
-  assert.match(footer[1], /position:sticky/, 'footer phải được cố định (sticky) giống header');
-  assert.match(footer[1], /bottom:0/, 'footer cố định phải neo vào đáy khung nhìn');
-  assert.match(footer[1], /background:/, 'footer cố định phải có nền, nếu không chữ nội trang sẽ hiện xuyên qua');
-  const footerZ = Number(/z-index:(\d+)/.exec(footer[1])[1]);
-  assert.ok(footerZ < 20, `footer phải nằm dưới header/modal (20), đang là ${footerZ}`);
+  assert.doesNotMatch(footer[1], /position:sticky/,
+    'footer không được pin: khối danh tính 4 dòng sẽ che nội dung khi cuộn');
+  assert.match(footer[1], /border-top:/, 'footer vẫn phải có đường phân cách với nội dung');
 });
 
 
