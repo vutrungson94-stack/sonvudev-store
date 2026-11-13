@@ -1115,6 +1115,12 @@ const STATIC_PAGES = {
   "terms.html": { slug: "/terms", key: "terms" },
   "privacy.html": { slug: "/privacy", key: "privacy" },
   "refund.html": { slug: "/refund", key: "refund" },
+  // Contact is linked from every footer and was the one localized route left out
+  // of this table. /en/contact therefore skipped localizeStaticHtml, served the
+  // Vietnamese template with lang="vi", and let i18n.js translate the whole page
+  // after load — a 0.204 layout shift on a phone, and a crawlable English URL
+  // that returned Vietnamese bytes.
+  "contact.html": { slug: "/contact", key: "contact" },
 };
 
 /**
@@ -1169,6 +1175,15 @@ export const STATIC_META = {
     fr: { title: "Politique de remboursement - {{brandName}}", description: "Politique de remboursement de {{brandName}} : conditions de remboursement, délais de traitement et les cas où le remboursement est impossible." },
     ja: { title: "返金ポリシー - {{brandName}}", description: "{{brandName}} の返金ポリシー：返金条件、処理期限、返金できない場合。" },
     "zh-CN": { title: "退款政策 - {{brandName}}", description: "{{brandName}} 退款政策：退款条件、处理期限，以及不予退款的情形。" },
+  },
+  contact: {
+    vi: { title: "Liên hệ - {{brandName}}", description: "Liên hệ {{brandName}} để được hỗ trợ đơn hàng, hoàn tiền, hoặc hỏi đáp trước khi mua. Chúng tôi trả lời qua email và điện thoại." },
+    en: { title: "Contact - {{brandName}}", description: "Contact {{brandName}} for order support, refunds or pre-sales questions. We answer by email and phone." },
+    de: { title: "Kontakt - {{brandName}}", description: "Kontaktieren Sie {{brandName}} für Bestellhilfe, Rückerstattungen oder Fragen vor dem Kauf. Wir antworten per E-Mail und Telefon." },
+    es: { title: "Contacto - {{brandName}}", description: "Contacta con {{brandName}} para soporte de pedidos, reembolsos o dudas antes de comprar. Respondemos por correo y teléfono." },
+    fr: { title: "Contact - {{brandName}}", description: "Contactez {{brandName}} pour l'aide sur les commandes, les remboursements ou les questions avant achat. Nous répondons par e-mail et par téléphone." },
+    ja: { title: "お問い合わせ - {{brandName}}", description: "ご注文のサポート、返金、購入前のご質問は {{brandName}} まで。メールと電話でお答えします。" },
+    "zh-CN": { title: "联系我们 - {{brandName}}", description: "如需订单支持、退款或购买前咨询，请联系 {{brandName}}。我们通过电子邮件和电话回复。" },
   },
 };
 
@@ -1257,7 +1272,13 @@ export function localizeStaticHtml(html, { file = "", lang = DEFAULT_LOCALE, val
       },
     );
     out = out.replace(
-      /<([A-Za-z][\w-]*)([^>]*?)\sdata-i18n="([^"]+)"([^>]*)>([^<]*)<\/\1>/g,
+      // Nested markup is allowed and flattened to the dictionary's text on
+      // purpose. The browser's apply() sets textContent, so a localized
+      // sentence with a <strong> or a link in the template ends up as plain
+      // text there too; matching only text-only elements left the contact
+      // list in Vietnamese on /en/contact until i18n.js rewrote it after load,
+      // which is the 0.204 layout shift this pass exists to prevent.
+      /<([A-Za-z][\w-]*)([^>]*?)\sdata-i18n="([^"]+)"([^>]*)>([\s\S]*?)<\/\1>/g,
       // Rebuild the tag keeping data-i18n so the browser's dictionary still owns the live page.
       (_m, tag, before, k, after, _inner) => {
         const v = dict[k];

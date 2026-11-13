@@ -4,6 +4,7 @@ import { existsSync, promises as fs, readFileSync } from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import './helpers/env.mjs';
+import { createDom, runScript } from './helpers/dom.mjs';
 
 process.env.NODE_ENV = 'test';
 
@@ -158,6 +159,44 @@ test('blog inline CSS rút gọn và phủ hết class đang dùng', async () =>
       }
     }
   }
+});
+
+// The redirect that sent PageSpeed Insights from /blog to /en/blog. The script
+// runs in a stubbed browser, the same way the storefront i18n tests boot the
+// real i18n.js.
+async function runLangDetect({ pathname = '/blog', stored = null, language = 'en-US' } = {}) {
+  const store = stored ? { sonvudev_lang: stored } : {};
+  const localStorage = {
+    getItem: (key) => (key in store ? store[key] : null),
+    setItem: (key, value) => { store[key] = String(value); },
+  };
+  const location = { pathname, href: '', search: '', hash: '' };
+  const { document } = createDom([]);
+  await runScript(readFileSync(path.join(process.cwd(), 'public', 'lang-detect.js'), 'utf8'), {
+    document,
+    localStorage,
+    navigator: { language },
+    // `location` is a top-level sandbox global: runScript assigns win.location
+    // from here, so passing it inside `window` is overwritten by the default.
+    location,
+  });
+  return location;
+}
+
+test('browser tiếng Anh không bị chuyển từ /blog sang /en/blog', async () => {
+  const location = await runLangDetect({ stored: null, language: 'en-US' });
+  assert.equal(location.href, '',
+    'trình duyệt mới không được redirect — PageSpeed/Lighthouse không audit được /blog');
+});
+
+test('lựa chọn ngôn ngữ đã lưu vẫn được tôn trọng', async () => {
+  const location = await runLangDetect({ stored: 'en', language: 'vi-VN' });
+  assert.equal(location.href, '/en/blog');
+});
+
+test('URL có prefix ngôn ngữ luôn thắng lựa chọn đã lưu', async () => {
+  const location = await runLangDetect({ pathname: '/de/blog', stored: 'en' });
+  assert.equal(location.href, '', 'trang /de/blog phải giữ nguyên');
 });
 
 test('loadBlogPosts đọc đúng số bài viết', async () => {
