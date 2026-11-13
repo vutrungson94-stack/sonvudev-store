@@ -9,7 +9,7 @@ import { esc } from "./format.js";
 import { SUPPORTED_LOCALES } from "./i18n-registry.mjs";
 import { analyticsMeta } from "./pages.js";
 import { assetUrl } from "./lib/assets.mjs";
-import { inlineStyles } from "./lib/inline-styles.mjs";
+import { inlineBlogStyles } from "./lib/inline-styles.mjs";
 
 // The directory the module reads by default, resolved from this module's own
 // location (src/blog-posts) — never from dataDir (data/blog). data/ is runtime
@@ -324,7 +324,7 @@ export function renderBlogPost(post, lang = "vi") {
     ? ui.translationNotice
     : "";
 
-  return inlineStyles(`<!DOCTYPE html>
+  return inlineBlogStyles(`<!DOCTYPE html>
 <html lang="${ui.htmlLang}">
 <head>
   <meta charset="UTF-8">
@@ -366,7 +366,13 @@ ${analyticsMeta()}
     <a href="${absolute("/")}" class="blog-home">← ${ui.home}</a>
     ${blogLanguageCombobox(post.slug, lang, ui.language)}
   </nav>
-  <script src="${assetUrl('/blog-lang.js')}"></script>
+  <!-- deferred: neither script is needed to paint the page. blog-lang.js only
+       wires the combobox, and lang-detect.js only redirects when the URL has no
+       locale prefix — both can run after parsing. Loaded blocking, they were the
+       first two requests on the critical path ("Render-blocking requests":
+       440 ms on a phone, 343 ms of dependency chain on /en/blog). Both still run
+       before DOMContentLoaded, so the redirect keeps its place ahead of the page. -->
+  <script defer src="${assetUrl('/blog-lang.js')}"></script>
   <article class="blog-post">
     <header class="blog-header">
       <div class="blog-meta">
@@ -386,7 +392,7 @@ ${analyticsMeta()}
       </div>
     </footer>
   </article>
-  <script src="${assetUrl('/lang-detect.js')}"></script>
+  <script defer src="${assetUrl('/lang-detect.js')}"></script>
   <script defer src="${assetUrl('/quality.js')}"></script>
 </body>
 </html>`);
@@ -431,7 +437,7 @@ export function renderBlogIndex(posts, lang = "vi") {
     ? `<div class="blog-translation-wrap">${ui.translationNotice}</div>`
     : "";
 
-  return inlineStyles(`<!DOCTYPE html>
+  return inlineBlogStyles(`<!DOCTYPE html>
 <html lang="${ui.htmlLang}">
 <head>
   <meta charset="UTF-8">
@@ -468,7 +474,13 @@ ${analyticsMeta()}
     <a href="${absolute("/")}" class="blog-home">← ${ui.home}</a>
     ${blogLanguageCombobox("", lang, ui.language)}
   </nav>
-  <script src="${assetUrl('/blog-lang.js')}"></script>
+  <!-- deferred: neither script is needed to paint the page. blog-lang.js only
+       wires the combobox, and lang-detect.js only redirects when the URL has no
+       locale prefix — both can run after parsing. Loaded blocking, they were the
+       first two requests on the critical path ("Render-blocking requests":
+       440 ms on a phone, 343 ms of dependency chain on /en/blog). Both still run
+       before DOMContentLoaded, so the redirect keeps its place ahead of the page. -->
+  <script defer src="${assetUrl('/blog-lang.js')}"></script>
   <main class="wrap">
     <header class="blog-index-header">
       <h1>${esc(ui.pageTitle)}</h1>
@@ -478,7 +490,7 @@ ${analyticsMeta()}
       ${noticeHtml}${cards || `<p>${esc(ui.empty)}</p>`}
     </div>
   </main>
-  <script src="${assetUrl('/lang-detect.js')}"></script>
+  <script defer src="${assetUrl('/lang-detect.js')}"></script>
   <script defer src="${assetUrl('/quality.js')}"></script>
 </body>
 </html>`);

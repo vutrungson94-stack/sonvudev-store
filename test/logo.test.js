@@ -70,6 +70,28 @@ test('manifest được chèn sau khi tải, không nằm trên critical request
     'manifest không được nằm trong <head> — nó nằm trên critical request chain');
 });
 
+// The header brand mark is an <img> on every page. It has to be requested from the
+// site root: a relative src on /en/ resolves to /en/logo-ink-64.png, which the
+// static route does not serve, and DevTools shows a failed request for a file that
+// exists. Same failure class as the stylesheet link in AGENTS.md §4, so it is
+// asserted the same way — on a prefixed page, not on /.
+test('brand mark dùng đường dẫn tuyệt đối từ gốc, và file tồn tại', async () => {
+  const { createApp } = await import('../src/app.js');
+  const app = await createApp();
+  const server = app.listen(0);
+  const { port } = server.address();
+  try {
+    const html = await (await fetch(`http://127.0.0.1:${port}/en/`)).text();
+    const img = html.match(/<img[^>]*logo-ink-64\.png[^>]*>/);
+    assert.ok(img, 'header phải có brand mark');
+    assert.match(img[0], /src="\/logo-ink-64\.png"/,
+      'src phải là /logo-ink-64.png — src tương đối trên /en/ là 404');
+    assert.ok(await exists('public/logo-ink-64.png'), 'public/logo-ink-64.png phải tồn tại');
+  } finally {
+    server.close();
+  }
+});
+
 test('mọi trang đều nhận đủ bộ icon, không viết tay link nào', async () => {
   const pages = ['index.html', 'about.html', 'terms.html', 'privacy.html', 'refund.html',
     '404.html', 'lookup.html', 'order.html', 'paypal-return.html', 'admin.html'];

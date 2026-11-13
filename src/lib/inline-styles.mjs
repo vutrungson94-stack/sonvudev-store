@@ -29,14 +29,29 @@ import { fileURLToPath } from "node:url";
 
 const publicDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..", "public");
 
-let css = "";
-try {
-  css = readFileSync(path.join(publicDir, "styles.min.css"), "utf8").trim();
-} catch {
-  // No built stylesheet (a checkout that has not run the build). The page then
-  // keeps its stylesheet link, which is slower but correct.
-  css = "";
-}
+const read = (file) => {
+  try {
+    return readFileSync(path.join(publicDir, file), "utf8").trim();
+  } catch {
+    // No built stylesheet (a checkout that has not run the build). The page then
+    // keeps its stylesheet link, which is slower but correct.
+    return "";
+  }
+};
+
+const css = read("styles.min.css");
+// Blog pages use a fifth of the storefront stylesheet; scripts/subset-blog-css.mjs
+// generates the filtered copy from the same public/styles.css. If the build has
+// not produced it, fall back to the full sheet rather than shipping an unstyled
+// page.
+const blogCss = read("blog.min.css");
+
+const replaceLink = (html, text) => (text
+  ? html.replace(
+    /<link rel="stylesheet" href="\/styles\.min\.css[^"]*">/g,
+    `<style id="site-styles">${text}</style>`,
+  )
+  : html);
 
 /**
  * Replaces the stylesheet link with the stylesheet itself.
@@ -44,10 +59,12 @@ try {
  * @param {string} html the rendered page
  * @returns {string}
  */
-export const inlineStyles = (html) => {
-  if (!css) return html;
-  return html.replace(
-    /<link rel="stylesheet" href="\/styles\.min\.css[^"]*">/g,
-    `<style id="site-styles">${css}</style>`,
-  );
-};
+export const inlineStyles = (html) => replaceLink(html, css);
+
+/**
+ * The same inline stylesheet, filtered to the rules blog pages use.
+ *
+ * @param {string} html the rendered page
+ * @returns {string}
+ */
+export const inlineBlogStyles = (html) => replaceLink(html, blogCss || css);

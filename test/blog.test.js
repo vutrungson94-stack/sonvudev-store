@@ -107,6 +107,14 @@ test('blog index uses the stored publication date and a compact, mobile-safe lan
   assert.ok(html.includes('class="lang-trigger"'), 'combobox must have a trigger button');
   assert.ok(/data-blog-lang="vi"[^>]*aria-current="true"|aria-current="true"[^>]*data-blog-lang="vi"/.test(html), 'current blog locale must be marked selected/current');
   assert.ok(html.includes('/blog-lang.js'), 'blog combobox behavior/persistence script must be loaded');
+  // Both blog scripts used to be blocking. Lighthouse measured 440 ms of
+  // render-blocking requests and a /en/blog -> blog-lang.js -> lang-detect.js
+  // chain. They only wire the combobox and redirect an unprefixed URL, so they
+  // are deferred; a blocking tag here brings the 440 ms back.
+  assert.match(html, /<script defer src="\/blog-lang\.js/, 'blog-lang.js phải defer');
+  assert.match(html, /<script defer src="\/lang-detect\.js/, 'lang-detect.js phải defer');
+  assert.ok(!/<script src="\/(blog-lang|lang-detect)\.js/.test(html),
+    'blog-lang.js và lang-detect.js không được chặn render');
   const css = readFileSync(path.join(process.cwd(), 'public', 'styles.css'), 'utf8');
   assert.ok(/\.blog-lang a\.active\{[^}]*background:var\(--brand\)/.test(css), 'legacy active-link rule must remain available');
   assert.ok(/@media\(max-width:700px\)\{\.blog-lang\{display:flex/.test(css), 'mobile must keep blog nav compact (home + combobox), not a grid of language links');
@@ -119,6 +127,37 @@ test('blog index uses the stored publication date and a compact, mobile-safe lan
 test('blog slug không tồn tại trả về 404', async () => {
   const res = await get('/blog/khong-ton-tai');
   assert.equal(res.status, 404);
+});
+
+// Blog pages used to inline the whole storefront stylesheet (~70 KB) when they
+// match about a fifth of it: Lighthouse charged 12-14 KiB gzipped of "unused CSS"
+// on a content page. scripts/subset-blog-css.mjs writes public/blog.min.css from
+// the same public/styles.css, and this test holds the two ends together: the page
+// must inline the subset, and every class the page renders must have a rule in it
+// (a class added to a template without rebuilding would style nothing).
+test('blog inline CSS rút gọn và phủ hết class đang dùng', async () => {
+  const index = await text('/blog');
+  const post = await text('/blog/kiem-tra-dung-luong-usb');
+  assert.ok(index.includes('<style id="site-styles">'), 'blog phải inline CSS như các trang khác');
+  assert.ok(!index.includes('href="/styles.min.css'), 'blog không được tải stylesheet đầy đủ');
+  const subset = readFileSync(path.join(process.cwd(), 'public', 'blog.min.css'), 'utf8');
+  const full = readFileSync(path.join(process.cwd(), 'public', 'styles.min.css'), 'utf8');
+  assert.ok(subset.length < full.length / 2, 'subset phải nhỏ hơn một nửa stylesheet đầy đủ');
+  const faces = (text) => (text.match(/@font-face/g) || []).length;
+  assert.equal(faces(subset), faces(full),
+    'subset phải giữ đủ @font-face — thiếu một unicode-range là mất dấu tiếng Việt');
+  for (const page of [index, post]) {
+    for (const match of page.matchAll(/class="([^"]+)"/g)) {
+      for (const name of match[1].split(/\s+/)) {
+        // Some classes are hooks with no rule of their own (e.g.
+        // .blog-language-label carries .sr-only). Only assert the rules that
+        // exist in the full sheet survive the subset.
+        if (!full.includes(`.${name}`)) continue;
+        assert.ok(subset.includes(`.${name}`),
+          `blog.min.css thiếu .${name} — chạy npm run build để sinh lại subset`);
+      }
+    }
+  }
 });
 
 test('loadBlogPosts đọc đúng số bài viết', async () => {
