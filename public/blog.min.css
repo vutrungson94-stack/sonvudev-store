@@ -7,7 +7,8 @@ html{scroll-behavior:smooth}
 body{margin:0;background:var(--paper);color:var(--ink);font-family:'Be Vietnam Pro',Arial,sans-serif;font-size:15px;line-height:1.5}
 a{color:inherit;text-decoration:none}
 button,input{font:inherit}
-@media(max-width:800px){:root{--gutter:24px}}`n.wrap{width:min(1160px,calc(100% - var(--gutter)*2));margin:auto}
+@media(max-width:800px){:root{--gutter:24px}}
+.wrap{width:min(1160px,calc(100% - var(--gutter) - var(--gutter)));margin:auto}
 nav{display:flex;gap:32px;color:#1f2d36;font-size:13px}
 nav a:hover{color:var(--green)}
 .sr-only{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap;border:0}
@@ -22,7 +23,7 @@ nav a:hover{color:var(--green)}
 .blog-section{flex:1 1 auto;text-align:right}
 .blog-card h2,.blog-card h3{font:600 17px 'Space Grotesk';letter-spacing:-.03em;margin:10px 18px 0;line-height:1.3}
 .blog-card p{color:var(--muted);font-size:12px;line-height:1.6;margin:10px 18px 18px;flex:1 1 auto}
-.blog-lang{display:flex;align-items:center;justify-content:flex-end;gap:14px;width:min(720px,calc(100% - var(--gutter)*2));margin:0 auto;padding:10px 0;font-size:12px;color:var(--muted)}
+.blog-lang{display:flex;align-items:center;justify-content:flex-end;gap:14px;width:min(720px,calc(100% - var(--gutter) - var(--gutter)));margin:0 auto;padding:10px 0;font-size:12px;color:var(--muted)}
 .blog-lang a{display:inline-flex;align-items:center;gap:6px;padding:6px 10px;border-radius:999px;border:1px solid var(--line);color:var(--ink);text-decoration:none;font-size:11px;font-weight:600;letter-spacing:.02em;line-height:1.2}
 .blog-lang a.active{background:var(--brand);color:#fff;border-color:var(--brand)}
 .blog-lang .blog-home{display:inline-flex;align-items:center;gap:6px;padding:6px 10px;border-radius:999px;border:1px solid var(--line);color:var(--ink);text-decoration:none;font-size:11px;font-weight:600;letter-spacing:.02em;line-height:1.2}
@@ -32,7 +33,7 @@ nav a:hover{color:var(--green)}
 .blog-lang-option:hover{background:#f0fdf4}
 .blog-lang-option[aria-current="true"],.blog-lang .lang-dropdown li[aria-selected="true"] .blog-lang-option{background:#f0fdf4;color:var(--green);font-weight:600}
 .blog-lang-current{max-width:10.5em;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-@media(max-width:700px){.blog-lang{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;width:min(720px,calc(100% - var(--gutter)*2));padding:10px 0}
+@media(max-width:700px){.blog-lang{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;width:min(720px,calc(100% - var(--gutter) - var(--gutter)));padding:10px 0}
 .blog-lang .blog-home{font-size:12px;padding:7px 10px}
 .blog-lang-combobox-wrap{margin-left:auto}
 .blog-lang .lang-trigger{padding:6px 10px;font-size:12px}
@@ -89,7 +90,7 @@ nav a:hover{color:var(--green)}
 .lang-dropdown li[aria-selected="true"]{background:#f0fdf4;color:var(--green)}
 .lang-dropdown .lang-flag{width:20px;height:14px}
 body.modal-open{overflow:hidden}
-@media(max-width:800px){.wrap,.site-header{width:min(100% - var(--gutter)*2,600px)}}
+@media(max-width:800px){.wrap,.site-header{width:min(100% - var(--gutter) - var(--gutter),600px)}}
 @media(max-width:800px){.lang-trigger{padding:5px 9px;font-size:11px}}
 @media(max-width:420px){.lang-trigger{padding:4px 7px;font-size:10px;letter-spacing:.04em}}
 @media(max-width:700px){body.modal-open{position:fixed;inset:0;overflow:hidden;width:100%;height:100%}}
