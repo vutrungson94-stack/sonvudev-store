@@ -947,9 +947,10 @@ export const footerLinks = (route, copy = null, prefix = "") =>
 export const footerBar = (route, copy, prefix = "") => {
   const contactHtml = businessContactHtml(copy ? 'vi' : 'vi');
   return `<footer class="site-footer wrap"><div class="brand">${brandWordmark()}</div>` +
+    `<p>${esc(copy.tagline || "")}</p>` +
     (contactHtml ? `<div class="footer-contact">${contactHtml}</div>` : '') +
     `<div class="footer-links">${footerLinks(route, copy, prefix)}</div>` +
-    `<small>© ${new Date().getFullYear()} ${esc(brand())} · ${esc(copy.tagline)}</small></footer>`;
+    `<small>© ${new Date().getFullYear()} ${esc(brand())}</small></footer>`;
 };
 
 /**
@@ -1597,6 +1598,7 @@ export const renderStats = (products) => {
  */
 export const COPY_VI = {
   home: "Trang chủ",
+  tagline: "Phần mềm tốt cho công việc tốt",
   products: "Sản phẩm",
   faqNav: "Câu hỏi",
   about: "Về chúng tôi",
@@ -1650,6 +1652,7 @@ export const COPY_VI = {
 
 export const COPY_EN = {
   home: "Home",
+  tagline: "Good software for good work",
   products: "Products",
   faqNav: "FAQ",
   about: "About",
@@ -1697,6 +1700,7 @@ export const COPY_EN = {
 // home. Anything missing from the asset falls back to the English label.
 const COPY_DE = {
   home: "Startseite",
+  tagline: "Gute Software für gute Arbeit",
   products: "Produkte",
   faqNav: "FAQ",
   about: "Über uns",
@@ -1755,6 +1759,7 @@ const COPY_DE = {
 
 const COPY_ES = {
   home: "Inicio",
+  tagline: "Buen software para un buen trabajo",
   products: "Productos",
   faqNav: "Preguntas",
   about: "Sobre nosotros",
@@ -1813,6 +1818,7 @@ const COPY_ES = {
 
 const COPY_FR = {
   home: "Accueil",
+  tagline: "Un bon logiciel pour un bon travail",
   products: "Produits",
   faqNav: "FAQ",
   about: "À propos",
@@ -1871,6 +1877,7 @@ const COPY_FR = {
 
 const COPY_JA = {
   home: "ホーム",
+  tagline: "良い仕事のための良いソフトウェア",
   products: "製品",
   faqNav: "よくある質問",
   about: "私たちについて",
@@ -1929,6 +1936,7 @@ const COPY_JA = {
 
 const COPY_ZH = {
   home: "首页",
+  tagline: "好工具，好工作",
   products: "产品",
   faqNav: "常见问题",
   about: "关于我们",

@@ -107,7 +107,7 @@ test('audit chặn được từng loại lỗi nó sinh ra để bắt', async 
     const cwd = await copy('missing-translation');
     const file = path.join(cwd, 'public', 'i18n.js');
     const source = await fs.readFile(file, 'utf8');
-    const cut = source.replace(/\n\s*'brand\.tagline': 'Phần mềm tốt cho công việc tốt\.',/, '');
+    const cut = source.replace(/\n\s*'brand\.tagline': 'Phần mềm tốt cho công việc tốt',/, '');
     assert.notEqual(cut.length, source.length, 'phải tìm được dòng tiếng Việt để xoá');
     await fs.writeFile(file, cut, 'utf8');
     const result = runAudit(cwd);

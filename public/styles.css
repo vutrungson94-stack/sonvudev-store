@@ -775,7 +775,7 @@ body.modal-open{overflow:hidden}
 .site-footer{display:flex;flex-direction:column;align-items:center;text-align:center;background:rgba(247,249,248,.92);border-top:1px solid var(--line);padding:32px 0 20px;gap:0}
 .site-footer .brand{flex:0 0 auto}
 .site-footer p{flex:0 0 auto;max-width:none;margin:0}
-.site-footer>p[data-i18n="brand.tagline"]{max-width:132px;margin-top:6px;line-height:1.35;font-size:11px}
+.site-footer .brand+p{margin-top:6px;line-height:1.35;font-size:11px}
 .footer-contact{flex:0 0 auto;display:grid;justify-items:center;gap:4px;width:100%;margin-top:16px;padding-top:16px;border-top:1px solid var(--line)}
 .footer-contact p{line-height:1.55;overflow-wrap:anywhere}
 .footer-links{flex:0 0 auto;display:flex;flex-wrap:wrap;align-items:center;justify-content:center;gap:8px 28px;width:100%;margin-top:16px;padding-top:16px;border-top:1px solid var(--line);font-size:12px;white-space:normal}
