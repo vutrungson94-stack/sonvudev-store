@@ -1463,18 +1463,31 @@ const I18N = {
 };
 
 // Walks the document swapping text, placeholders and attributes.
+//
+// Every write is guarded by "is it actually different". The server already renders
+// the page in its URL's language, so on a first visit this function's job is mostly
+// to discover that there is nothing to do. Writing the same string back still
+// replaces the text node: on a slow connection i18n.js arrives after first paint,
+// every text node is replaced at once, the page relayouts, and Lighthouse records
+// the hero heading as a 2.6 s LCP with CLS 0.16 — for a page that was already
+// correct. Comparing first makes a no-op stay a no-op.
 function apply(root = document) {
   root.querySelectorAll('[data-i18n]').forEach((el) => {
-    el.textContent = I18N.t(el.dataset.i18n, el.textContent);
+    const value = I18N.t(el.dataset.i18n, el.textContent);
+    if (value !== el.textContent) el.textContent = value;
   });
   root.querySelectorAll('[data-i18n-html]').forEach((el) => {
-    el.innerHTML = I18N.t(el.dataset.i18nHtml, el.innerHTML);
+    const value = I18N.t(el.dataset.i18nHtml, el.innerHTML);
+    if (value !== el.innerHTML) el.innerHTML = value;
   });
   root.querySelectorAll('[data-i18n-attr]').forEach((el) => {
     // Format: "placeholder:lookup.order,aria-label:nav.buy"
     el.dataset.i18nAttr.split(',').forEach((pair) => {
       const [attr, key] = pair.split(':').map((s) => s.trim());
-      if (attr && key) el.setAttribute(attr, I18N.t(key, el.getAttribute(attr)));
+      if (attr && key) {
+        const value = I18N.t(key, el.getAttribute(attr));
+        if (value !== el.getAttribute(attr)) el.setAttribute(attr, value);
+      }
     });
   });
   // Legacy data-vi/data-en fallback: Only apply for VI or EN.
@@ -1495,14 +1508,12 @@ function apply(root = document) {
   root.querySelectorAll('.filter').forEach((btn) => {
     const filter = btn.dataset.filter;
     if (!filter) return;
-    if (filter === 'all') {
-      btn.textContent = I18N.t('products.all', btn.textContent);
-    } else {
-      const translated = I18N.productLabel('category', filter) 
-                       || I18N.productLabel('platform', filter) 
-                       || filter;
-      btn.textContent = translated;
-    }
+    const translated = filter === 'all'
+      ? I18N.t('products.all', btn.textContent)
+      : (I18N.productLabel('category', filter)
+        || I18N.productLabel('platform', filter)
+        || filter);
+    if (btn.textContent !== translated) btn.textContent = translated;
   });
   document.documentElement.lang = current;
 }
