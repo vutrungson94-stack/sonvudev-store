@@ -401,10 +401,14 @@ test('/merchant-feed.tsv là TSV hợp lệ và có đủ trường GMC', async 
   assert.equal(created.status, 201);
   const text = await (await fetch(`${base}/merchant-feed.tsv`)).text();
   const lines = text.split('\n').filter((l) => l.trim());
-  assert.ok(lines[0].startsWith('id\ttitle\tdescription\tlink\timage_link\tprice\tavailability\tcondition\tbrand\tmpn\tproduct_type\tshipping_weight\tshipping_length\tshipping_width\tshipping_height'));
+  assert.ok(lines[0].startsWith('id\ttitle\tdescription\tlink\timage_link\tprice\tavailability\tcondition\tbrand\tmpn\tproduct_type'));
   assert.ok(lines.length >= 2, 'phải có ít nhất 1 sản phẩm');
   const cols = lines[1].split('\t');
-  assert.equal(cols.length, 15);
+  // 11 columns: the four shipping_* columns were removed because every product
+  // is a digital download, and shipping dimensions told GMC to treat it as
+  // physical (which is what produced the shipping-currency mismatch).
+  assert.equal(cols.length, 11);
+  assert.ok(!lines[0].includes('shipping'), 'feed hàng số không được khai báo shipping');
   assert.match(cols[5], /\d+\.\d+\s+VND/);
   assert.equal(cols[6], 'in stock');
   assert.equal(cols[7], 'new');

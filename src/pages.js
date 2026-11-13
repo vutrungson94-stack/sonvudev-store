@@ -2546,10 +2546,12 @@ export function renderMerchantFeed(products) {
       escape(env.brand.name),
       mpn,
       escape(product.category || "Software"),
-      "0",
-      "0",
-      "0",
-      "0",
+      // No shipping_* columns. Every product is a digital download, and the four
+      // zeroes that used to sit here told Merchant Center the opposite: an item
+      // with shipping dimensions is a physical item, so GMC demanded a shipping
+      // service and then failed every product on "shipping currency does not
+      // match the price currency". A digital feed carries no shipping data at
+      // all, which is also what Google's feed spec asks for.
     ].join("\t");
   });
 
@@ -2565,10 +2567,6 @@ export function renderMerchantFeed(products) {
     "brand",
     "mpn",
     "product_type",
-    "shipping_weight",
-    "shipping_length",
-    "shipping_width",
-    "shipping_height",
   ].join("\t");
 
   return [header, ...rows].join("\n") + "\n";
