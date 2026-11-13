@@ -19,6 +19,7 @@
 <section class="admin-card" id="login-card">
 <h2>Đăng nhập quản trị</h2>
 <form id="login-form">
+<input type="text" name="username" autocomplete="username" value="admin" hidden aria-hidden="true">
 <label>Admin token<input id="admin-token" type="password" required autocomplete="current-password" placeholder="Nhập ADMIN_API_TOKEN"></label>
 <button class="button button-primary" type="submit">Mở bảng điều khiển <span>→</span></button>
 <p id="login-status" class="form-message"></p>
