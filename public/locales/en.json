@@ -1,6 +1,6 @@
 {
   "brand.supportEmail": "{{support}}",
-  "brand.tagline": "Good software for good work.",
+  "brand.tagline": "Good software for good work",
   "brand.rights": "© {{year}} SonVuDev · All rights reserved",
   "announce.text": "{brand} is opening up to new releases",
   "announce.cta": "Explore now",

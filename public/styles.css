@@ -768,16 +768,17 @@ body.modal-open{overflow:hidden}
    guess: the checkout sheet and the toast sit at 20 and 30, and the footer is
    the last element in the document — at the header's 20 an equal z-index would
    be decided by document order and the footer would paint over the modal. */
-/* A centred stack: brand, tagline, the identity block, then one row of links and
-   the copyright. The old multi-column row left the tagline stranded beside the
-   brand and the links floating under the address; a single centred column reads
-   as one footer at every width and keeps the identity lines together. */
-.site-footer{display:flex;flex-direction:column;align-items:center;gap:12px;text-align:center;background:rgba(247,249,248,.92);border-top:1px solid var(--line);padding:36px 0 24px}
+/* Four stacked groups, each separated by a full-width hairline: the brand
+   lockup (logo + tagline), the identity block, the links, the copyright. The
+   tagline belongs to the logo, so it sits tight under it and is no wider than
+   the wordmark; every rule below spans the footer's own width. */
+.site-footer{display:flex;flex-direction:column;align-items:center;text-align:center;background:rgba(247,249,248,.92);border-top:1px solid var(--line);padding:32px 0 20px;gap:0}
 .site-footer .brand{flex:0 0 auto}
 .site-footer p{flex:0 0 auto;max-width:none;margin:0}
-.footer-contact{flex:0 0 auto;display:grid;justify-items:center;gap:4px}
+.site-footer>p[data-i18n="brand.tagline"]{max-width:132px;margin-top:6px;line-height:1.35;font-size:11px}
+.footer-contact{flex:0 0 auto;display:grid;justify-items:center;gap:4px;width:100%;margin-top:16px;padding-top:16px;border-top:1px solid var(--line)}
 .footer-contact p{line-height:1.55;overflow-wrap:anywhere}
-.footer-links{flex:0 0 auto;display:flex;flex-wrap:wrap;align-items:center;justify-content:center;gap:8px 28px;width:100%;font-size:12px;padding-top:18px;border-top:1px solid var(--line);white-space:normal}
+.footer-links{flex:0 0 auto;display:flex;flex-wrap:wrap;align-items:center;justify-content:center;gap:8px 28px;width:100%;margin-top:16px;padding-top:16px;border-top:1px solid var(--line);font-size:12px;white-space:normal}
 /* Footer links and the support address are the smallest tap targets on the page.
    At 12px/11px with an 18px line box they failed Lighthouse's "Tap targets are
    sized appropriately" on a phone even though the gaps were generous: the box
@@ -785,11 +786,11 @@ body.modal-open{overflow:hidden}
    the type size or the footer's look. */
 .footer-links a{display:inline-flex;align-items:center;min-height:24px;padding:2px 0}
 .site-footer p a{display:inline-flex;align-items:center;min-height:24px}
-.site-footer small{flex:0 0 auto;padding-top:0;margin:0}
+.site-footer small{flex:0 0 auto;width:100%;margin-top:16px;padding-top:14px;border-top:1px solid var(--line)}
 @media(max-width:800px){
-  .site-footer{gap:10px;padding:28px 0 20px}
-  .footer-contact{gap:3px}
-  .footer-links{gap:6px 18px;padding-top:14px}
+  .site-footer{padding:26px 0 18px}
+  .footer-contact{gap:3px;margin-top:14px;padding-top:14px}
+  .footer-links{gap:6px 18px;margin-top:14px;padding-top:14px}
 }
 
 /* About page: align indentation with legal pages.

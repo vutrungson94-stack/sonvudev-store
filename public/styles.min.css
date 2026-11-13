@@ -728,18 +728,19 @@ body.modal-open{overflow:hidden}#modal-content{display:flex;flex-direction:colum
 .admin-product-list .admin-product-row:last-child{border-bottom:0}
 .admin-product-list .table-empty{padding:22px 0;font-size:12px}
 .admin-panel-count{color:var(--muted);font-size:11px;font-weight:500;margin-left:auto;white-space:nowrap}
-.site-footer{display:flex;flex-direction:column;align-items:center;gap:12px;text-align:center;background:rgba(247,249,248,.92);border-top:1px solid var(--line);padding:36px 0 24px}
+.site-footer{display:flex;flex-direction:column;align-items:center;text-align:center;background:rgba(247,249,248,.92);border-top:1px solid var(--line);padding:32px 0 20px;gap:0}
 .site-footer .brand{flex:0 0 auto}
 .site-footer p{flex:0 0 auto;max-width:none;margin:0}
-.footer-contact{flex:0 0 auto;display:grid;justify-items:center;gap:4px}
+.site-footer>p[data-i18n="brand.tagline"]{max-width:132px;margin-top:6px;line-height:1.35;font-size:11px}
+.footer-contact{flex:0 0 auto;display:grid;justify-items:center;gap:4px;width:100%;margin-top:16px;padding-top:16px;border-top:1px solid var(--line)}
 .footer-contact p{line-height:1.55;overflow-wrap:anywhere}
-.footer-links{flex:0 0 auto;display:flex;flex-wrap:wrap;align-items:center;justify-content:center;gap:8px 28px;width:100%;font-size:12px;padding-top:18px;border-top:1px solid var(--line);white-space:normal}
+.footer-links{flex:0 0 auto;display:flex;flex-wrap:wrap;align-items:center;justify-content:center;gap:8px 28px;width:100%;margin-top:16px;padding-top:16px;border-top:1px solid var(--line);font-size:12px;white-space:normal}
 .footer-links a{display:inline-flex;align-items:center;min-height:24px;padding:2px 0}
 .site-footer p a{display:inline-flex;align-items:center;min-height:24px}
-.site-footer small{flex:0 0 auto;padding-top:0;margin:0}
-@media(max-width:800px){.site-footer{gap:10px;padding:28px 0 20px}
-.footer-contact{gap:3px}
-.footer-links{gap:6px 18px;padding-top:14px}}
+.site-footer small{flex:0 0 auto;width:100%;margin-top:16px;padding-top:14px;border-top:1px solid var(--line)}
+@media(max-width:800px){.site-footer{padding:26px 0 18px}
+.footer-contact{gap:3px;margin-top:14px;padding-top:14px}
+.footer-links{gap:6px 18px;margin-top:14px;padding-top:14px}}
 .about-copy h1~*{padding-left:24px}
 .about-copy h1~ul{padding-left:24px}
 .about-copy h2~*:not(h2){padding-left:48px}

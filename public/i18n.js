@@ -36,7 +36,7 @@ const DICT = {
   vi: {
     // Địa chỉ hỗ trợ do máy chủ đưa vào data-support, không ghi tay ở đây.
     'brand.supportEmail': supportAddress(),
-    'brand.tagline': 'Phần mềm tốt cho công việc tốt.',
+    'brand.tagline': 'Phần mềm tốt cho công việc tốt',
     'brand.rights': `© ${YEAR} ${host()} · Đồng sở hữu`,
     'announce.text': '{brand} đang mở cửa cho các bản phát hành mới',
     'announce.cta': 'Khám phá ngay',
@@ -613,7 +613,7 @@ const DICT = {
   en: {
     // The configured default. The server substitutes the live SUPPORT_EMAIL.
     'brand.supportEmail': supportAddress(),
-    'brand.tagline': 'Good software for good work.',
+    'brand.tagline': 'Good software for good work',
     'brand.rights': `© ${YEAR} ${host()} · All rights reserved`,
     'announce.text': '{brand} is opening up to new releases',
     'announce.cta': 'Explore now',
