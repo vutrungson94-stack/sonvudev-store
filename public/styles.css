@@ -775,12 +775,12 @@ body.modal-open{overflow:hidden}
    phone, email). Laid out one after another they wrapped into a staircase with
    the support email stranded on its own row; as a two-column block they read
    as one panel. */
-.footer-contact{flex:1 1 480px;display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:6px 36px;align-content:start}
+.footer-contact{flex:1 1 480px;display:grid;grid-template-columns:1fr;gap:6px;align-content:start}
 .footer-contact p{flex:none;max-width:none;line-height:1.55;overflow-wrap:anywhere}
 /* Identity row, then a full-width strip of links. The links used to be a third
    flex item squeezed beside the contact panel, which left them floating under
    the address with the left half of the row empty. */
-.footer-links{flex:1 1 100%;display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px 24px;font-size:12px;padding-top:18px;border-top:1px solid var(--line);white-space:normal}
+.footer-links{flex:1 1 100%;display:flex;flex-wrap:wrap;align-items:center;gap:8px 28px;font-size:12px;padding-top:18px;border-top:1px solid var(--line);white-space:normal}
 /* Footer links and the support address are the smallest tap targets on the page.
    At 12px/11px with an 18px line box they failed Lighthouse's "Tap targets are
    sized appropriately" on a phone even though the gaps were generous: the box
@@ -791,8 +791,8 @@ body.modal-open{overflow:hidden}
 .site-footer small{flex:1 1 100%;padding-top:12px;margin:0}
 @media(max-width:800px){
   .site-footer{gap:14px}
-  .footer-contact{flex-basis:100%;grid-template-columns:1fr;gap:4px}
-  .footer-links{grid-template-columns:repeat(2,minmax(0,1fr));gap:6px 18px;padding-top:14px}
+  .footer-contact{flex-basis:100%;gap:4px}
+  .footer-links{gap:6px 18px;padding-top:14px}
 }
 
 /* About page: align indentation with legal pages.
