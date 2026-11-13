@@ -1114,7 +1114,7 @@ const REPAIR_MAPS = {
   },
   badge: {
     vi: { 'moi': 'Mới', 'ban chay': 'Bán chạy', 'cap nhat': 'Cập nhật', 'phat hanh': 'Phát hành', 'pho bien': 'Phổ biến', 'chuyen nghiep': 'Chuyên nghiệp', 'tiet kiem': 'Tiết kiệm', 'doanh nghiep': 'Doanh nghiệp', 'uu dai som': 'Ưu đãi sớm' },
-    en: { 'Mới': 'New', 'Bán chạy': 'Best seller', 'Cập nhật': 'Updated', 'Phát hành': 'Release', 'Phổ biến': 'Popular', 'Chuyên nghiệp': 'Professional', 'Tiết kiệm': 'Value', 'Doanh nghiệp': 'Enterprise', 'Ưu đãi sớm': 'Early Bird', 'Safe Edition v4.3': 'Safe Edition v4.3', 'Phát hành 1.4.0': 'Release 1.4.0' }
+    en: { 'Mới': 'New', 'Bán chạy': 'Best seller', 'Cập nhật': 'Updated', 'Phát hành': 'Release', 'Phổ biến': 'Popular', 'Chuyên nghiệp': 'Professional', 'Tiết kiệm': 'Value', 'Doanh nghiệp': 'Enterprise', 'Ưu đãi sớm': 'Early Bird', 'Safe Edition v4.3': 'Safe Edition v4.3', 'Phát hành 1.5.0': 'Release 1.5.0' }
   }
 };
 
@@ -1307,7 +1307,7 @@ const I18N = {
   },
   // Category and badge are free-text catalogue columns, so they cannot be looked
   // up by a fixed key. The label key is derived from the value itself
-  // ("Release 1.4.0" -> product.label.badge.release-1.4.0) after folding
+  // ("Release 1.5.0" -> product.label.badge.release-1.5.0) after folding
   // diacritics and case, which also matches rows typed without accents.
   // Returns null when no translation exists, so the caller can fall back instead
   // of printing an untranslated label it cannot detect.

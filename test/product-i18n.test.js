@@ -131,7 +131,7 @@ test('nhãn danh mục và badge tra theo giá trị, kể cả khi gõ thiếu 
   assert.equal(I18N.productLabel('category', 'Công cụ'), 'ツール');
   assert.equal(I18N.productLabel('category', 'Tiện ích'), 'ユーティリティ');
   assert.equal(I18N.productLabel('badge', 'Phổ biến'), '人気');
-  assert.equal(I18N.productLabel('badge', 'Phát hành 1.4.0'), 'v1.4.0 リリース', 'key suy ra từ giá trị, không cần bảng tay');
+  assert.equal(I18N.productLabel('badge', 'Phát hành 1.5.0'), 'v1.5.0 リリース', 'key suy ra từ giá trị, không cần bảng tay');
   assert.equal(I18N.productLabel('category', 'Không tồn tại'), null, 'giá trị lạ phải trả null để nơi gọi tự dự phòng');
 });
 

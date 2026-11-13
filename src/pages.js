@@ -259,7 +259,7 @@ const OG_LOCALE = { vi: "vi_VN", en: "en_US", de: "de_DE", es: "es_ES", fr: "fr_
 const SCHEMA_LANG = { vi: "vi-VN", en: "en", de: "de", es: "es", fr: "fr", ja: "ja", "zh-CN": "zh-CN" };
 const localePrefix = (lang) => (!lang || lang === "vi" ? "" : `/${lang}`);
 // Mirrors public/i18n.js labelSlug() so the server derives the same dictionary
-// keys ("Phát hành 1.4.0" -> "phat-hanh-1.4.0") without importing browser code.
+// keys ("Phát hành 1.5.0" -> "phat-hanh-1.5.0") without importing browser code.
 const labelSlug = (value) => String(value || "")
   .toLowerCase()
   .normalize("NFD")
@@ -1610,11 +1610,11 @@ export const COPY_VI = {
   breadcrumbLabel: "Đường dẫn",
   software: "Phần mềm",
   // Category and badge are free-text columns, so a Vietnamese product carries
-  // Vietnamese words there. Rendering them raw put "Công cụ · Windows · Phát hành 1.4.0"
+  // Vietnamese words there. Rendering them raw put "Công cụ · Windows · Phát hành 1.5.0"
   // at the top of the English page. These map the values the shop actually uses; an
   // unknown one still renders as written rather than disappearing.
   categories: { "Công cụ": "Công cụ", "Tiện ích": "Tiện ích", "Phần mềm": "Phần mềm", "Khác": "Khác" },
-  badges: { "Mới": "Mới", "Bán chạy": "Bán chạy", "Cập nhật": "Cập nhật", "Phát hành": "Phát hành", "Phổ biến": "Phổ biến", "Chuyên nghiệp": "Chuyên nghiệp", "Tiết kiệm": "Tiết kiệm", "Doanh nghiệp": "Doanh nghiệp", "Ưu đãi sớm": "Ưu đãi sớm", "Safe Edition v4.3": "Safe Edition v4.3", "Phát hành 1.4.0": "Phát hành 1.4.0" },
+  badges: { "Mới": "Mới", "Bán chạy": "Bán chạy", "Cập nhật": "Cập nhật", "Phát hành": "Phát hành", "Phổ biến": "Phổ biến", "Chuyên nghiệp": "Chuyên nghiệp", "Tiết kiệm": "Tiết kiệm", "Doanh nghiệp": "Doanh nghiệp", "Ưu đãi sớm": "Ưu đãi sớm", "Safe Edition v4.3": "Safe Edition v4.3", "Phát hành 1.5.0": "Phát hành 1.5.0" },
   // The verification block. What it links to is what the claim rests on, so every
   // line here points at something a stranger can open and check: an independent
   // antivirus scan, and the build report of the shop selling the file. Neither
@@ -1666,7 +1666,7 @@ export const COPY_EN = {
   // raw values have to be mapped onto it in more than one place — here, and in
   // the store that reads the catalogue.
   categories: CATEGORY_EN,
-  badges: { "Mới": "New", "Bán chạy": "Best seller", "Cập nhật": "Updated", "Phát hành": "Release", "Phổ biến": "Popular", "Chuyên nghiệp": "Professional", "Tiết kiệm": "Value", "Doanh nghiệp": "Enterprise", "Ưu đãi sớm": "Early Bird", "Safe Edition v4.3": "Safe Edition v4.3", "Phát hành 1.4.0": "Release 1.4.0" },
+  badges: { "Mới": "New", "Bán chạy": "Best seller", "Cập nhật": "Updated", "Phát hành": "Release", "Phổ biến": "Popular", "Chuyên nghiệp": "Professional", "Tiết kiệm": "Value", "Doanh nghiệp": "Enterprise", "Ưu đãi sớm": "Early Bird", "Safe Edition v4.3": "Safe Edition v4.3", "Phát hành 1.5.0": "Release 1.5.0" },
   trustHeading: "Verification",
   trustScan: "Independent antivirus scan (VirusTotal)",
   trustScanNote: "Run by a third party, not by this shop. Open it to see how many engines scanned the exact file you download, and how many flagged it.",
@@ -2170,7 +2170,7 @@ function localizeToEnglish(product) {
  * `category` and `badge` are free-text columns. They are written once, in whichever
  * language the owner was typing in, and the shop has two languages — so rendering
  * them raw put a Vietnamese eyebrow at the top of every English product page:
- * "Công cụ · Windows · Phát hành 1.4.0" on a URL declared as the English alternative
+ * "Công cụ · Windows · Phát hành 1.5.0" on a URL declared as the English alternative
  * of the Vietnamese one. A dictionary entry cannot fix that on its own, because the
  * owner can type anything into those columns; the map below covers the values the
  * shop actually uses and this is what decides what happens to the rest.
@@ -2188,8 +2188,8 @@ export const localised = (value, map, fallback = "") => {
   const raw = String(value ?? "").trim();
   if (!raw) return fallback;
   if (map && Object.prototype.hasOwnProperty.call(map, raw)) return map[raw];
-  // A catalogue row typed without diacritics ("Phat hanh 1.4.0") is the same word
-  // as the dictionary key ("Phát hành 1.4.0"). Exact lookup alone left the raw
+  // A catalogue row typed without diacritics ("Phat hanh 1.5.0") is the same word
+  // as the dictionary key ("Phát hành 1.5.0"). Exact lookup alone left the raw
   // column text on screen, so the reader saw an unaccented label next to a fully
   // accented Vietnamese page. Folding both sides matches it without editing data
   // that was created years ago and may live in a database we do not control.
