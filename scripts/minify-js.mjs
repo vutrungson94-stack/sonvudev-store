@@ -34,9 +34,11 @@ const targetDir = dirFlag !== -1
   ? path.resolve(process.argv[dirFlag + 1])
   : path.join(root, ARTIFACT_PATH, "public");
 
-// The two files Lighthouse named. admin.js, related.js and the rest are
-// smaller and are not on the critical path of a storefront visit.
-const TARGETS = ["app.js", "i18n.js"];
+// The two files Lighthouse named, plus admin.js: the panel is its own page, and
+// Lighthouse charges it ~4 KiB of whitespace and comments ("Minify JavaScript").
+// related.js, format.js and the rest are smaller and are not on the critical path
+// of a storefront visit.
+const TARGETS = ["app.js", "i18n.js", "admin.js"];
 
 let saved = 0;
 for (const name of TARGETS) {

@@ -378,20 +378,16 @@ export const iconLinkMarkup = () => {
     if (link.color) attrs.push(`color="${link.color}"`);
     return `<link ${attrs.join(' ')}>`;
   });
-  // Preload the manifest so the browser fetches it in parallel with the HTML
-  // instead of chaining it after quality.js runs (HTML -> quality.js -> manifest).
-  // This is a preload hint, not the manifest registration itself: quality.js still
-  // appends the real <link rel="manifest"> for PWA install, and the browser reuses
-  // the preloaded response. The preload removes the "Network dependency tree"
-  // chain Lighthouse reports for the deferred injection.
+  // No manifest link and no manifest preload here.
   //
-  // No crossorigin, and that is load-bearing. /site.webmanifest is same-origin and
-  // sends no Access-Control-Allow-Origin, so crossorigin="use-credentials" turns
-  // the preload into a CORS request that the route refuses: Chrome reports the
-  // failure against this exact <link>, discards the preload, and fetches the
-  // manifest a second time. The manifest link quality.js appends carries no
-  // crossorigin either, so both requests use same-origin credentials and match.
-  lines.push('<link rel="preload" href="/site.webmanifest" as="manifest">');
+  // `as="manifest"` is not a valid preload destination — the preload list is
+  // audio, document, embed, fetch, font, image, object, script, style, track,
+  // video, worker — so Chrome reports a warning against that exact <link> and
+  // ignores it. The bytes are fetched anyway when quality.js appends the real
+  // <link rel="manifest">, which is the only registration. A <link rel="manifest">
+  // in the head would put the fetch on the critical tree (Lighthouse "Network
+  // dependency tree": 781 ms for a 1 KiB file), and the preload that was tried
+  // instead did not remove anything because browsers rejected it.
   return lines;
 };
 
@@ -501,14 +497,7 @@ const productSchema = (product, lang = "vi") => ({
   ...(env.brand.socialLinks.length ? { sameAs: env.brand.socialLinks } : {}),
   author: { "@id": `${site()}/#organization` },
   publisher: { "@id": `${site()}/#organization` },
-  offers: {
-    "@type": "Offer",
-    price: Number(product.price) || 0,
-    priceCurrency: product.currency || "VND",
-    availability: "https://schema.org/InStock",
-    url: absolute(productUrl(product.slug, lang)),
-    seller: { "@id": `${site()}/#organization` },
-  },
+  offers: productOffer(product, lang),
 });
 
 /**
@@ -565,9 +554,32 @@ const productSchema = (product, lang = "vi") => ({
    };
  };
 
+// One Offer node, used by both the SoftwareApplication and the Product node on a
+// product page. They used to be two hand-built objects: the Product carried
+// itemCondition and hasMerchantReturnPolicy, the SoftwareApplication carried
+// neither — so a crawler that read the app node reported the merchant fields as
+// missing even though the page published them. Two offers for one product must
+// also agree on price and currency, and the only way to guarantee that is one
+// object. Digital goods keep returnMethod and shippingDetails out; see the
+// comments on merchantReturnPolicy and digitalShippingDetails above.
+const productOffer = (product, lang = DEFAULT_LOCALE) => {
+  const isDigital = true; // All products are digital downloads
+  const shippingDetails = digitalShippingDetails(isDigital);
+  return {
+    "@type": "Offer",
+    price: Number(product.price) || 0,
+    priceCurrency: String(product.currency || "VND").toUpperCase(),
+    availability: "https://schema.org/InStock",
+    itemCondition: "https://schema.org/NewCondition",
+    url: absolute(productUrl(product.slug, lang)),
+    seller: { "@id": `${site()}/#organization` },
+    hasMerchantReturnPolicy: merchantReturnPolicy(isDigital),
+    ...(shippingDetails ? { shippingDetails } : {}),
+  };
+};
+
 const merchantProductSchema = (product, lang = "vi") => {
   const url = absolute(productUrl(product.slug, lang));
-  const currency = String(product.currency || "VND").toUpperCase();
   // Google's description attribute is a product description, not a sale notice.
   // Sentences that only exist to run a promotion are dropped whole — a sentence
   // is the smallest unit that survives deletion with its grammar intact. If every
@@ -577,8 +589,6 @@ const merchantProductSchema = (product, lang = "vi") => {
   const rawDescription = String(product.description || product.shortDescription || "").replace(/\s+/g, " ").trim();
   const kept = rawDescription.split(/(?<=[.!?])\s+/).filter((sentence) => !PROMO_IN_TEXT.test(sentence)).join(" ").trim();
   const description = (kept || derivedDescription(product)).slice(0, 5000);
-  const isDigital = true; // All products are digital downloads
-  const shippingDetails = digitalShippingDetails(isDigital);
   return {
     "@type": "Product",
     "@id": `${url}#product`,
@@ -597,20 +607,7 @@ const merchantProductSchema = (product, lang = "vi") => {
     category: "Software > Computer Software",
     additionalType: "https://schema.org/SoftwareApplication",
     itemCondition: "https://schema.org/NewCondition",
-    offers: {
-      "@type": "Offer",
-      price: Number(product.price) || 0,
-      priceCurrency: currency,
-      availability: "https://schema.org/InStock",
-      itemCondition: "https://schema.org/NewCondition",
-      url,
-      seller: { "@id": `${site()}/#organization` },
-      // The refund policy published at /refund: 14 days, no restocking fee. Stated
-      // in the offer because Merchant Center reads it from here when the account
-      // has no return policy configured.
-      hasMerchantReturnPolicy: merchantReturnPolicy(isDigital),
-      ...(shippingDetails ? { shippingDetails } : {}),
-    },
+    offers: productOffer(product, lang),
   };
 };
 
@@ -977,6 +974,7 @@ export const PAGE_TOKENS = [
   "site", "brandName", "brandWordmark", "support", "paymentWindowHours",
   "reviewMinLength", "reviewMaxLength", "year", "legalEntityLine", "businessContactHtml", "jsonLd", "iconLinks", "cssVersion",
   "policyUpdated", "policyUpdatedDisplay", "headerNav", "footerLinks", "founder", "brandPhone", "brandAddress",
+  "contactPhoneCardAttr", "contactAddressCardAttr",
 ];
 /**
  * The date printed at the top of the refund policy.
@@ -1070,6 +1068,14 @@ export function pageTokenValues({ products = [], reviewLimits = null, page = "",
     founder: esc(env.brand.founderName || env.brand.name),
     brandPhone: esc(env.brand.phone || ''),
     brandAddress: esc(env.brand.address || ''),
+    // An optional contact card is hidden, not emptied, when its value is not
+    // configured. A <p></p> under "Địa chỉ" and a tel: link with no number read
+    // as a broken page to a visitor and as a seller nobody can locate to the
+    // Merchant Center misrepresentation review. The owner still has to set
+    // BRAND_PHONE/BRAND_ADDRESS; this only stops the page from advertising that
+    // they are missing.
+    contactPhoneCardAttr: String(env.brand.phone || '').trim() ? '' : ' hidden',
+    contactAddressCardAttr: String(env.brand.address || '').trim() ? '' : ' hidden',
   };
 }
 
@@ -2434,16 +2440,7 @@ export function renderFeed(products) {
       mpn: String(product.id || product.slug),
       category: "Software > Computer Software",
       itemCondition: "https://schema.org/NewCondition",
-      offers: {
-        "@type": "Offer",
-        price: Number(product.price) || 0,
-        priceCurrency: product.currency || "VND",
-        availability: "https://schema.org/InStock",
-        url: absolute(productUrl(product.slug)),
-        seller: { "@id": `${site()}/#organization` },
-        hasMerchantReturnPolicy: merchantReturnPolicy(true),
-        ...(digitalShippingDetails(true) ? { shippingDetails: digitalShippingDetails(true) } : {}),
-      },
+      offers: productOffer(product),
     },
   }));
   const blogItems = blogPosts.map((post, index) => {

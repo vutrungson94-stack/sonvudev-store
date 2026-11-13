@@ -66,6 +66,27 @@ test('brandPhone and brandAddress are page tokens the renderer fills', () => {
   assert.ok(tokens[1].includes('"brandAddress"'), 'brandAddress must be in PAGE_TOKENS');
 });
 
+// The test environment configures neither BRAND_PHONE nor BRAND_ADDRESS, which is
+// also what a fresh deploy looks like before the owner sets them. An empty card
+// (a <p></p> under "Địa chỉ", a tel: link with no number) reads as a broken page
+// and as a seller nobody can locate — the misrepresentation review cares about
+// both. The card has to disappear, not render empty.
+test('thẻ điện thoại/địa chỉ trống được ẩn, không render ô rỗng', async () => {
+  const { createApp } = await import('../src/app.js');
+  const app = await createApp();
+  const server = app.listen(0);
+  const { port } = server.address();
+  try {
+    const html = await (await fetch(`http://127.0.0.1:${port}/contact`)).text();
+    assert.match(html, /class="contact-card" hidden/,
+      'thẻ phải mang hidden khi chưa cấu hình BRAND_PHONE/BRAND_ADDRESS');
+    assert.equal((html.match(/class="contact-card" hidden/g) || []).length, 2,
+      'cả thẻ điện thoại và thẻ địa chỉ phải bị ẩn khi chưa cấu hình');
+  } finally {
+    server.close();
+  }
+});
+
 // ---------------------------------------------------------------------------
 // 3. No unenforceable scarcity/discount claims in product copy.
 // ---------------------------------------------------------------------------

@@ -41,6 +41,10 @@ export const TEST_ENV = {
   R2_BUCKET_NAME: 'test-private-bucket',
   BRAND_NAME: 'SonVuDev',
   BRAND_DESCRIPTION: 'Công cụ và tiện ích phần mềm cho doanh nghiệp và cá nhân tại Việt Nam.',
+  // Blank on purpose: the contact page hides the optional phone/address cards when
+  // they are unset, and a developer's .env must not decide which branch a test sees.
+  BRAND_PHONE: '',
+  BRAND_ADDRESS: '',
   BANK_NAME: 'Test Bank',
   BANK_ACCOUNT_NAME: 'SonVuDev Test',
   BANK_ACCOUNT_NUMBER: '0123456789',

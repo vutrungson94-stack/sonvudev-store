@@ -26,12 +26,12 @@ const { createApp } = await import('../src/app.js');
 // so the manifest may only name files that are really there, with the size the
 // manifest claims — a manifest that points at a missing file turns the install
 // prompt into an empty box.
-// The manifest is not linked in the head: quality.js appends it after load so it
-// stays off the critical request chain. The only head hint is a preload, and it
-// must not carry crossorigin — /site.webmanifest is same-origin and sends no
-// Access-Control-Allow-Origin, so a CORS preload is refused, reported against
-// that exact <link>, and the manifest is then fetched a second time.
-test('preload manifest không có crossorigin, và head không có link manifest', async () => {
+// The manifest is registered by quality.js after load, and nothing about it is
+// in the head. `as="manifest"` is not a valid preload destination: Chrome logs a
+// warning against that exact <link> and ignores it, so the preload bought nothing
+// and cost a console error. A real <link rel="manifest"> in the head would put the
+// fetch on the critical tree instead, which is why it is injected later.
+test('head không có link hay preload manifest', async () => {
   const app = await createApp();
   const server = app.listen(0);
   const { port } = server.address();
@@ -40,13 +40,13 @@ test('preload manifest không có crossorigin, và head không có link manifest
     const head = html.slice(0, html.indexOf('</head>'));
     assert.ok(!/<link[^>]*rel="manifest"/i.test(head),
       'head không được chứa <link rel="manifest"> — quality.js thêm sau khi tải xong');
-    const preload = head.match(/<link[^>]*rel="preload"[^>]*as="manifest"[^>]*>/i);
-    assert.ok(preload, 'phải có preload manifest để bỏ chuỗi HTML -> quality.js -> manifest');
-    assert.ok(!/crossorigin/i.test(preload[0]),
-      `preload không được có crossorigin (request CORS sẽ bị chặn): ${preload[0]}`);
-    const response = await fetch(`http://127.0.0.1:${port}/site.webmanifest`);
-    assert.equal(response.headers.get('access-control-allow-origin'), null,
-      '/site.webmanifest không gửi ACAO — nếu sau này có, sửa test này cùng lúc với route');
+    assert.ok(!/<link[^>]*as="manifest"/i.test(head),
+      'as="manifest" không phải preload destination hợp lệ — Chrome cảnh báo và bỏ qua');
+    // And the registration still happens, from the script that was always meant
+    // to do it.
+    const quality = await readFile(path.join(root, 'public', 'quality.js'), 'utf8');
+    assert.match(quality, /manifestLink\.rel\s*=\s*['"]manifest['"]/,
+      'quality.js phải gắn <link rel="manifest"> sau khi tải');
   } finally {
     server.close();
   }

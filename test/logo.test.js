@@ -82,15 +82,16 @@ test('mọi trang đều nhận đủ bộ icon, không viết tay link nào', a
   }
 });
 
-test('iconLinks render đủ icon link + 1 preload manifest, mỗi link một dòng', () => {
+test('iconLinks render đủ icon link, mỗi link một dòng, không preload manifest', () => {
   const markup = iconLinkMarkup();
-  // ICON_LINKS carries the icon slots; iconLinkMarkup() appends one preload hint
-  // for the manifest so the fetch is parallel with the HTML instead of chaining
-  // after quality.js. 8 icon slots + 1 preload = 9 lines.
-  assert.equal(markup.length, ICON_LINKS.length + 1);
+  // ICON_LINKS carries every icon slot. The manifest is registered by quality.js
+  // after load, and a <link rel="preload" as="manifest"> is not valid — Chrome
+  // warns about it and ignores it — so iconLinkMarkup() adds nothing.
+  assert.equal(markup.length, ICON_LINKS.length);
   for (const line of markup) {
     assert.match(line, /^<link rel="[a-z-]+" href="\//);
     assert.ok(line.endsWith('>'));
+    assert.ok(!/as="manifest"/.test(line), 'không được preload manifest: as="manifest" không hợp lệ');
   }
 });
 
