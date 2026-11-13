@@ -14,7 +14,11 @@ import { fileURLToPath } from "node:url";
 import { translateText } from "../src/translate-service.mjs";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
-const BLOG_DIR = join(root, "data", "blog");
+// Blog content ships in src/blog-posts, not data/blog: data/ is runtime state
+// (orders.json) and is excluded from the deploy artifact, so anything read from
+// there is missing in production. Resolved from this script's own path so it works
+// both in a checkout and in publish-output/node/scripts.
+const BLOG_DIR = join(root, "src", "blog-posts");
 const DRY_RUN = !process.argv.includes("--apply");
 const TARGET_LANGS = ["de", "es", "fr", "ja", "zh-CN"];
 const SOURCE_LANG = "vi";

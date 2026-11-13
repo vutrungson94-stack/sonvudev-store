@@ -69,9 +69,9 @@ test('nội dung của shop chỉ dùng ký tự mà hai subset phủ hết', as
   const catalogue = await fs.readFile(path.join(root, 'data', 'products.json'), 'utf8');
   sources.push(['data/products.json', catalogue]);
 
-  const blogDir = path.join(root, 'data', 'blog');
+  const blogDir = path.join(root, 'src', 'blog-posts');
   for (const name of await fs.readdir(blogDir)) {
-    sources.push([`data/blog/${name}`, await fs.readFile(path.join(blogDir, name), 'utf8')]);
+    sources.push([`src/blog-posts/${name}`, await fs.readFile(path.join(blogDir, name), 'utf8')]);
   }
 
   for (const name of await fs.readdir(path.join(root, 'public'))) {

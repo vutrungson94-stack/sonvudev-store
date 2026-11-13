@@ -1,6 +1,6 @@
 // Dynamic blog module for SonVuDev.
 // Stores and renders multilingual blog posts from JSON files under data/blog/.
-import { readdirSync, readFileSync } from "node:fs";
+import { readdirSync, readFileSync, statSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { env } from "./config.js";
@@ -11,8 +11,20 @@ import { analyticsMeta } from "./pages.js";
 import { assetUrl } from "./lib/assets.mjs";
 import { inlineStyles } from "./lib/inline-styles.mjs";
 
-// Directory where blog post JSON files live.
-const BLOG_DIR = path.join(dataDir, "blog");
+// The directory the module reads by default, resolved from this module's own
+// location (src/blog-posts) — never from dataDir (data/blog). data/ is runtime
+// state and is deliberately excluded from the deploy artifact, so anything read
+// from there is missing in production. Resolving from import.meta.url means the
+// same path works in a checkout and in publish-output/node/src/blog-posts.
+export const DEFAULT_BLOG_POSTS_DIR = path.join(path.dirname(fileURLToPath(import.meta.url)), "blog-posts");
+
+// BLOG_POSTS_DIR is a test-only seam: blog.test.js points it at a temp dir so it
+// can seed a controlled fixture. It is ignored outside NODE_ENV=test so a stray
+// value in a production .env cannot silently repoint shipped content at an empty
+// directory — the "empty shop" failure this change exists to fix.
+const BLOG_DIR = process.env.NODE_ENV === "test" && process.env.BLOG_POSTS_DIR
+  ? path.resolve(process.env.BLOG_POSTS_DIR)
+  : DEFAULT_BLOG_POSTS_DIR;
 
 // Build absolute URLs for SEO (canonical, og, alternate).
 const site = () => env.appUrl.replace(/\/$/, "");
@@ -51,6 +63,15 @@ const buyHref = (slug, lang = "vi") => {
   return id ? absolute(`/?buy=${encodeURIComponent(id)}#products`) : productPageHref(slug, lang);
 };
 
+// Parsed posts, keyed by the directory's mtime+size stamp.
+//
+// The content is now really shipped, so without this every /blog, /blog.json,
+// /sitemap.xml and product page paid 8 reads plus 8 JSON.parse on the event
+// loop. The stamp is mtime+size rather than a TTL: an edit in the admin panel or
+// a translation run is visible on the next request, and a request that changes
+// nothing does not read the disk again.
+let blogCache = { stamp: "", posts: null };
+
 // Load all blog posts from disk and sort by date (newest first).
 export function loadBlogPosts() {
   let files;
@@ -59,6 +80,17 @@ export function loadBlogPosts() {
   } catch {
     return [];
   }
+  let stamp = "";
+  try {
+    stamp = files.map((f) => {
+      const s = statSync(path.join(BLOG_DIR, f));
+      return `${f}:${s.mtimeMs}:${s.size}`;
+    }).join("|");
+  } catch {
+    // A file vanished between readdir and stat: read it the slow way.
+    stamp = "";
+  }
+  if (stamp && blogCache.stamp === stamp) return blogCache.posts;
   const posts = [];
   for (const file of files) {
     try {
@@ -69,11 +101,13 @@ export function loadBlogPosts() {
       // skip unreadable posts
     }
   }
-  return posts.sort((a, b) => {
+  const sorted = posts.sort((a, b) => {
     const da = new Date(a.published || a.modified || 0);
     const db = new Date(b.published || b.modified || 0);
     return db - da;
   });
+  blogCache = { stamp, posts: sorted };
+  return sorted;
 }
 
 // Find a single blog post by slug, or null if missing.

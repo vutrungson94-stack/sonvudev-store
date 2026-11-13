@@ -52,6 +52,13 @@ process.env.BRAND_SOCIAL_LINKS = '';
 process.env.BRAND_FOUNDER_NAME = '';
 process.env.BRAND_FOUNDER_URL = '';
 
+// The feed is built from the live catalogue *and* the shipped blog posts, so a
+// test that asserts "the catalogue only" has to isolate itself from ambient
+// content. Blog posts used to be read from DATA_DIR/blog (empty in this temp
+// dir); they now ship in src/blog-posts and are read no matter what DATA_DIR
+// says — which made numberOfItems 9 (1 product + 8 posts) instead of 1.
+process.env.BLOG_POSTS_DIR = path.join(tempDir, 'blog-posts');
+
 const { createApp } = await import('../src/app.js');
 let server;
 let base;

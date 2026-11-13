@@ -384,7 +384,14 @@ export const iconLinkMarkup = () => {
   // appends the real <link rel="manifest"> for PWA install, and the browser reuses
   // the preloaded response. The preload removes the "Network dependency tree"
   // chain Lighthouse reports for the deferred injection.
-  lines.push('<link rel="preload" href="/site.webmanifest" as="manifest" crossorigin="use-credentials">');
+  //
+  // No crossorigin, and that is load-bearing. /site.webmanifest is same-origin and
+  // sends no Access-Control-Allow-Origin, so crossorigin="use-credentials" turns
+  // the preload into a CORS request that the route refuses: Chrome reports the
+  // failure against this exact <link>, discards the preload, and fetches the
+  // manifest a second time. The manifest link quality.js appends carries no
+  // crossorigin either, so both requests use same-origin credentials and match.
+  lines.push('<link rel="preload" href="/site.webmanifest" as="manifest">');
   return lines;
 };
 

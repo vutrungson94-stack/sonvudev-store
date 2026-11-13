@@ -37,6 +37,7 @@ Both were invisible to a single "it works on my machine" pass. Both were caught 
 - **`public/i18n.js`** — the URL prefix wins. Never rewrite a URL the server already renders in the locale the URL names.
 - **`public/index.html` & static legal pages** — the stylesheet link must be absolute (`/styles.css`), never relative (`styles.css`), because prefixes exist.
 - **`src/store.js`** — seed products are development data only; production must not ship phantom catalogue entries.
+- **Shipped content vs runtime data** — **BẮT BUỘC:** anything the site must serve in production (blog posts, product copy, legal text, static JSON) lives in **`src/`** or **`public/`**, both of which are copied into the deploy artifact. **`data/` is runtime state only** (orders.json, email previews) and is deliberately excluded from the artifact and rejected by `deploy.sh`. Content placed in `data/` ships as an empty shop: the file is missing in the image, the loader returns `[]`/null, and the page 404s. Blog posts live in `src/blog-posts/` for this reason. `test/content-ships.test.js` fails if a runtime path is used for shipped content.
 - **`scripts/*.mjs`** — never reintroduce a self-certifying metric (`buildSuccessRate = 100`). Measure, or report `unknown`.
 - **`.github/checks.yml`** — `deployed-site` must wait for the deployed commit to match `github.sha` before running `seo:check`.
 - **`scripts/seo-check.mjs`** — the gate reads absolute URLs (`href="/styles.css"`). Do not make them relative.
@@ -57,6 +58,17 @@ When asked to audit/improve SonVuDev or evaluate maturity, assess the **actual c
 - **Maturity lens (industrial)** — when requested, evaluate against **CMMI Level 5 Optimizing / enterprise platform maturity** criteria grounded in evidence from the codebase: repeatable gates, measurable quality/security, defect prevention, controlled change/rollback, automation, observability, traceability, governance, and continuous improvement. Report current level candidly with gaps and prioritized remediation.
 
 Quality fixes must follow §2: baseline, smallest safe change, fix-until-green, no regressions. Never “fix” by weakening gates/tests except when a gate is provably wrong (document the reason).
+
+## 4.2. Reuse before you write (code economy)
+
+Every new helper is a new thing to read, test and keep in step. Search first:
+
+- **Shared libraries:** `scripts/lib/*` (file walk, artifact, env, HTTP), `src/lib/*` (assets, inline styles, categories, URLs), `src/format.js` / `public/format.js` (escaping, money, bytes, dates), `src/i18n-registry.mjs` (locale list), `src/pages.js` (renderers), `public/i18n.js` (client strings), `src/notify.js` (outbox mail).
+- **The pattern already exists in a sibling file.** A second implementation of escaping, money formatting, locale handling or a route renderer is how the duplication counters in `scripts/metrics.mjs` went up; read one sibling before writing the first line.
+- **One implementation per concern.** If you find the same logic twice, consolidate it in the change you are already making — only when behaviour is identical and a test covers the path. Do not create a “shared” module for two unrelated call sites.
+- **Short, not clever.** A helper earns its place by removing a repeated block. Prefer a 3-line function in the file that uses it over a new module plus an index; prefer an existing module over a new file. No new dependency for something `node:` or the existing dependencies already do.
+- **Delete what your change orphans.** An export nothing imports, a file no route reads, a branch no input can reach: remove it in the same change, or state in the plan why it must stay (a build/runtime contract, intentional extensibility).
+- **Say what you reused.** The change plan names the existing helper/module used instead of the new code written. A reviewer can then check the reuse instead of re-deriving it.
 
 ## 5. The gates
 

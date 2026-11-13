@@ -22,7 +22,6 @@ public/build-report.json
 logs/
 data/
 !data/products.json
-!data/blog/
 backup/
 .tmp-*
 

@@ -19,6 +19,10 @@ process.env.APP_URL = 'https://blog-fixture.example';
 process.env.ADMIN_API_TOKEN = 'test-admin-token';
 process.env.RESEND_API_KEY = '';
 process.env.INDEXNOW_KEY = '';
+// Blog content ships in src/blog-posts (not data/), so the fixture points the
+// loader at a temp dir to seed a controlled single post. Without this the test
+// would read the real 8 posts and its "exactly 1 post" assertions would fail.
+process.env.BLOG_POSTS_DIR = path.join(tempDir, 'blog-posts');
 
 const { createApp } = await import('../src/app.js');
 const { loadBlogPosts, getBlogPostBySlug, renderBlogPost, renderBlogIndex, renderBlogFeed } = await import('../src/blog.js');
@@ -33,8 +37,8 @@ const json = async (p) => (await get(p)).json();
 test.before(async () => {
   server = (await createApp()).listen(0);
   base = `http://127.0.0.1:${server.address().port}`;
-  // Seed one blog post directly into the temp data dir used by the app
-  const blogDir = path.join(tempDir, 'data', 'blog');
+  // Seed one blog post directly into the temp blog-posts dir used by the app
+  const blogDir = path.join(tempDir, 'blog-posts');
   await fs.mkdir(blogDir, { recursive: true });
   await fs.writeFile(path.join(blogDir, 'kiem-tra-dung-luong-usb.json'), JSON.stringify({
     slug: 'kiem-tra-dung-luong-usb',

@@ -445,7 +445,12 @@ app.get(["/admin", "/admin.html", "/admin.js"], async (_req, res) => {
   if (_req.path === "/admin.js") return res.sendFile(path.join(publicDir, "admin.js"));
   try {
     const html = await fs.readFile(path.join(publicDir, "admin.html"), "utf8");
-    res.type("html").send(fillPageTokens(html, pageTokenValues({ page: "admin.html" })));
+    // Inline the stylesheet here too. renderPage() does it for every page, but
+    // the admin panel is served as a file, so it was the one page still loading
+    // /styles.min.css as a render-blocking request — which is what Lighthouse
+    // reports as a "Render-blocking resource" and the critical path on the
+    // admin page.
+    res.type("html").send(inlineStyles(fillPageTokens(html, pageTokenValues({ page: "admin.html" }))));
   } catch (error) {
     console.error(error);
     res.sendFile(path.join(publicDir, "admin.html"));
@@ -710,7 +715,7 @@ app.get("/en/product/:slug", productPage("en"));
 // a translated heading.
 for (const lang of EXTRA_BLOG_LOCALES) app.get(`/${lang}/product/:slug`, productPage(lang));
 
-// Blog routes — dynamic, served from data/blog/*.json.
+// Blog routes — dynamic, served from src/blog-posts/*.json (shipped content).
 // A missing post is treated as 404 so a typo in the slug never publishes
 // an empty page to crawlers.
 const blogPage = (lang) => async (req, res) => {
