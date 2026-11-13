@@ -23,7 +23,7 @@ nav a:hover{color:var(--green)}
 .hero{min-height:580px;display:grid;grid-template-columns:1fr 1fr;align-items:center;gap:45px;padding:65px 0 80px;background:var(--brand-glow)}
 .eyebrow{color:var(--green);font-size:11px;font-weight:700;letter-spacing:.13em;text-transform:uppercase;margin:0 0 18px}
 .eyebrow span{color:var(--coral-ink);font-size:14px;margin-right:6px}
-.hero h1{font:600 clamp(45px,5.5vw,74px)/.98 'Space Grotesk',sans-serif;letter-spacing:-.07em;margin:0 0 26px}
+.hero h1{font:600 clamp(45px,5.5vw,74px)/1.05 'Space Grotesk',sans-serif;letter-spacing:-.04em;margin:0 0 26px}
 .hero h1 em,.why-copy em{color:var(--coral-ink);font-style:normal}
 .hero-text{max-width:470px;color:var(--muted);font-size:16px;line-height:1.7;margin:0 0 30px}
 .hero-actions{display:flex;align-items:center;gap:25px}
@@ -616,9 +616,9 @@ body.modal-open{overflow:hidden}#modal-content{display:flex;flex-direction:colum
 .admin-heading h1{font-size:24px}
 .admin-card{padding:18px 16px}#dashboard,#revenue-panel{padding:16px 14px}
 .form-block{padding:10px 12px 2px}}
-@media(max-width:800px){.wrap,.site-header{width:min(100% - 32px,600px)}
+@media(max-width:800px){.wrap,.site-header{width:min(100% - 48px,600px)}
 .hero{grid-template-columns:1fr;padding-top:45px;gap:20px}
-.hero h1{font-size:53px}
+.hero h1{font-size:53px;line-height:1.1}
 .hero-art{height:370px;transform:scale(.9);margin:-20px}
 .stats{grid-template-columns:repeat(3,1fr);gap:16px}
 .stats strong{font-size:26px}
