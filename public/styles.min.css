@@ -728,17 +728,17 @@ body.modal-open{overflow:hidden}#modal-content{display:flex;flex-direction:colum
 .admin-product-list .admin-product-row:last-child{border-bottom:0}
 .admin-product-list .table-empty{padding:22px 0;font-size:12px}
 .admin-panel-count{color:var(--muted);font-size:11px;font-weight:500;margin-left:auto;white-space:nowrap}
-.site-footer{display:flex;flex-wrap:wrap;align-items:flex-start;gap:16px 36px;background:rgba(247,249,248,.92);border-top:1px solid var(--line);padding:28px 0 20px}
+.site-footer{display:flex;flex-direction:column;align-items:center;gap:12px;text-align:center;background:rgba(247,249,248,.92);border-top:1px solid var(--line);padding:36px 0 24px}
 .site-footer .brand{flex:0 0 auto}
-.site-footer p{flex:0 1 220px;max-width:340px;margin:0}
-.footer-contact{flex:1 1 480px;display:grid;grid-template-columns:1fr;gap:6px;align-content:start}
-.footer-contact p{flex:none;max-width:none;line-height:1.55;overflow-wrap:anywhere}
-.footer-links{flex:1 1 100%;display:flex;flex-wrap:wrap;align-items:center;gap:8px 28px;font-size:12px;padding-top:18px;border-top:1px solid var(--line);white-space:normal}
+.site-footer p{flex:0 0 auto;max-width:none;margin:0}
+.footer-contact{flex:0 0 auto;display:grid;justify-items:center;gap:4px}
+.footer-contact p{line-height:1.55;overflow-wrap:anywhere}
+.footer-links{flex:0 0 auto;display:flex;flex-wrap:wrap;align-items:center;justify-content:center;gap:8px 28px;width:100%;font-size:12px;padding-top:18px;border-top:1px solid var(--line);white-space:normal}
 .footer-links a{display:inline-flex;align-items:center;min-height:24px;padding:2px 0}
 .site-footer p a{display:inline-flex;align-items:center;min-height:24px}
-.site-footer small{flex:1 1 100%;padding-top:12px;margin:0}
-@media(max-width:800px){.site-footer{gap:14px}
-.footer-contact{flex-basis:100%;gap:4px}
+.site-footer small{flex:0 0 auto;padding-top:0;margin:0}
+@media(max-width:800px){.site-footer{gap:10px;padding:28px 0 20px}
+.footer-contact{gap:3px}
 .footer-links{gap:6px 18px;padding-top:14px}}
 .about-copy h1~*{padding-left:24px}
 .about-copy h1~ul{padding-left:24px}
