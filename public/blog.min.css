@@ -8,7 +8,7 @@ body{margin:0;background:var(--paper);color:var(--ink);font-family:'Be Vietnam P
 a{color:inherit;text-decoration:none}
 button,input{font:inherit}
 @media(max-width:800px){:root{--gutter:24px}}
-.wrap{width:min(1160px,calc(100% - var(--gutter) - var(--gutter)));margin:auto}
+.wrap{width:min(1144px,calc(100% - var(--gutter) - var(--gutter)));margin:auto}
 nav{display:flex;gap:32px;color:#1f2d36;font-size:13px}
 nav a:hover{color:var(--green)}
 .sr-only{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap;border:0}

@@ -8,12 +8,12 @@ body{margin:0;background:var(--paper);color:var(--ink);font-family:'Be Vietnam P
 a{color:inherit;text-decoration:none}
 button,input{font:inherit}
 @media(max-width:800px){:root{--gutter:24px}}
-.wrap{width:min(1160px,calc(100% - var(--gutter) - var(--gutter)));margin:auto}
+.wrap{width:min(1144px,calc(100% - var(--gutter) - var(--gutter)));margin:auto}
 .announcement{height:32px;background:var(--mint);display:flex;align-items:center;justify-content:center;gap:8px;font-size:12px;color:var(--green);letter-spacing:.02em}
 .announcement a{font-weight:700;margin-left:12px}
 .announcement a span{font-size:15px;margin-left:4px}
 .dot{width:6px;height:6px;background:var(--coral);border-radius:50%}#stats,#products,#why,#faq{scroll-margin-top:96px}
-.site-header{height:78px;width:min(1160px,calc(100% - var(--gutter) - var(--gutter)));margin:auto;display:flex;align-items:center;justify-content:space-between;gap:30px;position:sticky;top:0;z-index:20;background:rgba(247,249,248,.92);-webkit-backdrop-filter:blur(8px);backdrop-filter:blur(8px);border-bottom:1px solid var(--line)}
+.site-header{height:78px;width:min(1144px,calc(100% - var(--gutter) - var(--gutter)));margin:auto;display:flex;align-items:center;justify-content:space-between;gap:30px;position:sticky;top:0;z-index:20;background:rgba(247,249,248,.92);-webkit-backdrop-filter:blur(8px);backdrop-filter:blur(8px);border-bottom:1px solid var(--line)}
 .brand{display:flex;align-items:center;gap:10px;font:700 20px 'Space Grotesk',sans-serif;letter-spacing:-.04em}
 .brand>span:last-child>span{color:var(--coral-ink)}
 .brand-mark{width:29px;height:29px;display:grid;place-items:center;background:var(--paper);color:var(--green);border-radius:8px;font-size:17px}
@@ -149,7 +149,7 @@ nav a:hover{color:var(--green)}
 .payment-loader{width:45px;height:45px;margin:0 auto 20px;border:4px solid #e1f1e8;border-top-color:var(--green);border-radius:50%;animation:spin .8s linear infinite}
 @keyframes spin{to{transform:rotate(360deg)}}#actions{display:flex;justify-content:center;gap:10px;flex-wrap:wrap}
 .admin-page{background:#f1f6f3}
-.admin-shell{width:min(1160px,calc(100% - var(--gutter) - var(--gutter)));margin:40px auto 100px}
+.admin-shell{width:min(1144px,calc(100% - var(--gutter) - var(--gutter)));margin:40px auto 100px}
 .admin-heading{display:flex;justify-content:space-between;align-items:start;margin-bottom:35px}
 .admin-heading h1{font:600 45px 'Space Grotesk';letter-spacing:-.07em;margin:0 0 12px}
 .admin-heading p:not(.eyebrow){color:var(--muted);font-size:13px;max-width:600px}
@@ -323,7 +323,7 @@ nav a:hover{color:var(--green)}
 .site-footer p,.site-footer small{color:#1f2d36;font-size:11px}
 .site-footer small{grid-column:1/-1;border-top:1px solid var(--line);padding-top:20px}
 .footer-links{display:flex;justify-content:flex-end;gap:20px;font-size:12px;flex-wrap:nowrap;white-space:nowrap}
-.legal{width:min(1160px,calc(100% - var(--gutter) - var(--gutter)));margin:0 auto;padding:70px 0 90px}
+.legal{width:min(1144px,calc(100% - var(--gutter) - var(--gutter)));margin:0 auto;padding:70px 0 90px}
 .legal h1~*{padding-left:24px}
 .legal h1~ul{padding-left:24px}
 .legal h2~*:not(h2){padding-left:48px}
