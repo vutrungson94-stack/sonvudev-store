@@ -20,7 +20,7 @@ nav{display:flex;gap:32px;color:#1f2d36;font-size:13px}
 nav a:hover{color:var(--green)}
 .header-cta{border:1px solid #cdd8d5;padding:10px 16px;border-radius:7px;font-size:13px;font-weight:700}
 .header-cta span{margin-left:8px;color:var(--coral-ink)}
-.hero{min-height:580px;display:grid;grid-template-columns:1fr 1fr;align-items:center;gap:45px;padding:65px 0 80px;background:var(--brand-glow);border-radius:24px}
+.hero{min-height:580px;display:grid;grid-template-columns:1fr 1fr;align-items:center;gap:45px;padding:65px 0 80px;background:var(--brand-glow)}
 .eyebrow{color:var(--green);font-size:11px;font-weight:700;letter-spacing:.13em;text-transform:uppercase;margin:0 0 18px}
 .eyebrow span{color:var(--coral-ink);font-size:14px;margin-right:6px}
 .hero h1{font:600 clamp(45px,5.5vw,74px)/.98 'Space Grotesk',sans-serif;letter-spacing:-.07em;margin:0 0 26px}
