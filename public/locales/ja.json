@@ -561,6 +561,8 @@
   "blog.title2": "でもっと快適に。",
   "blog.more": "すべての記事を見る",
   "blog.readMore": "続きを読む",
+  "blog.noPosts": "記事はまだありません。",
+  "blog.loadError": "記事を読み込めませんでした。",
   "contact.address": "住所",
   "contact.email": "サポートメール",
   "contact.emailNote": "営業時間内24時間以内に返信。ご注文コードがあれば併記してください。",

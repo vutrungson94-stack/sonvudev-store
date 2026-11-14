@@ -306,6 +306,9 @@ test('blog.json feed trả về cấu trúc hợp lệ', async () => {
   const postItem = data.items.find((i) => i.url.includes('kiem-tra-dung-luong-usb'));
   assert.ok(postItem, 'phải có bài viết USB trong feed');
   assert.ok(postItem.title.includes('USB'), 'tiêu đề phải chứa USB');
+  // JSON Feed extension fields the homepage cards read for vi/en content.
+  assert.ok(postItem._titleVi !== undefined && postItem._titleEn !== undefined, 'items phải mang extension fields đa ngữ (_titleVi/_titleEn)');
+  assert.ok(postItem._descriptionVi !== undefined && postItem._descriptionEn !== undefined, 'items phải mang extension fields đa ngữ (_descriptionVi/_descriptionEn)');
 });
 
 test('sitemap bao gồm blog posts', async () => {
@@ -318,4 +321,14 @@ test('llms.txt bao gồm blog posts', async () => {
   const body = await text('/llms.txt');
   assert.ok(body.includes('How to check real USB capacity'), 'llms.txt phải có blog post (tiêu đề tiếng Anh cho máy đọc)');
   assert.ok(body.includes('/blog/'), 'llms.txt phải có link blog');
+});
+
+test('homepage đọc /blog.json theo cấu trúc JSON Feed, không theo mảng', async () => {
+  // /blog.json từng đổi sang JSON Feed ({ title, items: [...] }) khiến homepage
+  // vỡ: app.js coi phản hồi là mảng, posts.filter ném TypeError và trang hiện
+  // "Không thể tải bài viết." — fix: đọc data.items + extension đa ngữ.
+  const src = await fs.readFile(new URL('../public/app.js', import.meta.url), 'utf8');
+  assert.match(src, /data\.items/, 'homepage phải đọc mảng items của JSON Feed');
+  assert.match(src, /post\._titleVi/, 'homepage phải đọc extension field _titleVi cho tiếng Việt');
+  assert.match(src, /post\._titleEn/, 'homepage phải đọc extension field _titleEn cho tiếng Anh');
 });

@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 // The shop's test environment, applied before anything imports src/.
 import './helpers/env.mjs';
 import { spawnSync } from 'node:child_process';
+import { readFileSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -43,6 +44,20 @@ test('khong co APP_URL thi bo qua, khong phai fail', () => {
   assert.doesNotMatch(result.stdout, /\bPASS\b/, 'không được in PASS khi không kiểm tra gì');
   assert.match(result.stdout, /seo:check -- https/, 'phải chỉ ra cách chạy thật');
 });
+
+test('gate đọc Offer từ node Product, không đọc SoftwareApplication.offers', () => {
+  // Khóa phản hồi lỗi CI trên commit aea74a6: gate từng đọc
+  // SoftwareApplication.offers.price, nhưng Offer chỉ còn ở node Product (một
+  // Offer duy nhất - xem src/pages.js productOffer và test/purchase-link-contract.test.js)
+  // nên mọi trang vi fail với "giá schema undefined ≠ giá thật …".
+  const source = readFileSync(script, 'utf8');
+  assert.ok(source.includes('n["@type"] === "Product"'), 'gate phải đọc node Product');
+  assert.doesNotMatch(source, /software\.offers/, 'không được đọc SoftwareApplication.offers nữa');
+  // Các trang có prefix locale không được bỏ qua ngầm: trước đây name bị
+  // thành "en/product/pc-cleanup" → không tìm được giá → check im lặng PASS.
+  assert.match(source, /split\("\/product\/"\)\[1\]/, 'phải cắt slug sau /product/ kể cả khi có locale prefix');
+});
+
 
 test('có APP_URL mà trang không trả lời thì vẫn fail', () => {
   // The half that must not regress. Port 1 on loopback refuses immediately, so this

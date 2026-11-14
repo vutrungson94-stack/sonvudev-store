@@ -561,6 +561,8 @@
   "blog.title2": "帮你更好工作。",
   "blog.more": "查看所有文章",
   "blog.readMore": "阅读更多",
+  "blog.noPosts": "暂无文章。",
+  "blog.loadError": "无法加载文章。",
   "contact.address": "地址",
   "contact.email": "支持邮箱",
   "contact.emailNote": "24 个工作小时内回复。如有订单号请附上。",

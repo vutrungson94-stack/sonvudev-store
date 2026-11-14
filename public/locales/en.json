@@ -134,6 +134,8 @@
   "blog.title2": "to help you work better.",
   "blog.more": "View all posts",
   "blog.readMore": "Read more",
+  "blog.noPosts": "No posts yet.",
+  "blog.loadError": "Could not load posts.",
   "products.searchLabel": "Search products",
   "products.searchPlaceholder": "Search by name or feature…",
   "products.count": "products",

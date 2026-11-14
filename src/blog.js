@@ -514,6 +514,13 @@ export function renderBlogFeed(posts) {
       description: desc,
       date,
       alternate: enUrl,
+      // JSON Feed allows `_`-prefixed extension fields; the homepage cards read
+      // these for locale-correct title/description instead of showing the
+      // Vietnamese fallback to English readers.
+      _titleVi: post.titleVi || "",
+      _titleEn: post.titleEn || "",
+      _descriptionVi: (post.descriptionVi || "").replace(/\s+/g, " ").trim(),
+      _descriptionEn: (post.descriptionEn || "").replace(/\s+/g, " ").trim(),
     };
   });
   return {

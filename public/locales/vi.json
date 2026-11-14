@@ -134,6 +134,8 @@
   "blog.title2": "giúp bạn làm việc tốt hơn.",
   "blog.more": "Xem tất cả bài viết",
   "blog.readMore": "Đọc tiếp",
+  "blog.noPosts": "Chưa có bài viết nào.",
+  "blog.loadError": "Không thể tải bài viết.",
   "products.searchLabel": "Tìm sản phẩm",
   "products.searchPlaceholder": "Tìm theo tên hoặc tính năng…",
   "products.count": "sản phẩm",

@@ -877,27 +877,31 @@ loadPayOptions();
 // that are related to the products they are browsing.
 const blogCards = document.getElementById('blog-cards');
 if (blogCards) {
-  fetch('/blog.json').then(r => r.ok ? r.json() : []).then(posts => {
+  fetch('/blog.json').then(r => r.ok ? r.json() : { items: [] }).then(data => {
     const lang = currentLang();
+    const posts = Array.isArray(data) ? data : (data.items || []);
     const sorted = posts
-      .filter(p => p.title || p.titleVi || p.titleEn)
-      .sort((a, b) => new Date(b.published || b.modified || 0) - new Date(a.published || a.modified || 0))
+      .filter(p => p._titleVi || p._titleEn || p.title)
+      .sort((a, b) => new Date(b.date || b.published || 0) - new Date(a.date || a.published || 0))
       .slice(0, 3);
     blogCards.innerHTML = sorted.length
       ? sorted.map(post => {
-          const title = lang !== 'vi' ? (post.titleEn || post.titleVi || post.title || '') : (post.titleVi || post.title || post.titleEn || '');
-          const desc = lang !== 'vi' ? (post.descriptionEn || post.descriptionVi || post.description || '') : (post.descriptionVi || post.description || post.descriptionEn || '');
-          const date = new Date(post.published || post.modified).toLocaleDateString(lang === 'vi' ? 'vi-VN' : 'en-US', { month: 'short', day: 'numeric', year: 'numeric' });
-          const href = lang !== 'vi' && post.slug ? `/en/blog/${post.slug}` : post.slug ? `/blog/${post.slug}` : '#';
-          const safeTitle = desc
-            ? `${esc(title)}`
-            : esc(title);
+          const title = lang !== 'vi'
+            ? (post._titleEn || post._titleVi || post.title || '')
+            : (post._titleVi || post._titleEn || post.title || '');
+          const desc = lang !== 'vi'
+            ? (post._descriptionEn || post._descriptionVi || post.description || '')
+            : (post._descriptionVi || post._descriptionEn || post.description || '');
+          const date = post.date
+            ? new Date(post.date).toLocaleDateString(lang === 'vi' ? 'vi-VN' : 'en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+            : '';
+          const href = lang !== 'vi' && post.alternate ? post.alternate : post.url || '#';
+          const safeTitle = esc(title);
           const safeDesc = desc.length > 120 ? `${esc(desc.slice(0, 120))}…` : esc(desc);
           return `<a class="blog-card" href="${esc(href)}"><div class="blog-card-meta"><span>${esc(date)}</span><span>${esc(T('blog.readMore'))}</span></div><h3>${safeTitle}</h3>${safeDesc ? `<p>${safeDesc}</p>` : ''}</a>`;
         }).join('')
-      : `<p style="color:var(--muted);font-size:13px">${lang === 'vi' ? 'Chưa có bài viết nào.' : 'No posts yet.'}</p>`;
+      : `<p style="color:var(--muted);font-size:13px">${esc(T('blog.noPosts'))}</p>`;
   }).catch(() => {
-    const lang = currentLang();
-    blogCards.innerHTML = `<p style="color:var(--muted);font-size:13px">${lang === 'vi' ? 'Không thể tải bài viết.' : 'Could not load posts.'}</p>`;
+    blogCards.innerHTML = `<p style="color:var(--muted);font-size:13px">${esc(T('blog.loadError'))}</p>`;
   });
 }

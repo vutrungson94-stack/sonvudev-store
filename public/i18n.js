@@ -200,6 +200,8 @@ const DICT = {
     'blog.title2': 'giúp bạn làm việc tốt hơn.',
     'blog.more': 'Xem tất cả bài viết',
     'blog.readMore': 'Đọc tiếp',
+    'blog.noPosts': 'Chưa có bài viết nào.',
+    'blog.loadError': 'Không thể tải bài viết.',
     // Ô tìm kiếm. Lọc phía client trên catalogue đã nạp, nên không có endpoint nào
     // để dịch — chỉ nhãn cho người đọc màn hình và gợi ý trong ô.
     'products.searchLabel': 'Tìm sản phẩm',
@@ -755,6 +757,8 @@ const DICT = {
     'blog.title2': 'to help you work better.',
     'blog.more': 'View all posts',
     'blog.readMore': 'Read more',
+    'blog.noPosts': 'No posts yet.',
+    'blog.loadError': 'Could not load posts.',
     'products.searchLabel': 'Search products',
     'products.searchPlaceholder': 'Search by name or feature…',
     'products.count': 'products',

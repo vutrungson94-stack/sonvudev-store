@@ -560,6 +560,8 @@
   "blog.title2": "para trabajar mejor.",
   "blog.more": "Ver todas las entradas",
   "blog.readMore": "Leer más",
+  "blog.noPosts": "Aún no hay artículos.",
+  "blog.loadError": "No se pudieron cargar los artículos.",
   "brand.supportEmail": "{{support}}",
   "contact.address": "Dirección",
   "contact.email": "Email de soporte",
