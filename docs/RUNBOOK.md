@@ -243,6 +243,19 @@ Log Caddy và log ứng dụng nằm ngoài `ReadWritePaths`, hãy kiểm tra `d
 - Sau khi xoay khóa: restart service, kiểm tra health, xác nhận log không còn dùng
   khóa cũ, rồi thu hồi khóa cũ ở nhà cung cấp.
 - Không dán secret vào ticket/chat. Dùng trình quản lý bí mật của đội.
+- **Xoay ADMIN_API_TOKEN tự động (hằng tháng, ngày 01 lúc 02:00 UTC)** — xem
+  `scripts/rotate-admin-token.mjs` và workflow `.github/workflows/rotate-admin-token.yml`:
+  1. Secrets cần có trên repo (Settings → Secrets and variables → Actions):
+     `RENDER_API_KEY`, `RENDER_SERVICE_ID`, `RESEND_API_KEY`, `APP_URL`,
+     `SUPPORT_EMAIL`, `EMAIL_FROM` (thiếu cái nào bị từ chối ghi rõ trong log).
+  2. Local safety: `npm run rotate:admin-token` không chạm vào gì — chỉ in kế hoạch;
+     xoay thật: `npm run rotate:admin-token:apply`.
+  3. Script luôn: đọc token cũ → PUT duy nhất biến `ADMIN_API_TOKEN` → deploy → poll
+     `/api/admin/products` với token mới tới khi 200 → **mới gửi email token mới
+     cho SUPPORT_EMAIL** qua Resend. Lỗi ở bất kỳ bước nào trước email → tự rollback
+     về token cũ + redeploy.
+  4. Sau email, cập nhật token trong admin panel / bookmark / script ở máy của bạn.
+  5. Chạy thử trước khi tin cậy: Actions → `rotate-admin-token` → "Run workflow".
 
 ## 10. Checklist trực ca
 

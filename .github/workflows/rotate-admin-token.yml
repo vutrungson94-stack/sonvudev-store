@@ -1,0 +1,54 @@
+name: rotate-admin-token
+
+# Xoay ADMIN_API_TOKEN trên Render hằng tháng, tự động, không khóa admin ra ngoài.
+#
+# Cách chạy:
+#   - Tự động: 02:00 UTC ngày 1 hằng tháng
+#   - Thủ công: Actions → rotate-admin-token → "Run workflow"
+#
+# Secrets cần trên repo (Settings → Secrets and variables → Actions):
+#   RENDER_API_KEY, RENDER_SERVICE_ID, RESEND_API_KEY   (bắt buộc)
+#   APP_URL                                          (mặc định theo fixture bên dưới)
+#   SUPPORT_EMAIL                                     (mặc định theo fixture bên dưới)
+#   EMAIL_FROM                                        (mặc định theo fixture bên dưới)
+#
+# An toàn: script chỉ gửi token qua email SAU KHI token mới được xác nhận
+# hoạt động trên live; lỗi bất kỳ → rollback về token cũ + redeploy.
+
+on:
+  schedule:
+    - cron: '0 2 1 * *'   # 02:00 UTC, ngày 1 hằng tháng
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+
+concurrency:
+  group: rotate-admin-token
+  cancel-in-progress: true
+
+jobs:
+  rotate:
+    name: rotate token
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      RENDER_API_KEY: ${{ secrets.RENDER_API_KEY }}
+      RENDER_SERVICE_ID: ${{ secrets.RENDER_SERVICE_ID }}
+      RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
+      APP_URL: ${{ secrets.APP_URL || 'https://ci-fixture.example' }}
+      SUPPORT_EMAIL: ${{ secrets.SUPPORT_EMAIL || 'support@ci-fixture.example' }}
+      EMAIL_FROM: ${{ secrets.EMAIL_FROM || 'ci-fixture <no-reply@ci-fixture.example>' }}
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: '22'
+          cache: npm
+
+      - name: install
+        run: npm ci
+
+      - name: rotate
+        run: npm run rotate:admin-token:apply

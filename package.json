@@ -62,6 +62,8 @@
     "logs:prune": "node scripts/prune-logs.mjs",
     "backup": "node scripts/backup.mjs",
     "backup:drill": "node scripts/backup-drill.mjs",
+    "rotate:admin-token": "node scripts/rotate-admin-token.mjs",
+    "rotate:admin-token:apply": "node scripts/rotate-admin-token.mjs --apply",
     "provenance": "node scripts/provenance.mjs",
     "benchmark": "node scripts/benchmark.mjs",
     "trust:virustotal": "node scripts/set-virus-scan.mjs",
