@@ -455,7 +455,7 @@ try {
     catalogProblems.join("; ") || `${viPages.length} trang vi + ${enPages.length} trang en cho ${products.length} sản phẩm`);
   for (const loc of productPages) {
     const { body } = await get(loc);
-    const name = loc.replace(`${base}/product/`, "");
+    const name = (loc.split("/product/")[1] || "").replace(/\/$/, "");
     const price = JSON.parse(api.body || "{}").products.find((p) => encodeURIComponent(p.slug) === name)?.price;
     const canonicalHere = one(body, /<link\s+rel="canonical"\s+href="([^"]*)"/i);
     const blocks = [...body.matchAll(/<script type="application\/ld\+json">([\s\S]*?)<\/script>/g)];
@@ -468,7 +468,13 @@ try {
     if ((body.match(/<title[^>]*>/g) || []).length !== 1) problems.push("nhiều hơn một thẻ title");
     if (canonicalHere !== loc) problems.push(`canonical lệch (${canonicalHere || "thiếu"})`);
     if (!software) problems.push("thiếu SoftwareApplication");
-    if (software && price !== undefined && Number(software.offers?.price) !== Number(price)) problems.push(`giá schema ${software.offers?.price} ≠ giá thật ${price}`);
+    // The merchant listing is the Product node; the SoftwareApplication deliberately
+    // carries no offers (one Offer, one node). See src/pages.js productOffer and
+    // test/purchase-link-contract.test.js — the gate has to read the same node
+    // Google reads.
+    const merchant = graph.find((n) => n["@type"] === "Product");
+    if (!merchant) problems.push("thiếu Product (merchant listing)");
+    else if (price !== undefined && Number(merchant.offers?.price) !== Number(price)) problems.push(`giá schema ${merchant.offers?.price} ≠ giá thật ${price}`);
     // The organization logo is a URL Google fetches. It was /logo.svg, a file
     // that never existed, and the page rendered perfectly anyway.
     const logo = graph.find((n) => n["@type"] === "Organization")?.logo;
