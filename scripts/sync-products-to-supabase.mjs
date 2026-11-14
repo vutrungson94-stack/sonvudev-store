@@ -42,6 +42,7 @@
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { env } from "../src/config.js";
+import { parseAdminTokens, isExpired } from "../src/admin-auth.js";
 
 // ──────────────────────────────────────────────
 // 1. Load environment
@@ -54,7 +55,16 @@ import { env } from "../src/config.js";
 const projectRoot = fileURLToPath(new URL("..", import.meta.url));
 // The admin token authorises every write below. Keep it secret.
 // Central config is the single source: this used to re-parse .env by hand.
-const ADMIN_API_TOKEN = env.adminToken;
+// When the dedicated script token (ADMIN_API_TOKEN) is not set, fall back to the
+// first non-expired ADMIN_API_TOKENS entry with role admin — the same credential
+// the server itself accepts for admin calls — instead of bailing out.
+const ADMIN_API_TOKEN = (() => {
+  const primary = String(env.adminToken || "").trim();
+  if (primary) return primary;
+  const usable = parseAdminTokens({ primary: "", extra: env.adminTokens })
+    .filter((entry) => entry.role === "admin" && !isExpired(entry));
+  return usable.length ? usable[0].token : "";
+})();
 
 if (!ADMIN_API_TOKEN) {
   console.error("[sync] ERROR: ADMIN_API_TOKEN is not set in .env or environment.");
@@ -200,9 +210,11 @@ function toApiPayload(product) {
       if (arr.length > 0) payload[key] = arr;
       continue;
     }
-    // Scalars: coerce to string, skip blanks.
+    // Scalars: coerce to string. An empty value is sent on purpose — the repo is
+    // the source of truth, and a blank field there means blank live. Skipping it
+    // left the stale live value behind (e.g. a badge the repo already cleared).
     const value = String(product[key]).trim();
-    if (value) payload[key] = value;
+    payload[key] = value;
   }
   return payload;
 }
