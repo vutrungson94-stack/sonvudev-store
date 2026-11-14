@@ -208,14 +208,14 @@ kiểm thử tay trên staging trước khi đưa lên `main`.
 
 | Hạng mục | Vì sao | Ưu tiên | Nơi thực hiện |
 | --- | --- | --- | --- |
-| **Deterministic build** | Build cùng một source phải cho cùng hash artifact; hiện `builtAt`/timestamp làm mỗi lần build khác nhau, khó chứng minh "cái đã deploy là cái đã test" | P1 | `scripts/build-web.mjs`, `scripts/provenance.mjs` |
-| **Backup restore drill** | Có `scripts/backup.mjs` nhưng chưa có bài kiểm tra khôi phục; backup chưa khôi phục được thì không phải backup | P1 | `scripts/backup.mjs`, `docs/RUNBOOK.md` |
+| **Deterministic build** ✅ 2026-11-14 | Build cùng một source cho cùng hash artifact: `public/build-report.json` dùng `builtAt` = commit date (không còn wall-clock) và bị loại khỏi `filesSha256` (self-reference); hai build liên tiếp cùng source cho cùng `tree-sha256` | P1 | `scripts/build-web.mjs`, `scripts/provenance.mjs` |
+| **Backup restore drill** ✅ 2026-11-14 | `scripts/backup-drill.mjs`: backup hằng tháng, kiểm tra file JSON parse được, Supabase `products`/`orders` khớp số dòng live (read-only), restore mô phỏng byte-identical; run bằng `npm run backup:drill` | P1 | `scripts/backup-drill.mjs`, `docs/RUNBOOK.md §8`, `PROCESS.md §10` |
 | **Third-party SLA/incident watch** | PayPal, Resend, Supabase, Cloudflare là phụ thuộc lớn; không có giám sát nào phát hiện sự cố phía họ | P1 | `scripts/health-check.mjs`, `docs/SLO.md` |
 | **Feature flag / canary tự động** | Có `X-Deployment-Channel` nhưng quyết định promote vẫn là thủ công | P2 | `deploy/`, `src/app.js` |
 | **Cost per deploy / per order** | CMMI L4 cần "cost of quality" để so sánh phương án cải tiến | P2 | `scripts/metrics.mjs` |
 | **Data retention & privacy matrix** | Có `privacy.html` nhưng chưa có bảng: dữ liệu nào, giữ bao lâu, xoá thế nào | P2 | `docs/`, `src/store.js` |
 | **Định nghĩa "done" cho từng loại việc** | AGENTS có §7 nhưng chưa phân loại (feature/bug/security/docs) | P2 | `AGENTS.md` |
-| **SLO cho chính quy trình** | Lead time của CI, tỉ lệ flaky test, thời gian khôi phục incident chưa có ngưỡng | P1 | `scripts/metrics.mjs` |
+| **SLO cho chính quy trình** ✅ 2026-11-14 | CI wall time, flaky test rate, gate/build pass rate, restore drill, MTTR, deploy success — đặt ngưỡng và nguồn trong `docs/PROCESS-SLO.md` | P1 | `docs/PROCESS-SLO.md` |
 | **Chuẩn hoá lỗi tiếng Việt trong log** | Log hiện có cả tiếng Việt có dấu lẫn không dấu (đã thấy trong output PowerShell) — khó grep, khó tổng hợp | P2 | `src/app.js`, `scripts/` |
 
 ---
@@ -224,15 +224,15 @@ kiểm thử tay trên staging trước khi đưa lên `main`.
 
 | Chỉ số | Nguồn | Cách tính | Hiện tại | Ngưỡng L4 | Ngưỡng L5 |
 | --- | --- | --- | --- | --- | --- |
-| Deployment frequency | CI tags | số deploy / tuần | 0 | ≥ 1/tuần | ≥ 1/ngày |
-| Lead time for change | git + CI | commit đầu → deploy | 0 | ≤ 3 ngày | ≤ 1 ngày |
-| Change failure rate | deploy + incident | deploy phải rollback / tổng deploy | 0 | ≤ 15% | ≤ 5% |
-| Escaped defect rate | issue tracker | lỗi lọt / tổng lỗi | 0 (proxy commit) | ≤ 10% | ≤ 5% |
+| Deployment frequency | CI tags | số deploy / tuần | **2,72/tuần** (35 deploys / 90 ngày, đo 2026-11-14) | ≥ 1/tuần | ≥ 1/ngày |
+| Lead time for change | git + CI | commit đầu → deploy | **0,01 ngày** (theo git tag) | ≤ 3 ngày | ≤ 1 ngày |
+| Change failure rate | deploy + incident | deploy phải rollback / tổng deploy | **11,4%** (đo 2026-11-14; mục tiêu ≤ 15%) | ≤ 15% | ≤ 5% |
+| Escaped defect rate | issue tracker | lỗi lọt / tổng lỗi | **unknown** (defect tracker chưa có; commit-proxy đã ngừng dùng) | ≤ 10% | ≤ 5% |
 | Gate pass rate | CI | lần chạy xanh / tổng lần chạy | chưa đo | ≥ 90% | ≥ 95% |
 | Flaky test rate | test runner | test fail rồi pass / tổng | chưa đo | ≤ 2% | 0 |
 | MTTR | incident records | tổng downtime / số sự cố | chưa đo | ≤ 4 giờ | ≤ 1 giờ |
-| SLO breach count | `metrics-slo.json` | số lần vi phạm | 0 (chưa đo thật) | 0 | 0 |
-| Coverage | test runner | % dòng phủ | chưa đo | ≥ 70% | ≥ 85% |
+| SLO breach count | `metrics-slo.json` | số lần vi phạm | **unknown** (5/7 SLO unknown — chưa có dữ liệu edge log) | 0 | 0 |
+| Coverage | test runner | % dòng phủ | **89,3 / 73,2 / 81,5** (lines/branches/functions, 2026-11-12) | ≥ 70% | ≥ 85% |
 | Lighthouse performance | Lighthouse CI | median 5 lần chạy | ~0.8 (trước đợt này) | ≥ 0.95 | ≥ 0.98 |
 
 ---

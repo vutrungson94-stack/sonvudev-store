@@ -31,6 +31,11 @@ for (const abs of files) {
   try {
     const rel = path.relative(root, abs).replaceAll('\\', '/');
     if (rel.includes('/.wrangler/') || rel.includes('/.gbuildcache/')) continue;
+    // The build writes public/build-report.json FROM this file's own output.
+    // Including it makes filesSha256 hash a file that embeds filesSha256 of a
+    // tree that contains it — no fixed point exists, so every build differed.
+    // It is derived, not source; its content is verified by the artifact hash.
+    if (rel === 'public/build-report.json') continue;
     const buf = await readFile(abs);
     entries.push({ file: rel, sha256: sha256(buf), bytes: buf.length });
   } catch { /* file thiếu: build gate sẽ báo */ }

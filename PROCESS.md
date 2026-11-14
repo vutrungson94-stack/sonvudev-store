@@ -163,6 +163,8 @@ npm run health:check
 - `git log --oneline --since="1 month ago" --grep="RCA"` — defect patterns?
 - `npm audit` — new vulnerabilities?
 - Build duration trend (gbuild telemetry)
+- `npm run backup:drill` — backup restorable this month?
+- `npm run slo:check` — SLO breaches with corrective action on file?
 
 ### Quarterly Retrospective
 1. Review top 3 defect categories → add prevention gate

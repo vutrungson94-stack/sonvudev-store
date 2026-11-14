@@ -34,7 +34,7 @@ if (url && key && /^https:\/\/[a-z0-9-]+\.supabase\.co$/i.test(url)) {
         signal: AbortSignal.timeout(30000),
       });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      await writeFile(path.join(outDir, `${table}.json`), JSON.stringify(await res.json(), null, 2));
+      await writeFile(path.join(outDir, `supabase-${table}.json`), JSON.stringify(await res.json(), null, 2));
       saved.push(`supabase/${table}`);
     } catch (e) {
       console.error(`[backup] WARN: không backup được ${table}: ${e.message}`);

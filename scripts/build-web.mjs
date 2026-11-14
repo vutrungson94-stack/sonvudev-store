@@ -14,7 +14,7 @@ import {
   ARTIFACT_ROOT,
   ARTIFACT_SUBDIR,
 } from './lib/artifact.mjs';
-import { commitHash } from '../src/lib/git.mjs';
+import { commitHash, gitCommand } from '../src/lib/git.mjs';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 // The commit this artifact was built from. It is recorded in the build report so
@@ -26,6 +26,11 @@ const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 // carry the hash of the file's own bytes, so the version changes exactly when
 // the file changes.
 const commit = commitHash(root);
+// The wall-clock time the build ran made every artifact different even for the
+// same commit — exactly what prevents proving that what shipped is what was
+// tested. The commit date is deterministic per source revision and equally
+// traceable against public history, so the artifact is now byte-stable.
+const commitDate = gitCommand(['log', '-1', '--format=%cI'], root).trim();
 // The build refuses to package without each of these. Every one was added because
 // the site worked but something on it was quietly broken: og.png because every
 // platform that renders a link preview refuses SVG, related.js because the strict
@@ -118,7 +123,7 @@ try {
   const transparency = {
     application: provenanceDoc.application,
     version: provenanceDoc.version,
-    builtAt: provenanceDoc.generatedAt,
+    builtAt: commitDate || provenanceDoc.generatedAt,
     git: { commit: provenanceDoc.gitCommit, branch: provenanceDoc.gitBranch },
     runtime: provenanceDoc.node,
     integrity: { files: (provenanceDoc.files || []).length, filesSha256: provenanceDoc.filesSha256 },

@@ -228,6 +228,11 @@ Log Caddy và log ứng dụng nằm ngoài `ReadWritePaths`, hãy kiểm tra `d
   `DATA_DIR/backups`; cất thêm một bản ngoài máy.
 - **Khôi phục**: dựng bản mới từ release đã biết là tốt, trỏ `current`, khôi phục dữ
   liệu, rồi chạy lại health + một giao dịch thử ở chế độ sandbox.
+- **Kiểm tra khả năng khôi phục (restore drill)**: `npm run backup:drill` — backup
+  mới nhất phải: mọi file JSON parse được, `products`/`orders` của Supabase khớp số
+  dòng với live (read-only), byte-identical khi restore mô phỏng. Chạy **hằng
+  tháng** hoặc sau mỗi lần backup đổi format. Nếu drill FAIL: khóa thay đổi mới,
+  mở RCA, backup lại ngay rồi chạy drill lại.
 
 ## 9. Bảo mật và xoay khóa
 

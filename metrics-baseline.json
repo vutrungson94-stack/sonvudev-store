@@ -1,12 +1,12 @@
 {
-  "generatedAt": "2026-11-10T04:24:16.483Z",
+  "generatedAt": "2026-11-14T05:17:30.846Z",
   "measurements": {
     "tests": {
-      "value": 555,
+      "value": 605,
       "direction": "up"
     },
     "testFiles": {
-      "value": 76,
+      "value": 89,
       "direction": "up"
     },
     "routes": {
@@ -14,7 +14,7 @@
       "direction": "up"
     },
     "dependencies": {
-      "value": 8,
+      "value": 7,
       "direction": "down"
     },
     "escCopies": {
@@ -34,11 +34,11 @@
       "direction": "down"
     },
     "i18nKeys": {
-      "value": 868,
+      "value": 916,
       "direction": "up"
     },
     "indexablePages": {
-      "value": 7,
+      "value": 8,
       "direction": "up"
     },
     "productPageLocales": {
@@ -46,7 +46,7 @@
       "direction": "up"
     },
     "localizedPages": {
-      "value": 9,
+      "value": 10,
       "direction": "up"
     },
     "productPageRenderers": {
@@ -54,19 +54,19 @@
       "direction": "down"
     },
     "deploymentFrequency": {
-      "value": 0,
+      "value": 2.72,
       "direction": "up"
     },
     "leadTimeDays": {
-      "value": 0,
+      "value": 0.01,
       "direction": "down"
     },
     "changeFailureRate": {
-      "value": 0,
+      "value": 0.1143,
       "direction": "down"
     },
     "escapeRate": {
-      "value": 0,
+      "value": null,
       "direction": "down"
     },
     "sloBreachCount": {

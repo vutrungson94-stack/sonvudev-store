@@ -61,3 +61,13 @@
 - [x] **Checkout minh bạch trước khi cam kết** (giá/currency/quy đổi/cách nhận/hoàn tiền) — điều kiện "Giá và điều kiện giao dịch không trung thực".
 - [ ] **DORA/SLO/defect-escape đo thật**: vẫn `unknown`/`sampleSize` thấp; cần 30 ngày log edge + defect tracker thật. Không claim L4/L5 đạt khi chưa đo được.
 - [ ] **Monthly review đọc trạng thái GMC/GSC**: owner chạy `npm run ops:catalog:apply` sau deploy + GSC Validate fix + xác minh lại; verification xanh mới đóng sự cố.
+
+
+## Đợt 2026-11-14 — L5 batch 2 (đo lường, backup, build chắc chắn)
+
+- [x] **DORA đo thật (90 ngày, 35 deploys)**: deploymentFrequency 2.72/tuần, leadTime 0.01 ngày, changeFailureRate 11.4%, mttr 1.3 ngày. Trước đó script báo 0 deploy vì thiếu thẻ; giờ dùng `for-each-ref`; baseline `metrics-baseline.json` đã cập nhật về số thật (loại `unknown → 0`).
+- [x] **Deterministic build**: transparency `public/build-report.json` không còn wall-clock (`builtAt` = commit date) và bị loại khỏi `filesSha256` (nó là output của chính build nên không tồn tại fixed point). Hai build liên tiếp cùng source cho cùng `tree-sha256` (đã verify).
+- [x] **Backup restore drill**: `scripts/backup-drill.mjs` — backup JSON parse được, `products`/`orders` Supabase khớp số dòng với live (read-only `Prefer: count=exact`), restore mô phỏng byte-identical, chạy `npm run backup:drill`. RUNBOOK §8 + PROCESS.md §10 (monthly review) đã ghi.
+- [x] **Process SLOs**: `docs/PROCESS-SLO.md` — CI wall time, flaky test rate, gate/build pass rate, restore drill, MTTR, deploy success… kèm nguồn đo (hoặc `unknown`).
+- [x] **Traceability matrix**: `docs/TRACEABILITY.md` — yêu cầu → test → release; defect-prevention loop (GSC/GMC RCA) có bằng chứng.
+- [ ] Chưa làm (P1/P2 còn lại): tách `app.js` (dynamic import, cần wave riêng), E2E + axe gates, SPC ≥25 điểm, escape rate từ defect tracker thật, monthly review đọc SLO/GSC/GMC tự động.

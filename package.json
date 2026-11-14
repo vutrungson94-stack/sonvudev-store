@@ -61,6 +61,7 @@
     "health:check": "node scripts/health-check.mjs",
     "logs:prune": "node scripts/prune-logs.mjs",
     "backup": "node scripts/backup.mjs",
+    "backup:drill": "node scripts/backup-drill.mjs",
     "provenance": "node scripts/provenance.mjs",
     "benchmark": "node scripts/benchmark.mjs",
     "trust:virustotal": "node scripts/set-virus-scan.mjs",
