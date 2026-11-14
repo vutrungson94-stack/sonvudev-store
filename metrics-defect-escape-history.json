@@ -54,6 +54,42 @@
         "escapeRate": 0.9852941176470589,
         "warning": "proxy only — a commit message is not a defect record"
       }
+    },
+    {
+      "generatedAt": "2026-11-14T06:12:45.079Z",
+      "status": "unknown",
+      "source": "no defect tracker; commit subjects are not a measurement",
+      "productionDefects": null,
+      "caughtDefects": null,
+      "total": null,
+      "escapeRate": null,
+      "threshold": 0.05,
+      "withinThreshold": null,
+      "proxy": {
+        "basis": "git commit subjects: ^(fix|hotfix|bug): vs ^test:",
+        "productionDefects": 67,
+        "caughtDefects": 1,
+        "escapeRate": 0.9852941176470589,
+        "warning": "proxy only — a commit message is not a defect record"
+      }
+    },
+    {
+      "generatedAt": "2026-11-14T06:12:51.167Z",
+      "status": "tracking",
+      "source": "github-issues (label escaped-defect); caught-defect source not wired — escapeRate stays null until it is",
+      "productionDefects": 0,
+      "caughtDefects": null,
+      "total": null,
+      "escapeRate": null,
+      "threshold": 0.05,
+      "withinThreshold": null,
+      "proxy": {
+        "basis": "git commit subjects: ^(fix|hotfix|bug): vs ^test:",
+        "productionDefects": 67,
+        "caughtDefects": 1,
+        "escapeRate": 0.9852941176470589,
+        "warning": "proxy only — a commit message is not a defect record"
+      }
     }
   ]
 }

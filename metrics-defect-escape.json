@@ -1,8 +1,8 @@
 {
-  "generatedAt": "2026-11-12T03:08:22.599Z",
-  "status": "unknown",
-  "source": "no defect tracker; commit subjects are not a measurement",
-  "productionDefects": null,
+  "generatedAt": "2026-11-14T06:12:51.167Z",
+  "status": "tracking",
+  "source": "github-issues (label escaped-defect); caught-defect source not wired — escapeRate stays null until it is",
+  "productionDefects": 0,
   "caughtDefects": null,
   "total": null,
   "escapeRate": null,
