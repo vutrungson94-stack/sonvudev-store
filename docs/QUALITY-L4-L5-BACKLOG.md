@@ -28,7 +28,7 @@
 ## GSC / Merchant Center theo dõi
 - **“Đã thu thập dữ liệu – hiện chưa được lập chỉ mục” (Crawled – currently not indexed), 0 trang bị ảnh hưởng**: không phải lỗi code; là tín hiệu Google đã crawl nhưng chưa chọn index. Theo dõi thêm trong GSC; nếu số trang tăng, kiểm tra canonical/noindex/nội dung mỏng/trùng lặp và internal links. Không “sửa” bằng cách thêm trang mỏng hoặc gỡ noindex sai.
 - **“Cải thiện giao diện mục”**: `aggregateRating`/`review` là **tùy chọn**; codebase chủ động không phát star rating. Chỉ xem lại nếu có nguồn review đủ điều kiện và quyết định sản phẩm mới.
-- **Merchant Center “Trình bày sai” / “Các phương thức kinh doanh không được chấp nhận”**: xem `docs/MERCHANT-CENTER-MISREPRESENTATION-REMEDIATION.md`. Codebase đã gỡ hardcode địa chỉ/điện thoại schema/about và làm trung thực dữ liệu sản phẩm mẫu; **chủ sở hữu phải** cấu hình thông tin doanh nghiệp thật (GMC + env/website), đảm bảo giá/phí/policy/fulfillment khớp, rồi mới kháng nghị.
+- **Merchant Center “Trình bày sai” / “Các phương thức kinh doanh không được chấp nhận”**: xem `docs/MERCHANT-CENTER-MISREPRESENTATION-REMEDIATION.md`. **Đợt 2026-11-14:** tìm thấy live Supabase lệch repo (claim “giảm 33% cho 100 khách đầu tiên”, badge “Ưu đãi sớm”, badge “Safe Edition v4.3” khi version 4.4) dù repo đã dọn claim; `npm run ops:catalog`/`:apply` chính là bước bị bỏ sót. Đã dọn claim ở products/blog/locales/seed, checkout hiển thị giá (giá/currency/quy đổi PayPal/cách nhận/hoàn tiền) trước nút thanh toán, một Offer duy nhất ở node `Product`, `deliveryTime` 0 ngày, danh tính “Doanh nghiệp cá nhân”. Postmortem: `postmortems/2026-11-14-gmc-misrepresentation.json`; RCA: `docs/rca/2026-11-14-gmc-misrepresentation.md`. Gate mới: quét claim product data/blog/locales + test checkout giá + invariant repo↔live (`WORKFLOW.md §7.6`, `AGENTS.md §4`). Chủ sở hữu phải: `npm run ops:catalog:apply` sau deploy, đối chiếu live, GSC “Validate fix”, chạy lại xác minh.
 
 ## P1 (tiếp theo, kỹ thuật)
 - [ ] Contract test cho mọi locale route mua/khám phá trên `/product/:slug` và `/en/*`/`/<lang>/*` (khi có fixture đủ nhẹ). Khóa hành vi `?buy` handler client khi product không load kịp / không tồn tại (toast/fallback an toàn, không form sai).
@@ -52,3 +52,12 @@
 - Extension `cai-dotnet-sdk-khong-admin` connection error: ngoài app, không ảnh hưởng nghiệp vụ; chỉ noise debug.
 - Permissions-Policy unrecognized features: warning, khả năng từ edge; không ảnh hưởng mua hàng/render.
 - `cloudflareinsights` beacon `ERR_BLOCKED_BY_CLIENT`: chỉ mất analytics trên client chặn; không ảnh hưởng mua hàng.
+
+## Đợt 2026-11-14 — GMC trust + repo↔live parity (L5 một phần)
+
+- [x] **Live↔repo parity được ghi vào quy trình**: `WORKFLOW.md §7.6` (product data/copy → `ops:catalog` → `ops:catalog:apply` → verify `GET /api/products`/trang/feed), `§7.5` no-regress, `AGENTS.md §4` invariant. Live stale + repo xanh = đỏ.
+- [x] **Gate theo dữ liệu sống không chỉ theo file tĩnh**: quét claim trong product data/blog/seed; test checkout giá; test một Offer + deliveryTime.
+- [x] **Causal analysis xảy ra thật**: postmortem + RCA cho sự cố GMC (8/8 sản phẩm, 100%, xác minh bị chặn), thay vì chỉ viết remediation checklist.
+- [x] **Checkout minh bạch trước khi cam kết** (giá/currency/quy đổi/cách nhận/hoàn tiền) — điều kiện "Giá và điều kiện giao dịch không trung thực".
+- [ ] **DORA/SLO/defect-escape đo thật**: vẫn `unknown`/`sampleSize` thấp; cần 30 ngày log edge + defect tracker thật. Không claim L4/L5 đạt khi chưa đo được.
+- [ ] **Monthly review đọc trạng thái GMC/GSC**: owner chạy `npm run ops:catalog:apply` sau deploy + GSC Validate fix + xác minh lại; verification xanh mới đóng sự cố.

@@ -64,7 +64,7 @@ test('public/related.js fallback: thẻ sản phẩm khác là discovery (trang 
   assert.doesNotMatch(src, /\/\?buy=|openPurchaseForm|openCheckout/, 'related.js fallback discovery không được mở luồng mua');
 });
 
-test('structured data merchant listing: Offer có applicableCountry/returnMethod/shippingDetails cho digital products', () => {
+test('structured data merchant listing: Offer có applicableCountry + digital shippingDetails với deliveryTime', () => {
   const product = {
     id: 'p-schema',
     slug: 'schema-probe',
@@ -89,6 +89,17 @@ test('structured data merchant listing: Offer có applicableCountry/returnMethod
   assert.ok(merchant.offers.hasMerchantReturnPolicy.applicableCountry.includes('VN'), 'return policy áp dụng VN');
   // Digital products: no returnMethod (no physical return by mail)
   assert.ok(!merchant.offers.hasMerchantReturnPolicy.returnMethod, 'sản phẩm số: không có returnMethod ReturnByMail');
-  // Digital products: no shippingDetails (no physical shipping)
-  assert.ok(!merchant.offers.shippingDetails, 'sản phẩm số: không có shippingDetails');
+  // Digital products: shippingDetails present with a zero-value deliveryTime —
+  // Merchant Center flags "deliveryTime bị thiếu (nằm trong offers.shippingDetails)".
+  assert.ok(merchant.offers.shippingDetails, 'sản phẩm số: phải có shippingDetails với deliveryTime');
+  assert.equal(merchant.offers.shippingDetails.shippingRate.currency, 'VND', 'shippingRate dùng cùng currency với giá');
+  const time = merchant.offers.shippingDetails.deliveryTime;
+  assert.equal(time.handlingTime.minValue, 0);
+  assert.equal(time.handlingTime.maxValue, 0);
+  assert.equal(time.transitTime.minValue, 0);
+  assert.equal(time.transitTime.maxValue, 0);
+  assert.equal(time.handlingTime.unitCode, 'DAY');
+  // A single Offer for the product: SoftwareApplication must not carry its own.
+  const software = graph.find((n) => n['@type'] === 'SoftwareApplication');
+  assert.ok(!('offers' in software), 'SoftwareApplication không được mang Offer — một Offer duy nhất ở node Product');
 });

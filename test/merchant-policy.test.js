@@ -100,6 +100,12 @@ const SCARCITY_PATTERNS = [
   /limited\s+to\s+\d+/i,
   /先着\s*\d+/,
   /前\s*\d+\s*名/,
+  /ưu đãi/i,
+  /giảm giá/i,
+  /khuyến mãi/i,
+  /early bird deal/i,
+  /introductory pricing/i,
+  /limited time/i,
 ];
 
 test('locale product copy carries no scarcity or discount claims', () => {
@@ -140,4 +146,78 @@ test('checkout consent matches the refund policy language', () => {
   // The consent must reference the policy, not a blanket "no refund after download".
   assert.doesNotMatch(dict, /không được hoàn tiền sau khi đã tải|not refundable once it has been downloaded/i,
     'cart.agree must not claim a blanket no-refund-after-download');
+});
+
+// ---------------------------------------------------------------------------
+// 5. The catalogue the BUYER sees (and the live shop syncs to) carries no
+//    unenforceable scarcity/discount claims either — not only the locale assets.
+// ---------------------------------------------------------------------------
+// The 2026-11-14 GMC audit found "Ưu đãi sớm - chỉ 199.000đ (giảm 33%) cho 100
+// khách đầu tiên" live on the storefront after the repo had been cleaned: the
+// claim lived in the runtime catalogue (Supabase), fed by this JSON file. A gate
+// that only watches public/locales cannot see that class of escape.
+import { readdirSync } from 'node:fs';
+const catalogFiles = (dir) => readdirSync(path.join(root, dir)).filter((f) => f.endsWith('.json'));
+
+test('catalogue (products.json) carries no scarcity/discount claims', () => {
+  const products = JSON.parse(read('data/products.json'));
+  assert.ok(Array.isArray(products) && products.length > 0, 'data/products.json phải có sản phẩm');
+  const offenders = [];
+  for (const p of products) {
+    const text = Object.entries(p)
+      .filter(([, v]) => typeof v === 'string' || Array.isArray(v))
+      .map(([k, v]) => `${k}: ${Array.isArray(v) ? v.join(' ') : v}`)
+      .join(' ');
+    for (const pattern of SCARCITY_PATTERNS) {
+      if (pattern.test(text)) offenders.push(`${p.slug} matches ${pattern}`);
+    }
+  }
+  assert.deepEqual(offenders, [], `catalogue carries claims:\n${offenders.join('\n')}`);
+});
+
+test('seed catalogue (src/store.js) carries no scarcity/discount claims', () => {
+  const source = read('src/store.js');
+  const offenders = SCARCITY_PATTERNS.filter((p) => p.test(source)).map((p) => String(p));
+  assert.deepEqual(offenders, [], `seed store carries claims:\n${offenders.join('\n')}`);
+});
+
+test('blog posts carry no scarcity/discount claims', () => {
+  const offenders = [];
+  for (const file of catalogFiles('src/blog-posts')) {
+    const post = JSON.parse(read(`src/blog-posts/${file}`));
+    const text = Object.values(post)
+      .filter((v) => typeof v === 'string')
+      .join(' ');
+    for (const pattern of SCARCITY_PATTERNS) {
+      if (pattern.test(text)) offenders.push(`${file} matches ${pattern}`);
+    }
+  }
+  assert.deepEqual(offenders, [], `blog posts carry claims:\n${offenders.join('\n')}`);
+});
+
+// ---------------------------------------------------------------------------
+// 6. Checkout shows the price before the buyer commits.
+// ---------------------------------------------------------------------------
+// Google Merchant Center "Giá và điều kiện giao dịch không trung thực": the buyer
+// must see the total price, the payment model and the delivery method BEFORE
+// paying. The checkout modal used to collect name + email and jump straight to
+// the payment step with no price anywhere on that screen.
+test('checkout hiển thị giá, quy đổi PayPal, cách nhận và hoàn tiền trước khi trả', () => {
+  const app = read('public/app.js');
+  const form = app.slice(app.indexOf('function openCheckout'));
+  assert.ok(form.includes('priceFor(p)'), 'openCheckout phải render giá sản phẩm (priceFor(p))');
+  assert.ok(form.includes("T('cart.conversion')"), 'phải ghi chú quy đổi VND→USD của PayPal');
+  assert.ok(form.includes("T('cart.deliveryDigital')"), 'phải ghi cách nhận sản phẩm số');
+  assert.ok(form.includes("T('cart.refundWindow')"), 'phải ghi cửa sổ hoàn tiền');
+  const i18n = read('public/i18n.js');
+  for (const key of ['cart.conversion', 'cart.deliveryDigital', 'cart.refundWindow']) {
+    assert.ok(i18n.includes(`'${key}'`), `i18n.js thiếu ${key}`);
+  }
+  // Locale parity: các bản dịch khác cũng phải có key (khóa mồ côi / thiếu dịch).
+  for (const lang of ['de', 'es', 'fr', 'ja', 'zh-CN']) {
+    const dict = JSON.parse(read(`public/locales/${lang}.json`));
+    for (const key of ['cart.conversion', 'cart.deliveryDigital', 'cart.refundWindow']) {
+      assert.ok(dict[key], `thiếu bản dịch ${key} trong ${lang}.json`);
+    }
+  }
 });

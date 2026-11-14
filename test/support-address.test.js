@@ -210,8 +210,8 @@ test('trang 404 nói được cả hai ngôn ngữ', async () => {
   assert.match(related, /window\.I18N/, 'related.js phải dùng từ điển khi trang có nó');
   assert.ok(!/^\s*vi:\s*'/m.test(related.replace(/emptyFallback[\s\S]*?\};/, '')),
     'related.js không được mang bảng hai ngôn ngữ riêng cho câu này');
-  assert.ok(publicI18n.includes("'products.onlyOne'"),
-    'từ điển phải có products.onlyOne — đó là nơi câu duy nhất này sống bây giờ');
+  assert.ok(publicI18n.includes("'products.noRelated'"),
+    'từ điển phải có products.noRelated — đó là nơi câu duy nhất này sống bây giờ');
 });
 
 test('danh sách sản phẩm trong trang 404 cũng theo ngôn ngữ của trang', async () => {

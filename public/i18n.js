@@ -210,7 +210,7 @@ const DICT = {
     // ngôn ngữ riêng trong public/related.js, bên cạnh chính từ điển đã có mặt
     // trên đúng những trang đó — nên thêm một ngôn ngữ thứ ba cũng không tới được
     // nó, và mọi bản dịch phải sửa ở hai chỗ.
-    'products.onlyOne': 'Đây là sản phẩm duy nhất hiện tại.',
+    'products.noRelated': 'Chưa có sản phẩm liên quan.',
     // Một trạng thái rỗng cho cả hai nguyên nhân: catalogue rỗng, và từ khoá tìm
     // không khớp. Trước đây có hai cặp khoá — "Chưa có sản phẩm" cho catalogue rỗng
     // và một câu khác khi lọc — nhưng render() chỉ có một chỗ gọi ra, nên câu dành
@@ -290,6 +290,9 @@ const DICT = {
     'cart.name': 'Họ tên',
     'cart.paying': 'Đang xử lý…',
     'cart.note': 'Bạn chỉ bị tính phí khi thanh toán thành công.',
+    'cart.conversion': 'PayPal quy đổi VND sang USD theo tỷ giá tại thời điểm thanh toán (có thể lệch nhẹ). Chuyển khoản/MoMo/ZaloPay giữ nguyên giá VND.',
+    'cart.deliveryDigital': 'Sản phẩm số: mã tra cứu và link tải gửi qua email ngay khi thanh toán thành công.',
+    'cart.refundWindow': 'Hoàn tiền trong 14 ngày kể từ ngày thanh toán, theo Chính sách hoàn tiền.',
     'pay.accountLabel': 'Số tài khoản / ví',
     'pay.amountLabel': 'Số tiền',
     'pay.transferNote': 'Nội dung chuyển khoản (ghi đúng để đối soát)',
@@ -449,7 +452,7 @@ const DICT = {
     // substitutes and <em> styles: the Vietnamese sentence is a span the switch
     // can reach, the brand is markup it must not touch.
     'about.h1': 'Ai đứng sau',
-    'about.lede': 'Một người viết phần mềm dùng cho công việc thật, rồi bán đúng những gì mình đã dùng. Không công ty, không nhà đầu tư, không đội quảng cáo.',
+    'about.lede': 'Một người viết phần mềm dùng cho công việc thật, rồi bán đúng những gì mình đã dùng. Doanh nghiệp cá nhân, không nhà đầu tư, không đội quảng cáo.',
     'about.h2': 'Chúng tôi làm gì',
     'about.p1': 'Tiện ích và công cụ cho Windows, viết để giải quyết một việc cụ thể trong công việc văn phòng hoặc kỹ thuật. Mỗi sản phẩm trả lời đúng một câu hỏi: "vấn đề này thì làm sao?". Sản phẩm nào không trả lời được câu hỏi nào thì không lên cửa hàng.',
     'about.p2': 'Bán một lần, không thuê bao. Bạn tải file ngay sau khi thanh toán và không cần chờ ai duyệt. Mỗi đơn đều có mã tra cứu gửi qua email để bạn tạo lại link tải bất cứ lúc nào, không giới hạn số lần.',
@@ -755,7 +758,7 @@ const DICT = {
     'products.searchLabel': 'Search products',
     'products.searchPlaceholder': 'Search by name or feature…',
     'products.count': 'products',
-    'products.onlyOne': 'This is the only product right now.',
+    'products.noRelated': 'No related products yet.',
     'products.emptyTitle': 'No product matches',
     'products.emptyText': 'Try a different word, or clear the filter you picked.',
     'products.searchNoResultsTitle': 'No matching products',
@@ -830,6 +833,9 @@ const DICT = {
     'cart.name': 'Full name',
     'cart.paying': 'Processing…',
     'cart.note': 'You are only charged when the payment succeeds.',
+    'cart.conversion': 'PayPal converts VND to USD at the rate at the time of payment (small differences possible). Bank transfer/MoMo/ZaloPay keep the listed VND price.',
+    'cart.deliveryDigital': 'Digital product: the lookup code and download link are emailed as soon as payment succeeds.',
+    'cart.refundWindow': 'Refunds within 14 days of payment, per the Refund Policy.',
     'cart.agree': 'I have read the Terms of Use, the Privacy Policy and the Refund Policy, and understand that refunds apply only as described in the Refund Policy.',
     'product.requirements': 'System requirements',
     'product.version': 'Version',
@@ -947,7 +953,7 @@ const DICT = {
 
     // ---- about ----
     'about.h1': 'Who stands behind',
-    'about.lede': 'One person writes software for real work, then sells exactly what they use themselves. No company, no investors, no ads team.',
+    'about.lede': 'One person writes software for real work, then sells exactly what they use themselves. A sole-proprietor business, no investors, no ads team.',
     'about.h2': 'What we build',
     'about.p1': 'Utilities and tools for Windows, written to solve one specific job in office or technical work. Every product answers exactly one question: "how do I solve this?". A product that answers no question at all does not go on sale.',
     'about.p2': 'One-off price, no subscription. You download the file as soon as payment goes through, and nobody has to approve it first. Every order gets a lookup code by email, so you can create a fresh download link whenever you like, as many times as you like.',

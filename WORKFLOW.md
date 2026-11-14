@@ -114,7 +114,38 @@ Before `_Sync`/push you MUST read this list. Anything on it is a past production
 - **SEO audits belong on public pages, not on private surfaces.** `public/admin.html`, `order.html` and `paypal-return.html` carry `<meta name="robots" content="noindex,nofollow">` and no meta description on purpose, and `robots.txt` disallows those paths too. Running Lighthouse SEO against one of them reports "Page is blocked from indexing" and "Document does not have a meta description"; that is the correct state, not a defect, and removing `noindex` is a regression. Audit `/`, `/en/` or a product page instead (`scripts/lighthouse-check.mjs` does exactly that on the packaged artifact). The inlined stylesheet's `@font-face` blocks also show up as "unused CSS" in coverage-based audits — the fonts are preloaded and `font-display: optional`, and that diagnostic is not scored.
 - **Blog pages inline a filtered copy of the stylesheet.** The full sheet is ~70 KB minified and a blog page matches about a fifth of it, so inlining it whole put 12–14 KiB gzipped of dead CSS in every blog page and Lighthouse reported it as "unused CSS". `scripts/subset-blog-css.mjs` writes `public/blog.min.css` from the same `public/styles.css` (single source, no hand copy): the class list comes from rendering the real blog pages in every locale, `test/blog.test.js` fails if a rule the page uses is missing from the subset, and `inlineBlogStyles()` falls back to the full sheet when the file is absent. Regenerate with `npm run build`; never hand-edit `blog.min.css`.
 - **No redirect based on browser language.** `public/lang-detect.js` follows only a **stored** choice (`sonvudev_lang`, set when the reader picks a language) and never `navigator.language`. The browser-language version answered the first request from a fresh en-US browser — every crawler, Lighthouse and PageSpeed Insights run — with a redirect from `/blog` to `/en/blog`, so the Vietnamese page could not be audited and hreflang's `x-default` disagreed with what the tool saw. A locale-prefixed URL always wins over storage. `test/blog.test.js` covers the three cases (fresh browser, stored choice, prefixed URL).
+- **Repo ↔ live parity.** Product data/copy lives in two places: `data/products.json`
+  (repo) and Supabase (live). Any edit to product data/copy must end with
+  `npm run ops:catalog:apply` and a live check (`GET /api/products`, product page,
+  `/merchant-feed.tsv`). See §7.6.
 - **A metric that is not measured is `null`, not `0`.** `scripts/metrics.mjs` used to coerce a missing value to `0`, which reported a perfect escape rate and an instant lead time on a project that had measured neither. A `null` is skipped in the baseline comparison and printed as "chua do duoc". Never reintroduce `?? 0` for a measurement.
+
+## 7.6. Repo ↔ live parity — product data and copy must match
+
+`data/products.json` is the version-controlled source of truth for the catalogue.
+When `SUPABASE_URL` is configured (production), the storefront reads its catalogue
+from Supabase, so **editing `data/products.json` alone does not change what buyers,
+Google and Merchant Center see**. A claim cleaned in the repo that is still live is
+a live policy violation with a green repo behind it.
+
+Whenever a change touches product/catalog/content — copy, SEO fields, badges,
+prices, features, requirements, images — you MUST:
+
+1. Edit the source of truth: `data/products.json` (and the locale assets). Never
+   hand-edit Supabase or the admin panel first; the repo stays the authority.
+2. Run `npm run ops:catalog` (dry-run) and read the diff it prints.
+3. Run `npm run ops:catalog:apply` to push the same data to the live admin API.
+4. Verify the live result matches the repo, field for field:
+   - `GET /api/products` — badge/shortDescription/seoDescription/features/version/price.
+   - The rendered product page and `/merchant-feed.tsv`.
+   If any field differs, do not stop — resolve it or write down exactly what
+   diverges and why, in the change-plan.
+5. If the change is not product data (stylesheet, routes, infra), say
+   "n/a (no catalog change)" in the change-plan; do not silently skip this step.
+
+The GMC audit of 2026-11-14 found the live homepage still showing
+"giảm 33% cho 100 khách đầu tiên" after the repo had been cleaned — the sync step
+had never been run. Treat "repo green, live stale" as a red build.
 
 ## 8. Post-release
 

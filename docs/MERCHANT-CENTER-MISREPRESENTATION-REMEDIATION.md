@@ -9,9 +9,28 @@ Tài liệu này tổng hợp **hành động trong codebase/website** và **hà
 - **Xóa thông tin liên hệ hardcode có rủi ro sai lệch**: `public/about.html` không còn địa chỉ/điện thoại hardcode; hiển thị qua `{{businessContactHtml}}` chỉ khi được cấu hình.
 - **Schema `Organization` chỉ phát dữ liệu đã cấu hình/xác minh**: `src/pages.js` không còn hardcode `telephone`/`address`. Chỉ xuất `telephone`, `PostalAddress`, `contactPoint` (email hỗ trợ) khi có giá trị từ cấu hình.
 - **Cấu hình minh bạch (không mặc định giả)**: `src/config.js`, `.env.example` hỗ trợ `BRAND_LEGAL_ENTITY`, `BRAND_ADDRESS`, `BRAND_PHONE` (tùy chọn, chỉ dùng khi đúng và nhất quán với GMC/cửa hàng/pháp lý).
-- **Làm sạch claim quảng cáo/khan hiếm không kiểm chứng** trong `data/products.json` (ví dụ SEO title “Giảm giá đặc biệt”, “chỉ 100 bản/100 khách đầu tiên”) cho `ramcleaner-earlybird`; thay bằng mô tả trung thực theo trang sản phẩm.
-- **Merchant listing structured data** (`Product`/`Offer`): đã có `hasMerchantReturnPolicy` với `applicableCountry`, `returnMethod`, `returnFees`, `merchantReturnDays` và `shippingDetails` (phí 0 cho sản phẩm số). **Không** thêm `AggregateRating`/review sao tự thu thập.
+- **Làm sạch claim quảng cáo/khan hiếm không kiểm chứng** trong `data/products.json` (ví dụ SEO title “Giảm giá đặc biệt”, “chỉ 100 bản/100 khách đầu tiên”) cho `ramcleaner-earlybird`; thay bằng mô tả trung thực theo trang sản phẩm. **(Đợt 2026-11-14: mở rộng quét toàn bộ sản phẩm — PC Cleanup “tăng tốc”, MouseWheel “duy nhất”/“21/21 PASS”, Personal “tăng tốc”, Early Bird; seed trong `src/store.js`; `src/blog-posts/ramcleaner-earlybird.json`; locales vi/en/de/es/fr/ja/zh-CN; `products.onlyOne` → `products.noRelated`.)**
+- **Merchant listing structured data** (`Product`/`Offer`): `hasMerchantReturnPolicy` (`applicableCountry`, `returnFees`, `merchantReturnDays=14`; **không** `returnMethod` cho sản phẩm số) và `shippingDetails` với `shippingRate: 0 VND` + **`deliveryTime` 0 ngày** (GMC “deliveryTime bị thiếu (nằm trong offers.shippingDetails)” — 6 mục). **Một Offer duy nhất** (`Product`); `SoftwareApplication` không còn mang `offers` (tránh trùng/hai Offer lệch). **Không** thêm `AggregateRating`/review sao tự thu thập.
 - **Luồng mua/khám phá**: CTA mua dùng `/?buy=<id>` + form mua; liên kết khám phá/sản phẩm liên quan đi tới trang sản phẩm. Tránh điều hướng gây hiểu nhầm.
+- **Checkout hiển thị giá trước khi cam kết** (`openCheckout`, `public/app.js`): tên SP, giá/currency (`priceFor`), ghi chú quy đổi PayPal VND→USD, cách nhận sản phẩm số và cửa sổ hoàn tiền 14 ngày — trước nút thanh toán. Test khóa: `test/merchant-policy.test.js` (mục 6).
+- **Danh tính doanh nghiệp**: `.env` đã đặt `BRAND_LEGAL_ENTITY=Vũ Trung Sơn` (owner cần đặt giống trên Render), trang About/Contact nêu rõ “Doanh nghiệp cá nhân”/“sole-proprietor business” thay vì “Không công ty”.
+
+## 1.5) Phát hiện live↔repo ngày 2026-11-14 (nguyên nhân thật)
+
+GMC flag **8/8 sản phẩm (100%)** — “Trình bày sai” — và chặn xác minh doanh nghiệp ở `/product/pc-cleanup`, `/product/mousewheel-vba`, `/product/ramcleaner-business`. Nguyên nhân:
+
+- Live `GET /api/products` (Supabase) vẫn trả `shortDescription: "Ưu đãi sớm - chỉ 199.000đ (giảm 33%) cho 100 khách đầu tiên"`, `badge: "Ưu đãi sớm"` cho Early Bird và `badge: "Safe Edition v4.3"` cho Excel (version 4.4) — trong khi repo đã sạch. **Bước `npm run ops:catalog:apply` chưa từng được chạy.**
+- Gate cũ chỉ quét `public/locales/*.json`; không gate nào quét `data/products.json`, `src/store.js`, `src/blog-posts` hay đối chiếu repo↔live.
+- Checkout không hiển thị giá trước khi cam kết; danh tính lệch (email live là Gmail, repo env là email domain; `BRAND_LEGAL_ENTITY` rỗng).
+
+Chi tiết: `docs/rca/2026-11-14-gmc-misrepresentation.md`, `postmortems/2026-11-14-gmc-misrepresentation.json`, change-plan `docs/CHANGE-PLAN-2026-11-14-GMC-TRUST.md`.
+
+**Hành động bắt buộc sau khi deploy code:**
+
+1. `npm run ops:catalog` (dry-run, đọc diff) rồi `npm run ops:catalog:apply`.
+2. Đối chiếu live: `GET /api/products` khớp `data/products.json` từng field (badge, shortDescription, seoDescription, features, version, price); kiểm tra `/merchant-feed.tsv` và trang sản phẩm live.
+3. GSC: Inspect URL + “Validate fix” cho 3 URL bị flag; chạy lại xác minh doanh nghiệp (`answer/17123828`). Chỉ kháng nghị khi các bước 1–3 xanh.
+4. Render env (ngoài repo, không đổi trong file gitignored): `SUPPORT_EMAIL=hello@sonvudev.com` phải khớp contact/schema/FAQ; `BRAND_LEGAL_ENTITY`, `BRAND_ADDRESS`, `BRAND_PHONE` khớp giấy tờ.
 
 ## 2) Việc chủ sở hữu PHẢI làm (ngoài code)
 

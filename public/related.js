@@ -146,7 +146,7 @@
   return enCol && enCol !== p.name ? { ...p, name: enCol } : p;
 };
 
-  var EMPTY = 'products.onlyOne';
+  var EMPTY = 'products.noRelated';
   var emptyText = function () {
     if (dictionary && dictionary.t) {
       // The shared sentence, resolved in the reader's language rather than chosen
@@ -159,7 +159,7 @@
     return emptyFallback();
   };
   var emptyFallback = function () {
-    return lang === 'en' ? 'This is the only product right now.' : 'Đây là sản phẩm duy nhất hiện tại.';
+    return lang === 'en' ? 'No related products yet.' : 'Chưa có sản phẩm liên quan.';
   };
 
   // Maps a product through localizeProduct and picks the right field for the

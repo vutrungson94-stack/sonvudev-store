@@ -104,8 +104,11 @@ test('dữ liệu có cấu trúc đúng schema và có giá khớp sản phẩm
   assert.ok(types.includes('BreadcrumbList'), 'phải có BreadcrumbList');
   assert.ok(types.includes('Organization'), 'phải có Organization');
   const software = graph.find((node) => node['@type'] === 'SoftwareApplication');
-  assert.equal(software.offers.price, 249000, 'giá trong schema phải lấy từ dữ liệu, không gõ tay');
-  assert.equal(software.offers.priceCurrency, 'VND');
+  const merchant = graph.find((node) => node['@type'] === 'Product');
+  assert.ok(merchant, 'phải có node Product cho merchant listing');
+  assert.equal(merchant.offers.price, 249000, 'giá trong schema phải lấy từ dữ liệu, không gõ tay');
+  assert.equal(merchant.offers.priceCurrency, 'VND');
+  assert.ok(!('offers' in software), 'SoftwareApplication không được mang Offer — một Offer duy nhất ở node Product');
   assert.equal(software.operatingSystem, 'Windows');
   assert.equal(software.softwareVersion, '2.1');
 });

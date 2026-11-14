@@ -367,6 +367,10 @@ nav a:hover{color:var(--green)}
 .order-row>b{text-align:right}
 .order-hint{color:#1f2d36;font-size:13px;line-height:1.7;background:#fff;border:1px solid var(--line);border-radius:10px;padding:14px 16px;margin:0 0 16px}
 .expiry-note{background:#fff8e8;border:1px solid #f0dcb0;border-radius:8px;padding:11px 13px;margin:0 0 16px;color:#7a5a12;font-size:11px;line-height:1.6}
+.checkout-price{display:flex;align-items:end;justify-content:space-between;gap:16px;background:#eef6f1;border:1px solid #cfe3d7;border-radius:8px;padding:11px 13px;margin:0 0 12px}
+.checkout-price small{color:var(--muted);font-size:10px}
+.checkout-price strong{font:600 22px 'Space Grotesk';margin-top:3px}
+.cart-terms{color:var(--muted);font-size:11px;line-height:1.7;margin:0 0 12px}
 .order-deadline{font:600 13px 'Space Grotesk';letter-spacing:.02em;color:#247653;background:#e8f7ef;border-radius:8px;padding:9px 13px;margin:0 0 14px;text-align:center;font-variant-numeric:tabular-nums}
 .order-deadline.is-over{color:#a03226;background:#fdeceb;border-color:#f3cdc9}
 .revenue-panel{margin-bottom:34px}

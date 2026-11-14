@@ -1,0 +1,26 @@
+{
+  "title": "GMC gắn \"Trình bày sai\" lên 8/8 sản phẩm và chặn xác minh doanh nghiệp",
+  "date": "2026-11-14T09:30:00+07:00",
+  "impact": "8/8 sản phẩm (100%, 28 ngày trước) bị Google Merchant Center flag \"Trình bày sai\"; 5/8 hiển thị trong danh sách sản phẩm; xác minh doanh nghiệp không tiếp tục được — 3 landing page bị ảnh hưởng: /product/pc-cleanup, /product/mousewheel-vba, /product/ramcleaner-business. \"Cải thiện giao diện\" còn 6 mục aggregateRating/review và 6 mục deliveryTime.",
+  "durationMinutes": 0,
+  "detectedBy": "GMC audit của chủ sở hữu ngày 2026-11-14 (ảnh chụp màn hình + link chính sách answer/6150127)",
+  "rootCause": "Ba nguyên nhân cộng hưởng: (1) Live catalogue (Supabase) lệch repo — trang chủ live còn hiển thị \"Ưu đãi sớm - chỉ 199.000đ (giảm 33%) cho 100 khách đầu tiên\" và badge \"Ưu đãi sớm\" cho RAMCleaner Early Bird, badge \"Safe Edition v4.3\" cho Excel Trusted Locations khi version là 4.4, dù repo đã được làm sạch; bước sync repo→Supabase chưa bao giờ được chạy. (2) Checkout (openCheckout, public/app.js) không hiển thị giá/tổng/quy đổi PayPal/cách nhận hàng/hoàn tiền trước khi người mua cam kết. (3) Danh tính doanh nghiệp yếu: BRAND_LEGAL_ENTITY rỗng, live dùng email Gmail trong khi repo .env để email domain, Organization schema phát thông tin không khớp GMC.",
+  "correctiveActions": [
+    "data/products.json: bỏ claim khuyến mãi/scarcity ở mọi sản phẩm (PC Cleanup 'tăng tốc', MouseWheel 'duy nhất'/'21/21 PASS', Early Bird 'Introductory pricing', Personal 'tăng tốc'), điền đúng tiếng Việt cho mousewheel-vba/ramcleaner-personal/ramcleaner-earlybird, bỏ badge Excel khỏi live qua sync.",
+    "src/store.js: bỏ badge 'Ưu đãi sớm' ở seed earlybird.",
+    "src/blog-posts/ramcleaner-earlybird.json: bỏ 'Giá ưu tiên giới hạn'/'introductory pricing, limited offer' ở mọi locale.",
+    "public/locales/*.json + public/i18n.js: bỏ 'duy nhất'/'21/21' ở product.copy; đổi products.onlyOne → products.noRelated với câu trung thực; thêm cart.conversion/cart.deliveryDigital/cart.refundWindow (vi+en+5 locale khác).",
+    "public/app.js: openCheckout hiển thị giá (priceFor), quy đổi PayPal VND→USD, cách nhận sản phẩm số và cửa sổ hoàn tiền 14 ngày trước nút thanh toán. public/styles.css (.checkout-price, .cart-terms).",
+    "src/pages.js: bỏ offers của node SoftwareApplication (một Offer duy nhất ở node Product); digitalShippingDetails phát shippingRate 0 VND + deliveryTime 0 ngày (handling/transit) thay vì bỏ trống — GMC 'Cải thiện giao diện' mục deliveryTime (6 sản phẩm).",
+    "test/merchant-policy.test.js: gate mới quét claim trong data/products.json, src/store.js, src/blog-posts, public/locales (thêm patterns ưu đãi/giảm giá/khuyến mãi/early bird deal/introductory pricing/limited time); gate mới 'checkout hiển thị giá trước khi trả' (khoá app.js + i18n + 5 locale).",
+    "test/purchase-link-contract.test.js: Offer số phải có shippingDetails với deliveryTime 0 ngày; SoftwareApplication không mang Offer.",
+    "WORKFLOW.md §7.6 + §7.5 + AGENTS.md: invariant mới — mọi thay đổi product data/copy phải kết thúc bằng npm run ops:catalog:apply và đối chiếu live (GET /api/products, trang sản phẩm, /merchant-feed.tsv); checkout phải hiện giá trước khi cam kết.",
+    "Thay đổi đi kèm: about/contact copy cá nhân hóa ('Doanh nghiệp cá nhân', 'A sole-proprietor business'), .env BRAND_LEGAL_ENTITY=Vũ Trung Sơn, docs cập nhật, postmortem/RCA này.",
+    "Sau khi deploy: npm run ops:catalog:apply; verify GET /api/products khớp repo; GSC Inspect URL + 'Validate fix' cho 3 URL bị flag; chạy lại xác minh doanh nghiệp."
+  ],
+  "defectEscapedTests": true,
+  "escapeReason": "Gate cũ chỉ quét public/locales/*.json cho claim scarcity; không quét data/products.json, src/store.js, src/blog-posts, và không có gate đối chiếu repo↔live. Gate xanh trong khi live vẫn vi phạm chính sách.",
+  "owner": "chủ sở hữu repo",
+  "dueDate": "2026-11-28",
+  "status": "in-progress"
+}

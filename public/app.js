@@ -531,6 +531,13 @@ function openCheckout(p) {
       <p class="eyebrow">${esc(T('cart.secureTitle'))}</p>
       <h2 id="modal-title">${esc(T('cart.buyTitle'))} ${esc(p.name)}</h2>
       <p class="checkout-note">${esc(T('cart.note'))}</p>
+      <div class="checkout-price">
+        <small>${esc(T('product.priceOnce'))}</small>
+        <strong>${priceFor(p)}</strong>
+      </div>
+      <p class="cart-terms">${esc(T('cart.conversion'))}</p>
+      <p class="cart-terms">${esc(T('cart.deliveryDigital'))}</p>
+      <p class="cart-terms">${esc(T('cart.refundWindow'))}</p>
     </div>
     <form id="checkout-form" class="checkout-form">
       <label>${esc(T('cart.name'))}<input name="customerName" required maxlength="100" placeholder="${esc(T('cart.namePlaceholder'))}" autocomplete="name"></label>

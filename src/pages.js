@@ -497,7 +497,9 @@ const productSchema = (product, lang = "vi") => ({
   ...(env.brand.socialLinks.length ? { sameAs: env.brand.socialLinks } : {}),
   author: { "@id": `${site()}/#organization` },
   publisher: { "@id": `${site()}/#organization` },
-  offers: productOffer(product, lang),
+  // No offers here: the Product node carries the single Offer. Two Offer objects
+  // for one product made Merchant Center report the merchant fields as missing on
+  // the app node even though the page published them.
 });
 
 /**
@@ -541,30 +543,36 @@ const productSchema = (product, lang = "vi") => ({
    return policy;
  };
 
- const digitalShippingDetails = (isDigital = true) => {
-   // Digital products have no shipping; omit shippingDetails entirely
-   // to avoid OfferShippingDetails which implies physical delivery.
-   if (isDigital) {
-     return null;
-   }
+ const digitalShippingDetails = (isDigital = true, currency = "VND") => {
+   // All products are digital downloads. Merchant Center flags an Offer whose
+   // shippingDetails has no deliveryTime; an instant digital delivery is honestly
+   // zero handling and zero transit.
+   const unitCode = "DAY";
+   const handlingTime = { "@type": "QuantitativeValue", minValue: 0, maxValue: 0, unitCode };
+   const transitTime = { "@type": "QuantitativeValue", minValue: 0, maxValue: 0, unitCode };
    return {
      "@type": "OfferShippingDetails",
-     shippingRate: { "@type": "MonetaryAmount", value: 0, currency: "VND" },
+     shippingRate: { "@type": "MonetaryAmount", value: 0, currency: String(currency || "VND").toUpperCase() },
      shippingDestination: [{ "@type": "DefinedRegion", addressCountry: "VN" }],
+     deliveryTime: {
+       "@type": "ShippingDeliveryTime",
+       handlingTime,
+       transitTime,
+     },
    };
  };
 
-// One Offer node, used by both the SoftwareApplication and the Product node on a
-// product page. They used to be two hand-built objects: the Product carried
-// itemCondition and hasMerchantReturnPolicy, the SoftwareApplication carried
-// neither — so a crawler that read the app node reported the merchant fields as
-// missing even though the page published them. Two offers for one product must
-// also agree on price and currency, and the only way to guarantee that is one
-// object. Digital goods keep returnMethod and shippingDetails out; see the
-// comments on merchantReturnPolicy and digitalShippingDetails above.
+// One Offer node, used by the Product node; SoftwareApplication deliberately
+// carries no offers (see productSchema). They used to be two hand-built objects:
+// the Product carried itemCondition and hasMerchantReturnPolicy, the
+// SoftwareApplication carried neither — so a crawler that read the app node
+// reported the merchant fields as missing even though the page published them.
+// Digital goods keep returnMethod out (no physical return by mail); shippingDetails
+// IS present with a zero-value digital deliveryTime because Merchant Center
+// flags its absence (see digitalShippingDetails).
 const productOffer = (product, lang = DEFAULT_LOCALE) => {
   const isDigital = true; // All products are digital downloads
-  const shippingDetails = digitalShippingDetails(isDigital);
+  const shippingDetails = digitalShippingDetails(isDigital, String(product.currency || "VND").toUpperCase());
   return {
     "@type": "Offer",
     price: Number(product.price) || 0,

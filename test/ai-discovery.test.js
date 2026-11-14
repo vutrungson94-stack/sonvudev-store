@@ -263,8 +263,11 @@ test('schema mô tả đủ để trả lời "chạy được trên máy nào"'
   assert.equal(software.applicationCategory, 'Công cụ');
   assert.ok(software.downloadUrl, 'phải có downloadUrl');
   assert.ok(software.inLanguage, 'phải khai ngôn ngữ');
-  assert.equal(software.offers.price, 249000);
-  assert.equal(software.offers.priceCurrency, 'VND');
+  const merchant = jsonLd(body).find((node) => node['@type'] === 'Product');
+  assert.ok(merchant, 'phải có node Product cho merchant listing');
+  assert.equal(merchant.offers.price, 249000);
+  assert.equal(merchant.offers.priceCurrency, 'VND');
+  assert.ok(!('offers' in software), 'SoftwareApplication không được mang Offer — một Offer duy nhất ở node Product');
 });
 
 test('trang sản phẩm có FAQPage lấy từ dữ liệu thật', async () => {
