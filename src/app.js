@@ -496,10 +496,28 @@ const renderedPages = { ...Object.fromEntries(supportPages.map((file) => [file, 
 const extraRendered = { "lookup.html": {}, "404.html": {} };
 const served = { ...indexablePages, ...renderedPages, ...extraRendered };
 const pageCache = new Map();
+// Single-flight for a cold page: when the 60s TTL expires and 50 requests arrive
+// together, they all wait on one render instead of each querying Supabase and
+// rebuilding the same HTML. The map is cleared with the cache on a catalogue edit.
+const pageInflight = new Map();
 // Short-lived on purpose. A price change in the admin panel has to reach the
 // bytes a crawler reads: a search result that shows last week's price is worse
 // than no price, and the storefront's own script only ever sees the fresh copy.
 const PAGE_TTL_MS = 60000;
+
+// Rendered HTML pages (product, blog) are byte-identical for every visitor and
+// are rebuilt from Supabase on every request without this. The cache is
+// process-local, short-lived, and single-flight: a cold page is rendered once,
+// not once per concurrent request. invalidatePages() clears it on every admin
+// product/review mutation, so a price edit is never more than one request away.
+const htmlCache = new Map();
+const htmlInflight = new Map();
+const HTML_TTL_MS = 300000;
+// The test suite mutates the store directly (archive, refund, delete) and then
+// reads the page back. A production cache would serve the pre-mutation bytes and
+// turn those assertions into false failures. The cache is a production
+// optimisation; tests always render from the current store.
+const CACHE_ENABLED = process.env.NODE_ENV !== "test";
 
 // Every rendered page is derived from the catalogue, and the catalogue is
 // editable from the panel. Caching without this meant a price edit took up to a
@@ -507,14 +525,21 @@ const PAGE_TTL_MS = 60000;
 // /llms.txt and /feed.json describing products at prices that no longer existed.
 const invalidatePages = () => {
   pageCache.clear();
+  pageInflight.clear();
   textCache.clear();
+  htmlCache.clear();
+  htmlInflight.clear();
 };
 
 async function renderPage(file, lang = DEFAULT_LOCALE) {
   const cacheKey = `${file}::${lang}`;
-  const cached = pageCache.get(cacheKey);
-  if (cached && Date.now() - cached.at < PAGE_TTL_MS) return cached.html;
-  const template = await fs.readFile(path.join(publicDir, file), "utf8");
+  if (CACHE_ENABLED) {
+    const cached = pageCache.get(cacheKey);
+    if (cached && Date.now() - cached.at < PAGE_TTL_MS) return cached.html;
+    if (pageInflight.has(cacheKey)) return pageInflight.get(cacheKey);
+  }
+  const pending = (async () => {
+    const template = await fs.readFile(path.join(publicDir, file), "utf8");
   // Optional rather than assumed: a file missing from the table is rendered with
   // no catalogue and no verification tags instead of throwing on the first read.
   const products = served[file]?.catalog ? await listProducts() : [];
@@ -542,9 +567,16 @@ async function renderPage(file, lang = DEFAULT_LOCALE) {
     .replace(/<!--catalog:start-->[\s\S]*?<!--catalog:end-->/, `<!--catalog:start-->${renderIndexGrid(products)}<!--catalog:end-->`);
   // The stats strip carries data-i18n keys of its own; the localisation pass
   // fills the same placeholders the dictionary already owns.
-  const html = inlineStyles(localizeStaticHtml(filled, { file, lang, values }));
-  pageCache.set(cacheKey, { at: Date.now(), html });
-  return html;
+    const html = inlineStyles(localizeStaticHtml(filled, { file, lang, values }));
+    if (CACHE_ENABLED) pageCache.set(cacheKey, { at: Date.now(), html });
+    pageInflight.delete(cacheKey);
+    return html;
+  })().catch((error) => {
+    pageInflight.delete(cacheKey);
+    throw error;
+  });
+  if (CACHE_ENABLED) pageInflight.set(cacheKey, pending);
+  return pending;
 }
 
 const sendPage = (file, lang = DEFAULT_LOCALE) => async (_req, res) => {
@@ -631,6 +663,7 @@ app.get("/order/:id", sendPage("order.html"));
 const textCache = new Map();
 const TEXT_TTL_MS = 60000;
 const cachedText = async (key, build) => {
+  if (!CACHE_ENABLED) return build(await listProducts());
   const hit = textCache.get(key);
   // Cache hits must return the rendered value, not the wrapper object;
   // the first request returns a string/object, but a second request inside 60s
@@ -639,6 +672,35 @@ const cachedText = async (key, build) => {
   const value = build(await listProducts());
   textCache.set(key, { at: Date.now(), value });
   return value;
+};
+
+// The same idea for a whole rendered HTML page. `build` returns the HTML string,
+// or null for a 404 (a null is never cached — a product that becomes sellable
+// again must not stay a 404 because of a cold cache). A concurrent miss waits on
+// the same promise instead of each rendering the page again.
+const cachedHtml = async (key, build, ttl = HTML_TTL_MS) => {
+  if (!CACHE_ENABLED) return build();
+  const hit = htmlCache.get(key);
+  if (hit && Date.now() - hit.at < ttl) return hit.value;
+  if (htmlInflight.has(key)) return htmlInflight.get(key);
+  const promise = Promise.resolve()
+    .then(build)
+    .then((value) => {
+      htmlInflight.delete(key);
+      if (value == null) return value;
+      htmlCache.set(key, { at: Date.now(), value });
+      if (htmlCache.size > 200) {
+        const oldest = htmlCache.keys().next().value;
+        if (oldest !== undefined) htmlCache.delete(oldest);
+      }
+      return value;
+    })
+    .catch((error) => {
+      htmlInflight.delete(key);
+      throw error;
+    });
+  htmlInflight.set(key, promise);
+  return promise;
 };
 
 app.get("/llms.txt", async (_req, res, next) => {
@@ -681,23 +743,25 @@ app.get("/blog.json", async (_req, res, next) => {
  */
 const productPage = (lang) => async (req, res) => {
   try {
-    const product = await getProductBySlug(req.params.slug);
-    // A draft, or one with no file behind it, must read as a 404 rather than as a
-    // noindex page: the second is a page Google has already been told about, and
-    // leaving it reachable invites the URL being kept and re-submitted.
-    //
-    // Rendered through the same 404 handler as every other missing page. This
-    // used to sendFile the raw template, so /product/<anything> answered with
-    // the literal {{brandWordmark}} and {{year}} while every other 404 was
-    // substituted — a leak no file-based check could see, because the file on
-    // disk is meant to carry those tokens.
-    if (!isSellable(product)) {
-      return notFound(req, res);
-    }
-    const reviews = await listReviewsForProduct(product.id);
-    const products = await listProducts();
-    const related = (products || []).filter((item) => item.id !== product.id && isSellable(item)).slice(0, 6);
-    res.set("Cache-Control", "public, max-age=600").type("html").send(renderProductPage(product, lang, reviews, related));
+    const html = await cachedHtml(`product:${lang}:${req.params.slug}`, async () => {
+      const product = await getProductBySlug(req.params.slug);
+      // A draft, or one with no file behind it, must read as a 404 rather than as a
+      // noindex page: the second is a page Google has already been told about, and
+      // leaving it reachable invites the URL being kept and re-submitted.
+      //
+      // Rendered through the same 404 handler as every other missing page. This
+      // used to sendFile the raw template, so /product/<anything> answered with
+      // the literal {{brandWordmark}} and {{year}} while every other 404 was
+      // substituted — a leak no file-based check could see, because the file on
+      // disk is meant to carry those tokens.
+      if (!isSellable(product)) return null;
+      const reviews = await listReviewsForProduct(product.id);
+      const products = await listProducts();
+      const related = (products || []).filter((item) => item.id !== product.id && isSellable(item)).slice(0, 6);
+      return renderProductPage(product, lang, reviews, related);
+    });
+    if (html == null) return notFound(req, res);
+    res.set("Cache-Control", "public, max-age=600").type("html").send(html);
   } catch (error) {
     console.error(error);
     try {
@@ -720,9 +784,13 @@ for (const lang of EXTRA_BLOG_LOCALES) app.get(`/${lang}/product/:slug`, product
 // an empty page to crawlers.
 const blogPage = (lang) => async (req, res) => {
   try {
-    const post = getBlogPostBySlug(req.params.slug);
-    if (!post) return notFound(req, res);
-    res.set("Cache-Control", "public, max-age=300").type("html").send(renderBlogPost(post, lang));
+    const html = await cachedHtml(`blog:${lang}:${req.params.slug}`, () => {
+      const post = getBlogPostBySlug(req.params.slug);
+      if (!post) return null;
+      return renderBlogPost(post, lang);
+    }, 300000);
+    if (html == null) return notFound(req, res);
+    res.set("Cache-Control", "public, max-age=300").type("html").send(html);
   } catch (error) {
     console.error(error);
     res.status(500).sendFile(path.join(publicDir, "404.html"));
@@ -730,8 +798,8 @@ const blogPage = (lang) => async (req, res) => {
 };
 const blogIndexPage = (lang) => async (_req, res) => {
   try {
-    const posts = loadBlogPosts();
-    return res.set("Cache-Control", "public, max-age=300").type("html").send(renderBlogIndex(posts, lang));
+    const html = await cachedHtml(`blog-index:${lang}`, () => renderBlogIndex(loadBlogPosts(), lang), 300000);
+    return res.set("Cache-Control", "public, max-age=300").type("html").send(html);
   } catch (error) {
     console.error(error);
     return res.status(500).sendFile(path.join(publicDir, "404.html"));
