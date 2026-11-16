@@ -85,6 +85,13 @@ test('tất cả category trong data/products.json đều là danh mục canonic
   assert.deepEqual(unknown, [], `category không được biết trong data/products.json: ${unknown.join(', ')}`);
 });
 
+test('catalogue có ít nhất hai danh mục khác nhau để hàng lọc có nghĩa', () => {
+  const products = JSON.parse(read('data/products.json'));
+  const categories = new Set(products.map((p) => normaliseCategory(p.category)).filter(Boolean));
+  assert.ok(categories.size >= 2,
+    `catalogue chỉ có ${categories.size} danh mục (${[...categories].join(', ')}) — hàng lọc không có gì để lọc`);
+});
+
 test('tất cả category trong seed src/store.js đều là danh mục canonical', () => {
   const source = read('src/store.js');
   const matches = [...source.matchAll(/"category":\s*"([^"]+)"/g)].map((m) => m[1]);
