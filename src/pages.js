@@ -527,21 +527,25 @@ const productSchema = (product, lang = "vi") => ({
  // The published policy at /refund is a 14-day, free-return policy under
  // Vietnamese jurisdiction, so those are the values a crawler is given. Digital
  // delivery has no carrier and no shipping cost, so the shipping rate is zero.
- const merchantReturnPolicy = (isDigital = true) => {
-   const policy = {
-     "@type": "MerchantReturnPolicy",
-     applicableCountry: ["VN"],
-     returnPolicyCategory: "https://schema.org/MerchantReturnFiniteReturnWindow",
-     merchantReturnDays: 14,
-     returnFees: "https://schema.org/FreeReturn",
-   };
-   // Digital products don't have a physical return method; omit returnMethod
-   // for digital goods. Physical goods would use ReturnByMail.
-   if (!isDigital) {
-     policy.returnMethod = "https://schema.org/ReturnByMail";
-   }
-   return policy;
- };
+const merchantReturnPolicy = (isDigital = true) => {
+    const policy = {
+      "@type": "MerchantReturnPolicy",
+      applicableCountry: ["VN"],
+      returnPolicyCategory: "https://schema.org/MerchantReturnFiniteReturnWindow",
+      merchantReturnDays: 14,
+      returnFees: "https://schema.org/FreeReturn",
+    };
+    // GMC requires returnMethod on every MerchantReturnPolicy. Digital goods
+    // return the download itself; physical goods would return by mail. The
+    // first draft omitted it for digital products and Merchant Center flagged
+    // "Trường returnMethod bị thiếu" on every product — the remediation doc
+    // said "không returnMethod cho sản phẩm số" and the test asserted its
+    // absence, so both were wrong at the same time.
+    policy.returnMethod = isDigital
+      ? "https://schema.org/ReturnDownload"
+      : "https://schema.org/ReturnByMail";
+    return policy;
+  };
 
  const digitalShippingDetails = (isDigital = true, currency = "VND") => {
    // All products are digital downloads. Merchant Center flags an Offer whose
@@ -567,7 +571,7 @@ const productSchema = (product, lang = "vi") => ({
 // the Product carried itemCondition and hasMerchantReturnPolicy, the
 // SoftwareApplication carried neither — so a crawler that read the app node
 // reported the merchant fields as missing even though the page published them.
-// Digital goods keep returnMethod out (no physical return by mail); shippingDetails
+// Digital goods use ReturnDownload (the buyer gets the file back); shippingDetails
 // IS present with a zero-value digital deliveryTime because Merchant Center
 // flags its absence (see digitalShippingDetails).
 const productOffer = (product, lang = DEFAULT_LOCALE) => {

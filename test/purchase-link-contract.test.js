@@ -87,8 +87,13 @@ test('structured data merchant listing: Offer có applicableCountry + digital sh
   assert.ok(!('aggregateRating' in merchant), 'không tự thêm AggregateRating (không đủ điều kiện rich result)');
   assert.ok(Array.isArray(merchant.offers.hasMerchantReturnPolicy.applicableCountry), 'return policy phải có applicableCountry');
   assert.ok(merchant.offers.hasMerchantReturnPolicy.applicableCountry.includes('VN'), 'return policy áp dụng VN');
-  // Digital products: no returnMethod (no physical return by mail)
-  assert.ok(!merchant.offers.hasMerchantReturnPolicy.returnMethod, 'sản phẩm số: không có returnMethod ReturnByMail');
+  // GMC requires returnMethod on every MerchantReturnPolicy. Digital goods
+  // return the download itself, so the value is ReturnDownload, not
+  // ReturnByMail (that is for physical goods). The first draft asserted its
+  // absence and Merchant Center flagged "Trường returnMethod bị thiếu" on all
+  // 8 products — the test and the doc were both wrong together.
+  assert.equal(merchant.offers.hasMerchantReturnPolicy.returnMethod, 'https://schema.org/ReturnDownload',
+    'sản phẩm số: returnMethod phải là ReturnDownload, không được bỏ trống');
   // Digital products: shippingDetails present with a zero-value deliveryTime —
   // Merchant Center flags "deliveryTime bị thiếu (nằm trong offers.shippingDetails)".
   assert.ok(merchant.offers.shippingDetails, 'sản phẩm số: phải có shippingDetails với deliveryTime');

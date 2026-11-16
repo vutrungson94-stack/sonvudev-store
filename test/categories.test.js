@@ -3,8 +3,14 @@
 import './helpers/env.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { readFileSync, readdirSync } from 'node:fs';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { normaliseCategory, CATEGORY_EN } from '../src/lib/categories.mjs';
 import { renderIndexFilters } from '../src/pages.js';
+
+const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
+const read = (relative) => readFileSync(path.join(root, relative), 'utf8');
 
 // The catalogue's category is typed by hand in the admin panel, and the
 // production catalogue carried "Utility" (English, singular) beside "Tiện ích".
@@ -52,4 +58,47 @@ test('hàng lọc gộp hai cách viết của cùng một danh mục thành m�
   const utility = buttons.find((b) => b.includes('Tiện ích'));
   assert.match(utility, /data-count="2"/,
     '"Utility" và "Tiện ích" là cùng một danh mục nên phải gộp thành một nút, đếm 2 sản phẩm');
+});
+
+// The gate that missed the regression. b323084 typed "UtilitiesApplication"
+// into data/products.json and it shipped: the filter row and the product
+// eyebrow both printed the raw value in every language, and the filter test
+// still passed because it only asked "does the category have a button". A
+// category the dictionary does not know is a data defect, not a rendering
+// choice — the row is built from what is for sale, so what is for sale has to
+// be something the row can name.
+//
+// The check is "is the value a known category", not "does normaliseCategory
+// change it". Those are different questions, and the first draft asked the
+// second one: a value that matches nothing is left as-is, so
+// normaliseCategory('UtilitiesApplication') === 'UtilitiesApplication' and the
+// "changed?" test passed. A value can only be unknown, never wrongly mapped,
+// which is why the test has to ask about the canonical set.
+const CANONICAL = new Set(Object.keys(CATEGORY_EN));
+const unknownIn = (values) => [...new Set(values)]
+  .filter((c) => !CANONICAL.has(normaliseCategory(String(c || '').trim())))
+  .filter(Boolean);
+
+test('tất cả category trong data/products.json đều là danh mục canonical', () => {
+  const products = JSON.parse(read('data/products.json'));
+  const unknown = unknownIn(products.map((p) => p.category));
+  assert.deepEqual(unknown, [], `category không được biết trong data/products.json: ${unknown.join(', ')}`);
+});
+
+test('tất cả category trong seed src/store.js đều là danh mục canonical', () => {
+  const source = read('src/store.js');
+  const matches = [...source.matchAll(/"category":\s*"([^"]+)"/g)].map((m) => m[1]);
+  assert.deepEqual(unknownIn(matches), [], `seed category không được biết trong src/store.js`);
+});
+
+test('tất cả category trong blog-posts đều là danh mục canonical', () => {
+  const dir = path.join(root, 'src', 'blog-posts');
+  const files = readdirSync(dir).filter((f) => f.endsWith('.json'));
+  const unknown = [];
+  for (const f of files) {
+    const post = JSON.parse(read(path.join('src', 'blog-posts', f)));
+    if (!post.category) continue;
+    unknown.push(...unknownIn([post.category]).map((c) => `${f}:${c}`));
+  }
+  assert.deepEqual(unknown, [], `blog category không được biết: ${unknown.join(', ')}`);
 });

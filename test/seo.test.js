@@ -370,6 +370,34 @@ test('danh mục lọc được sinh từ dữ liệu, không phải danh sách 
   // The direction that matters: every category with products has a button, or the
   // buyer cannot filter to something they can see.
   for (const category of categories) assert.ok(buttons.includes(category), `thiếu nút lọc cho danh mục "${category}"`);
+  // And the other direction — the one this test missed. A button may not carry a
+  // category nobody knows. b323084 typed "UtilitiesApplication" into the
+  // catalogue; it rendered as a filter and as a product eyebrow in every
+  // language, and this test still passed, because it only asked "does the
+  // category have a button", never "is the button a category". A filter row is
+  // only as good as its dictionary: every non-"all" filter must be a canonical
+  // category, and its label must be the translated one, not the raw value the
+  // admin panel typed.
+  const { normaliseCategory } = await import('../src/lib/categories.mjs');
+  const unknown = buttons.filter((b) => b !== 'all' && normaliseCategory(b) !== b);
+  assert.deepEqual(unknown, [],
+    `nút lọc mang danh mục không được biết: ${unknown.join(', ')} — nó sẽ hiện thô trên mọi ngôn ngữ`);
+  for (const button of buttons.filter((b) => b !== 'all')) {
+    const block = html.slice(html.indexOf(`data-filter="${button}"`)).slice(0, 600);
+    assert.ok(block.includes(`data-vi="${normaliseCategory(button)}"`),
+      `nút "${button}" phải có data-vi là danh mục canonical, không phải giá trị thô`);
+    assert.ok(block.includes('data-en="'),
+      `nút "${button}" phải có data-en dịch`);
+  }
+  // The product page eyebrow runs the same normaliser. A raw value there is
+  // untranslated on every locale, which is how "UtilitiesApplication" showed up
+  // above the buy card in English, Japanese and Chinese too.
+  const productHtml = await text(`/product/${product.slug}`);
+  const eyebrow = productHtml.match(/<p class="eyebrow">[\s\S]*?<\/p>/);
+  assert.ok(eyebrow, 'trang sản phẩm phải có eyebrow');
+  const eyebrowCategory = String(product.category || '').trim();
+  assert.equal(normaliseCategory(eyebrowCategory), eyebrowCategory,
+    `category "${eyebrowCategory}" trên trang sản phẩm phải là danh mục canonical`);
   // Not the other direction. Rendered pages are cached for a minute on purpose, so
   // a category emptied a moment ago can keep its button until the cache turns over.
   // That is the trade the TTL buys — a stale button that filters to nothing is a
