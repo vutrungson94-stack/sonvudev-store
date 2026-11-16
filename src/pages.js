@@ -645,6 +645,30 @@ const merchantProductSchema = (product, lang = "vi") => {
   };
 };
 
+// A secondary TechArticle node. Google's AI/answer surfaces read article-like
+// content; the Product node is the commercial source of truth, and this node
+// gives the same page an article shape without changing the product data.
+const techArticleSchema = (product, lang = "vi") => {
+  const url = absolute(productUrl(product.slug, lang));
+  const headline = String(product.name || "").trim();
+  const description = String(product.shortDescription || product.description || "").replace(/\s+/g, " ").trim();
+  return {
+    "@type": "TechArticle",
+    "@id": `${url}#article`,
+    headline,
+    ...(description ? { description: description.slice(0, 300) } : {}),
+    inLanguage: lang,
+    isAccessibleForFree: true,
+    mainEntityOfPage: { "@id": url },
+    about: { "@id": `${url}#product` },
+    author: { "@id": `${site()}/#organization` },
+    publisher: { "@id": `${site()}/#organization` },
+    image: [productImage(product)],
+    ...(product.createdAt ? { datePublished: product.createdAt } : {}),
+    ...(product.updatedAt ? { dateModified: product.updatedAt } : {}),
+  };
+};
+
 const breadcrumbSchema = (product, lang = "vi") => {
   const labels = (() => {
     const c = getCopy(lang);
@@ -2326,7 +2350,7 @@ ${meta({ title, description, url, type: "product", lang, image: productImage(pro
 <link rel="stylesheet" href="${assetUrl('/styles.min.css')}">
 ${brandMeta()}
 ${analyticsMeta()}
-${jsonLd({ "@graph": [organization(), websiteSchema(), productSchema(product, lang), merchantProductSchema(product, lang), breadcrumbSchema(product, lang), faq] })}
+${jsonLd({ "@graph": [organization(), websiteSchema(), productSchema(product, lang), merchantProductSchema(product, lang), techArticleSchema(product, lang), breadcrumbSchema(product, lang), faq] })}
 </head>
 <body class="product-page">
 <header class="site-header"><a class="brand" href="${homeUrl}">${brandWordmark()}</a>${headerNav("", copy, homePrefix)}<a class="header-cta" href="${homePrefix}/#products"><span>${esc(copy.buyNow)}</span> <span>↗</span></a></header>

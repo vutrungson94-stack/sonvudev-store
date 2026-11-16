@@ -22,6 +22,24 @@ test('mọi sản phẩm đều có tóm tắt AI vi/en', () => {
   }
 });
 
+test('trang sản phẩm có node TechArticle làm tín hiệu phụ', () => {
+  for (const lang of ['vi', 'en']) {
+    const html = renderProductPage(products[0], lang, [], []);
+    const graph = [...html.matchAll(/<script type="application\/ld\+json">([\s\S]*?)<\/script>/g)]
+      .flatMap((match) => {
+        try { const parsed = JSON.parse(match[1]); return parsed['@graph'] || [parsed]; } catch { return []; }
+      });
+    const article = graph.find((node) => node['@type'] === 'TechArticle');
+    assert.ok(article, `${lang} thiếu node TechArticle`);
+    assert.equal(article.inLanguage, lang, 'TechArticle phải khai báo đúng ngôn ngữ');
+    assert.ok(article.headline, 'TechArticle thiếu headline');
+    assert.ok(article.mainEntityOfPage?.['@id'], 'TechArticle thiếu mainEntityOfPage');
+    assert.ok(article.author?.['@id'], 'TechArticle thiếu author');
+    assert.ok(article.publisher?.['@id'], 'TechArticle thiếu publisher');
+    assert.ok(String(article.about?.['@id'] || '').endsWith('#product'), 'TechArticle.about phải trỏ Product node');
+  }
+});
+
 test('trang sản phẩm render đúng một section tóm tắt AI, 1 cột, có disclaimer', () => {
   for (const lang of ['vi', 'en']) {
     for (const product of products) {
