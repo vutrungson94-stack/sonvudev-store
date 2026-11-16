@@ -12,8 +12,8 @@ import './helpers/env.mjs';
 //   1. the default command is a dry-run and never calls the API;
 //   2. the workflow has no fixture domain fallback, so a missing secret fails
 //      before any API call instead of rotating a real token against a fake URL.
-// The a48fef6 CI run failed exactly here: the audit gate flagged
-// `ci-fixture.example` hardcoded in the workflow.
+// The a48fef6 CI run failed exactly here: the audit gate flagged a fixture
+// domain hardcoded in the workflow.
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const script = path.join(root, 'scripts', 'rotate-admin-token.mjs');
 
