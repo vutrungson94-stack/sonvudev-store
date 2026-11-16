@@ -892,9 +892,9 @@ body.modal-open{overflow:hidden}
 /* AI summary — one column, full width, with a disclaimer that names the limit.
    The text comes from src/ai-summaries.json (offline-generated, reviewed), so
    the section is real content and not a live model call. */
-.ai-summary { position: relative; }
-.ai-summary-head { display: flex; align-items: center; justify-content: space-between; gap: .5rem; flex-wrap: wrap; }
+.ai-summary { position: relative; display: block; }
+.ai-summary-head { display: block; }
 .ai-summary-head h2 { margin: 0; }
-.ai-badge { font-size: .72rem; text-transform: uppercase; letter-spacing: .08em; color: #f97316; border: 1px solid rgba(249, 115, 22, .35); border-radius: 999px; padding: .15rem .55rem; white-space: nowrap; }
-.ai-summary p { margin: .55rem 0 0; max-width: 80ch; }
-.ai-summary .ai-disclaimer { font-size: .82rem; opacity: .72; margin-top: .65rem; }
+.ai-badge { display: inline-block; margin-top: .35rem; font-size: .72rem; text-transform: uppercase; letter-spacing: .08em; color: #f97316; border: 1px solid rgba(249, 115, 22, .35); border-radius: 999px; padding: .15rem .55rem; white-space: nowrap; }
+.ai-summary p { margin: .55rem 0 0; max-width: none; text-align: left; hyphens: manual; }
+.ai-summary .ai-disclaimer { font-size: .82rem; opacity: .72; margin-top: .65rem; text-align: left; }
