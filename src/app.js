@@ -1849,7 +1849,13 @@ app.patch("/api/admin/orders/:id", admin, json, async (req, res) => {
       if (amount === null) return res.status(400).json(refuse("api.err.refundPartialAmountRequired", "Hoàn kiểu “khách đổi ý” phải ghi số tiền lớn hơn 0 và nhỏ hơn số đã thu", 400));
       // The reason is in the order row; the request that carried it is here.
       acted("refund", { amount: existing.amount, currency: existing.currency, reason, category });
-      return res.json({ order: publicOrder(await voidPayment(existing, { reason, category, amount })) });
+      const refunded = await voidPayment(existing, { reason, category, amount });
+      // A refund removes the review from the product page. The page is cached for
+      // up to 5 minutes; without this the buyer's review stays visible after the
+      // money went back, which is exactly the stale-evidence failure the cache
+      // invalidation exists to prevent.
+      invalidatePages();
+      return res.json({ order: publicOrder(refunded) });
     }
     if (!ORDER_STATUSES.includes(status)) return res.status(400).json(refuse("api.err.invalidStatus", "Trạng thái không hợp lệ", 400));
     if (status === "paid") {
