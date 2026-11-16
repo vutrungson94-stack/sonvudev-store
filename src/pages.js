@@ -1,6 +1,13 @@
 import { readdirSync, readFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+
+// AI summaries are generated offline, reviewed, and shipped as content. They live
+// in src/ (not data/) because the deploy artifact copies src/ but deliberately
+// excludes runtime state in data/.
+const AI_SUMMARIES = JSON.parse(
+  readFileSync(new URL("./ai-summaries.json", import.meta.url), "utf8"),
+);
 import { env } from "./config.js";
 import { isSellable } from "./store.js";
 import { esc, money, formatBytes, initials } from "./format.js";
@@ -472,6 +479,21 @@ const trustBlock = (product, copy) => {
   const rows = [`<li><a href="${esc(scan)}" rel="nofollow noopener" target="_blank">${esc(copy.trustScan)}</a><small>${esc(copy.trustScanNote)}</small></li>`];
   rows.push(`<li><a href="/build-report.json">${esc(copy.trustBuild)}</a><small>${esc(copy.trustBuildNote)}</small></li>`);
   return `<section class="detail-block trust"><h2>${esc(copy.trustHeading)}</h2><ul class="trust-list">${rows.join("")}</ul></section>`;
+};
+
+// The AI summary. One column, full width, with a disclaimer that names the
+// limitation. The text comes from src/ai-summaries.json — offline-generated and
+// reviewed — not from a live model call, so the page has no API dependency and
+// no per-request cost.
+const aiSummaryBlock = (product, lang, copy) => {
+  const entry = AI_SUMMARIES[product.slug];
+  const text = entry?.[lang === "vi" ? "vi" : "en"] || entry?.vi || entry?.en;
+  if (!text) return "";
+  return `<section class="detail-block ai-summary" aria-labelledby="ai-summary-title">
+    <div class="ai-summary-head"><h2 id="ai-summary-title">${esc(copy.aiSummary)}</h2><span class="ai-badge">${esc(copy.aiGenerated || "AI")}</span></div>
+    <p>${esc(text)}</p>
+    <p class="ai-disclaimer">${esc(copy.aiDisclaimer)}</p>
+  </section>`;
 };
 
 const productSchema = (product, lang = "vi") => ({
@@ -1649,6 +1671,9 @@ export const COPY_VI = {
   pointLookup: "Mã tra cứu gửi qua email",
   pointRefund: "Hoàn tiền nếu file lỗi",
   features: "Tính năng",
+  aiSummary: "Tóm tắt bằng AI",
+  aiGenerated: "AI tạo",
+  aiDisclaimer: "Tóm tắt do AI tạo, có thể chưa đầy đủ. Kiểm chứng và đọc bài viết đầy đủ bên dưới.",
   requirements: "Yêu cầu hệ thống",
   faqHeading: "Câu hỏi thường gặp",
   reviewsHeading: "Khách đã dùng",
@@ -1692,6 +1717,9 @@ export const COPY_EN = {
   pointLookup: "Lookup code sent by email",
   pointRefund: "Refunded if the file is broken",
   features: "Features",
+  aiSummary: "AI summary",
+  aiGenerated: "AI-generated",
+  aiDisclaimer: "AI-generated summary. It may be incomplete — verify and read the full article below.",
   requirements: "System requirements",
   faqHeading: "Frequently asked questions",
   reviewsHeading: "What customers say",
@@ -2326,6 +2354,7 @@ ${jsonLd({ "@graph": [organization(), websiteSchema(), productSchema(product, la
 <ul class="buy-points"><li>${esc(copy.pointDownload)}</li><li>${esc(copy.pointLookup)}</li><li>${esc(copy.pointRefund)}</li></ul>
 </div>
 </header>
+${aiSummaryBlock(product, lang, copy)}
 ${features.length ? `<section class="detail-block"><h2>${esc(copy.features)}</h2><ul class="feature-grid">${features.map((item) => `<li>${esc(item)}</li>`).join("")}</ul></section>` : ""}
 ${product.requirements ? `<section class="detail-block"><h2>${esc(copy.requirements)}</h2><p>${esc(product.requirements).replace(/\n/g, "<br>")}</p></section>` : ""}
 ${(product.fileSize || product.file_size) ? `<section class="detail-block"><h2>${esc(copy.fileSizeLabel)}</h2><p>${esc(formatBytes(product.fileSize || product.file_size))}</p></section>` : ""}

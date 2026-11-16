@@ -1,0 +1,34 @@
+{
+  "pc-cleanup": {
+    "vi": "PC Cleanup là ứng dụng dọn dẹp đa nền tảng (Windows, macOS, Linux), xóa file tạm, cache trình duyệt, cache npm/NuGet, cache cập nhật OS và thùng rác. Chạy portable, không cần cài đặt, giao diện Việt/Anh.",
+    "en": "PC Cleanup is a cross-platform desktop cleaner (Windows, macOS, Linux) that removes temp files, browser cache, npm/NuGet cache, OS update cache and the recycle bin. It runs portable with no installation and a Vietnamese/English interface."
+  },
+  "mousewheel-vba": {
+    "vi": "MouseWheel for VBA là module VBA tự nhúng, bật cuộn con lăn cho ListBox, ComboBox, Frame và UserForm. Chỉ cần import một file .bas và thêm hai dòng lệnh; hỗ trợ Office 32/64-bit, không phụ thuộc thư viện MSForms.",
+    "en": "MouseWheel for VBA is a self-contained VBA module that enables mouse-wheel scrolling for ListBox, ComboBox, Frame and UserForm. Import one .bas file and add two lines; it supports 32/64-bit Office with no MSForms dependency."
+  },
+  "ramcleaner-personal": {
+    "vi": "RAMCleaner Personal giải phóng RAM standby/modified, nén bộ nhớ và dọn file tạm sau phiên làm việc dài. Chạy portable trên Windows, Linux và macOS; giấy phép cá nhân 1 thiết bị, cập nhật trọn đời.",
+    "en": "RAMCleaner Personal frees standby/modified RAM, compresses memory and cleans temp files after long sessions. It runs portable on Windows, Linux and macOS; the personal licence covers one device with lifetime updates."
+  },
+  "ramcleaner-earlybird": {
+    "vi": "RAMCleaner Early Bird là giấy phép của RAMCleaner Personal với đầy đủ tính năng và cập nhật trọn đời, dùng trên Windows, Linux và macOS.",
+    "en": "RAMCleaner Early Bird is a RAMCleaner Personal licence with all features and lifetime updates, for Windows, Linux and macOS."
+  },
+  "ramcleaner-business": {
+    "vi": "RAMCleaner Business dành cho doanh nghiệp quản lý bộ nhớ trên nhiều máy: giấy phép 10 thiết bị, file cấu hình tập trung, script triển khai hàng loạt và hỗ trợ ưu tiên 1 năm.",
+    "en": "RAMCleaner Business is for enterprises managing memory across multiple machines: a 10-device licence, centralised config file, mass-deployment scripts and one year of priority support."
+  },
+  "dotnet-sdk-portable-updater": {
+    "vi": "Công cụ cài .NET SDK ở phạm vi người dùng, không cần quyền Administrator: tự đặt DOTNET_ROOT/PATH, xác minh SHA-512, kiểm tra chữ ký Authenticode và dọn SDK cũ.",
+    "en": "A user-scope .NET SDK installer that needs no Administrator rights: it sets DOTNET_ROOT/PATH, verifies SHA-512, checks the Authenticode signature and prunes old SDKs."
+  },
+  "excel-trusted-locations-setup": {
+    "vi": "Tiện ích thêm thư mục bạn chọn vào Trusted Locations của Excel để mở macro .xlsm bị chặn, có dry-run, hoàn tác, audit log và danh sách trusted-locations trực tiếp; không cần quyền Administrator.",
+    "en": "A utility that adds the folders you choose to Excel Trusted Locations to unblock macros in .xlsm files, with dry-run, undo, an audit log and a live trusted-locations list; no Administrator rights needed."
+  },
+  "spark-capacity-tester-pro": {
+    "vi": "Spark Capacity Tester đo dung lượng thật của USB, thẻ nhớ và ổ đĩa bằng cách ghi rồi đọc lại dữ liệu và dò ranh giới; 5 chế độ test, kết luận PASS/FAIL và chứng nhận TCT_CERT. Portable Windows 10/11 x64, không cần cài đặt.",
+    "en": "Spark Capacity Tester measures the real capacity of USB sticks, memory cards and disks by writing and reading data back and probing boundaries; five test modes, a PASS/FAIL verdict and a TCT_CERT certificate. Portable Windows 10/11 x64, no installation."
+  }
+}
