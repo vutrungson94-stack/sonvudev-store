@@ -1,0 +1,34 @@
+name: Caught defect
+description: A defect caught before deploy — the denominator of the escape rate
+title: "[caught] "
+labels: ["caught-defect"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Use this form for defects caught by a test, a gate, or review **before**
+        they reached production. Together with `escaped-defect` issues it makes
+        `npm run defect:escape` a real measurement instead of a commit-prefix
+        guess. Do not use it for bugs users saw in production.
+  - type: textarea
+    id: what
+    attributes:
+      label: What was caught
+      description: The wrong behaviour, and what should have happened.
+    validations:
+      required: true
+  - type: textarea
+    id: gate
+    attributes:
+      label: Which gate caught it
+      description: Test file, audit rule, workflow, or review.
+      placeholder: test/blog.test.js, npm run audit, ...
+    validations:
+      required: true
+  - type: textarea
+    id: fix
+    attributes:
+      label: Fix
+      description: Link the commit/PR that fixed it.
+    validations:
+      required: false

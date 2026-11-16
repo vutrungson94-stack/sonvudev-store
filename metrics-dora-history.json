@@ -136,6 +136,40 @@
       "totalChanges": 35,
       "mttrDays": 1.34,
       "mttrSamples": 4
+    },
+    {
+      "generatedAt": "2026-11-16T04:47:14.462Z",
+      "windowDays": 90,
+      "source": "git tags (one tag per release, created by CI after a deploy)",
+      "sampleSize": 37,
+      "deploymentFrequency": 2.88,
+      "deploymentsInWindow": 37,
+      "totalDeployments": 37,
+      "leadTimeDays": 0.01,
+      "leadTimeSamples": 36,
+      "leadTimeBasis": "needs-a-previous-tag",
+      "changeFailureRate": 0.1622,
+      "failedChanges": 6,
+      "totalChanges": 37,
+      "mttrDays": 1.48,
+      "mttrSamples": 5
+    },
+    {
+      "generatedAt": "2026-11-16T04:47:17.871Z",
+      "windowDays": 90,
+      "source": "git tags (one tag per release, created by CI after a deploy)",
+      "sampleSize": 37,
+      "deploymentFrequency": 2.88,
+      "deploymentsInWindow": 37,
+      "totalDeployments": 37,
+      "leadTimeDays": 0.01,
+      "leadTimeSamples": 36,
+      "leadTimeBasis": "needs-a-previous-tag",
+      "changeFailureRate": 0.1622,
+      "failedChanges": 6,
+      "totalChanges": 37,
+      "mttrDays": 1.48,
+      "mttrSamples": 5
     }
   ]
 }

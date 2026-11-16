@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-11-10T04:28:51.041Z",
+  "generatedAt": "2026-11-16T06:09:28.144Z",
   "overall": "ok",
   "measurements": {
     "availability": {
@@ -13,11 +13,11 @@
       "source": "logs/last-availability.json — 30-day window from the edge access log",
       "owner": "platform-team",
       "remediation": "Check the deploy history and the incident log; runbook at docs/RUNBOOK.md",
-      "value": null,
-      "status": "unknown",
+      "value": 100,
+      "status": "ok",
       "breached": false,
-      "sampleSize": 0,
-      "measuredAt": "2026-11-10T04:28:51.042Z"
+      "sampleSize": 1989,
+      "measuredAt": "2026-11-16T06:09:28.151Z"
     },
     "errorRate": {
       "id": "errorRate",
@@ -30,11 +30,11 @@
       "source": "logs/last-error-report.json",
       "owner": "backend-team",
       "remediation": "Check /api/health failures; roll back if the rate holds for 15 minutes",
-      "value": null,
-      "status": "unknown",
+      "value": 0,
+      "status": "ok",
       "breached": false,
-      "sampleSize": 0,
-      "measuredAt": "2026-11-10T04:28:51.042Z"
+      "sampleSize": 1989,
+      "measuredAt": "2026-11-16T06:09:28.155Z"
     },
     "latencyP95": {
       "id": "latencyP95",
@@ -47,11 +47,11 @@
       "source": "logs/last-latency.json (p95Seconds, converted to milliseconds)",
       "owner": "backend-team",
       "remediation": "Profile the slow endpoints; add caching or scale the instances",
-      "value": null,
-      "status": "unknown",
+      "value": 238,
+      "status": "ok",
       "breached": false,
-      "sampleSize": 0,
-      "measuredAt": "2026-11-10T04:28:51.042Z"
+      "sampleSize": 1989,
+      "measuredAt": "2026-11-16T06:09:28.158Z"
     },
     "testPassRate": {
       "id": "testPassRate",
@@ -68,7 +68,7 @@
       "status": "ok",
       "breached": false,
       "sampleSize": 513,
-      "measuredAt": "2026-11-10T04:28:51.044Z"
+      "measuredAt": "2026-11-16T06:09:28.158Z"
     },
     "buildSuccessRate": {
       "id": "buildSuccessRate",
@@ -85,7 +85,7 @@
       "status": "ok",
       "breached": false,
       "sampleSize": 1,
-      "measuredAt": "2026-11-10T04:28:51.044Z"
+      "measuredAt": "2026-11-16T06:09:28.159Z"
     },
     "deploySuccessRate": {
       "id": "deploySuccessRate",
@@ -102,7 +102,7 @@
       "status": "unknown",
       "breached": false,
       "sampleSize": 0,
-      "measuredAt": "2026-11-10T04:28:51.044Z"
+      "measuredAt": "2026-11-16T06:09:28.159Z"
     },
     "escapeRate": {
       "id": "escapeRate",
@@ -119,7 +119,7 @@
       "status": "unknown",
       "breached": false,
       "sampleSize": 0,
-      "measuredAt": "2026-11-10T04:28:51.044Z"
+      "measuredAt": "2026-11-16T06:09:28.159Z"
     }
   },
   "unresolvedBreachCount": 0

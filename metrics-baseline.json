@@ -1,12 +1,12 @@
 {
-  "generatedAt": "2026-11-14T05:17:30.846Z",
+  "generatedAt": "2026-11-16T05:31:10.359Z",
   "measurements": {
     "tests": {
-      "value": 605,
+      "value": 617,
       "direction": "up"
     },
     "testFiles": {
-      "value": 89,
+      "value": 91,
       "direction": "up"
     },
     "routes": {
@@ -34,7 +34,7 @@
       "direction": "down"
     },
     "i18nKeys": {
-      "value": 916,
+      "value": 920,
       "direction": "up"
     },
     "indexablePages": {
@@ -54,7 +54,7 @@
       "direction": "down"
     },
     "deploymentFrequency": {
-      "value": 2.72,
+      "value": 2.88,
       "direction": "up"
     },
     "leadTimeDays": {
@@ -62,7 +62,7 @@
       "direction": "down"
     },
     "changeFailureRate": {
-      "value": 0.1143,
+      "value": 0.1622,
       "direction": "down"
     },
     "escapeRate": {

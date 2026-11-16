@@ -18,6 +18,12 @@ import { fileURLToPath } from 'node:url';
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const trendsFile = path.join(root, 'metrics-trends.json');
 const spcFile = path.join(root, 'metrics-spc.json');
+// The roadmap's L5 acceptance criterion: a control limit computed from fewer
+// than 25 points is not stable enough to act on. The gate does not fail below
+// this (a young repository would be red for weeks for something only time can
+// fix) — it labels the snapshot as not yet sufficient so the number is never
+// mistaken for a proven control limit.
+const MIN_SAMPLE = 25;
 
 const mean = (xs) => xs.reduce((a, b) => a + b, 0) / xs.length;
 const stdev = (xs) => {
@@ -93,12 +99,19 @@ for (const key of allKeys) {
     inControl: signals.length === 0,
     signals,
     n: values.length,
+    sufficient: values.length >= MIN_SAMPLE,
   };
 }
 
 const outOfControl = Object.entries(spc.metrics)
   .filter(([, m]) => !m.inControl)
   .map(([key]) => key);
+const notSufficient = Object.entries(spc.metrics)
+  .filter(([, m]) => !m.sufficient)
+  .map(([key]) => key);
+
+spc.minSampleSize = MIN_SAMPLE;
+spc.sampleSufficient = notSufficient.length === 0;
 
 await mkdir(path.dirname(spcFile), { recursive: true });
 await writeFile(spcFile, JSON.stringify(spc, null, 2) + '\n', 'utf8');
@@ -111,6 +124,11 @@ if (outOfControl.length > 0) {
   exitCode = 1;
 } else {
   console.log(`[spc] OK: all ${Object.keys(spc.metrics).length} metrics in statistical control`);
+}
+if (notSufficient.length > 0) {
+  console.log(
+    `[spc] WARNING: ${notSufficient.length} metric(s) have n < ${MIN_SAMPLE} — control limits are not yet stable enough to act on (L5 target ≥ ${MIN_SAMPLE} points): ${notSufficient.join(', ')}`,
+  );
 }
 
 process.exit(exitCode);

@@ -5,12 +5,14 @@
 # the change is that it now runs for everyone, every time, and a failure is
 # something a pull request cannot merge past.
 #
-# Three gates, in the order they should fail:
+# Five gates, in the order they should fail:
 #   1. lint        every file parses
 #   2. audit       the rules this project has already been bitten by
 #   3. test        the behaviour, including the two that no amount of reading
 #                  would have caught: the CSP blocking its own pages, and an
 #                  og:image that is not an image most platforms can display
+#   4. e2e         the purchase flow against a real server process
+#   5. axe         accessibility rules on the rendered pages
 #
 # The audit and the tests need APP_URL and SUPPORT_EMAIL to mean anything — the
 # audit compares files against those values and refuses to run without them, on
@@ -47,7 +49,7 @@ jobs:
       matrix:
         node-version: ['22', '24']
     runs-on: ubuntu-24.04
-    timeout-minutes: 10
+    timeout-minutes: 15
     env:
       NODE_ENV: test
       APP_URL: https://ci-fixture.example
@@ -114,6 +116,24 @@ jobs:
       # raise the bar by guessing.
       - name: coverage
         run: npm run coverage
+
+      # The shop as a buyer meets it: boot a real server, create a product,
+      # place an order, read it back. Unit tests cannot catch a route that
+      # compiles and then 500s on the one field the checkout needs.
+      - name: e2e purchase flow
+        run: npm run e2e:check
+
+      # axe-core against the rendered fixture shop. One Node leg is enough: the
+      # page does not change between Node 22 and 24, and a second identical scan
+      # only doubles the wall clock. AXE_REQUIRE_CHROME makes a missing browser a
+      # failure instead of a silent skip — a gate that inspects nothing and
+      # reports green is the failure this repository keeps undoing.
+      - name: axe accessibility
+        if: matrix.node-version == '22'
+        env:
+          CHROME_PATH: /usr/bin/google-chrome-stable
+          AXE_REQUIRE_CHROME: '1'
+        run: npm run axe:check
 
       # The build runs the audit again on purpose: it is what actually ships, and
       # the packaging step is the last moment a missing required file is cheap to

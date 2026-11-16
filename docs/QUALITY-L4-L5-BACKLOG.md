@@ -71,3 +71,34 @@
 - [x] **Process SLOs**: `docs/PROCESS-SLO.md` — CI wall time, flaky test rate, gate/build pass rate, restore drill, MTTR, deploy success… kèm nguồn đo (hoặc `unknown`).
 - [x] **Traceability matrix**: `docs/TRACEABILITY.md` — yêu cầu → test → release; defect-prevention loop (GSC/GMC RCA) có bằng chứng.
 - [ ] Chưa làm (P1/P2 còn lại): tách `app.js` (dynamic import, cần wave riêng), E2E + axe gates, SPC ≥25 điểm, escape rate từ defect tracker thật, monthly review đọc SLO/GSC/GMC tự động.
+
+## Đợt 2026-11-16 — đóng lỗ đo lường + L5 wave E2E/axe
+
+- [x] **SLO ingest từ Render metrics**: `npm run slo:ingest` đọc
+      `/metrics/http-requests?aggregateBy=statusCode` và `/metrics/http-latency`,
+      ghi `logs/last-availability.json`, `logs/last-error-report.json`,
+      `logs/last-latency.json`. `npm run slo:check` đọc lại. Có unit test cho
+      phần tính (5xx, status label, đổi ms→s, max p95). Chưa chạy thật vì
+      `RENDER_API_KEY`/`RENDER_SERVICE_ID` chưa có giá trị; khi có key, chạy
+      `npm run slo:ingest` để lấp 5/7 chỉ số.
+- [x] **DORA**: baseline mới 2.88 deploy/tuần, CFR 16.2% (6/37), MTTR 1.5 ngày;
+      RCA `docs/rca/2026-11-16-dora-cfr-regression.md` ghi rõ CFR hiện là
+      **proxy commit-prefix**, không phải sự cố production. Không đưa
+      `dora:check` vào CI cho tới khi định nghĩa lại.
+- [x] **Defect escape**: thêm label `caught-defect` + hai issue template
+      (`escaped-defect.yml`, `caught-defect.yml`); `defect-escape.mjs` đếm cả
+      hai nguồn. Hiện 0/0 → `escapeRate: null` (unknown, trung thực).
+- [x] **SPC**: `metrics-trends.yml` chuyển sang **daily** (25 điểm trong 25
+      ngày thay vì 25 tuần); `spc-control-chart.mjs` gắn `sufficient` và cảnh
+      báo khi `n < 25` nhưng không fail CI (giới hạn thời gian, không phải lỗi).
+- [x] **E2E purchase flow**: `npm run e2e:check` — server thật, tạo sản phẩm,
+      trang vi/en, đặt đơn, đọc lại đơn, blog feed. Có trong `checks`.
+- [x] **axe gate**: `npm run axe:check` — axe-core 4.10.2 qua npx, 0 violation
+      trên `/`, `/en/`, `/blog` của fixture shop; `AXE_REQUIRE_CHROME=1` trong
+      CI để thiếu Chrome là lỗi. Có trong `checks` (một Node leg).
+- [x] **Render key/id**: `npm run render:service-id` liệt kê `srv-...` theo tên
+      service; `scripts/render-service-id.mjs`.
+- [ ] Còn lại: thêm 5 GitHub secrets (`RENDER_API_KEY`, `RENDER_SERVICE_ID`,
+      `RESEND_API_KEY`, `SUPPORT_EMAIL`, `EMAIL_FROM`; `APP_URL` đã có), chạy
+      `npm run slo:ingest` thật, chờ 25 điểm SPC, gắn label defect khi có sự cố,
+      push để CI chạy E2E/axe, rồi tách `app.js`.

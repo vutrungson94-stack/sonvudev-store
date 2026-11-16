@@ -137,17 +137,74 @@ chung một cách đo, chung một đơn vị:
 
 | Chỉ số | Nguồn bằng chứng | Cơ sở | Trạng thái |
 | --- | --- | --- | --- |
-| `availability` | `logs/last-availability.json` — cửa sổ 30 ngày từ access log của edge | window | **unknown** (chưa có ai sinh file này) |
-| `errorRate` | `logs/last-error-report.json` | window | **unknown** |
-| `latencyP95` | `logs/last-latency.json` (`p95Seconds` → **ms**) | window | **unknown** |
+| `availability` | `logs/last-availability.json` — cửa sổ 30 ngày từ Render metrics (`aggregateBy=statusCode`) hoặc export access log | window | đo được bằng `npm run slo:ingest` khi có nguồn |
+| `errorRate` | `logs/last-error-report.json` — cùng nguồn | window | đo được bằng `npm run slo:ingest` khi có nguồn |
+| `latencyP95` | `logs/last-latency.json` (`p95Seconds` → **ms**) — Render p95 series hoặc export | window | đo được bằng `npm run slo:ingest` khi có nguồn |
 | `testPassRate` | `test_output.log` | lần chạy gần nhất | đo được khi có log |
 | `buildSuccessRate` | `build-reports/web-build.json` — kết quả build gần nhất, **không phải tỉ lệ** | lần chạy gần nhất | đo được |
 | `deploySuccessRate` | `logs/last-deploy.json` — do bước deploy ghi sau khi xong | lần chạy gần nhất | **unknown** |
-| `escapeRate` | `metrics-defect-escape.json` | window | **unknown** |
+| `escapeRate` | `metrics-defect-escape.json` — issue `escaped-defect` + `caught-defect` | window | **tracking** (0/0, chưa có issue nào được gắn label) |
 
 Nguyên tắc: **không có bằng chứng thì báo `unknown`, không báo 0 và không báo 100.**
 0 là một phép đo; `null` là sự vắng mặt của phép đo. `sampleSize` đi kèm mỗi giá
 trị để người đọc biết con số được làm từ bao nhiêu mẫu.
+
+### 7.1 Sinh bằng chứng SLO từ Render metrics
+
+`npm run slo:ingest` gọi API metrics của Render (không phải probe tổng hợp, không
+phải số sửa tay) và ghi ba file ở bảng trên:
+
+```bash
+# Render → Account Settings → API Keys → tạo key
+# Render → service → Settings/URL dashboard → service id dạng srv-...
+RENDER_API_KEY=... RENDER_SERVICE_ID=srv-... npm run slo:ingest
+RENDER_API_KEY=... RENDER_SERVICE_ID=srv-... npm run slo:ingest --dry-run   # xem, không ghi
+```
+
+- `availability` / `errorRate` từ `/metrics/http-requests?aggregateBy=statusCode`:
+  tổng request và số 5xx trong cửa sổ `--days` (mặc định 30).
+- `latencyP95` từ `/metrics/http-latency?quantile=0.95`: lấy **max** của chuỗi p95
+  trong cửa sổ (thận trọng — p95 30 ngày không thể dựng lại từ một chuỗi
+  percentile, và max là con số sẽ làm ai đó bị gọi).
+- Nếu Render trả request count **không có nhãn status code**, `availability` và
+  `errorRate` được ghi `null` và SLO vẫn `unknown` — không đoán.
+- `npm run slo:check` đọc lại ba file này; không có file thì vẫn `unknown`.
+
+`RENDER_SERVICE_ID` lấy bằng `npm run render:service-id` (liệt kê `srv-...` theo
+tên) hoặc từ URL dashboard Render. `RENDER_API_KEY` là API key ở Account Settings,
+không phải env var của service.
+
+**Giới hạn gói Render (đã kiểm tra 2026-11-16):** service `sonvudev-store` đang ở
+gói **free**. `/metrics/http-latency` trả `query is not allowed for plan: Hobby`,
+`/metrics/http-requests` trả `[]`, và request logs rỗng. Vì vậy `slo:ingest` không
+thể tự bịa số; muốn đóng 5/7 chỉ số, dùng một trong ba nguồn:
+
+1. **App log của Render** (chạy được trên gói free; request-log stream rỗng nhưng
+   app log có dòng request `... 200 GET /api/health 153.9ms`):
+
+```bash
+node scripts/slo-ingest.mjs --render-logs --include-health --pages=20
+```
+
+   `/api/health` là probe tổng hợp, được ghi rõ trong evidence (`source`, `method`,
+   `coverageDays`). CI chạy job `slo-monitor` hằng ngày (03:30 UTC) và in báo cáo
+   vào job summary; không commit evidence.
+2. Nâng Render lên gói trả phí (metrics/logs), rồi chạy `npm run slo:ingest`.
+3. Export access log từ Cloudflare Analytics / uptime monitor / log dump, rồi:
+
+```bash
+node scripts/slo-ingest.mjs --file=logs/access-30d.json
+```
+
+Định dạng file: mảng JSON, hoặc `{ "entries": [...] }` / `{ "logs": [...] }` /
+`{ "data": [...] }`. Mỗi bản ghi:
+
+```json
+{ "timestamp": "2026-11-16T00:00:00Z", "status": 200, "latencyMs": 250 }
+```
+
+`status|statusCode|status_code`, `latencyMs|durationMs` (ms) hoặc
+`latency|duration` (giây), `timestamp|time` (ISO; thiếu thì tính tất cả).
 
 Hai lỗi đơn vị đã sửa:
 
@@ -201,4 +258,18 @@ Lưu ý kỹ thuật: `git tag --creatordate` không chạy trên mọi phiên b
 đó **im lặng** — mọi tag biến mất và báo cáo nói "không có deploy nào". Script giờ
 dùng `git for-each-ref`, và `sampleSize` cho phép phân biệt "không có tag" với
 "đọc sai cách".
+
+## 10. E2E và axe: hai gate mới (2026-11-16)
+
+- `npm run e2e:check` — khởi động một server thật bằng môi trường test, tạo sản
+  phẩm qua admin API, mở trang sản phẩm ở hai locale, đặt đơn chuyển khoản, đọc
+  lại đơn bằng order token, và kiểm tra `/blog.json`. Đây là luồng mua, không
+  phải một unit test của từng module.
+- `npm run axe:check` — chạy axe-core 4.10.2 (pinned qua `npx`, không phải
+  dependency) trên `/`, `/en/`, `/blog` của shop fixture. Mặc định fail trên
+  violation `critical`; `AXE_FAIL_ON=serious` để siết. Nếu không có Chrome và
+  không đặt `AXE_REQUIRE_CHROME=1`, script skip rõ ràng; CI đặt
+  `AXE_REQUIRE_CHROME=1` để thiếu browser là lỗi gate, không phải skip.
+- CI: `checks` job chạy `e2e:check` (mọi Node) và `axe:check` (một Node leg).
+  `deployed-site` và `lighthouse` vẫn chạy trên main như trước.
 

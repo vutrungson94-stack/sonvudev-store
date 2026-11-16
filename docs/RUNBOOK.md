@@ -245,17 +245,26 @@ Log Caddy và log ứng dụng nằm ngoài `ReadWritePaths`, hãy kiểm tra `d
 - Không dán secret vào ticket/chat. Dùng trình quản lý bí mật của đội.
 - **Xoay ADMIN_API_TOKEN tự động (hằng tháng, ngày 01 lúc 02:00 UTC)** — xem
   `scripts/rotate-admin-token.mjs` và workflow `.github/workflows/rotate-admin-token.yml`:
-  1. Secrets cần có trên repo (Settings → Secrets and variables → Actions):
+  1. Secrets cần có trên repo (Settings → Secrets and variables → Actions) — **cả 6 bắt buộc**:
      `RENDER_API_KEY`, `RENDER_SERVICE_ID`, `RESEND_API_KEY`, `APP_URL`,
-     `SUPPORT_EMAIL`, `EMAIL_FROM` (thiếu cái nào bị từ chối ghi rõ trong log).
+     `SUPPORT_EMAIL`, `EMAIL_FROM`. **Không có fixture fallback**: thiếu biến nào thì
+     script thoát mã 2 và liệt kê đúng tên trước khi gọi API.
+     - `RENDER_API_KEY`: Render → Account Settings → API Keys → Create API Key.
+       Đây là **GitHub secret**, không phải env var của service.
+     - `RENDER_SERVICE_ID`: chạy `npm run render:service-id` (liệt kê `srv-...`
+       theo tên) hoặc lấy từ URL dashboard Render (`.../web/srv-...`).
   2. Local safety: `npm run rotate:admin-token` không chạm vào gì — chỉ in kế hoạch;
      xoay thật: `npm run rotate:admin-token:apply`.
-  3. Script luôn: đọc token cũ → PUT duy nhất biến `ADMIN_API_TOKEN` → deploy → poll
+  3. Preflight: nếu không đọc được `ADMIN_API_TOKEN` cũ từ Render API, script **từ chối
+     xoay** (không có rollback thì không được đổi). Chỉ khi chắc chắn chưa có token cũ
+     mới dùng `node scripts/rotate-admin-token.mjs --apply --bootstrap` (tạo mới, không rollback).
+  4. Script luôn: đọc token cũ → PUT duy nhất biến `ADMIN_API_TOKEN` → deploy → poll
      `/api/admin/products` với token mới tới khi 200 → **mới gửi email token mới
      cho SUPPORT_EMAIL** qua Resend. Lỗi ở bất kỳ bước nào trước email → tự rollback
-     về token cũ + redeploy.
-  4. Sau email, cập nhật token trong admin panel / bookmark / script ở máy của bạn.
-  5. Chạy thử trước khi tin cậy: Actions → `rotate-admin-token` → "Run workflow".
+     về token cũ + redeploy + email cảnh báo (email nói rõ rollback thành công hay thất bại).
+  5. Sau email, cập nhật token trong admin panel / bookmark / script ở máy của bạn.
+  6. Chạy thử trước khi tin cậy: Actions → `rotate-admin-token` → "Run workflow".
+     Kiểm tra `gh secret list` trước: repo hiện chỉ có `APP_URL`, còn 5 biến kia phải thêm.
 
 ## 10. Checklist trực ca
 

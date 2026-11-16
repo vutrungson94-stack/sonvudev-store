@@ -1,6 +1,6 @@
 name: metrics-trends
 
-# One real measurement a week, committed to the repository.
+# One real measurement a day, committed to the repository.
 #
 # The metrics gate compares one run against a committed baseline, which answers
 # "did this change make it worse" and nothing else. "Is this week better than
@@ -9,11 +9,17 @@ name: metrics-trends
 # the analysis (slope, acceleration, control limits) runs in scripts/metrics.mjs
 # on every one of those runs.
 #
+# The cadence is daily until the SPC control chart has 25 points (the minimum
+# for a stable control limit). At one snapshot a week that took 25 weeks; at one
+# a day it takes 25 days. A day with no change produces no commit, so a quiet
+# week still costs one commit, not seven. Once 25 points exist, the schedule can
+# go back to weekly.
+#
 # No fixture environment is needed here: the measurement counts lines of source,
 # and touches neither the server nor its configuration.
 on:
   schedule:
-    - cron: "0 3 * * 1"
+    - cron: "0 3 * * *"
   workflow_dispatch:
 
 permissions:
@@ -44,6 +50,6 @@ jobs:
           if git diff --cached --quiet; then
             echo "No new snapshot: nothing moved since the last measurement."
           else
-            git commit -m "ci: weekly metrics-trends snapshot"
+            git commit -m "ci: daily metrics-trends snapshot"
             git push
           fi

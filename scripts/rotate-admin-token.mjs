@@ -11,6 +11,10 @@
 // Chạy:
 //   npm run rotate:admin-token              # KHÔNG làm gì — chỉ in kế hoạch (an toàn)
 //   npm run rotate:admin-token:apply   # xoay thật (cần env vars đầy đủ)
+//   node scripts/rotate-admin-token.mjs --apply --bootstrap   # chỉ khi CHƯA có token cũ
+//
+// Preflight: nếu không đọc được ADMIN_API_TOKEN cũ, script TỪ CHỐI xoay (không có
+// rollback thì không được đổi). --bootstrap là opt-in có ý thức: tạo token mới, không có rollback.
 //
 // Nguyên tắc chống lỗi liên hoàn: script LUÔN an toàn khi gõ sai. Mặc định là
 // dry-run, chỉ --apply mới chạm vào Render.
@@ -29,6 +33,10 @@ dotenv.config({ path: path.join(root, '.env'), override: true });
 const value = (key, fallback = '') => (process.env[key] || fallback).trim();
 
 const APPLY = process.argv.includes('--apply');
+// --bootstrap is the explicit "there is no old token, create one" opt-in. Without
+// it the script refuses when ADMIN_API_TOKEN cannot be read back, because a
+// rotation with no known previous value cannot be rolled back.
+const BOOTSTRAP = process.argv.includes('--bootstrap');
 const token = value('RENDER_API_KEY');
 const serviceId = value('RENDER_SERVICE_ID');
 const resendKey = value('RESEND_API_KEY');
@@ -100,8 +108,11 @@ const getAdminToken = async () => {
   return entry ? entry.value : null;
 };
 
-const putEnvVar = async (key, value) => {
-  await apiCall('PUT', `/env-vars/${encodeURIComponent(key)}`, { key, value });
+const putEnvVar = async (key, nextValue) => {
+  // Render's PUT /env-vars/{key} schema is { "value": "..." } (api-docs
+  // "Add or update environment variable"). The key belongs in the URL, not the
+  // body; sending it as an extra field is not part of the documented schema.
+  await apiCall('PUT', `/env-vars/${encodeURIComponent(key)}`, { value: nextValue });
 };
 
 const triggerDeploy = async () => {
@@ -138,12 +149,13 @@ const email = {
 </ul>
 <p>Nếu bạn không mong đợi xoay này, hoặc token có thể đã lộ, hãy xoay thủ công ngay.</p>`,
   }),
-  failure: (error) => ({
-    subject: `[SonVuDev] XOAY TOKEN THẤT BẠI — đã rollback — ${dateStr}`,
+  failure: (error, rollbackNote) => ({
+    subject: `[SonVuDev] XOAY TOKEN THẤT BẠI — ${rollbackNote.ok ? 'đã rollback' : 'ROLLBACK THẤT BẠI'} — ${dateStr}`,
     html: `<p>Lần xoay token dự kiến <strong>${dateStr}</strong> đã thất bại với lỗi:</p>
 <pre>${String(error).replace(/</g, '&lt;')}</pre>
-<p>Hệ thống đã tự động rollback về token cũ (đã được xác nhận hoạt động). Token mới <strong>không</strong> được áp dụng.</p>
-<p>Không cần hành động ngay. Nếu lỗi lặp lại, kiểm tra GitHub Actions (workflow rotate-admin-token) hoặc xoay thủ công.</p>`,
+<p>${rollbackNote.text}</p>
+<p>Token mới <strong>không</strong> được áp dụng nếu rollback thành công. Kiểm tra log workflow để biết trạng thái rollback.</p>
+<p>Nếu rollback thất bại, hãy khôi phục ADMIN_API_TOKEN trên Render bằng tay và redeploy ngay.</p>`,
   }),
 };
 
@@ -175,6 +187,23 @@ try {
   oldToken = await getAdminToken(); // đọc 1 lần duy nhất, read-only
   logLine(`[rotate] read current ADMIN_API_TOKEN: ${oldToken ? `present (${fingerprint(oldToken)})` : 'absent'}`);
 
+  // Preflight: the rollback promise is only real when the old value is readable.
+  // If Render returns an empty value (a secret it will not reveal, or a genuinely
+  // absent key), rotating would replace a working token with one nobody can roll
+  // back to. Refuse unless the operator explicitly opts into creating one.
+  if (!oldToken && !BOOTSTRAP) {
+    throw new Error(
+      'ADMIN_API_TOKEN không đọc được từ Render API (GET /env-vars). Từ chối xoay vì không thể bảo đảm rollback. '
+      + 'Nếu biến chưa tồn tại, đặt nó trên Render trước. Nếu chắc chắn muốn tạo mới, chạy lại với --bootstrap (sẽ không có rollback).',
+    );
+  }
+  if (oldToken) {
+    const oldWorks = await adminWorksWith(oldToken);
+    logLine(`[rotate] preflight: old token ${oldWorks ? 'verified working on live' : 'did NOT verify (admin may already be locked out) — continuing; the new token is verified before email'}`);
+  } else {
+    logLine('[rotate] preflight: --bootstrap — no previous token; a failure will have nothing to restore');
+  }
+
   const newToken = randomBytes(32).toString('base64url');
   await putEnvVar(adminVarKey, newToken);
   logLine('[rotate] env-vars/ADMIN_API_TOKEN updated (single-variable PUT)');
@@ -198,6 +227,12 @@ try {
 } catch (error) {
   logLine(`[rotate] FAILURE — ${error.message}`);
   // Rollback: trả ADMIN_API_TOKEN về giá trị cũ duy nhất ta biết, rồi redeploy.
+  let rollbackNote = {
+    ok: true,
+    text: oldToken
+      ? 'Hệ thống đã khôi phục token cũ và redeploy.'
+      : 'Không có token cũ để khôi phục (chạy --bootstrap).',
+  };
   try {
     if (oldToken) {
       await putEnvVar(adminVarKey, oldToken);
@@ -207,10 +242,11 @@ try {
       logLine('[rotate] no previous ADMIN_API_TOKEN existed — nothing to restore');
     }
   } catch (rollbackError) {
+    rollbackNote = { ok: false, text: `ROLLBACK THẤT BẠI: ${rollbackError.message}` };
     logLine(`[rotate] rollback failed: ${rollbackError.message}`);
   }
   try {
-    const { subject, html } = email.failure(error.message);
+    const { subject, html } = email.failure(error.message, rollbackNote);
     await sendEmail(subject, html);
     logLine('[rotate] failure notice sent to admin');
   } catch (mailError) {

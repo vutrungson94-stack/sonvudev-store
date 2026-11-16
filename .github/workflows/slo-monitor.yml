@@ -1,0 +1,67 @@
+name: slo-monitor
+
+# Daily SLO measurement from Render's app log.
+#
+# Render's request-log stream is empty on the free plan and the metrics API
+# rejects the latency query, but every request the server handles is written to
+# the app log as:
+#   <uuid> trace=<trace> 200 GET /api/health 153.9ms
+# `node scripts/slo-ingest.mjs --render-logs` parses those lines into the same
+# evidence files the SLO monitor reads. /api/health is a synthetic probe; it is
+# included because it is the only continuous request stream this plan exposes,
+# and the evidence file records that fact (`source`, `method`, `coverageDays`).
+#
+# The job writes the evidence files to logs/ (gitignored) and prints the SLO
+# report. It never commits: committing the evidence would make the next run read
+# yesterday's measurement instead of taking today's.
+on:
+  schedule:
+    - cron: "30 3 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  slo:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: '22'
+          cache: npm
+      - run: npm ci
+
+      # 20 pages of 100 log lines each. The logs API allows 30 requests/minute;
+      # 20 leaves room for a retry and covers roughly the last two hours on a
+      # quiet shop. The sample size and the observed window are written into
+      # every evidence file, so nobody mistakes this for a 30-day census.
+      - name: measure from Render app logs
+        env:
+          RENDER_API_KEY: ${{ secrets.RENDER_API_KEY }}
+          RENDER_SERVICE_ID: ${{ secrets.RENDER_SERVICE_ID }}
+        run: node scripts/slo-ingest.mjs --render-logs --include-health --pages=20
+
+      - name: SLO check
+        run: |
+          set -eu
+          npm run slo:check > slo-report.txt
+          cat slo-report.txt
+
+      # `if: always()` on a separate step, not `| tee` on the check: a pipeline
+      # returns tee's exit code, and a gate that reports a failure as green is
+      # the one thing this repository keeps removing.
+      - name: publish SLO summary
+        if: always()
+        run: |
+          if [ -f slo-report.txt ]; then
+            {
+              echo "### SLO report"
+              echo
+              echo '```'
+              cat slo-report.txt
+              echo '```'
+            } >> "$GITHUB_STEP_SUMMARY"
+          fi

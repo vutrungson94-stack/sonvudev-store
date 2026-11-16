@@ -1,35 +1,38 @@
 {
-  "generatedAt": "2026-11-04T11:32:24.084Z",
+  "generatedAt": "2026-11-16T04:13:39.202Z",
   "metrics": {
     "tests": {
-      "mean": 497.2,
-      "stdev": 22.631,
-      "ucl": 565.0929,
-      "lcl": 429.3071,
-      "latest": 530,
+      "mean": 506.5,
+      "stdev": 29.313,
+      "ucl": 594.4389,
+      "lcl": 418.5611,
+      "latest": 553,
       "inControl": true,
       "signals": [],
-      "n": 5
+      "n": 6,
+      "sufficient": false
     },
     "testFiles": {
-      "mean": 64.2,
-      "stdev": 3.0594,
-      "ucl": 73.3782,
-      "lcl": 55.0218,
-      "latest": 69,
+      "mean": 66,
+      "stdev": 4.899,
+      "ucl": 80.6969,
+      "lcl": 51.3031,
+      "latest": 75,
       "inControl": true,
       "signals": [],
-      "n": 5
+      "n": 6,
+      "sufficient": false
     },
     "routes": {
-      "mean": 32.6,
-      "stdev": 3.3823,
-      "ucl": 42.7469,
-      "lcl": 22.4531,
-      "latest": 39,
+      "mean": 34,
+      "stdev": 4.397,
+      "ucl": 47.1909,
+      "lcl": 20.8091,
+      "latest": 41,
       "inControl": true,
       "signals": [],
-      "n": 5
+      "n": 6,
+      "sufficient": false
     },
     "dependencies": {
       "mean": 6,
@@ -39,7 +42,8 @@
       "latest": 6,
       "inControl": true,
       "signals": [],
-      "n": 5
+      "n": 6,
+      "sufficient": false
     },
     "escCopies": {
       "mean": 2,
@@ -49,7 +53,8 @@
       "latest": 2,
       "inControl": true,
       "signals": [],
-      "n": 5
+      "n": 6,
+      "sufficient": false
     },
     "moneyCopies": {
       "mean": 2,
@@ -59,7 +64,8 @@
       "latest": 2,
       "inControl": true,
       "signals": [],
-      "n": 5
+      "n": 6,
+      "sufficient": false
     },
     "initialsCopies": {
       "mean": 2,
@@ -69,7 +75,8 @@
       "latest": 2,
       "inControl": true,
       "signals": [],
-      "n": 5
+      "n": 6,
+      "sufficient": false
     },
     "sizeCopies": {
       "mean": 2,
@@ -79,17 +86,19 @@
       "latest": 2,
       "inControl": true,
       "signals": [],
-      "n": 5
+      "n": 6,
+      "sufficient": false
     },
     "i18nKeys": {
-      "mean": 835.2,
-      "stdev": 9.683,
-      "ucl": 864.2489,
-      "lcl": 806.1511,
-      "latest": 852,
+      "mean": 840.6667,
+      "stdev": 15.0849,
+      "ucl": 885.9215,
+      "lcl": 795.4118,
+      "latest": 868,
       "inControl": true,
       "signals": [],
-      "n": 5
+      "n": 6,
+      "sufficient": false
     },
     "indexablePages": {
       "mean": 7,
@@ -99,7 +108,8 @@
       "latest": 7,
       "inControl": true,
       "signals": [],
-      "n": 5
+      "n": 6,
+      "sufficient": false
     },
     "productPageLocales": {
       "mean": 2,
@@ -109,7 +119,8 @@
       "latest": 2,
       "inControl": true,
       "signals": [],
-      "n": 5
+      "n": 6,
+      "sufficient": false
     },
     "localizedPages": {
       "mean": 9,
@@ -119,7 +130,8 @@
       "latest": 9,
       "inControl": true,
       "signals": [],
-      "n": 5
+      "n": 6,
+      "sufficient": false
     },
     "productPageRenderers": {
       "mean": 1,
@@ -129,7 +141,10 @@
       "latest": 1,
       "inControl": true,
       "signals": [],
-      "n": 5
+      "n": 6,
+      "sufficient": false
     }
-  }
+  },
+  "minSampleSize": 25,
+  "sampleSufficient": false
 }

@@ -47,37 +47,45 @@ const proxyCaught = countCommits('^test:');
 const proxyTotal = proxyProduction + proxyCaught;
 const proxyRate = proxyTotal > 0 ? proxyProduction / proxyTotal : null;
 
-// Real production-defect source (read-only, optional): GitHub issues labelled
-// `escaped-defect`. A human decides what counts as escaped and applies the label,
-// so the count is a measurement, not a heuristic over commit subjects.
+// Real defect source (read-only, optional): GitHub issues labelled
+// `escaped-defect` (reached production) and `caught-defect` (caught before
+// deploy). A human decides what counts and applies the label, so the counts are
+// measurements, not a heuristic over commit subjects.
 //   gh issue list --state all --label escaped-defect --json number
+//   gh issue list --state all --label caught-defect  --json number
 // gh is not required for CI: if it is unavailable the metric stays unknown.
-let githubEscaped = null;
-try {
-  const out = execFileSync(
-    'gh',
-    ['issue', 'list', '--state', 'all', '--label', 'escaped-defect', '--json', 'number', '--limit', '1000'],
-    { cwd: root, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] },
-  ).trim();
-  const issues = out ? JSON.parse(out) : [];
-  githubEscaped = Array.isArray(issues) ? issues.length : 0;
-} catch {
-  githubEscaped = null;
-}
+const countGithub = (label) => {
+  try {
+    const out = execFileSync(
+      'gh',
+      ['issue', 'list', '--state', 'all', '--label', label, '--json', 'number', '--limit', '1000'],
+      { cwd: root, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] },
+    ).trim();
+    const issues = out ? JSON.parse(out) : [];
+    return Array.isArray(issues) ? issues.length : 0;
+  } catch {
+    return null;
+  }
+};
 
-const hasGithubSource = githubEscaped !== null;
+const githubEscaped = countGithub('escaped-defect');
+const githubCaught = countGithub('caught-defect');
+const hasGithubSource = githubEscaped !== null && githubCaught !== null;
+const defectTotal = hasGithubSource ? githubEscaped + githubCaught : null;
+const measuredRate = hasGithubSource && defectTotal > 0 ? githubEscaped / defectTotal : null;
+
 const metrics = {
   generatedAt: now,
   status: hasGithubSource ? 'tracking' : 'unknown',
   source: hasGithubSource
-    ? 'github-issues (label escaped-defect); caught-defect source not wired — escapeRate stays null until it is'
+    ? 'github-issues (labels escaped-defect + caught-defect)'
     : 'no defect tracker; commit subjects are not a measurement',
-  productionDefects: hasGithubSource ? githubEscaped : null,
-  caughtDefects: null,
-  total: null,
-  escapeRate: null,
+  productionDefects: githubEscaped,
+  caughtDefects: githubCaught,
+  total: defectTotal,
+  escapeRate: measuredRate,
   threshold: 0.05, // 5% escape rate target, applied when a real rate exists
-  withinThreshold: null,
+  withinThreshold: measuredRate == null ? null : measuredRate <= 0.05,
   proxy: {
     basis: 'git commit subjects: ^(fix|hotfix|bug): vs ^test:',
     productionDefects: proxyProduction,
@@ -109,17 +117,23 @@ await writeFile(
 let exitCode = 0;
 if (metrics.withinThreshold === false) {
   console.log(
-    `[defect] ESCAPE RATE HIGH: ${(metrics.escapeRate * 100).toFixed(1)}% — above 5% target`,
+    `[defect] ESCAPE RATE HIGH: ${(metrics.escapeRate * 100).toFixed(1)}% (${metrics.productionDefects}/${metrics.total}) — above 5% target`,
   );
   exitCode = 1;
-} else if (metrics.escapeRate == null) {
-  if (metrics.productionDefects !== null) {
-    console.log(`[defect] escaped defects (github label 'escaped-defect'): ${metrics.productionDefects}; escapeRate: unknown — the caught-defect source is not wired yet`);
-  } else {
-    console.log('[defect] escape rate: unknown — no defect tracker wired up. The commit-prefix count is a proxy, not the metric.');
-  }
+} else if (metrics.escapeRate != null) {
+  console.log(
+    `[defect] escape rate ${(metrics.escapeRate * 100).toFixed(1)}% (${metrics.productionDefects}/${metrics.total}) — within 5% target`,
+  );
+} else if (metrics.productionDefects !== null && metrics.caughtDefects !== null) {
+  console.log(
+    `[defect] labelled defects: escaped=${metrics.productionDefects}, caught=${metrics.caughtDefects}; escapeRate unknown — no defects labelled yet`,
+  );
+} else if (metrics.productionDefects !== null) {
+  console.log(
+    `[defect] escaped defects (github label 'escaped-defect'): ${metrics.productionDefects}; escapeRate: unknown — caught-defect source unavailable`,
+  );
 } else {
-  console.log(`[defect] escape rate ${(metrics.escapeRate * 100).toFixed(1)}% — within 5% target`);
+  console.log('[defect] escape rate: unknown — no defect tracker wired up. The commit-prefix count is a proxy, not the metric.');
 }
 
 const { escapeRate, productionDefects, caughtDefects } = metrics;

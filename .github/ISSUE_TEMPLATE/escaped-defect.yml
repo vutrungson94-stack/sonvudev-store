@@ -1,0 +1,46 @@
+name: Escaped defect
+description: A defect that reached production despite the test suite
+title: "[escaped] "
+labels: ["escaped-defect"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Use this form for every defect that reached production. It feeds
+        `npm run defect:escape` (`metrics-defect-escape.json`) and the L5
+        defect-prevention loop. Do not use it for bugs caught before deploy.
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened
+      description: What did the user see, and what should have happened?
+    validations:
+      required: true
+  - type: textarea
+    id: where
+    attributes:
+      label: Where
+      description: URL, page, product, or flow.
+    validations:
+      required: true
+  - type: textarea
+    id: detection
+    attributes:
+      label: Why did the tests/gates miss it?
+      description: Name the missing or wrong test, not just "we forgot".
+    validations:
+      required: true
+  - type: textarea
+    id: fix
+    attributes:
+      label: Fix and regression test
+      description: Link the commit/PR and the test that would have caught it.
+    validations:
+      required: false
+  - type: checkboxes
+    id: prevention
+    attributes:
+      label: Prevention
+      options:
+        - label: A gate or test was added so this class cannot ship again.
+        - label: The RCA or postmortem is linked below.

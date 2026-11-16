@@ -6,11 +6,12 @@ name: rotate-admin-token
 #   - Tự động: 02:00 UTC ngày 1 hằng tháng
 #   - Thủ công: Actions → rotate-admin-token → "Run workflow"
 #
-# Secrets cần trên repo (Settings → Secrets and variables → Actions):
-#   RENDER_API_KEY, RENDER_SERVICE_ID, RESEND_API_KEY   (bắt buộc)
-#   APP_URL                                          (mặc định theo fixture bên dưới)
-#   SUPPORT_EMAIL                                     (mặc định theo fixture bên dưới)
-#   EMAIL_FROM                                        (mặc định theo fixture bên dưới)
+# Secrets cần trên repo (Settings → Secrets and variables → Actions) — cả 6 bắt buộc:
+#   RENDER_API_KEY, RENDER_SERVICE_ID, RESEND_API_KEY, APP_URL, SUPPORT_EMAIL, EMAIL_FROM
+#
+# KHÔNG có fixture fallback. Thiếu secret → script thoát mã 2 TRƯỚC khi gọi API và
+# liệt kê đúng tên biến thiếu. Bản a48fef6 để fallback secret bằng một domain fixture
+# làm audit gate đỏ (domain gõ tay) và có thể xoay token thật rồi poll một URL giả.
 #
 # An toàn: script chỉ gửi token qua email SAU KHI token mới được xác nhận
 # hoạt động trên live; lỗi bất kỳ → rollback về token cũ + redeploy.
@@ -36,9 +37,9 @@ jobs:
       RENDER_API_KEY: ${{ secrets.RENDER_API_KEY }}
       RENDER_SERVICE_ID: ${{ secrets.RENDER_SERVICE_ID }}
       RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
-      APP_URL: ${{ secrets.APP_URL || 'https://ci-fixture.example' }}
-      SUPPORT_EMAIL: ${{ secrets.SUPPORT_EMAIL || 'support@ci-fixture.example' }}
-      EMAIL_FROM: ${{ secrets.EMAIL_FROM || 'ci-fixture <no-reply@ci-fixture.example>' }}
+      APP_URL: ${{ secrets.APP_URL }}
+      SUPPORT_EMAIL: ${{ secrets.SUPPORT_EMAIL }}
+      EMAIL_FROM: ${{ secrets.EMAIL_FROM }}
     steps:
       - uses: actions/checkout@v5
 
