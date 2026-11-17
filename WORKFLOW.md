@@ -119,6 +119,7 @@ Before `_Sync`/push you MUST read this list. Anything on it is a past production
   `npm run ops:catalog:apply` and a live check (`GET /api/products`, product page,
   `/merchant-feed.tsv`). See §7.6.
 - **A metric that is not measured is `null`, not `0`.** `scripts/metrics.mjs` used to coerce a missing value to `0`, which reported a perfect escape rate and an instant lead time on a project that had measured neither. A `null` is skipped in the baseline comparison and printed as "chua do duoc". Never reintroduce `?? 0` for a measurement.
+- **CSP keeps a fresh per-response nonce in `script-src`, never `unsafe-inline`.** Cloudflare Bot Fight Mode injects an inline JavaScript Detection loader into HTML; its hash embeds the ray id, so it cannot be allowlisted. Cloudflare parses the nonce from the CSP response header and stamps it onto the injected script. `test/ai-discovery.test.js` fails without the nonce or if it repeats across responses. Do not add inline `<script>` to a template and do not disable the nonce to "simplify" the header.
 
 ## 7.6. Repo ↔ live parity — product data and copy must match
 

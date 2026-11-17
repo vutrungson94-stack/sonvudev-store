@@ -184,10 +184,25 @@ test('CSP chặn script inline, và không trang nào còn script inline', async
   assert.match(notFound, /<script[^>]*src="\/related\.js"/, '404 phải dùng loader ngoài');
 });
 
+test('CSP có nonce mỗi response để Cloudflare JSD không bị chặn', async () => {
+  // Bot Fight Mode injects an inline loader whose hash changes per request. A
+  // fixed hash cannot be allowlisted; Cloudflare reads the nonce from the CSP
+  // header instead, so the header must carry a fresh one on every response.
+  const first = (await page('/')).response.headers.get('content-security-policy') || '';
+  const second = (await page('/')).response.headers.get('content-security-policy') || '';
+  const nonceOf = (csp) => /script-src[^;]*'nonce-([^']+)'/.exec(csp)?.[1] || '';
+  const a = nonceOf(first);
+  const b = nonceOf(second);
+  assert.ok(a.length >= 16, `CSP phải có nonce đủ dài, nhận được: ${first}`);
+  assert.ok(b.length >= 16, `CSP phải có nonce ở response thứ hai, nhận được: ${second}`);
+  assert.notEqual(a, b, 'nonce phải khác nhau giữa hai response');
+  assert.ok(!/'unsafe-inline'/.test(first.split(';')[1]), 'script-src không được có unsafe-inline');
+});
+
 test('script ngoài phải được phép chạy theo chính CSP đó', async () => {
   const { body } = await page(`/product/${product.slug}`);
-  // script-src 'self' with no nonce allows same-origin scripts, so the loader has
-  // to be a real file rather than a nonce the template forgot to pass.
+  // script-src keeps 'self' alongside the nonce, so a same-origin loader still
+  // runs; it has to be a real file rather than an inline block the nonce forgot.
   assert.match(body, /<script[^>]*src="\/related\.js"/, 'trang sản phẩm phải nạp loader ngoài');
   assert.equal((await fetch(`${base}/related.js`)).status, 200, 'loader phải tồn tại');
   const loader = await (await fetch(`${base}/related.js`)).text();

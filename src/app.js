@@ -296,7 +296,14 @@ app.use((req, res, next) => {
   // Analytics are both gone (the reasons are written down in src/pages.js,
   // analyticsMeta), and a host that is allowed but never used is a hole with
   // nothing behind it.
-  const scriptSrc = ["'self'"];
+  // Cloudflare Bot Fight Mode injects an inline JavaScript Detection loader into
+  // HTML responses. Its hash embeds the ray id, so it changes every request and
+  // cannot be allowlisted, and 'unsafe-inline' is not an option here. Cloudflare
+  // parses the CSP *header* and stamps its nonce onto injected scripts, so a
+  // fresh nonce per response keeps script-src strict without breaking the bot
+  // check. Our own scripts stay external and load through 'self'.
+  const cspNonce = crypto.randomBytes(16).toString("base64url");
+  const scriptSrc = ["'self'", `'nonce-${cspNonce}'`];
   const connectSrc = ["'self'", "https://*.r2.cloudflarestorage.com"];
   const imgSrc = ["'self'", "data:", "https://img.vietqr.io"];
   res.setHeader("Content-Security-Policy", `default-src 'self'; script-src ${scriptSrc.join(" ")}; style-src 'self' 'unsafe-inline'; font-src 'self'; img-src ${imgSrc.join(" ")}; connect-src ${connectSrc.join(" ")}; frame-ancestors 'none'; base-uri 'self'; form-action 'self'`);
