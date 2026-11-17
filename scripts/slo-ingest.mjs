@@ -22,8 +22,11 @@
 //   node scripts/slo-ingest.mjs --render-logs --include-health
 //
 //   # Cloudflare GraphQL Analytics (real 30-day edge traffic; needs
-//   # CLOUDFLARE_API_TOKEN with Zone Analytics: Read + CLOUDFLARE_ZONE_ID)
+//   # CLOUDFLARE_API_TOKEN with Account Analytics: Read — httpRequests* are
+//   # account-scoped datasets — and CLOUDFLARE_ZONE_ID. Zone Analytics: Read
+//   # alone returns an empty list, which this script refuses to record.)
 //   node scripts/slo-ingest.mjs --cloudflare
+//   node scripts/slo-ingest.mjs --cloudflare --allow-empty   # window truly had 0 requests
 //
 //   # External access-log export (Cloudflare/uptime/Render log dump)
 //   node scripts/slo-ingest.mjs --file=logs/access-30d.json
@@ -197,6 +200,28 @@ export function cloudflareGroupsToSummary(groups) {
   };
 }
 
+/**
+ * The operator-facing explanation for a zero-row Cloudflare answer.
+ *
+ * `httpRequests*` are **account-scoped** datasets: a token that holds only the
+ * zone permission (`Zone → Analytics → Read`) can call the node and receive an
+ * empty list, while the same query under `viewer.accounts` answers "not
+ * authorized for that account". The zone's `settings { httpRequestsAdaptiveGroups
+ * { enabled notOlderThan } }` still reports the dataset enabled and 31 days of
+ * retention, so nothing in the zone configuration points at the cause.
+ *
+ * A zero here is a source that could not be read, not a measurement of a quiet
+ * month. The CLI refuses to write it over real evidence unless the operator says
+ * the window truly had no requests (`--allow-empty`).
+ */
+export function cloudflareEmptyDiagnostic(summary, days) {
+  if (!summary || Number(summary.total) > 0) return null;
+  return `Cloudflare trả 0 request trong ${days} ngày. httpRequests* là dataset cấp ACCOUNT: `
+    + 'token cần "Account → Account Analytics → Read" (chỉ "Zone → Analytics → Read" thì node '
+    + 'trả danh sách rỗng, còn truy vấn account-level báo "not authorized for that account"). '
+    + 'Nếu cửa sổ thật sự không có request thì chạy lại với --allow-empty.';
+}
+
 const fetchCloudflareGroups = async (token, zoneId, { days }) => {
   const start = new Date(Date.now() - days * 86400000).toISOString();
   const end = new Date().toISOString();
@@ -330,6 +355,15 @@ export async function main() {
     }
     const groups = await fetchCloudflareGroups(token, zoneId, { days });
     const summary = cloudflareGroupsToSummary(groups);
+    if (summary.total === 0 && !hasFlag('allow-empty')) {
+      // Refuse rather than write null evidence: a previous real availability
+      // would be erased, and the SLO would look "unknown" for a permission bug
+      // instead of reporting it. --allow-empty is the explicit opt-in for a
+      // window that genuinely had no traffic.
+      console.error(`[slo:ingest] ${cloudflareEmptyDiagnostic(summary, days)}`);
+      console.error('[slo:ingest] Không ghi evidence: 0 dòng ở đây là lỗi nguồn, không phải phép đo.');
+      process.exit(2);
+    }
     total = summary.total;
     serverErrors = summary.serverErrors;
     unknown = summary.unknown;

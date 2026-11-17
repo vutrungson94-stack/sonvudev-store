@@ -275,12 +275,18 @@ Log Caddy và log ứng dụng nằm ngoài `ReadWritePaths`, hãy kiểm tra `d
   CLOUDFLARE_API_TOKEN=... CLOUDFLARE_ZONE_ID=<zone tag> npm run slo:ingest:cloudflare
   npm run slo:check
   ```
-- Token cần quyền **`Zone Analytics: Read`** (ngoài các quyền Cache). Nếu thiếu,
-  GraphQL trả "does not have permission …zone.analytics.read" — script báo lỗi rõ,
-  không ghi số giả. Availability/errorRate lấy từ `httpRequestsAdaptiveGroups`
-  nhóm theo `edgeResponseStatus` (5xx = unavailable); **latency vẫn unknown** vì
-  adaptive groups không có dimension p95 — trung thực hơn là đoán.
-- Các nguồn cũ仍然 giữ: `--render-logs` (sampled, ghi `sampled`/`coverageDays`),
+- Token cần **`Account → Account Analytics → Read`** (scope account) **và**
+  `Zone → Analytics → Read` (scope zone `sonvudev.com`). `httpRequests*` là dataset
+  cấp account: chỉ có quyền zone thì node trả **danh sách rỗng** (không báo lỗi),
+  còn truy vấn `viewer.accounts` báo `not authorized for that account`. Đã kiểm
+  17/11/2026: `settings { httpRequestsAdaptiveGroups { enabled notOlderThan } }`
+  = `enabled: true`, giữ 31 ngày — nên 0 dòng là thiếu quyền, không phải zone cấu hình sai.
+- Script **từ chối ghi evidence** khi Cloudflare trả 0 dòng (exit 2) để một lỗi
+  quyền không xoá số đo thật; `--allow-empty` là opt-in cho cửa sổ thật sự không
+  có request. Availability/errorRate lấy từ `httpRequestsAdaptiveGroups` nhóm theo
+  `edgeResponseStatus` (5xx = unavailable); **latency vẫn unknown** vì adaptive groups
+  không có dimension p95 — trung thực hơn là đoán.
+- Các nguồn cũ vẫn giữ: `--render-logs` (sampled, ghi `sampled`/`coverageDays`),
   `--file=logs/access-30d.json` (export ngoài). Mỗi evidence file ghi rõ `source`.
 
 ### Purge edge cache sau deploy

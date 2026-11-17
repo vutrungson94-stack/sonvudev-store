@@ -10,6 +10,7 @@ import {
   latencyP95,
   summarizeRecords,
   cloudflareGroupsToSummary,
+  cloudflareEmptyDiagnostic,
 } from '../scripts/slo-ingest.mjs';
 
 const series = (status, value, unit = '') => ({
@@ -74,6 +75,18 @@ test('cloudflareGroupsToSummary đếm 5xx theo edgeResponseStatus, không đoá
   ]);
   assert.equal(withUnknown.unknown, 1);
   assert.equal(withUnknown.availability, null, 'thiếu nhãn status thì availability vẫn unknown');
+});
+
+test('Cloudflare trả 0 dòng là lỗi nguồn, không phải phép đo 0%', () => {
+  // The real failure this guards: a token with only Zone Analytics: Read gets an
+  // empty list from httpRequestsAdaptiveGroups while the account-level query
+  // answers "not authorized for that account". Recording that as availability
+  // would erase a real measurement, so the diagnostic names the permission.
+  const empty = cloudflareEmptyDiagnostic({ total: 0 }, 30);
+  assert.match(empty, /Account Analytics/);
+  assert.match(empty, /--allow-empty/);
+  assert.equal(cloudflareEmptyDiagnostic({ total: 5 }, 30), null, 'có dữ liệu thì không báo lỗi');
+  assert.equal(cloudflareEmptyDiagnostic(null, 30), null);
 });
 
 test('summarizeRecords tính availability/errorRate và không đoán khi thiếu status', () => {
