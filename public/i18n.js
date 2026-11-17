@@ -1151,16 +1151,28 @@ const langOf = (lang) => {
 // Locales whose dictionary is fetched on demand from /locales/<code>.json.
 // Vietnamese and English stay bundled because they are the source language and
 // the fallback language; a third language is an asset, not a code change.
-// Bundled languages are those included in the DICT object inside this file.
-// Others are loaded from /public/locales/*.json.
-const BUNDLED = ['vi', 'en'];
-const EXTRA_LOCALES = ['de', 'es', 'fr', 'ja', 'zh-CN']; 
+// One row per locale: label, BCP-47 tag, flag class and whether the dictionary
+// is bundled in this file. Every other list below is derived from this table,
+// and the code list itself is published by the server (window.SVD_LOCALES from
+// src/i18n-registry.mjs). The literal table is the fallback for a bare file open;
+// adding a locale means one registry entry plus one row here (copy + flag).
+const LOCALE_META = {
+  vi: { label: 'Tiếng Việt', tag: 'vi-VN', flag: 'flag-vi', bundled: true },
+  en: { label: 'English', tag: 'en-US', flag: 'flag-en', bundled: true },
+  de: { label: 'Deutsch', tag: 'de-DE', flag: 'flag-de' },
+  es: { label: 'Español', tag: 'es-ES', flag: 'flag-es' },
+  fr: { label: 'Français', tag: 'fr-FR', flag: 'flag-fr' },
+  ja: { label: '日本語', tag: 'ja-JP', flag: 'flag-ja' },
+  'zh-CN': { label: '中文', tag: 'zh-CN', flag: 'flag-zh-cn' },
+};
+const CODES = Object.keys(LOCALE_META);
+const BUNDLED = CODES.filter((code) => LOCALE_META[code].bundled);
 const SUPPORTED = (Array.isArray(window.SVD_LOCALES) && window.SVD_LOCALES.length)
   ? [...window.SVD_LOCALES]
-  : [...BUNDLED, ...EXTRA_LOCALES];
-const LANG_LABELS = { vi: 'Tiếng Việt', en: 'English', de: 'Deutsch', es: 'Español', fr: 'Français', ja: '日本語', 'zh-CN': '中文' };
-const LOCALE_TAGS = { vi: 'vi-VN', en: 'en-US', de: 'de-DE', es: 'es-ES', fr: 'fr-FR', ja: 'ja-JP', 'zh-CN': 'zh-CN' };
-const FLAG_CLASS = { vi: 'flag-vi', en: 'flag-en', de: 'flag-de', es: 'flag-es', fr: 'flag-fr', ja: 'flag-ja', 'zh-CN': 'flag-zh-cn' };
+  : CODES;
+const LANG_LABELS = Object.fromEntries(CODES.map((code) => [code, LOCALE_META[code].label]));
+const LOCALE_TAGS = Object.fromEntries(CODES.map((code) => [code, LOCALE_META[code].tag]));
+const FLAG_CLASS = Object.fromEntries(CODES.map((code) => [code, LOCALE_META[code].flag]));
 const flagClass = (code) => FLAG_CLASS[code] || 'flag-generic';
 const STORAGE_KEY = 'sonvudev_lang';
 const listeners = new Set();

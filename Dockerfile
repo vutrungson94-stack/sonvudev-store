@@ -1,30 +1,37 @@
-# SonVuDev Store — multi-stage, chạy được trên Render/VPS mà không cần build tool ngoài.
+# SonVuDev Store — multi-stage, cùng đường build với Render (render.yaml).
+#
+# Trước đây image copy source public/ rồi chạy `node src/server.js`: đó là bản
+# chưa minify, không có asset-manifest hash — đúng thứ Lighthouse chụp phạt trong
+# khi render.yaml đã chạy artifact. Giờ Docker cũng build artifact rồi chạy nó,
+# nên "deploy bằng Docker" và "deploy bằng Render" phục vụ cùng một bytes.
 FROM node:22-alpine AS deps
 WORKDIR /app
 COPY package.json package-lock.json ./
-RUN npm ci --omit=dev --ignore-scripts
+# esbuild (devDependency) cần để minify ở bước build — giữ --include=dev như
+# render.yaml:49. Runner chỉ cài runtime deps ở giai đoạn cuối.
+RUN npm ci --include=dev --ignore-scripts
+
+FROM node:22-alpine AS build
+WORKDIR /app
+COPY --from=deps /app/node_modules ./node_modules
+COPY . .
+RUN npm run build
 
 FROM node:22-alpine AS runner
 WORKDIR /app
 ENV NODE_ENV=production
 RUN addgroup -S app && adduser -S app -G app
-COPY --from=deps /app/node_modules ./node_modules
-COPY src ./src
-COPY public ./public
-COPY scripts ./scripts
-COPY supabase ./supabase
-COPY cloudflare ./cloudflare
-COPY deploy ./deploy
-COPY package.json package-lock.json render.yaml .env.example README.md ./
-# Không bao giờ copy .env / data / logs / publish-output / .wrangler vào image.
-# Image vẫn phải boot được chế độ local (không Supabase): lúc đó tiến trình ghi
-# data/*.json và logs/*.log dưới /app mà root sở hữu còn user app không ghi được,
-# container chết EACCES ở lần ghi đầu tiên thay vì phục vụ shop rỗng. Hai thư mục
-# được tạo sẵn và trao quyền cho user chạy runtime; .dockerignore vẫn giữ dữ liệu
-# thật ngoài image.
+# Chỉ artifact được đưa vào image: cùng thứ render.yaml startCommand dùng.
+COPY --from=build --chown=app:app /app/publish-output/node/ ./
+# Artifact không kèm node_modules (build-web.mjs chỉ copy source). Cài runtime
+# deps từ lockfile đã có trong artifact, rồi chạy bằng user không-root.
+RUN npm ci --omit=dev --ignore-scripts && chown -R app:app /app
+# Không có Supabase → tiến trình ghi data/*.json và logs/*.log dưới /app; tạo
+# sẵn và trao quyền cho user app để không chết EACCES ở lần ghi đầu tiên.
+# .dockerignore vẫn giữ dữ liệu thật ngoài image.
 RUN mkdir -p /app/data /app/logs && chown -R app:app /app/data /app/logs
 # Khi không có Supabase có thể mount volume: docker run -v sonvudev-data:/app/data ...
 USER app
 EXPOSE 3000
 HEALTHCHECK --interval=30s --timeout=5s --retries=3 CMD node scripts/health-check.mjs || exit 1
-CMD ["node", "src/server.js"]
+CMD ["npm", "start"]

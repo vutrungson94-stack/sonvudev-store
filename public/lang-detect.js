@@ -20,7 +20,11 @@
 (function () {
   try {
     var STORAGE_KEY = 'sonvudev_lang';
-    var SUPPORTED = ['vi', 'en', 'de', 'es', 'fr', 'ja', 'zh-CN'];
+    // Published by the server from src/i18n-registry.mjs; the literal list is a
+    // fallback for a bare file open or a page that has not been given the token.
+    var SUPPORTED = (Array.isArray(window.SVD_LOCALES) && window.SVD_LOCALES.length)
+      ? window.SVD_LOCALES
+      : ['vi', 'en', 'de', 'es', 'fr', 'ja', 'zh-CN'];
     var path = window.location.pathname;
     var stored = null;
     try { stored = localStorage.getItem(STORAGE_KEY); } catch (_) { /* private mode */ }

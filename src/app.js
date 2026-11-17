@@ -554,8 +554,8 @@ async function renderPage(file, lang = DEFAULT_LOCALE) {
   const values = pageTokenValues({ products, reviewLimits, page: file, lang });
   const filled = fillPageTokens(template, values)
     .replace("</head>", `${tokenMeta(lang)}\n${verificationMeta()}\n${brandMeta()}\n${analyticsMeta()}\n</head>`)
-    .replace(/(<span[^>]*class="product-count"[^>]*id="product-count"[^>]*>)[\s\S]*?(<\/span>)/, `$1${esc(renderIndexCount(products))}$2`)
-    .replace(/<!--filters:start-->[\s\S]*?<!--filters:end-->/, `<!--filters:start-->${renderIndexFilters(products)}<!--filters:end-->`)
+    .replace(/(<span[^>]*class="product-count"[^>]*id="product-count"[^>]*>)[\s\S]*?(<\/span>)/, `$1${esc(renderIndexCount(products, lang))}$2`)
+    .replace(/<!--filters:start-->[\s\S]*?<!--filters:end-->/, `<!--filters:start-->${renderIndexFilters(products, lang)}<!--filters:end-->`)
     .replace(/(<section class="stats wrap" id="stats">)([\s\S]*?)(<\/section>)/, (_all, open, _body, close) => {
       // The three counts come from the catalogue, so they are never stale. With
       // nothing on sale the strip is removed rather than zeroed — see renderStats.
@@ -563,7 +563,7 @@ async function renderPage(file, lang = DEFAULT_LOCALE) {
       if (!stats) return "";
       return `${open}<div data-stat="products"><strong><span id="stat-products">${stats.products}</span></strong><small data-i18n="stats.1">Sản phẩm đang bán</small></div><div data-stat="platforms"><strong><span id="stat-platforms">${stats.platforms}</span></strong><small data-i18n="stats.2">Nền tảng được hỗ trợ</small></div><div data-stat="releases"><strong><span id="stat-releases">${stats.releases}</span></strong><small data-i18n="stats.3">Bản phát hành đã xuất bản</small></div><div class="stats-note"><span class="spark">✦</span><p data-i18n="stats.note">Mỗi sản phẩm đều được làm ra để giải quyết một vấn đề thật.</p></div>${close}`;
     })
-    .replace(/<!--catalog:start-->[\s\S]*?<!--catalog:end-->/, `<!--catalog:start-->${renderIndexGrid(products)}<!--catalog:end-->`);
+    .replace(/<!--catalog:start-->[\s\S]*?<!--catalog:end-->/, `<!--catalog:start-->${renderIndexGrid(products, lang)}<!--catalog:end-->`);
   // The stats strip carries data-i18n keys of its own; the localisation pass
   // fills the same placeholders the dictionary already owns.
     const html = inlineStyles(localizeStaticHtml(filled, { file, lang, values }));
@@ -1029,6 +1029,17 @@ app.use((req, res, next) => {
 // bytes behind that URL can never change again, because a change to the file
 // changes the hash and therefore the URL. An unversioned request keeps the
 // ordinary one-year policy, because nothing guarantees it will not change.
+// The browser's locale list is published from the same registry that owns the
+// routes (src/i18n-registry.mjs), never typed into a second file. It is a real
+// same-origin script — CSP forbids inline scripts — and versioned by the hash of
+// its own bytes so a locale change busts the cache exactly like any other asset.
+app.get("/locale-registry.js", (_req, res) => {
+  const body = `window.SVD_LOCALES=${JSON.stringify(LOCALE_CODES)};`;
+  const version = crypto.createHash("sha256").update(body).digest("hex").slice(0, 12);
+  res.set("Cache-Control", "public, max-age=31536000, immutable").type("application/javascript");
+  res.send(`/* v=${version} */\n${body}`);
+});
+
 app.use(express.static(publicDir, {
   maxAge: "1y",
   index: false,

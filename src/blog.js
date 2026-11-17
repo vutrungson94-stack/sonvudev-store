@@ -18,6 +18,11 @@ import { inlineBlogStyles } from "./lib/inline-styles.mjs";
 // same path works in a checkout and in publish-output/node/src/blog-posts.
 export const DEFAULT_BLOG_POSTS_DIR = path.join(path.dirname(fileURLToPath(import.meta.url)), "blog-posts");
 
+// The browser's locale list comes from the same registry the server renders
+// routes from. blog-lang.js and lang-detect.js read window.SVD_LOCALES; a second
+// copy here would drift the moment a locale is added or removed.
+const localeRegistryScript = () => `<script defer src="${assetUrl('/locale-registry.js')}"></script>`;
+
 // BLOG_POSTS_DIR is a test-only seam: blog.test.js points it at a temp dir so it
 // can seed a controlled fixture. It is ignored outside NODE_ENV=test so a stray
 // value in a production .env cannot silently repoint shipped content at an empty
@@ -372,6 +377,7 @@ ${analyticsMeta()}
        first two requests on the critical path ("Render-blocking requests":
        440 ms on a phone, 343 ms of dependency chain on /en/blog). Both still run
        before DOMContentLoaded, so the redirect keeps its place ahead of the page. -->
+  ${localeRegistryScript()}
   <script defer src="${assetUrl('/blog-lang.js')}"></script>
   <article class="blog-post">
     <header class="blog-header">
@@ -480,6 +486,7 @@ ${analyticsMeta()}
        first two requests on the critical path ("Render-blocking requests":
        440 ms on a phone, 343 ms of dependency chain on /en/blog). Both still run
        before DOMContentLoaded, so the redirect keeps its place ahead of the page. -->
+  ${localeRegistryScript()}
   <script defer src="${assetUrl('/blog-lang.js')}"></script>
   <main class="wrap">
     <header class="blog-index-header">
