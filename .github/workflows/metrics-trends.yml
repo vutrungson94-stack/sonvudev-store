@@ -53,6 +53,7 @@ jobs:
           npm run sla:check
           npm run postmortem:check
           npm run quality:report
+          npm run cache:check
       - name: commit the snapshot
         run: |
           git config user.name "github-actions[bot]"

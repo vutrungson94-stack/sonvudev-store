@@ -259,6 +259,16 @@ jobs:
             exit 1
           fi
 
+      # The health probe is deliberately uncached, so a green sha does not mean
+      # the edge HTML is fresh. Purge before the SEO audit so it measures the
+      # deploy it just certified. No token means no purge — the origin cache is
+      # still serving, and a missing secret must not turn a green deploy red.
+      - name: purge edge cache after verified deploy
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          APP_URL: ${{ secrets.APP_URL }}
+        run: npm run cache:purge
+
       - name: check the live site
         run: npm run seo:check -- "${{ secrets.APP_URL }}"
         env:

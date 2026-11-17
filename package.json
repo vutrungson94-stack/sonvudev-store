@@ -38,6 +38,8 @@
     "quality:report": "node scripts/quality-report.mjs",
     "slo:check": "node scripts/slo-monitor.mjs",
     "slo:ingest": "node scripts/slo-ingest.mjs",
+    "cache:check": "node scripts/cache-hit-check.mjs",
+    "cache:purge": "node scripts/cloudflare-purge.mjs",
     "spc:check": "node scripts/spc-control-chart.mjs",
     "defect:escape": "node scripts/defect-escape.mjs",
     "defect:check": "node scripts/defect-escape.mjs",

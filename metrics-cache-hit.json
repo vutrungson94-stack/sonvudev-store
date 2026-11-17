@@ -1,0 +1,85 @@
+{
+  "generatedAt": "2026-11-17T04:40:20.281Z",
+  "origin": "https://sonvudev.com",
+  "hitRate": 0,
+  "hits": 0,
+  "total": 8,
+  "results": [
+    {
+      "path": "/",
+      "readings": [
+        {
+          "cache": "DYNAMIC",
+          "age": null,
+          "cacheControl": "public, max-age=300",
+          "ray": "a5bc0e7fdca002d2-HKG",
+          "status": 200
+        },
+        {
+          "cache": "DYNAMIC",
+          "age": null,
+          "cacheControl": "public, max-age=300",
+          "ray": "a5bc0e818f8902d2-HKG",
+          "status": 200
+        }
+      ]
+    },
+    {
+      "path": "/en/",
+      "readings": [
+        {
+          "cache": "DYNAMIC",
+          "age": null,
+          "cacheControl": "public, max-age=300",
+          "ray": "a5bc0e82690802d2-HKG",
+          "status": 200
+        },
+        {
+          "cache": "DYNAMIC",
+          "age": null,
+          "cacheControl": "public, max-age=300",
+          "ray": "a5bc0e835b0502d2-HKG",
+          "status": 200
+        }
+      ]
+    },
+    {
+      "path": "/styles.min.css",
+      "readings": [
+        {
+          "cache": "DYNAMIC",
+          "age": null,
+          "cacheControl": "public, max-age=31536000",
+          "ray": "a5bc0e83fc0702d2-HKG",
+          "status": 200
+        },
+        {
+          "cache": "DYNAMIC",
+          "age": null,
+          "cacheControl": "public, max-age=31536000",
+          "ray": "a5bc0e848d4402d2-HKG",
+          "status": 200
+        }
+      ]
+    },
+    {
+      "path": "/product/pc-cleanup",
+      "readings": [
+        {
+          "cache": "DYNAMIC",
+          "age": null,
+          "cacheControl": "public, max-age=600",
+          "ray": "a5bc0e851e5f02d2-HKG",
+          "status": 200
+        },
+        {
+          "cache": "DYNAMIC",
+          "age": null,
+          "cacheControl": "public, max-age=600",
+          "ray": "a5bc0e8648be02d2-HKG",
+          "status": 200
+        }
+      ]
+    }
+  ]
+}
