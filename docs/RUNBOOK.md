@@ -267,6 +267,36 @@ Log Caddy và log ứng dụng nằm ngoài `ReadWritePaths`, hãy kiểm tra `d
   6. Chạy thử trước khi tin cậy: Actions → `rotate-admin-token` → "Run workflow".
      Kiểm tra `gh secret list` trước: repo hiện chỉ có `APP_URL`, còn 5 biến kia phải thêm.
 
+### SLO 30 ngày từ Cloudflare Analytics
+
+- Render free plan trả `requests=0` trên metrics API và log app chỉ giữ vài giờ.
+  Nguồn duy nhất cho cửa sổ 30 ngày thật là **Cloudflare GraphQL Analytics**:
+  ```
+  CLOUDFLARE_API_TOKEN=... CLOUDFLARE_ZONE_ID=<zone tag> npm run slo:ingest:cloudflare
+  npm run slo:check
+  ```
+- Token cần quyền **`Zone Analytics: Read`** (ngoài các quyền Cache). Nếu thiếu,
+  GraphQL trả "does not have permission …zone.analytics.read" — script báo lỗi rõ,
+  không ghi số giả. Availability/errorRate lấy từ `httpRequestsAdaptiveGroups`
+  nhóm theo `edgeResponseStatus` (5xx = unavailable); **latency vẫn unknown** vì
+  adaptive groups không có dimension p95 — trung thực hơn là đoán.
+- Các nguồn cũ仍然 giữ: `--render-logs` (sampled, ghi `sampled`/`coverageDays`),
+  `--file=logs/access-30d.json` (export ngoài). Mỗi evidence file ghi rõ `source`.
+
+### Purge edge cache sau deploy
+
+- `checks.yml` có bước **"purge edge cache after verified deploy"** trong job
+  `deployed-site`, chạy `npm run cache:purge` **sau** khi `/api/health` báo đúng sha
+  và **trước** `seo:check` — để SEO audit không đo bản HTML cũ.
+- Cần secret repo `CLOUDFLARE_API_TOKEN` (đã thêm 17/11/2026). Quyền tối thiểu:
+  `Zone:Zone:Read` + `Zone:Cache Purge:Purge`, scope đúng zone `sonvudev.com`.
+  Token hiện tại là token debug (có thêm Zone Settings/Cache Rules) — nên thay bằng
+  token riêng chỉ 2 quyền trên khi ổn định edge cache.
+- Khi chưa có secret, bước purge **no-op xanh** (cố tình): thiết bị lỗi secret không
+  được làm đỏ một deploy tốt. Origin cache + single-flight vẫn là lớp chịu tải chính.
+- Kiểm tra: `gh secret list --repo vutrungson94-stack/sonvudev-store` phải thấy cả
+  `CLOUDFLARE_API_TOKEN` và `APP_URL`.
+
 ## 10. Checklist trực ca
 
 Đầu ca:

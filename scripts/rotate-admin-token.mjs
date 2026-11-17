@@ -27,6 +27,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { mkdirSync, appendFileSync } from 'node:fs';
 import dotenv from 'dotenv';
+import { esc } from '../src/format.js';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 dotenv.config({ path: path.join(root, '.env'), override: true });
@@ -133,18 +134,19 @@ const adminWorksWith = async (candidate) => {
 
 const fingerprint = (tok) => (tok ? `${tok.slice(0, 8)}…${tok.slice(-4)}` : 'n/a');
 const dateStr = new Date().toISOString().slice(0, 10);
-const escapeHtml = (value) => String(value).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+// esc() from src/format.js is the single HTML escaper: this local copy omitted
+// the apostrophe, so a brand/host containing ' could break out of the mail HTML.
 const hostOf = () => { try { return new URL(appUrl).host; } catch { return appUrl; } };
 
 const email = {
   success: (newToken) => ({
     subject: `[SonVuDev] Admin API token đã xoay — ${dateStr}`,
-    html: `<p>Token admin API của <strong>${escapeHtml(hostOf())}</strong> đã được xoay tự động vào <strong>${dateStr}</strong>.</p>
+    html: `<p>Token admin API của <strong>${esc(hostOf())}</strong> đã được xoay tự động vào <strong>${dateStr}</strong>.</p>
 <p>Token mới (chỉ người nhận được email này có):</p>
 <p><code style="font-size:16px">${newToken}</code></p>
 <p>Token cũ đã bị vô hiệu hóa khi Render redeploy. Nếu bạn dùng token này cho:</p>
 <ul>
-<li>Admin panel tại <a href="${escapeHtml(appUrl)}/admin.html">${escapeHtml(hostOf())}/admin.html</a> — nhập token mới khi được hỏi.</li>
+<li>Admin panel tại <a href="${esc(appUrl)}/admin.html">${esc(hostOf())}/admin.html</a> — nhập token mới khi được hỏi.</li>
 <li>Script tại máy của bạn — cập nhật biến trong <code>.env</code>.</li>
 </ul>
 <p>Nếu bạn không mong đợi xoay này, hoặc token có thể đã lộ, hãy xoay thủ công ngay.</p>`,

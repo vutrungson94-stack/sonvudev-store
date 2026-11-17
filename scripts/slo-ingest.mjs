@@ -21,6 +21,10 @@
 //   node scripts/slo-ingest.mjs --render-logs --pages=30 --dry-run
 //   node scripts/slo-ingest.mjs --render-logs --include-health
 //
+//   # Cloudflare GraphQL Analytics (real 30-day edge traffic; needs
+//   # CLOUDFLARE_API_TOKEN with Zone Analytics: Read + CLOUDFLARE_ZONE_ID)
+//   node scripts/slo-ingest.mjs --cloudflare
+//
 //   # External access-log export (Cloudflare/uptime/Render log dump)
 //   node scripts/slo-ingest.mjs --file=logs/access-30d.json
 //
@@ -168,6 +172,57 @@ const fetchSeries = async (apiKey, serviceId, query) => {
   return Array.isArray(body) ? body : (body.series || body.items || []);
 };
 
+// Cloudflare GraphQL returns status groups shaped:
+//   [{ count, dimensions: { edgeResponseStatus: "503" } }, ...]
+// Convert them with the same 5xx rule as every other source. A group without a
+// status label is counted as unknown so availability stays honest (null), never 0.
+export function cloudflareGroupsToSummary(groups) {
+  let total = 0;
+  let serverErrors = 0;
+  let unknown = 0;
+  for (const group of groups || []) {
+    const count = Number(group?.count || 0);
+    if (!Number.isFinite(count) || count <= 0) continue;
+    total += count;
+    const status = group?.dimensions?.edgeResponseStatus ?? group?.dimensions?.clientResponseStatus ?? null;
+    if (status == null) unknown += count;
+    else if (isServerError(status)) serverErrors += count;
+  }
+  return {
+    total,
+    serverErrors,
+    unknown,
+    availability: total > 0 && unknown === 0 ? ((total - serverErrors) / total) * 100 : null,
+    errorRate: total > 0 && unknown === 0 ? (serverErrors / total) * 100 : null,
+  };
+}
+
+const fetchCloudflareGroups = async (token, zoneId, { days }) => {
+  const start = new Date(Date.now() - days * 86400000).toISOString();
+  const end = new Date().toISOString();
+  const query = `query SloGroups($zone: String!, $start: Time!, $end: Time!) {
+    viewer { zones(filter: { zoneTag: $zone }) {
+      httpRequestsAdaptiveGroups(
+        limit: 1000
+        filter: { datetime_geq: $start, datetime_lt: $end, requestSource: "eyeball" }
+      ) { count dimensions { edgeResponseStatus } }
+    } }
+  }`;
+  const response = await fetch('https://api.cloudflare.com/client/v4/graphql', {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ query, variables: { zone: zoneId, start, end } }),
+    signal: AbortSignal.timeout(45000),
+  });
+  const text = await response.text();
+  if (!response.ok) throw new Error(`HTTP ${response.status}: ${text.slice(0, 300)}`);
+  const body = JSON.parse(text);
+  if (body.errors?.length) throw new Error(body.errors.map((e) => e.message).join('; '));
+  const zones = body?.data?.viewer?.zones || [];
+  if (!zones.length) throw new Error('zone not found in Cloudflare Analytics (check CLOUDFLARE_ZONE_ID)');
+  return zones[0].httpRequestsAdaptiveGroups || [];
+};
+
 const fetchJson = async (url, apiKey) => {
   const response = await fetch(url, {
     headers: { Authorization: `Bearer ${apiKey}`, Accept: 'application/json' },
@@ -239,6 +294,7 @@ export async function main() {
   }
   const dryRun = hasFlag('dry-run');
   const file = argValue('file', '').trim();
+  const cloudflare = hasFlag('cloudflare');
   const renderLogs = hasFlag('render-logs');
   const pagesLimit = Number(argValue('pages', '20'));
   const includeHealth = hasFlag('include-health');
@@ -265,7 +321,30 @@ export async function main() {
   let observedTo = null;
   let coverageDays = 0;
 
-  if (file) {
+  if (cloudflare) {
+    const token = (process.env.CLOUDFLARE_API_TOKEN || '').trim();
+    const zoneId = (process.env.CLOUDFLARE_ZONE_ID || '').trim();
+    if (!token || !zoneId) {
+      console.error('[slo:ingest] --cloudflare cần CLOUDFLARE_API_TOKEN (Zone Analytics: Read) và CLOUDFLARE_ZONE_ID.');
+      process.exit(2);
+    }
+    const groups = await fetchCloudflareGroups(token, zoneId, { days });
+    const summary = cloudflareGroupsToSummary(groups);
+    total = summary.total;
+    serverErrors = summary.serverErrors;
+    unknown = summary.unknown;
+    availability = summary.availability;
+    errorRate = summary.errorRate;
+    // Cloudflare's adaptive groups do not carry a usable p95 latency series;
+    // latency stays unknown rather than inventing a number. Keep any earlier
+    // measured latency only when it came from a real source.
+    latencyResult = { p95Seconds: null, points: 0, units: [], reason: 'Cloudflare adaptive groups have no p95 latency dimension' };
+    source = `Cloudflare GraphQL Analytics (httpRequestsAdaptiveGroups, ${days}d, requestSource=eyeball)`;
+    latencyMethod = 'unknown — Cloudflare groups expose counts, not p95 latency';
+    coverageDays = total > 0 ? days : 0;
+    observedFrom = new Date(Date.now() - days * 86400000).toISOString();
+    observedTo = now;
+  } else if (file) {
     const body = JSON.parse(await readFile(path.resolve(root, file), 'utf8'));
     const records = Array.isArray(body) ? body : (body.entries || body.logs || body.data || []);
     const summary = summarizeRecords(records, days);

@@ -9,6 +9,7 @@ import {
   toSeconds,
   latencyP95,
   summarizeRecords,
+  cloudflareGroupsToSummary,
 } from '../scripts/slo-ingest.mjs';
 
 const series = (status, value, unit = '') => ({
@@ -56,6 +57,23 @@ test('latencyP95 lấy max của chuỗi p95 (thận trọng)', () => {
   assert.equal(result.p95Seconds, 0.35);
   assert.equal(result.points, 2);
   assert.deepEqual(result.units, ['s']);
+});
+
+test('cloudflareGroupsToSummary đếm 5xx theo edgeResponseStatus, không đoán khi thiếu status', () => {
+  const groups = [
+    { count: 900, dimensions: { edgeResponseStatus: '200' } },
+    { count: 50, dimensions: { edgeResponseStatus: '404' } },
+    { count: 10, dimensions: { edgeResponseStatus: '503' } },
+  ];
+  const result = cloudflareGroupsToSummary(groups);
+  assert.deepEqual(result, { total: 960, serverErrors: 10, unknown: 0, availability: (950 / 960) * 100, errorRate: (10 / 960) * 100 });
+
+  const withUnknown = cloudflareGroupsToSummary([
+    { count: 5, dimensions: { edgeResponseStatus: '200' } },
+    { count: 1, dimensions: {} },
+  ]);
+  assert.equal(withUnknown.unknown, 1);
+  assert.equal(withUnknown.availability, null, 'thiếu nhãn status thì availability vẫn unknown');
 });
 
 test('summarizeRecords tính availability/errorRate và không đoán khi thiếu status', () => {

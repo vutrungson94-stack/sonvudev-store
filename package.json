@@ -38,6 +38,7 @@
     "quality:report": "node scripts/quality-report.mjs",
     "slo:check": "node scripts/slo-monitor.mjs",
     "slo:ingest": "node scripts/slo-ingest.mjs",
+    "slo:ingest:cloudflare": "node scripts/slo-ingest.mjs --cloudflare",
     "cache:check": "node scripts/cache-hit-check.mjs",
     "cache:purge": "node scripts/cloudflare-purge.mjs",
     "spc:check": "node scripts/spc-control-chart.mjs",
