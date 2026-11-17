@@ -288,6 +288,48 @@ Log Caddy và log ứng dụng nằm ngoài `ReadWritePaths`, hãy kiểm tra `d
   không có dimension p95 — trung thực hơn là đoán.
 - Các nguồn cũ vẫn giữ: `--render-logs` (sampled, ghi `sampled`/`coverageDays`),
   `--file=logs/access-30d.json` (export ngoài). Mỗi evidence file ghi rõ `source`.
+- **Coverage là dữ liệu thật, không phải cửa sổ yêu cầu.** Script lấy bucket
+  5 phút đầu/cuối trả về dữ liệu và ghi `observedFrom`/`observedTo`/`coverageDays`
+  theo đó. Bật O2O giữa tháng thì bản ingest đầu tiên ghi `coverageDays≈0.014`;
+  `metrics-slo.json` đánh dấu `partialWindow: true`. **Đủ 30 ngày liên tục là
+  17/12/2026** — trước đó availability/errorRate là bằng chứng một phần.
+- Workflow `metrics-trends` (daily 03:00 UTC) chạy `slo:ingest:cloudflare
+  --days=30` → `slo:check` → commit `metrics-slo.json`. Cần secrets
+  `CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ZONE_ID`, `APP_URL`.
+
+### Xoay token Cloudflare (90 ngày)
+
+- Token **không tự gia hạn**. Token hiện tại `expires_on=2027-02-15`. Workflow
+  `metrics-trends` chạy `npm run cf:token:check:30`: verify
+  `/user/tokens/verify` và đỏ khi còn <30 ngày.
+- **Xoay 1 nhấn (đã triển khai).** Workflow `cf-token-reminder` chạy ngày 1 hằng
+  tháng (`0 4 1 * *`): đọc token hiện tại từ Render, gửi qua Resend một link
+  **đã ký HMAC-SHA256, hết hạn sau 72h** (`npm run cf:rotation:remind`). Link trỏ
+  tới `GET /api/rotation/confirm` — chỉ hiển thị một form POST, nên trình xem
+  link của mail client không thể tự xoay. `POST /api/rotation/execute` kiểm tra
+  lại chữ ký (giới hạn 10 req/15 phút/IP) rồi mới đổi. Không có giá trị token
+  nào được gửi qua email — chỉ có link đã ký.
+- **Render là nguồn sự thật** của `CLOUDFLARE_API_TOKEN`. GitHub Actions đọc
+  token từ Render lúc chạy (secrets `RENDER_API_KEY`, `RENDER_SERVICE_ID`), nên
+  sau khi xoay **không cần sửa GitHub Secret** (Secret `CLOUDFLARE_API_TOKEN` cũ
+  có thể xóa để tránh nhầm). Quy trình xoay theo thứ tự: đọc policy token cũ →
+  tạo token thay thế (hạn +90 ngày, cùng permissions) → verify token mới →
+  `PUT /env-vars/CLOUDFLARE_API_TOKEN` + deploy trên Render → gửi mail xác nhận →
+  **cuối cùng mới revoke token cũ**. Nếu bước nào trước mail thất bại, token mới
+  bị xóa và token cũ vẫn nguyên; nếu chỉ revoke cuối thất bại, mail báo token id
+  cần thu hồi tay.
+- **Secrets cần có:** trên Render — `CLOUDFLARE_API_TOKEN` (token đang dùng),
+  `CLOUDFLARE_MASTER_TOKEN` (quyền **API Tokens:Read + Write** để tạo/xóa token
+  con), `ROTATION_SIGNING_KEY` (chuỗi ngẫu nhiên ≥32 byte, cùng giá trị với
+  GitHub); trên GitHub — `RENDER_API_KEY`, `RENDER_SERVICE_ID`,
+  `ROTATION_SIGNING_KEY`, `RESEND_API_KEY`, `EMAIL_FROM`, `SUPPORT_EMAIL`,
+  `APP_URL`, `CLOUDFLARE_ZONE_ID`.
+- Token đang dùng đã lộ trong chat (id `40654ef8bb09066fa93bbf49af6ecda7`,
+  hạn `2027-02-15`): **sau khi setup xong, bấm link xoay một lần rồi revoke token
+  cũ**. Tách quyền tối thiểu: purge chỉ cần `Zone:Zone:Read` +
+  `Zone:Cache Purge:Purge`; SLO chỉ cần `Account Analytics:Read` +
+  `Zone Analytics:Read`. `CLOUDFLARE_MASTER_TOKEN` là token riêng, không chia sẻ
+  với CI.
 
 ### Purge edge cache sau deploy
 

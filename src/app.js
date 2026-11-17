@@ -14,6 +14,7 @@ import { paymentInstructions, paymentOptions } from "./payments.js";
 import { analyticsMeta, brandMeta, esc, fillCopy, fillPageTokens, localizeStaticHtml, pageTokenValues, renderFeed, renderIndexCount, renderIndexFilters, renderIndexGrid, renderLlmsTxt, renderMerchantFeed, renderOgImage, renderProductPage, renderStats, tokenMeta, verificationFile, verificationMeta, REFUND_POLICY_UPDATED } from "./pages.js";
 import { isVersionedRequest } from "./lib/assets.mjs";
 import { inlineStyles } from "./lib/inline-styles.mjs";
+import { rotationConfig, verifyRotationPayload, rotateCloudflareToken, confirmationPage, nextExpiry } from "./lib/cloudflare-rotation.mjs";
 import { renderBlogPost, renderBlogIndex, renderBlogFeed, loadBlogPosts, getBlogPostBySlug, EXTRA_BLOG_LOCALES } from "./blog.js";
 import { hasPayment, isClosed, isUnpaid, markOrderDelivered, markOrderPaid, paymentDeadline, sweeperRunning, voidPayment } from "./orders.js";
 import { notifyOrder, notifyMode } from "./notify.js";
@@ -1045,6 +1046,47 @@ app.get("/locale-registry.js", (_req, res) => {
   const version = crypto.createHash("sha256").update(body).digest("hex").slice(0, 12);
   res.set("Cache-Control", "public, max-age=31536000, immutable").type("application/javascript");
   res.send(`/* v=${version} */\n${body}`);
+});
+
+const textError = (error) => String(error?.message || error || "").slice(0, 300);
+
+// One-click Cloudflare token rotation. The emailed link is HMAC-signed and bound
+// to one token id. A GET only renders a POST form: mail clients and link scanners
+// follow links but do not submit forms, so a preview cannot rotate a credential.
+app.get("/api/rotation/confirm", async (req, res) => {
+  const config = rotationConfig();
+  const verdict = verifyRotationPayload(config.signingKey, {
+    action: typeof req.query.action === "string" ? req.query.action : "",
+    tokenId: typeof req.query.tokenId === "string" ? req.query.tokenId : "",
+    exp: typeof req.query.exp === "string" ? req.query.exp : "",
+    sig: typeof req.query.sig === "string" ? req.query.sig : "",
+  });
+  res.set("Cache-Control", "no-store");
+  if (!verdict.ok) return res.status(400).type("html").send(`<!doctype html><html lang="vi"><head><meta charset="utf-8"><title>Link không hợp lệ</title><link rel="stylesheet" href="/styles.min.css"></head><body class="wrap"><main><h1>Link xoay không hợp lệ</h1><p>${esc(verdict.reason)}</p><p><a href="/">Quay lại trang chủ</a></p></main></body></html>`);
+  const { tokenId } = verdict;
+  const exp = String(req.query.exp);
+  const sig = String(req.query.sig);
+  res.type("html").send(confirmationPage({ tokenId, exp, sig, expiresOn: nextExpiry() }));
+});
+
+app.post("/api/rotation/execute", json, async (req, res) => {
+  if (await tooManyAttempts(req)) return res.status(429).json(refuse("api.err.rateLimitedCreate"));
+  const config = rotationConfig();
+  const verdict = verifyRotationPayload(config.signingKey, {
+    action: typeof req.body?.action === "string" ? req.body.action : "",
+    tokenId: typeof req.body?.tokenId === "string" ? req.body.tokenId : "",
+    exp: typeof req.body?.exp === "string" || typeof req.body?.exp === "number" ? String(req.body.exp) : "",
+    sig: typeof req.body?.sig === "string" ? req.body.sig : "",
+  });
+  if (!verdict.ok) return res.status(400).json(refuse("api.err.forbidden", verdict.reason, 400));
+  try {
+    const summary = await rotateCloudflareToken(config, { tokenId: verdict.tokenId });
+    console.log(`[rotation] ${summary.oldId} -> ${summary.newId} revoked=${summary.revoked}`);
+    res.json({ ok: true, ...summary });
+  } catch (error) {
+    console.error("[rotation] failed:", error);
+    res.status(502).json(refuse("api.err.internal", textError(error), 502));
+  }
 });
 
 app.use(express.static(publicDir, {

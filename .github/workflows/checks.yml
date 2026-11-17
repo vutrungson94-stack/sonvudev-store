@@ -259,13 +259,21 @@ jobs:
             exit 1
           fi
 
+      # Render is the single source of truth for the Cloudflare token, so a
+      # one-click roll never has to rewrite a GitHub Secret. The helper script
+      # makes a missing token a warning, not a hidden failure: no token simply
+      # means no purge, never a red build that was actually green.
+      - name: read Cloudflare token from Render
+        env:
+          RENDER_API_KEY: ${{ secrets.RENDER_API_KEY }}
+          RENDER_SERVICE_ID: ${{ secrets.RENDER_SERVICE_ID }}
+        run: node scripts/gha-read-cf-token.mjs
+
       # The health probe is deliberately uncached, so a green sha does not mean
       # the edge HTML is fresh. Purge before the SEO audit so it measures the
-      # deploy it just certified. No token means no purge — the origin cache is
-      # still serving, and a missing secret must not turn a green deploy red.
+      # deploy it just certified.
       - name: purge edge cache after verified deploy
         env:
-          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           APP_URL: ${{ secrets.APP_URL }}
         run: npm run cache:purge
 

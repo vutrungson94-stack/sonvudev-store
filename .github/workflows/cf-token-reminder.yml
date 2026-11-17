@@ -1,0 +1,36 @@
+name: cf-token-reminder
+
+# The Cloudflare token cannot renew itself. Once a month this sends one signed,
+# 72-hour link to the owner. Nothing is rotated until the link is opened and its
+# confirmation form is submitted, so a mail-client preview cannot roll a secret.
+on:
+  schedule:
+    - cron: "0 4 1 * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  remind:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - name: read Cloudflare token from Render
+        env:
+          RENDER_API_KEY: ${{ secrets.RENDER_API_KEY }}
+          RENDER_SERVICE_ID: ${{ secrets.RENDER_SERVICE_ID }}
+        run: node scripts/gha-read-cf-token.mjs --required
+      - name: email the signed rotation link
+        env:
+          ROTATION_SIGNING_KEY: ${{ secrets.ROTATION_SIGNING_KEY }}
+          RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
+          EMAIL_FROM: ${{ secrets.EMAIL_FROM }}
+          SUPPORT_EMAIL: ${{ secrets.SUPPORT_EMAIL }}
+          APP_URL: ${{ secrets.APP_URL }}
+        run: npm run cf:rotation:remind

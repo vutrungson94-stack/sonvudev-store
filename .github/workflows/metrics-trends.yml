@@ -47,6 +47,10 @@ jobs:
         # when someone remembered to run them by hand. A metric with no cadence
         # is an anecdote, not a control. The trend job already owns the daily
         # commit, so these run here instead of a second racing cron.
+        env:
+          # The origin host is configuration, never typed into source; the
+          # checkout has no .env, so the cache probe reads the repo secret.
+          APP_URL: ${{ secrets.APP_URL }}
         run: |
           npm run spc:check
           npm run defect:check
@@ -54,6 +58,27 @@ jobs:
           npm run postmortem:check
           npm run quality:report
           npm run cache:check
+      - name: read Cloudflare token from Render
+        # Render holds the one live value; a roll updates it there and GitHub
+        # never needs a secret-write PAT. --required makes an empty answer fail
+        # the job: an SLO written without a real source is worse than no SLO.
+        env:
+          RENDER_API_KEY: ${{ secrets.RENDER_API_KEY }}
+          RENDER_SERVICE_ID: ${{ secrets.RENDER_SERVICE_ID }}
+        run: node scripts/gha-read-cf-token.mjs --required
+      - name: Cloudflare edge SLO ingest (30d)
+        # One daily edge sample builds the real 30-day window. The ingest keeps
+        # the measured coverage span in the evidence, and slo:check writes the
+        # SLO file this job commits. An empty Cloudflare answer exits 2 rather
+        # than overwriting good evidence with null.
+        env:
+          CLOUDFLARE_ZONE_ID: ${{ secrets.CLOUDFLARE_ZONE_ID }}
+        run: |
+          npm run slo:ingest:cloudflare:30d
+          npm run slo:check
+      - name: Cloudflare token expiry guard
+        # Warns before the 90-day token silently kills the ingest above.
+        run: npm run cf:token:check:30
       - name: commit the snapshot
         run: |
           git config user.name "github-actions[bot]"
