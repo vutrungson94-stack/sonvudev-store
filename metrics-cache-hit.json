@@ -1,25 +1,28 @@
 {
-  "generatedAt": "2026-11-17T05:54:26.155Z",
+  "generatedAt": "2026-11-17T10:54:48.217Z",
   "origin": "https://sonvudev.com",
-  "hitRate": 0,
-  "hits": 0,
+  "hitRate": 1,
+  "hits": 8,
   "total": 8,
+  "steadyStateHitRate": 1,
+  "steadyStateHits": 4,
+  "steadyStateTotal": 4,
   "results": [
     {
       "path": "/",
       "readings": [
         {
-          "cache": "DYNAMIC",
-          "age": null,
+          "cache": "HIT",
+          "age": "245",
           "cacheControl": "public, max-age=300",
-          "ray": "a5bc7b0afe968499-HKG",
+          "ray": "a5be330c881cc896-HKG",
           "status": 200
         },
         {
-          "cache": "DYNAMIC",
-          "age": null,
+          "cache": "HIT",
+          "age": "245",
           "cacheControl": "public, max-age=300",
-          "ray": "a5bc7b0bdf438499-HKG",
+          "ray": "a5be330d0941c896-HKG",
           "status": 200
         }
       ]
@@ -28,17 +31,17 @@
       "path": "/en/",
       "readings": [
         {
-          "cache": "DYNAMIC",
-          "age": null,
+          "cache": "HIT",
+          "age": "244",
           "cacheControl": "public, max-age=300",
-          "ray": "a5bc7b0c7fa88499-HKG",
+          "ray": "a5be330d49f6c896-HKG",
           "status": 200
         },
         {
-          "cache": "DYNAMIC",
-          "age": null,
+          "cache": "HIT",
+          "age": "245",
           "cacheControl": "public, max-age=300",
-          "ray": "a5bc7b0d2ff78499-HKG",
+          "ray": "a5be330dab0fc896-HKG",
           "status": 200
         }
       ]
@@ -47,17 +50,17 @@
       "path": "/styles.min.css",
       "readings": [
         {
-          "cache": "DYNAMIC",
-          "age": null,
+          "cache": "HIT",
+          "age": "244",
           "cacheControl": "public, max-age=31536000",
-          "ray": "a5bc7b0db8608499-HKG",
+          "ray": "a5be330e0c17c896-HKG",
           "status": 200
         },
         {
-          "cache": "DYNAMIC",
-          "age": null,
+          "cache": "HIT",
+          "age": "244",
           "cacheControl": "public, max-age=31536000",
-          "ray": "a5bc7b0e48b78499-HKG",
+          "ray": "a5be330e5d15c896-HKG",
           "status": 200
         }
       ]
@@ -66,17 +69,17 @@
       "path": "/product/pc-cleanup",
       "readings": [
         {
-          "cache": "DYNAMIC",
-          "age": null,
+          "cache": "HIT",
+          "age": "244",
           "cacheControl": "public, max-age=600",
-          "ray": "a5bc7b0ee9228499-HKG",
+          "ray": "a5be330eae01c896-HKG",
           "status": 200
         },
         {
-          "cache": "DYNAMIC",
-          "age": null,
+          "cache": "HIT",
+          "age": "244",
           "cacheControl": "public, max-age=600",
-          "ray": "a5bc7b10ea808499-HKG",
+          "ray": "a5be330f0efbc896-HKG",
           "status": 200
         }
       ]

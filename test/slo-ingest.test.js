@@ -11,6 +11,7 @@ import {
   summarizeRecords,
   cloudflareGroupsToSummary,
   cloudflareEmptyDiagnostic,
+  cloudflareObservedRange,
 } from '../scripts/slo-ingest.mjs';
 
 const series = (status, value, unit = '') => ({
@@ -87,6 +88,22 @@ test('Cloudflare trả 0 dòng là lỗi nguồn, không phải phép đo 0%', (
   assert.match(empty, /--allow-empty/);
   assert.equal(cloudflareEmptyDiagnostic({ total: 5 }, 30), null, 'có dữ liệu thì không báo lỗi');
   assert.equal(cloudflareEmptyDiagnostic(null, 30), null);
+});
+
+test('cloudflareObservedRange đo cửa sổ thật từ bucket, không gán cửa sổ yêu cầu', () => {
+  // The edge was switched on partway through the requested 30-day window. The
+  // oldest non-empty five-minute bucket is the true start of evidence; the last
+  // bucket is still open, so its end is five minutes after its timestamp.
+  const range = cloudflareObservedRange('2026-11-17T10:25:00Z', '2026-11-17T10:40:00Z');
+  assert.equal(range.observedFrom, '2026-11-17T10:25:00.000Z');
+  assert.equal(range.observedTo, '2026-11-17T10:45:00.000Z');
+  assert.ok(Math.abs(range.coverageDays - 20 / 1440) < 1e-12, 'coverage là 20 phút, không phải 30 ngày');
+
+  const oneBucket = cloudflareObservedRange('2026-11-17T10:25:00Z', '2026-11-17T10:25:00Z');
+  assert.equal(oneBucket.coverageDays, 5 / 1440, 'một bucket rỗng không phải cửa sổ 0');
+
+  const missing = cloudflareObservedRange(null, '2026-11-17T10:40:00Z');
+  assert.deepEqual(missing, { observedFrom: null, observedTo: null, coverageDays: 0 });
 });
 
 test('summarizeRecords tính availability/errorRate và không đoán khi thiếu status', () => {

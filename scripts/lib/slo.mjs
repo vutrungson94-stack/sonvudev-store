@@ -39,7 +39,7 @@ export const SLOS = [
     want: 'up',
     unit: '%',
     basis: 'window',
-    source: 'logs/last-availability.json — sampled window from Render app logs (coverageDays recorded in the file)',
+    source: 'logs/last-availability.json — edge request window from the configured source (windowDays/coverageDays recorded in the file)',
     owner: 'platform-team',
     remediation: 'Check the deploy history and the incident log; runbook at docs/RUNBOOK.md',
   },
@@ -140,6 +140,21 @@ export async function measureSLOs(root, slos = SLOS) {
   for (const slo of slos) {
     let value = null;
     let sampleSize = 0;
+    // Window metadata travels with the value so a 20-minute sample cannot be
+    // read as a month-long SLO when the evidence file is opened next to it.
+    let coverage = null;
+
+    const coverageOf = (report) => {
+      if (!report || report.coverageDays == null) return null;
+      const coverageDays = Number(report.coverageDays);
+      return {
+        coverageDays,
+        windowDays: Number(report.windowDays) || null,
+        observedFrom: report.observedFrom || null,
+        observedTo: report.observedTo || null,
+        partialWindow: Number.isFinite(coverageDays) && coverageDays < 1,
+      };
+    };
 
     switch (slo.id) {
       case 'availability': {
@@ -152,6 +167,7 @@ export async function measureSLOs(root, slos = SLOS) {
         if (report && typeof report.availability === 'number') {
           value = report.availability;
           sampleSize = Number(report.samples) || 0;
+          coverage = coverageOf(report);
         }
         break;
       }
@@ -160,6 +176,7 @@ export async function measureSLOs(root, slos = SLOS) {
         if (report && typeof report.errorRate === 'number') {
           value = report.errorRate;
           sampleSize = Number(report.samples) || 0;
+          coverage = coverageOf(report);
         }
         break;
       }
@@ -171,6 +188,7 @@ export async function measureSLOs(root, slos = SLOS) {
           // 500 ms objective look like a 500 second one.
           value = Math.round(report.p95Seconds * 1000);
           sampleSize = Number(report.samples) || 0;
+          coverage = coverageOf(report);
         }
         break;
       }
@@ -241,6 +259,7 @@ export async function measureSLOs(root, slos = SLOS) {
       status,
       breached,
       sampleSize,
+      ...(coverage || {}),
       measuredAt: new Date().toISOString(),
     };
   }

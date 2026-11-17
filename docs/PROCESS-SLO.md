@@ -18,7 +18,23 @@ thực tế, nó được ghi rõ là `unknown` — không gán 0 hay 100.
 | Deploy success rate | 100% trên CI | `logs/last-deploy.json` (chưa được ghi) | unknown | rollback + postmortem |
 | PR merge sạch (không revert trong 7 ngày) | ≥ 95% | `git log` theo tuần | unknown | RCA + lặp lại gate |
 | Time-to-review | ≤ 1 ngày làm việc | lịch sử PR | unknown | nhắc reviewer; nếu do một người → phân quyền |
-| Edge cache HIT rate | ≥ 80% trên `/`, `/en/`, static, trang sản phẩm sau khi rule có hiệu lực | `metrics-cache-hit.json` (`npm run cache:check`, chạy daily) | 0% (17/11: `DYNAMIC` trên mọi path dù Cache Rule `cache=true`/`respect_origin`, `cache_level=basic`, Dev Mode off, Bot Fight Mode off, Page Rules=0; Rule simulator & Request Trace API đều trả "hostname does not belong to your account"). **Probe 17/11 (quyết định):** thêm tạm Cache Rule `override_origin` 60 s cho một path riêng → vẫn `DYNAMIC` (rule đã gỡ, chỉ còn "Storefront edge cache"); `/styles.min.css` + `/og.png` (đuôi mặc định được cache) cũng `DYNAMIC`; site Cloudflare đối chứng trả `HIT` cho favicon trong cùng môi trường → cache không bật ở tầng zone/account, không phải biểu thức rule. Tracking: đã đăng bài Cloudflare Community category CDN ngày 17/11 — **1 post pending moderator approval** (link sẽ bổ sung khi duyệt). CF-RAY: `a5bc62f78c220fe0-HKG`, `a5bc7a01f84b84e5-HKG`. | chờ câu trả lời Community/Support; gửi Support 3 probe trên (override_origin vẫn DYNAMIC, static DYNAMIC, site đối chứng HIT); origin cache vẫn là lớp chịu tải chính |
+| Edge cache HIT rate | ≥ 80% trên `/`, `/en/`, static, trang sản phẩm sau khi rule có hiệu lực | `metrics-cache-hit.json` (`npm run cache:check`, chạy daily) | **100% (17/11, sau khi bật O2O)**: steady-state 4/4 HIT; raw 8/8 HIT (`/`: REVALIDATED→HIT; `/en/`, `/styles.min.css`, `/product/pc-cleanup`: MISS→HIT). Trước đó 0%/`DYNAMIC` vì apex trỏ bằng A record không proxied; đã sửa bằng CNAME proxied cho apex/`www` + Cache Rule phase `http_request_cache_settings`, `cache=true`, Edge/Browser TTL `respect_origin`, loại trừ `/api/`, `/admin`, `/order`, `/lookup` và query string — `/api/health` đo được `DYNAMIC`, đúng như exclusion. | steady-state < 80%: request trace từng path, kiểm tra rule simulator; không hạ ngưỡng để xanh |
+
+### Cửa sổ SLO dịch vụ hiện tại (Cloudflare edge)
+
+- Edge O2O bật 2026-11-17T10:27Z; `httpRequestsAdaptiveGroups` chỉ trả bucket từ
+  10:25Z. Bản ingest 17/11 ghi `coverageDays=0.0139` (10:25–10:45),
+  `observedFrom`/`observedTo` lấy từ bucket đầu/cuối, và `metrics-slo.json` đánh
+  dấu `partialWindow: true`.
+- **Tới 17/12/2026 mới đủ 30 ngày liên tục.** Trước đó availability/errorRate là
+  bằng chứng một phần, không phải SLO 30 ngày; latency vẫn `unknown` vì adaptive
+  groups không có dimension p95. Workflow `metrics-trends` chạy ingest hằng ngày
+  và commit `metrics-slo.json`.
+- Ingest và purge đọc `CLOUDFLARE_API_TOKEN` từ **Render** lúc chạy, không từ
+  GitHub Secret, nên lần xoay token 90 ngày (email → nhấn xác nhận) không làm
+  đứt chuỗi đo lường. `cf:token:check:30` đỏ khi token còn <30 ngày; xoay sớm
+  để không mất bucket edge. Chi tiết secrets và quy trình: mục "Xoay token
+  Cloudflare (90 ngày)" trong `docs/RUNBOOK.md`.
 
 ## Nhịp kiểm
 

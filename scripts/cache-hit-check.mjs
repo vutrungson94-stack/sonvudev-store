@@ -58,15 +58,27 @@ for (const target of targets) {
 
 const hits = results.reduce((n, r) => n + r.readings.filter((x) => x.cache === "HIT").length, 0);
 const total = results.reduce((n, r) => n + r.readings.length, 0);
+// The first request primes the edge: a MISS then HIT is a working cache, not a
+// broken one. Counting only the second read answers the question the SLO asks
+// ("does a repeat visitor get a cached response"), while the raw hitRate above
+// stays in the file so the priming cost remains visible.
+const steady = results.map((r) => r.readings[r.readings.length - 1]);
+const steadyHits = steady.filter((x) => x.cache === "HIT").length;
 const snapshot = {
   generatedAt: new Date().toISOString(),
   origin,
   hitRate: Number((hits / total).toFixed(3)),
   hits,
   total,
+  steadyStateHitRate: Number((steadyHits / steady.length).toFixed(3)),
+  steadyStateHits: steadyHits,
+  steadyStateTotal: steady.length,
   results,
 };
 await writeFile(path.join(root, "metrics-cache-hit.json"), `${JSON.stringify(snapshot, null, 2)}\n`, "utf8");
-console.log(`[cache:check] HIT ${hits}/${total} (${(hits / total) * 100}%) -> metrics-cache-hit.json`);
+console.log(
+  `[cache:check] HIT ${hits}/${total} (cold reads included); `
+  + `steady-state ${steadyHits}/${steady.length} (${(snapshot.steadyStateHitRate) * 100}%) -> metrics-cache-hit.json`,
+);
 
 if (process.argv.includes("--strict") && hits < total) process.exit(1);

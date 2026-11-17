@@ -222,21 +222,29 @@ export function cloudflareEmptyDiagnostic(summary, days) {
     + 'Nếu cửa sổ thật sự không có request thì chạy lại với --allow-empty.';
 }
 
-const fetchCloudflareGroups = async (token, zoneId, { days }) => {
-  const start = new Date(Date.now() - days * 86400000).toISOString();
-  const end = new Date().toISOString();
-  const query = `query SloGroups($zone: String!, $start: Time!, $end: Time!) {
-    viewer { zones(filter: { zoneTag: $zone }) {
-      httpRequestsAdaptiveGroups(
-        limit: 1000
-        filter: { datetime_geq: $start, datetime_lt: $end, requestSource: "eyeball" }
-      ) { count dimensions { edgeResponseStatus } }
-    } }
-  }`;
+// The five-minute bucket a group starts at covers that whole bucket, so the last
+// non-empty bucket ends five minutes after its timestamp. Without this the
+// reported window stops at the start of the last observed interval.
+export function cloudflareObservedRange(earliest, latest) {
+  const fromMs = earliest ? Date.parse(earliest) : Number.NaN;
+  const toMs = latest ? Date.parse(latest) : Number.NaN;
+  if (!Number.isFinite(fromMs) || !Number.isFinite(toMs)) {
+    return { observedFrom: null, observedTo: null, coverageDays: 0 };
+  }
+  const start = Math.min(fromMs, toMs);
+  const end = Math.max(fromMs, toMs) + 300_000;
+  return {
+    observedFrom: new Date(start).toISOString(),
+    observedTo: new Date(end).toISOString(),
+    coverageDays: (end - start) / 86400000,
+  };
+}
+
+const cloudflareGraphql = async (token, query, variables) => {
   const response = await fetch('https://api.cloudflare.com/client/v4/graphql', {
     method: 'POST',
     headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
-    body: JSON.stringify({ query, variables: { zone: zoneId, start, end } }),
+    body: JSON.stringify({ query, variables }),
     signal: AbortSignal.timeout(45000),
   });
   const text = await response.text();
@@ -245,7 +253,48 @@ const fetchCloudflareGroups = async (token, zoneId, { days }) => {
   if (body.errors?.length) throw new Error(body.errors.map((e) => e.message).join('; '));
   const zones = body?.data?.viewer?.zones || [];
   if (!zones.length) throw new Error('zone not found in Cloudflare Analytics (check CLOUDFLARE_ZONE_ID)');
-  return zones[0].httpRequestsAdaptiveGroups || [];
+  return zones[0];
+};
+
+// Returns the status summary AND the real observation span.
+//
+// `httpRequestsAdaptiveGroups` only returns buckets that carry requests. When the
+// edge was switched on partway through the requested month (CNAME/proxied DNS
+// change, or an account token that previously could not read the dataset), the
+// oldest bucket is not the start of the requested window, and claiming a full
+// 30-day measurement would be false. Two limit-1 queries give the first and last
+// non-empty five-minute buckets, so coverage is measured instead of assumed.
+const fetchCloudflareGroups = async (token, zoneId, { days }) => {
+  const start = new Date(Date.now() - days * 86400000).toISOString();
+  const end = new Date().toISOString();
+  const variables = { zone: zoneId, start, end };
+  const groupsQuery = `query SloGroups($zone: String!, $start: Time!, $end: Time!) {
+    viewer { zones(filter: { zoneTag: $zone }) {
+      httpRequestsAdaptiveGroups(
+        limit: 1000
+        filter: { datetime_geq: $start, datetime_lt: $end, requestSource: "eyeball" }
+        orderBy: [date_ASC]
+      ) { count dimensions { date edgeResponseStatus } }
+    } }
+  }`;
+  const boundsQuery = (order) => `query SloBounds($zone: String!, $start: Time!, $end: Time!) {
+    viewer { zones(filter: { zoneTag: $zone }) {
+      httpRequestsAdaptiveGroups(
+        limit: 1
+        filter: { datetime_geq: $start, datetime_lt: $end, requestSource: "eyeball" }
+        orderBy: [datetimeFiveMinutes_${order}]
+      ) { count dimensions { datetimeFiveMinutes } }
+    } }
+  }`;
+  const node = await cloudflareGraphql(token, groupsQuery, variables);
+  const earliest = await cloudflareGraphql(token, boundsQuery('ASC'), variables);
+  const latest = await cloudflareGraphql(token, boundsQuery('DESC'), variables);
+  const firstBucket = earliest.httpRequestsAdaptiveGroups?.[0]?.dimensions?.datetimeFiveMinutes ?? null;
+  const lastBucket = latest.httpRequestsAdaptiveGroups?.[0]?.dimensions?.datetimeFiveMinutes ?? null;
+  return {
+    groups: node.httpRequestsAdaptiveGroups || [],
+    ...cloudflareObservedRange(firstBucket, lastBucket),
+  };
 };
 
 const fetchJson = async (url, apiKey) => {
@@ -345,15 +394,17 @@ export async function main() {
   let observedFrom = null;
   let observedTo = null;
   let coverageDays = 0;
+  let coverageMethod = 'requested window';
 
   if (cloudflare) {
     const token = (process.env.CLOUDFLARE_API_TOKEN || '').trim();
     const zoneId = (process.env.CLOUDFLARE_ZONE_ID || '').trim();
     if (!token || !zoneId) {
-      console.error('[slo:ingest] --cloudflare cần CLOUDFLARE_API_TOKEN (Zone Analytics: Read) và CLOUDFLARE_ZONE_ID.');
+      console.error('[slo:ingest] --cloudflare cần CLOUDFLARE_API_TOKEN (Account → Account Analytics: Read) và CLOUDFLARE_ZONE_ID.');
       process.exit(2);
     }
-    const groups = await fetchCloudflareGroups(token, zoneId, { days });
+    const cf = await fetchCloudflareGroups(token, zoneId, { days });
+    const groups = cf.groups;
     const summary = cloudflareGroupsToSummary(groups);
     if (summary.total === 0 && !hasFlag('allow-empty')) {
       // Refuse rather than write null evidence: a previous real availability
@@ -375,9 +426,14 @@ export async function main() {
     latencyResult = { p95Seconds: null, points: 0, units: [], reason: 'Cloudflare adaptive groups have no p95 latency dimension' };
     source = `Cloudflare GraphQL Analytics (httpRequestsAdaptiveGroups, ${days}d, requestSource=eyeball)`;
     latencyMethod = 'unknown — Cloudflare groups expose counts, not p95 latency';
-    coverageDays = total > 0 ? days : 0;
-    observedFrom = new Date(Date.now() - days * 86400000).toISOString();
-    observedTo = now;
+    // Coverage comes from the buckets that actually returned rows, not from the
+    // requested window. A month-long window with data only since the edge was
+    // switched on must say so; otherwise a 20-minute sample is filed as a
+    // 30-day SLO and reads as a month of evidence.
+    coverageDays = total > 0 ? cf.coverageDays : 0;
+    observedFrom = cf.observedFrom;
+    observedTo = cf.observedTo;
+    coverageMethod = 'first/last non-empty five-minute bucket (httpRequestsAdaptiveGroups)';
   } else if (file) {
     const body = JSON.parse(await readFile(path.resolve(root, file), 'utf8'));
     const records = Array.isArray(body) ? body : (body.entries || body.logs || body.data || []);
@@ -404,6 +460,7 @@ export async function main() {
     coverageDays = observedFrom && observedTo
       ? (Date.parse(observedTo) - Date.parse(observedFrom)) / 86400000
       : 0;
+    coverageMethod = 'min/max timestamp in the export';
   } else if (renderLogs) {
     const missing = [];
     if (!apiKey) missing.push('RENDER_API_KEY');
@@ -443,6 +500,7 @@ export async function main() {
     coverageDays = observedFrom && observedTo
       ? (Date.parse(observedTo) - Date.parse(observedFrom)) / 86400000
       : 0;
+    coverageMethod = 'min/max request-line timestamp in the app log';
   } else {
     const missing = [];
     if (!apiKey) missing.push('RENDER_API_KEY');
@@ -525,6 +583,7 @@ export async function main() {
       observedFrom,
       observedTo,
       coverageDays,
+      coverageMethod,
     }, null, 2) + '\n',
     'utf8',
   );
@@ -543,6 +602,7 @@ export async function main() {
       observedFrom,
       observedTo,
       coverageDays,
+      coverageMethod,
     }, null, 2) + '\n',
     'utf8',
   );
@@ -562,6 +622,7 @@ export async function main() {
       observedFrom,
       observedTo,
       coverageDays,
+      coverageMethod,
     }, null, 2) + '\n',
     'utf8',
   );
