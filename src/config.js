@@ -291,7 +291,11 @@ const paypalEnv = resolvePaypalEnvironment(value("PAYPAL_ENVIRONMENT"));
 export const paypalEnvironmentIsSet = paypalEnv.isSet;
 
 export const isConfigured = {
-  admin: configured("ADMIN_API_TOKEN"),
+  // Both variables authenticate the same middleware (adminEntries() in app.js),
+  // but only the old single-token name was checked here. A host that had moved to
+  // ADMIN_API_TOKENS ran a working admin panel while /api/health reported
+  // admin:false — monitors and audits then described a healthy shop as broken.
+  admin: configured("ADMIN_API_TOKEN") || configured("ADMIN_API_TOKENS"),
   r2: configured("R2_ACCOUNT_ID") && configured("R2_ACCESS_KEY_ID") && configured("R2_SECRET_ACCESS_KEY") && configured("R2_BUCKET_NAME"),
   supabase: hasSupabaseProjectUrl() && configured("SUPABASE_SERVICE_ROLE_KEY"),
   // The currency list is PAYPAL_CURRENCIES from src/paypal-environment.js, beside

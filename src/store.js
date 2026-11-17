@@ -160,7 +160,15 @@ export async function ensureSeed() {
     if (!(await fs.stat(files.products).catch(() => null))) await writeJson(files.products, seedProducts);
     if (!(await fs.stat(files.orders).catch(() => null))) await writeJson(files.orders, []);
     return;
-  } try { const rows = await supabase("products?select=id&limit=1"); if (!rows?.length) await supabase("products", { method: "POST", body: JSON.stringify(seedProducts.map(toProduct)) }); } catch (error) {
+  } try {
+    // A configured Supabase is the source of truth. An empty products table is an
+    // honest empty shop: the owner fills it through the admin panel or with
+    // `ops:catalog:apply` from data/products.json. Writing the six development
+    // seeds here — one literally says "Sample product. Replace this content" —
+    // shipped a phantom catalogue to production and broke the shipped-content
+    // invariant in AGENTS.md §4. The query stays as a connectivity probe only.
+    await supabase("products?select=id&limit=1");
+  } catch (error) {
   // Fail closed, never silent: when Supabase is configured but unreachable,
   // falling back to local JSON would write paid orders to this host's ephemeral
   // disk while every other host keeps writing to Postgres — revenue split across
