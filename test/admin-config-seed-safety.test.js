@@ -1,5 +1,5 @@
-// Regression tests for the two P0 findings of the 2026-11-17 L5 audit:
-//  1. /api/health reported admin:false on hosts using ADMIN_API_TOKENS.
+// Regression tests for the 2026-11-17 L5 audit and its follow-up:
+//  1. admin config must be true from the single ADMIN_API_TOKEN credential.
 //  2. ensureSeed() pushed six development demo products into a live Supabase.
 import test from 'node:test';
 import assert from 'node:assert/strict';
@@ -21,20 +21,20 @@ const adminFlag = (extra) => {
     cwd: root,
     encoding: 'utf8',
     timeout: 30000,
-    env: { ...process.env, NODE_ENV: 'test', ADMIN_API_TOKEN: '', ADMIN_API_TOKENS: '', ...extra },
+    env: { ...process.env, NODE_ENV: 'test', ADMIN_API_TOKEN: '', ...extra },
   });
   assert.equal(result.status, 0, result.stderr);
   return result.stdout.trim();
 };
 
-test('isConfigured.admin nhận ADMIN_API_TOKENS khi token đơn vắng mặt', () => {
-  assert.equal(adminFlag({ ADMIN_API_TOKENS: 'owner:token:admin' }), 'true',
-    'host đã chuyển sang token mới vẫn phải báo admin:true trên /api/health');
+test('isConfigured.admin bật khi có ADMIN_API_TOKEN', () => {
+  assert.equal(adminFlag({ ADMIN_API_TOKEN: 'owner-token' }), 'true',
+    'mối admin duy nhất phải báo admin:true trên owner /api/health');
 });
 
-test('isConfigured.admin vẫn là false khi không có token admin nào', () => {
+test('isConfigured.admin vẫn là false khi ADMIN_API_TOKEN trống', () => {
   assert.equal(adminFlag({}), 'false',
-    'không được báo đã cấu hình khi cả hai biến đều trống');
+    'không được báo đã cấu hình khi token admin trống');
 });
 
 test('ensureSeed() không ghi sản phẩm mẫu vào Supabase production', async () => {

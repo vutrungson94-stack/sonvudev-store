@@ -26,7 +26,7 @@ import { renderRobotsTxt } from "./robots.js";
 import { adminThrottled, downloadThrottled, healthThrottled, tooManyAttempts, checkoutThrottled } from "./rate-limit.js";
 import { isConfigured as tIsConfigured, translateText, translateMissingKeys } from "./translate-service.mjs";
 import { LOCALE_CODES, DEFAULT_LOCALE, normalizeLocale, isSupportedLocale } from "./i18n-registry.mjs";
-import { parseAdminTokens, matchAdminToken } from "./admin-auth.js";
+import { adminEntries, matchAdminToken } from "./admin-auth.js";
 import { isEnabled } from "./feature-flags.js";
 import { otelEnabled, exportSpan, otelStats } from "./otel.js";
 import { canaryAssignment, canaryCookie, canaryClearCookie } from "./canary.js";
@@ -194,10 +194,9 @@ const deadlinePayload = (order) => {
 };
 const text = (value, max = 180) => String(value || "").trim().slice(0, max);
 const isEmail = (value) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
-const adminEntries = () => parseAdminTokens({ primary: env.adminToken, extra: env.adminTokens });
 const adminEntryFor = (req) => {
   const supplied = req.get("x-admin-token") || (req.get("authorization") || "").replace(/^Bearer\s+/i, "");
-  return matchAdminToken(supplied, adminEntries());
+  return matchAdminToken(supplied, adminEntries(env.adminToken));
 };
 // GET is allowed for viewer and admin; mutations (POST/PATCH/PUT/DELETE) require admin.
 // The old single token has no role and defaults to admin, so current tests and callers remain valid.

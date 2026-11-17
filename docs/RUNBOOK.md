@@ -236,8 +236,9 @@ Log Caddy và log ứng dụng nằm ngoài `ReadWritePaths`, hãy kiểm tra `d
 
 ## 9. Bảo mật và xoay khóa
 
-- `ADMIN_API_TOKEN` không có hạn và không có 2FA: xoay ngay khi nghi lộ, và dùng
-  `ADMIN_API_TOKENS` cho token có hạn/role khi cần.
+- `ADMIN_API_TOKEN` là **mối admin duy nhất**, không có hạn và không có 2FA: xoay
+  ngay khi nghi lộ bằng `npm run rotate:admin-token:apply`. Không tạo token admin
+  thứ hai — một credential không được xoay là một cửa sau vĩnh viễn.
 - `SUPABASE_SERVICE_ROLE_KEY` bỏ qua RLS. Chỉ đặt trong env của máy chủ, không bao
   giờ trong biến `NEXT_PUBLIC`/`PUBLIC` hay file tĩnh.
 - Sau khi xoay khóa: restart service, kiểm tra health, xác nhận log không còn dùng

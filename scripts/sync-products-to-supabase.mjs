@@ -42,7 +42,6 @@
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { env } from "../src/config.js";
-import { parseAdminTokens, isExpired } from "../src/admin-auth.js";
 
 // ──────────────────────────────────────────────
 // 1. Load environment
@@ -53,18 +52,9 @@ import { parseAdminTokens, isExpired } from "../src/admin-auth.js";
 // `fileURLToPath` is required because URL pathnames keep `%20` for spaces,
 // while `readFileSync` needs the real filesystem path with literal spaces.
 const projectRoot = fileURLToPath(new URL("..", import.meta.url));
-// The admin token authorises every write below. Keep it secret.
-// Central config is the single source: this used to re-parse .env by hand.
-// When the dedicated script token (ADMIN_API_TOKEN) is not set, fall back to the
-// first non-expired ADMIN_API_TOKENS entry with role admin — the same credential
-// the server itself accepts for admin calls — instead of bailing out.
-const ADMIN_API_TOKEN = (() => {
-  const primary = String(env.adminToken || "").trim();
-  if (primary) return primary;
-  const usable = parseAdminTokens({ primary: "", extra: env.adminTokens })
-    .filter((entry) => entry.role === "admin" && !isExpired(entry));
-  return usable.length ? usable[0].token : "";
-})();
+// The single admin token authorises every write below. Central config is the
+// source of truth; there is no secondary credential to fall back to.
+const ADMIN_API_TOKEN = String(env.adminToken || "").trim();
 
 if (!ADMIN_API_TOKEN) {
   console.error("[sync] ERROR: ADMIN_API_TOKEN is not set in .env or environment.");
