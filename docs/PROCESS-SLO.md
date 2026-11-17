@@ -18,7 +18,7 @@ thực tế, nó được ghi rõ là `unknown` — không gán 0 hay 100.
 | Deploy success rate | 100% trên CI | `logs/last-deploy.json` (chưa được ghi) | unknown | rollback + postmortem |
 | PR merge sạch (không revert trong 7 ngày) | ≥ 95% | `git log` theo tuần | unknown | RCA + lặp lại gate |
 | Time-to-review | ≤ 1 ngày làm việc | lịch sử PR | unknown | nhắc reviewer; nếu do một người → phân quyền |
-| Edge cache HIT rate | ≥ 80% trên `/`, `/en/`, static, trang sản phẩm sau khi rule có hiệu lực | `metrics-cache-hit.json` (`npm run cache:check`, chạy daily) | 0% (17/11: mọi path vẫn `DYNAMIC` dù đã có Cache Rule `Eligible for cache`) | đối chiếu lại rule/zone trên Cloudflare; origin cache vẫn là lớp chịu tải chính |
+| Edge cache HIT rate | ≥ 80% trên `/`, `/en/`, static, trang sản phẩm sau khi rule có hiệu lực | `metrics-cache-hit.json` (`npm run cache:check`, chạy daily) | 0% (17/11: `DYNAMIC` trên mọi path dù Cache Rule `cache=true`/`respect_origin`, `cache_level=basic`, Dev Mode off, Bot Fight Mode off, Page Rules=0; Rule simulator & Request Trace API đều trả "hostname does not belong to your account"). Tracking: đã đăng bài Cloudflare Community category CDN ngày 17/11 — **1 post pending moderator approval** (link sẽ bổ sung khi duyệt). CF-RAY: `a5bc62f78c220fe0-HKG`, `a5bc7a01f84b84e5-HKG`. | chờ câu trả lời Community/Support rồi áp; origin cache vẫn là lớp chịu tải chính |
 
 ## Nhịp kiểm
 
