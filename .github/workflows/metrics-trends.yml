@@ -42,14 +42,25 @@ jobs:
       - run: npm ci
       - name: measure and analyse
         run: npm run metrics:trends
+      - name: L5 measurement modules
+        # Five measurement modules had no schedule: their numbers only moved
+        # when someone remembered to run them by hand. A metric with no cadence
+        # is an anecdote, not a control. The trend job already owns the daily
+        # commit, so these run here instead of a second racing cron.
+        run: |
+          npm run spc:check
+          npm run defect:check
+          npm run sla:check
+          npm run postmortem:check
+          npm run quality:report
       - name: commit the snapshot
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add metrics-trends.json
+          git add metrics-*.json
           if git diff --cached --quiet; then
             echo "No new snapshot: nothing moved since the last measurement."
           else
-            git commit -m "ci: daily metrics-trends snapshot"
+            git commit -m "ci: daily metrics + L5 measurement snapshot"
             git push
           fi

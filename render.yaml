@@ -119,8 +119,14 @@ services:
         sync: false
       - key: INDEXNOW_ENDPOINT
         sync: false
+      # Canonical admin credential. Render generates it, rotate-admin-token.yml
+      # rotates this one variable monthly with verified rollback, and the ops
+      # scripts (sync-products-to-supabase, payment-flow-test) use it too.
       - key: ADMIN_API_TOKEN
         generateValue: true
+      # Optional RBAC extension: "name:token:role@YYYY-MM-DD". Nothing rotates this
+      # variable, so a leftover value is a permanent admin credential — remove it
+      # on Render unless named tokens, viewer role or expiry are actually in use.
       - key: ADMIN_API_TOKENS
         sync: false
       - key: R2_ACCOUNT_ID

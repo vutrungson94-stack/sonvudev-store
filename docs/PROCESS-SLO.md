@@ -9,9 +9,10 @@ thực tế, nó được ghi rõ là `unknown` — không gán 0 hay 100.
 | Chỉ số | Mục tiêu | Nguồn | Trạng thái hiện tại | Hành động khi vi phạm |
 | --- | --- | --- | --- | --- |
 | CI wall time (push → checks xanh) | ≤ 10 phút | GitHub Actions duration (`gh run list`) | unknown | chia nhóm test, cache NPM |
+| Local build wall time (gbuild) | ≤ 180 s, không có trend > 2,0 s/mẫu với R² > 0,4 | `build-reports/telemetry.jsonl` + anomaly detector của gbuild | 121,1 s (17/11); bước nhảy 97→146 s ngày 12/11 do thêm coverage gate, không phải regression | đọc scope timings, chia gate; không hạ ngưỡng anomaly để xanh |
 | Flaky test rate | ≤ 2% | 3 lần chạy cùng commit, fail-rồi-pass | unknown | fix hoặc cô lập test; ghi RCA |
 | Gate/build pass rate (CI) | ≥ 95% | lịch sử `.github/workflows/checks.yml` | unknown | RCA + phòng ngừa |
-| Coverage gate | ≥ 70/60/70 (lines/branches/functions) | `npm run coverage` | 89,3 / 73,2 / 81,5 (2026-11-12) | không được phép giảm; CI đỏ |
+| Coverage gate | ≥ 70/60/70 (lines/branches/functions) | `npm run coverage` | 86,48 / 72,58 / 79,64 (2026-11-17) | không được phép giảm; CI đỏ |
 | Restore drill (backup) | hằng tháng, ≤ 60 phút, trên máy sạch | `npm run backup:drill` + tick trong `docs/RUNBOOK.md §8` | **đã có drill, chưa chạy lần khôi phục thật trong điều kiện mới** | drill fail → khóa `main`, mở RCA |
 | MTTR sự cố production | ≤ 4 giờ | `postmortems/` | chưa đo (0 postmortem ghi nhận downtime) | RCA bắt buộc sau mỗi sự cố |
 | Deploy success rate | 100% trên CI | `logs/last-deploy.json` (chưa được ghi) | unknown | rollback + postmortem |

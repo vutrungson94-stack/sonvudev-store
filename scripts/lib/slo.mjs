@@ -39,7 +39,7 @@ export const SLOS = [
     want: 'up',
     unit: '%',
     basis: 'window',
-    source: 'logs/last-availability.json — 30-day window from the edge access log',
+    source: 'logs/last-availability.json — sampled window from Render app logs (coverageDays recorded in the file)',
     owner: 'platform-team',
     remediation: 'Check the deploy history and the incident log; runbook at docs/RUNBOOK.md',
   },
@@ -143,10 +143,11 @@ export async function measureSLOs(root, slos = SLOS) {
 
     switch (slo.id) {
       case 'availability': {
-        // The 30-day window from the edge access log. The health probe is a
-        // different question — "is it up right now" — and is not availability;
-        // conflating the two is how a 99.9% claim survives on the back of one
-        // green probe.
+        // A sampled window from the Render app log, not a 30-day census. The
+        // evidence file carries coverageDays and sampled so a short window cannot
+        // be presented as a month. The health probe is a different question —
+        // "is it up right now" — and is not availability; conflating the two is
+        // how a perfect rate survives on the back of one green probe.
         const report = await readJson(path.join(root, 'logs', 'last-availability.json'));
         if (report && typeof report.availability === 'number') {
           value = report.availability;
