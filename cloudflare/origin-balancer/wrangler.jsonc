@@ -4,7 +4,8 @@
   // e.g. "https://sonvudev-store.onrender.com https://sonvudev-store.fly.dev"
   "$schema": "node_modules/wrangler/config-schema.json",
   "name": "sonvudev-origin-balancer",
-  "main": "cloudflare/origin-balancer/worker.js",
+  // Path is resolved relative to THIS config file's directory, not the cwd.
+  "main": "worker.js",
   "compatibility_date": "2026-11-18",
   "vars": {
     // A dead origin is skipped for two minutes, then probed once more.
