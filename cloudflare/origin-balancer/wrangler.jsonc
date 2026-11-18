@@ -1,0 +1,18 @@
+{
+  // Deploy: wrangler deploy --config cloudflare/origin-balancer/wrangler.jsonc
+  // ORIGINS is a secret, not a hardcoded domain: wrangler secret put ORIGINS
+  // e.g. "https://sonvudev-store.onrender.com https://sonvudev-store.fly.dev"
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "sonvudev-origin-balancer",
+  "main": "cloudflare/origin-balancer/worker.js",
+  "compatibility_date": "2026-11-18",
+  "vars": {
+    // A dead origin is skipped for two minutes, then probed once more.
+    "COOLDOWN_MS": "120000"
+  },
+  // Bound via `wrangler secret put ORIGINS` — space/comma separated URLs.
+  // No `triggers`: this Worker has only a fetch handler, no cron.
+  "observability": {
+    "enabled": true
+  }
+}

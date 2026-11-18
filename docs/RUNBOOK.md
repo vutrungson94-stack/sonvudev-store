@@ -364,6 +364,46 @@ Log Caddy và log ứng dụng nằm ngoài `ReadWritePaths`, hãy kiểm tra `d
   origin thứ 2 (xem `docs/CHANGE-PLAN-2026-11-18-EDGE-FAILOVER.md`); Cloudflare
   Load Balancer (failover DNS thật) là tính phí, không dùng được trên free plan.
 
+### Cân bằng tải giữa các host free — origin balancer (18/11/2026)
+
+Worker `cloudflare/origin-balancer/worker.js` phân lượt truy cập đều qua nhiều
+host free (Render + Fly/Koyeb...) và tự bỏ qua host đang suspend. Đây là phần
+"đọc + ghi" mà failover cache ở trên không làm được.
+
+**Chuẩn bị host thứ 2 (mỗi host có 5GB riêng):**
+
+- **Fly.io** (khuyến nghị trước): đăng ký bằng GitHub tại `fly.io`, thêm thẻ
+  (authorization hold, không charge). Cài CLI `iwr https://fly.io/install.ps1 -useb | iex`,
+  rồi `fly auth login`. Trong repo: `fly launch --no-deploy --config cloudflare/origin-balancer/../Dockerfile`
+  sẽ hỏi app name/region — hoặc tạo `fly.toml` với `[build] dockerfile = "Dockerfile"`
+  và `[[services]] internal_port = 3000, http_check = "/api/health"`. Deploy:
+  `fly deploy`. Copy env vars từ Render sang: `fly secrets set APP_URL=... SUPABASE_URL=... SUPABASE_SERVICE_ROLE_KEY=... ADMIN_API_TOKEN=... RESEND_API_KEY=... SUPPORT_EMAIL=... R2_ACCOUNT_ID=... R2_ACCESS_KEY_ID=... R2_SECRET_ACCESS_KEY=... R2_BUCKET_NAME=... PAYPAL_ENVIRONMENT=... PAYPAL_CLIENT_ID=... PAYPAL_CLIENT_SECRET=...` (đúng giá trị với Render để đơn hàng/CSP/R2 nhất quán). Lấy URL `https://<app>.fly.dev`.
+- **Koyeb** (nếu Fly không đăng ký được): đăng ký tại `koyeb.com` (không cần
+  thẻ), New Service → GitHub repo → builder **Dockerfile** → port 3000 →
+  health check `/api/health` → thêm cùng bộ env vars → deploy. URL dạng
+  `https://<app>-<org>.koyeb.app`.
+
+**Cấu hình balancer:**
+
+```bash
+# ORIGINS là secret — không gõ domain vào repo.
+wrangler secret put ORIGINS --config cloudflare/origin-balancer/wrangler.jsonc
+# dán: "https://sonvudev-store.onrender.com https://<app>.fly.dev"
+wrangler deploy --config cloudflare/origin-balancer/wrangler.jsonc
+```
+
+Sau đó trong Cloudflare Dashboard → Workers & Pages → worker `sonvudev-origin-balancer`
+→ Settings → Triggers → add Route: `sonvudev.com/*` (zone của bạn).
+
+**Hoạt động:** visitor được băm theo `cf-connecting-ip + path` vào một origin
+còn sống → phân đều, cùng visitor giữ cùng host (ấm instance). Host trả 5xx hoặc
+trang "suspended" bị bỏ qua 2 phút rồi thử lại. HTML cache theo URL gốc (không
+nhân bản theo origin); nếu mọi host cùng chết, bản stale được trả kèm
+`Warning: 110` (chỉ đọc). Header `X-SVD-Origin` cho biết host đã trả lời.
+
+**Verify sau deploy:** `curl -sI https://sonvudev.com/ | grep -i x-svd-origin`
+từ vài IP khác nhau → thấy host khác nhau; `cf-cache-status` trên HTML vẫn HIT.
+
 ## 10. Checklist trực ca
 
 Đầu ca:
