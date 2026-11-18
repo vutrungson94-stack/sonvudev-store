@@ -1,0 +1,15 @@
+{
+  "project": "package",
+  "version": "0.0.0",
+  "commit": "c89aba2",
+  "dirty": false,
+  "builtAtUtc": "2026-11-18T10:06:31.1042171Z",
+  "archive": "package-0.0.0-c89aba2.zip",
+  "sizeBytes": 2575961,
+  "sha256": "bbd02c1f929615671b217c113a15d5eb0c904266c5158a270f33408449582551",
+  "signed": false,
+  "signedFiles": 0,
+  "checkedFiles": 0,
+  "signer": "",
+  "machine": "FCVL-PESOLID2"
+}
