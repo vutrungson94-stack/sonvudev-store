@@ -1,0 +1,32 @@
+# Fly.io config for SonVuDev Store.
+# The Dockerfile in this repo builds the same artifact as render.yaml, so a
+# Fly deploy and a Render deploy serve identical bytes. No Tigris / object
+# storage addon: the shop stores release files in Cloudflare R2, not Fly.
+app = 'sonvudev-store'
+primary_region = 'sin'
+
+[build]
+  dockerfile = 'Dockerfile'
+
+[http_service]
+  internal_port = 3000
+  force_https = true
+  auto_stop_machines = 'suspend'
+  auto_start_machines = true
+  min_machines_running = 0
+  processes = ['app']
+
+  [[http_service.checks]]
+    grace_period = '10s'
+    interval = '30s'
+    method = 'GET'
+    path = '/api/health'
+    timeout = '5s'
+
+[env]
+  PORT = '3000'
+
+[[vm]]
+  cpu_kind = 'shared'
+  cpus = 1
+  memory_mb = 256
