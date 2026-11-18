@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-11-17T10:50:18.718Z",
+  "generatedAt": "2026-11-19T03:32:59.800Z",
   "overall": "ok",
   "measurements": {
     "availability": {
@@ -10,7 +10,7 @@
       "want": "up",
       "unit": "%",
       "basis": "window",
-      "source": "logs/last-availability.json — sampled window from Render app logs (coverageDays recorded in the file)",
+      "source": "logs/last-availability.json — edge request window from the configured source (windowDays/coverageDays recorded in the file)",
       "owner": "platform-team",
       "remediation": "Check the deploy history and the incident log; runbook at docs/RUNBOOK.md",
       "value": 100,
@@ -22,7 +22,7 @@
       "observedFrom": "2026-11-17T10:25:00.000Z",
       "observedTo": "2026-11-17T10:45:00.000Z",
       "partialWindow": true,
-      "measuredAt": "2026-11-17T10:50:18.719Z"
+      "measuredAt": "2026-11-19T03:32:59.802Z"
     },
     "errorRate": {
       "id": "errorRate",
@@ -44,7 +44,7 @@
       "observedFrom": "2026-11-17T10:25:00.000Z",
       "observedTo": "2026-11-17T10:45:00.000Z",
       "partialWindow": true,
-      "measuredAt": "2026-11-17T10:50:18.719Z"
+      "measuredAt": "2026-11-19T03:32:59.802Z"
     },
     "latencyP95": {
       "id": "latencyP95",
@@ -61,7 +61,7 @@
       "status": "unknown",
       "breached": false,
       "sampleSize": 0,
-      "measuredAt": "2026-11-17T10:50:18.719Z"
+      "measuredAt": "2026-11-19T03:32:59.802Z"
     },
     "testPassRate": {
       "id": "testPassRate",
@@ -78,7 +78,7 @@
       "status": "ok",
       "breached": false,
       "sampleSize": 513,
-      "measuredAt": "2026-11-17T10:50:18.720Z"
+      "measuredAt": "2026-11-19T03:32:59.802Z"
     },
     "buildSuccessRate": {
       "id": "buildSuccessRate",
@@ -95,7 +95,7 @@
       "status": "ok",
       "breached": false,
       "sampleSize": 1,
-      "measuredAt": "2026-11-17T10:50:18.720Z"
+      "measuredAt": "2026-11-19T03:32:59.803Z"
     },
     "deploySuccessRate": {
       "id": "deploySuccessRate",
@@ -112,7 +112,7 @@
       "status": "unknown",
       "breached": false,
       "sampleSize": 0,
-      "measuredAt": "2026-11-17T10:50:18.720Z"
+      "measuredAt": "2026-11-19T03:32:59.803Z"
     },
     "escapeRate": {
       "id": "escapeRate",
@@ -129,7 +129,7 @@
       "status": "unknown",
       "breached": false,
       "sampleSize": 0,
-      "measuredAt": "2026-11-17T10:50:18.720Z"
+      "measuredAt": "2026-11-19T03:32:59.803Z"
     }
   },
   "unresolvedBreachCount": 0

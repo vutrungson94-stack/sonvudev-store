@@ -37,6 +37,7 @@
     "dora:check": "node scripts/dora-metrics.mjs --check",
     "quality:report": "node scripts/quality-report.mjs",
     "slo:check": "node scripts/slo-monitor.mjs",
+    "slo:timeline": "node scripts/slo-timeline.mjs",
     "slo:ingest": "node scripts/slo-ingest.mjs",
     "slo:ingest:cloudflare": "node scripts/slo-ingest.mjs --cloudflare",
     "slo:ingest:cloudflare:30d": "node scripts/slo-ingest.mjs --cloudflare --days=30",
