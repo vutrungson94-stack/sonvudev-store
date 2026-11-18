@@ -586,9 +586,18 @@ async function renderPage(file, lang = DEFAULT_LOCALE) {
   return pending;
 }
 
+// Public HTML is safe for a long shared cache: pages contain no per-visitor data
+// (orders and account pages are /api/* and no-store). A one-day TTL cuts origin
+// revalidation from 288/day to 1/day per page; stale-while-revalidate keeps a
+// warm copy serving while the edge refreshes; stale-if-error is the free
+// failover — when the origin is suspended (503) Cloudflare serves the last good
+// HTML instead of the provider's suspension page. A verified deploy still purges
+// the edge (checks.yml), so a long TTL never pins a stale release.
+const PUBLIC_PAGE_CACHE = "public, max-age=86400, stale-while-revalidate=604800, stale-if-error=2592000";
+
 const sendPage = (file, lang = DEFAULT_LOCALE) => async (_req, res) => {
   try {
-    res.set("Cache-Control", "public, max-age=300").type("html").send(await renderPage(file, lang));
+    res.set("Cache-Control", PUBLIC_PAGE_CACHE).type("html").send(await renderPage(file, lang));
   } catch (error) {
     console.error(error);
     // A broken template must not take the storefront down with it.
@@ -602,7 +611,7 @@ const sendPage = (file, lang = DEFAULT_LOCALE) => async (_req, res) => {
 // where someone is already lost is not the place to show them "© {{year}}".
 const notFound = async (_req, res) => {
   try {
-    res.status(404).set("Cache-Control", "public, max-age=300").type("html").send(await renderPage("404.html"));
+    res.status(404).set("Cache-Control", PUBLIC_PAGE_CACHE).type("html").send(await renderPage("404.html"));
   } catch (error) {
     console.error(error);
     res.status(404).sendFile(path.join(publicDir, "404.html"));
@@ -768,7 +777,7 @@ const productPage = (lang) => async (req, res) => {
       return renderProductPage(product, lang, reviews, related);
     });
     if (html == null) return notFound(req, res);
-    res.set("Cache-Control", "public, max-age=600").type("html").send(html);
+    res.set("Cache-Control", PUBLIC_PAGE_CACHE).type("html").send(html);
   } catch (error) {
     console.error(error);
     try {
@@ -797,7 +806,7 @@ const blogPage = (lang) => async (req, res) => {
       return renderBlogPost(post, lang);
     }, 300000);
     if (html == null) return notFound(req, res);
-    res.set("Cache-Control", "public, max-age=300").type("html").send(html);
+    res.set("Cache-Control", PUBLIC_PAGE_CACHE).type("html").send(html);
   } catch (error) {
     console.error(error);
     res.status(500).sendFile(path.join(publicDir, "404.html"));
@@ -806,7 +815,7 @@ const blogPage = (lang) => async (req, res) => {
 const blogIndexPage = (lang) => async (_req, res) => {
   try {
     const html = await cachedHtml(`blog-index:${lang}`, () => renderBlogIndex(loadBlogPosts(), lang), 300000);
-    return res.set("Cache-Control", "public, max-age=300").type("html").send(html);
+    return res.set("Cache-Control", PUBLIC_PAGE_CACHE).type("html").send(html);
   } catch (error) {
     console.error(error);
     return res.status(500).sendFile(path.join(publicDir, "404.html"));

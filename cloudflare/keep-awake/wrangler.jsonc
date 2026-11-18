@@ -36,13 +36,15 @@
   // request against the 100,000/day allowance — 1,020 calls on a 19-hour window
   // is about one percent of it.
   //
-  // It has to be this frequent: Render sleeps a free service after 15 minutes, so
-  // anything slower than that lets it fall asleep between pings. The alternative —
-  // GitHub Actions on a 10-minute cron — needs 4,320 runs a month against a
-  // 2,000-minute quota and stops around the fourteenth. There is no slower interval
-  // that fits the quota, which is the whole reason this file exists.
+  // Five minutes, not one: Render sleeps a free service after 15 minutes, so
+  // 5 still keeps it awake but cuts origin requests (and the bandwidth they
+  // consume on the Hobby workspace) by 80% — from 43,200 to 8,640 pings/month.
+  // Anything slower than 15 minutes lets it fall asleep between pings. The
+  // alternative — GitHub Actions on a 10-minute cron — needs 4,320 runs a month
+  // against a 2,000-minute quota and stops around the fourteenth. There is no
+  // Actions interval that fits the quota, which is why this Worker exists.
   "triggers": {
-    "crons": ["* * * * *"]
+    "crons": ["*/5 * * * *"]
   }
 
   // Set in the dashboard, not here, so a fork does not inherit a URL it should not

@@ -345,6 +345,25 @@ Log Caddy và log ứng dụng nằm ngoài `ReadWritePaths`, hãy kiểm tra `d
 - Kiểm tra: `gh secret list --repo vutrungson94-stack/sonvudev-store` phải thấy cả
   `CLOUDFLARE_API_TOKEN` và `APP_URL`.
 
+### Edge failover khi origin suspend (18/11/2026)
+
+- HTML công khai gửi `Cache-Control: public, max-age=86400,
+  stale-while-revalidate=604800, stale-if-error=2592000`. Khi Render suspend
+  (hết bandwidth/trả 503), Cloudflare **phục vụ HTML đã cache** thay vì trang
+  "This service has been suspended" — cửa hàng vẫn đọc được (đọc, không đặt
+  hàng). `/api/*` luôn `no-store`, nên checkout/lookup không bị cache.
+- Đây là lý do TTL 1 ngày được chọn dù nonce CSP bị "đóng băng" trong thời gian
+  cache: nonce vẫn khác nhau giữa các response do origin tạo, và Cloudflare JSD
+  chèn script theo nonce của header được cache. Đổi TTL xuống 300 giây là đưa
+  288 lần revalidation/ngày/trang trở lại — chính là nguyên nhân hết 5GB.
+- Purge sau deploy (mục trên) là điều kiện bắt buộc để TTL dài không phục vụ bản
+  cũ: `checks.yml` purge ngay sau khi sha khớp, trước `seo:check`.
+- `cloudflare/keep-awake` ping mỗi **5 phút** (`*/5 * * * *`), vẫn dưới ngưỡng ngủ
+  15 phút của Render nhưng cắt request origin từ 43.200 xuống 8.640/tháng.
+- Giới hạn: đây là failover **chỉ đọc**. Muốn đặt hàng khi origin suspend cần
+  origin thứ 2 (xem `docs/CHANGE-PLAN-2026-11-18-EDGE-FAILOVER.md`); Cloudflare
+  Load Balancer (failover DNS thật) là tính phí, không dùng được trên free plan.
+
 ## 10. Checklist trực ca
 
 Đầu ca:
