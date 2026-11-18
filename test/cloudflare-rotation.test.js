@@ -58,12 +58,18 @@ function mockFetch({ renderFail = false } = {}) {
 }
 
 test('signed link verifies only for the exact token, action and expiry', () => {
-  assert.equal(verifyRotationPayload(SECRET, signed()).ok, true);
-  assert.equal(verifyRotationPayload(SECRET, signed({ tokenId: 'other' })).ok, false);
-  assert.equal(verifyRotationPayload(SECRET, signed({ action: 'delete' })).ok, false);
-  assert.equal(verifyRotationPayload(SECRET, signed({ sig: 'bad' })).ok, false);
-  assert.equal(verifyRotationPayload('', signed()).ok, false);
-  const expired = signed({ exp: '1', sig: signRotationPayload(SECRET, { action: 'rotate', tokenId: TOKEN_ID, exp: '1' }) });
+  // exp must be relative to now: a hardcoded epoch goes stale as wall time moves
+  // and would turn this into a false "link expired" failure.
+  const now = Math.floor(Date.now() / 1000);
+  const freshExp = String(now + 3600);
+  const freshSig = signRotationPayload(SECRET, { action: 'rotate', tokenId: TOKEN_ID, exp: freshExp });
+  const fresh = { action: 'rotate', tokenId: TOKEN_ID, exp: freshExp, sig: freshSig };
+  assert.equal(verifyRotationPayload(SECRET, fresh).ok, true);
+  assert.equal(verifyRotationPayload(SECRET, { ...fresh, tokenId: 'other' }).ok, false);
+  assert.equal(verifyRotationPayload(SECRET, { ...fresh, action: 'delete' }).ok, false);
+  assert.equal(verifyRotationPayload(SECRET, { ...fresh, sig: 'bad' }).ok, false);
+  assert.equal(verifyRotationPayload('', fresh).ok, false);
+  const expired = { action: 'rotate', tokenId: TOKEN_ID, exp: String(now - 3600), sig: signRotationPayload(SECRET, { action: 'rotate', tokenId: TOKEN_ID, exp: String(now - 3600) }) };
   assert.equal(verifyRotationPayload(SECRET, expired).ok, false);
   assert.match(verifyRotationPayload(SECRET, expired).reason, /hết hạn/);
 });
