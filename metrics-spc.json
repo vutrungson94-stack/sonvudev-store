@@ -1,48 +1,48 @@
 {
-  "generatedAt": "2026-11-17T03:14:21.082Z",
+  "generatedAt": "2026-11-18T12:00:36.694Z",
   "metrics": {
     "tests": {
-      "mean": 522.2857,
-      "stdev": 47.2402,
-      "ucl": 664.0062,
-      "lcl": 380.5652,
-      "latest": 617,
+      "mean": 539.875,
+      "stdev": 64.1744,
+      "ucl": 732.3983,
+      "lcl": 347.3517,
+      "latest": 663,
       "inControl": true,
       "signals": [],
-      "n": 7,
+      "n": 8,
       "sufficient": false
     },
     "testFiles": {
-      "mean": 69.5714,
-      "stdev": 9.854,
-      "ucl": 99.1335,
-      "lcl": 40.0093,
-      "latest": 91,
+      "mean": 73.25,
+      "stdev": 13.4048,
+      "ucl": 113.4643,
+      "lcl": 33.0357,
+      "latest": 99,
       "inControl": true,
       "signals": [],
-      "n": 7,
+      "n": 8,
       "sufficient": false
     },
     "routes": {
-      "mean": 35,
-      "stdev": 4.7509,
-      "ucl": 49.2528,
-      "lcl": 20.7472,
-      "latest": 41,
+      "mean": 36.125,
+      "stdev": 5.3488,
+      "ucl": 52.1713,
+      "lcl": 20.0787,
+      "latest": 44,
       "inControl": true,
       "signals": [],
-      "n": 7,
+      "n": 8,
       "sufficient": false
     },
     "dependencies": {
-      "mean": 6.1429,
-      "stdev": 0.3499,
-      "ucl": 7.1926,
-      "lcl": 5.0931,
+      "mean": 6.25,
+      "stdev": 0.433,
+      "ucl": 7.549,
+      "lcl": 4.951,
       "latest": 7,
       "inControl": true,
       "signals": [],
-      "n": 7,
+      "n": 8,
       "sufficient": false
     },
     "escCopies": {
@@ -53,7 +53,7 @@
       "latest": 2,
       "inControl": true,
       "signals": [],
-      "n": 7,
+      "n": 8,
       "sufficient": false
     },
     "moneyCopies": {
@@ -64,7 +64,7 @@
       "latest": 2,
       "inControl": true,
       "signals": [],
-      "n": 7,
+      "n": 8,
       "sufficient": false
     },
     "initialsCopies": {
@@ -75,7 +75,7 @@
       "latest": 2,
       "inControl": true,
       "signals": [],
-      "n": 7,
+      "n": 8,
       "sufficient": false
     },
     "sizeCopies": {
@@ -86,29 +86,29 @@
       "latest": 2,
       "inControl": true,
       "signals": [],
-      "n": 7,
+      "n": 8,
       "sufficient": false
     },
     "i18nKeys": {
-      "mean": 852,
-      "stdev": 31.0759,
-      "ucl": 945.2278,
-      "lcl": 758.7722,
+      "mean": 860.5,
+      "stdev": 36.7526,
+      "ucl": 970.7577,
+      "lcl": 750.2423,
       "latest": 920,
       "inControl": true,
       "signals": [],
-      "n": 7,
+      "n": 8,
       "sufficient": false
     },
     "indexablePages": {
-      "mean": 7.1429,
-      "stdev": 0.3499,
-      "ucl": 8.1926,
-      "lcl": 6.0931,
+      "mean": 7.25,
+      "stdev": 0.433,
+      "ucl": 8.549,
+      "lcl": 5.951,
       "latest": 8,
       "inControl": true,
       "signals": [],
-      "n": 7,
+      "n": 8,
       "sufficient": false
     },
     "productPageLocales": {
@@ -119,18 +119,18 @@
       "latest": 2,
       "inControl": true,
       "signals": [],
-      "n": 7,
+      "n": 8,
       "sufficient": false
     },
     "localizedPages": {
-      "mean": 9.1429,
-      "stdev": 0.3499,
-      "ucl": 10.1926,
-      "lcl": 8.0931,
+      "mean": 9.25,
+      "stdev": 0.433,
+      "ucl": 10.549,
+      "lcl": 7.951,
       "latest": 10,
       "inControl": true,
       "signals": [],
-      "n": 7,
+      "n": 8,
       "sufficient": false
     },
     "productPageRenderers": {
@@ -141,7 +141,51 @@
       "latest": 1,
       "inControl": true,
       "signals": [],
-      "n": 7,
+      "n": 8,
+      "sufficient": false
+    },
+    "deploymentFrequency": {
+      "mean": 1.92,
+      "stdev": 1.3576,
+      "ucl": 5.9929,
+      "lcl": -2.1529,
+      "latest": 2.88,
+      "inControl": true,
+      "signals": [],
+      "n": 3,
+      "sufficient": false
+    },
+    "leadTimeDays": {
+      "mean": 0.0067,
+      "stdev": 0.0047,
+      "ucl": 0.0208,
+      "lcl": -0.0075,
+      "latest": 0.01,
+      "inControl": true,
+      "signals": [],
+      "n": 3,
+      "sufficient": false
+    },
+    "changeFailureRate": {
+      "mean": 0.1081,
+      "stdev": 0.0765,
+      "ucl": 0.3375,
+      "lcl": -0.1213,
+      "latest": 0.1622,
+      "inControl": true,
+      "signals": [],
+      "n": 3,
+      "sufficient": false
+    },
+    "sloBreachCount": {
+      "mean": 0,
+      "stdev": 0,
+      "ucl": 0,
+      "lcl": 0,
+      "latest": 0,
+      "inControl": true,
+      "signals": [],
+      "n": 3,
       "sufficient": false
     }
   },

@@ -14,6 +14,7 @@
 import { readFile, writeFile, mkdir } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { mean, stdev, hasRunSameSide, hasSteadyTrend } from './lib/spc.mjs';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const trendsFile = path.join(root, 'metrics-trends.json');
@@ -24,42 +25,6 @@ const spcFile = path.join(root, 'metrics-spc.json');
 // fix) — it labels the snapshot as not yet sufficient so the number is never
 // mistaken for a proven control limit.
 const MIN_SAMPLE = 25;
-
-const mean = (xs) => xs.reduce((a, b) => a + b, 0) / xs.length;
-const stdev = (xs) => {
-  const m = mean(xs);
-  return Math.sqrt(xs.reduce((a, b) => a + Math.pow(b - m, 2), 0) / xs.length);
-};
-
-// Detect runs: 8 consecutive points on one side of the mean.
-const hasRunSameSide = (values, meanValue) => {
-  let run = 0;
-  for (const v of values) {
-    if (v >= meanValue) run++;
-    else run = 0;
-    if (run >= 8) return true;
-  }
-  run = 0;
-  for (const v of values) {
-    if (v <= meanValue) run++;
-    else run = 0;
-    if (run >= 8) return true;
-  }
-  return false;
-};
-
-// Detect trend: 7 steadily increasing or decreasing points.
-const hasSteadyTrend = (values) => {
-  if (values.length < 7) return false;
-  let inc = 0, dec = 0;
-  for (let i = 1; i < values.length; i++) {
-    if (values[i] > values[i - 1]) { inc++; dec = 0; }
-    else if (values[i] < values[i - 1]) { dec++; inc = 0; }
-    else { inc = 0; dec = 0; }
-    if (inc >= 7 || dec >= 7) return true;
-  }
-  return false;
-};
 
 const trends = JSON.parse(await readFile(trendsFile, 'utf8'));
 const history = trends.history || [];

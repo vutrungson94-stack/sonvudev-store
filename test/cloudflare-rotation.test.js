@@ -19,11 +19,6 @@ const SECRET = 'signing-key-for-tests';
 const APP_URL = process.env.APP_URL; // fixture from helpers/env.mjs — never hardcode the live domain
 const TOKEN_ID = '40654ef8bb09066fa93bbf49af6ecda7';
 const NOW = new Date('2026-11-17T12:00:00Z');
-const exp = String(Math.floor(NOW.getTime() / 1000) + 3600);
-
-const signed = (overrides = {}) => ({
-  action: 'rotate', tokenId: TOKEN_ID, exp, sig: signRotationPayload(SECRET, { action: 'rotate', tokenId: TOKEN_ID, exp }), ...overrides,
-});
 
 const reply = (body, { ok = true, status = 200 } = {}) => ({
   ok, status, text: async () => (typeof body === 'string' ? body : JSON.stringify(body)),
@@ -75,13 +70,14 @@ test('signed link verifies only for the exact token, action and expiry', () => {
 });
 
 test('buildRotationLink creates a verifiable, token-bound link', () => {
-  const link = buildRotationLink({ origin: `${APP_URL}/`, secret: SECRET, tokenId: TOKEN_ID, ttlHours: 24, now: NOW });
+  const now = Date.now();
+  const link = buildRotationLink({ origin: `${APP_URL}/`, secret: SECRET, tokenId: TOKEN_ID, ttlHours: 24, now });
   const url = new URL(link);
   assert.equal(url.origin, APP_URL);
   assert.equal(url.pathname, '/api/rotation/confirm');
   const params = Object.fromEntries(url.searchParams);
   assert.equal(params.tokenId, TOKEN_ID);
-  assert.equal(params.exp, String(Math.floor(NOW.getTime() / 1000) + 86400));
+  assert.equal(params.exp, String(Math.floor(now / 1000) + 86400));
   assert.deepEqual(verifyRotationPayload(SECRET, params), { ok: true, tokenId: TOKEN_ID });
 });
 
@@ -90,7 +86,7 @@ test('confirmation form carries every signed field so the POST verifies', () => 
   // is dropped, the subsequent POST has an incomplete signature and the real
   // one-click flow fails even though the link itself is valid.
   const params = Object.fromEntries(new URL(
-    buildRotationLink({ origin: APP_URL, secret: SECRET, tokenId: TOKEN_ID, ttlHours: 24, now: NOW }),
+    buildRotationLink({ origin: APP_URL, secret: SECRET, tokenId: TOKEN_ID, ttlHours: 24, now: Date.now() }),
   ).searchParams);
   const page = confirmationPage({ tokenId: params.tokenId, exp: params.exp, sig: params.sig, expiresOn: '2027-02-15' });
   const fields = Object.fromEntries([...page.matchAll(/name="([^"]+)" value="([^"]+)"/g)].map((m) => [m[1], m[2]]));
