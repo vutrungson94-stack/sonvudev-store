@@ -269,9 +269,9 @@ Triển về trong `scripts/slo-timeline.mjs`:
 
 ## S. Tồn đọng (đang mở — theo thứ tự ưu tiên)
 
-1. **[BLOCKED: user] Origin restore (Render + Fly suspended)** — cần thêm card trên Render Dashboard → Environment Settings. Khi restore, tôi deploy lại cả `sonvudev-store` trên Render, verify `/api/health`.
+1. **[BLOCKED: user] Render restore** — Render vẫn `suspend-by-user` đến khi quota reset. Fly đang phục vụ toàn bộ traffic qua `sonvudev.com`; khi Render trở lại, thêm host vào secret `ORIGINS` rồi kiểm tra failover.
 2. **[BLOCKED: user] Render env missing (CLOUDFLARE_API_TOKEN, CLOUDFLARE_MASTER_TOKEN, CLOUDFLARE_ZONE_ID)** — nếu bạn có giá trị thật, dùng nội dung đo lường trong BAN-GIAO-19-11-2026.md/SP-AUDIT.md Mục J để dán.
-3. **[BLOCKED] Live smoke test (CSP nonce, cache HIT, SLO, Cân bằng tải render+fly)** — sau khi origin restore, tôi chạy verify qua custom script.
+3. **[DONE 19/11, còn failover] Live smoke qua `sonvudev.com`** — `/api/health` báo đúng commit `f6d0b14`, CSP nonce khớp, HTML `cf-cache-status: HIT`, `www` trả 308 về apex, geo `VN`, feed/sitemap 200, `/?buy=` mở form thanh toán. Chỉ còn test cân bằng tải Render+Fly sau khi Render restore.
 4. **[INDEPENDENT: Làm] W3a — Deploy timing optimization** — triển về từ gh data. Mục L2/M6 giờ đã đo số (W3a).
 | W5: Redude +ngầm Hyper-v bundle | ⭐ | 99ms/day |
 
