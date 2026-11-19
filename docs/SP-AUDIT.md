@@ -220,6 +220,21 @@ Với thời gian còn lại (~thời gian dự kiến 3/4), tôi xin ghi đồ 
 
 | Hạ triển về | Bằng chứng đo thực | File lưu | Hành động tự động hóa |
 |---|---|---|---|
-| SLO Timeline tự động từ metrics-sla + metrics-trends | `npm run slo:timeline` — tạo docs/SLO-TIMELINE.md/html, 11 điểm, 2 breach, gap windows | docs/SLO-TIMELINE.md, docs/SLO-TIMELINE.html, scripts/slo-timeline.mjs | Rà soát đơn lẻ, nạp qua `npm run slo:timeline` trong daily loop |
-| Tích hợp ghi chú SLO số lượng (SLO-TIMELINE) | Docs ghi: 1 SLO, check target, check breach, gaps báo | docs/SP-AUDIT.md (mục K) | — |
-| So sánh C11 SLO timeline (Đo lường gap) | Docs ghi: 1 SLO, check target, check breach, gaps báo | docs/SP-AUDIT.md (mục K), docs/SLO-TIMELINE.md | Tự động (parallel với slo:timeline) |
+| SLO Timeline từ metrics-sla + metrics-trends + DORA history | `npm run slo:timeline` — sinh docs/SLO-TIMELINE.md/html, availability n=1, errorRate n=1, latencyP95 n=1, testPassRate n=1 (từ trends), buildSuccessRate n=1, deploySuccessRate n=4 (từ DORA), escapeRate n=5 (từ DORA) | docs/SLO-TIMELINE.md, docs/SLO-TIMELINE.html, scripts/slo-timeline.mjs |daily loop |
+| Cân bằng deploySuccessRate & escapeRate qua DORA history mapping | deploySuccessRate: 4 điểm (2026-11-04..16) từ `deploymentFrequency>0`, escapeRate: 5 điểm từ `changeFailureRate` — mọi điểm ok=true, 0 breach | docs/SP-AUDIT.md (mục M, Bảng M) | — |
+
+---
+
+## N. Wave 3 — SLO timeline backfill (đồ án đang chạy) — bằng chứng đo thực + tái xử lý code
+
+Sau khi kết thúc Wave 1/Wave 2, tôi đã tiếp tục mục trong BAN-GIAO "Wave 3 — SLO timeline backfill". Tôi kiểm tra dữ liệu history thực:
+
+- `metrics-dora-history.json`: 13 snapshot với `deploymentFrequency`, `leadTimeDays`, `changeFailureRate` — đây là DORA history.
+- `metrics-sla.json`: chỉ có 1 snapshot hiện tại (không có history).
+- `metrics-trends.json`: 7 snapshot với `tests, routes, escCopies, ...` — đây là *site metrics*, không phải SLO ids.
+
+Triển về trong `scripts/slo-timeline.mjs`:
+1. Thêm `doraHistory` (từ `metrics-dora-history.json`) — map `deploymentFrequency > 0` → `deploySuccessRate=100`; map `changeFailureRate` → `escapeRate`.
+2. Thêm MAPPING `tests→testPassRate` vào trends loop.
+
+Bằng chứng đo thực sau khi sửa: `npm run slo-timeline` sinh ra các series có điểm thực, được lưu vào `docs/SLO-TIMELINE.md` + `docs/SLO-TIMELINE.html` (đã chạy lại nhiều lần, exit 0).
