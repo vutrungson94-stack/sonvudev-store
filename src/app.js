@@ -489,7 +489,7 @@ const indexablePages = {
 // config: the same value is in the outgoing email, in the terms, and on three
 // static pages, and a change made in one place used to leave the others pointing
 // at an address nobody reads.
-const supportPages = ["order.html", "paypal-return.html"];
+const supportPages = ["order.html", "paypal-return.html", "status.html"];
 // Rendered but reached by their own route rather than by a bare filename.
 //
 // lookup.html carries {{support}} and 404.html carries {{year}}. Neither was in
@@ -651,7 +651,7 @@ for (const file of Object.keys(served)) {
   // indexable legal pages also answer under their locale prefix; support pages
   // and the 404 stay unprefixed (they are vi/en runtime pages, and a localized
   // URL pointing at Vietnamese bytes is worse than no localized URL).
-  if (["about.html", "terms.html", "privacy.html", "refund.html", "contact.html"].includes(file)) {
+  if (["about.html", "terms.html", "privacy.html", "refund.html", "contact.html", "status.html"].includes(file)) {
     for (const lang of LOCALE_CODES.filter((code) => code !== "vi")) {
       app.get(`/${lang}/${file}`, sendPage(file, lang));
       app.get(`/${lang}/${file.replace(/\.html$/, "")}`, sendPage(file, lang));
@@ -874,6 +874,7 @@ app.get("/sitemap.xml", async (_req, res, next) => {
     { file: "refund.html", path: "/refund", priority: "0.3", changefreq: "monthly" },
     { file: "about.html", path: "/about", priority: "0.3", changefreq: "monthly" },
     { file: "contact.html", path: "/contact", priority: "0.3", changefreq: "monthly" },
+    { file: "status.html", path: "/status", priority: "0.3", changefreq: "hourly" },
   ];
   // The five static pages exist in every supported language under their locale
   // prefix - a German reader must find a German terms page, and the sitemap is
@@ -1243,6 +1244,70 @@ app.get("/api/health", adminOrHealth, async (req, res) => {
     // Collector health surfaces dropped spans and the last failure, without ever
     // putting the span payloads in a health answer.
     otel: otelEnabled() ? otelStats() : null,
+  });
+});
+
+// The public status page reads this. It reports three things, all measured:
+// the live result of a lightweight shallow probe (labelled as exactly that),
+// the committed SLO evidence the metrics job refreshes every 24h, and the
+// recorded postmortems. Nothing here is claimed that was not measured; a
+// missing file yields nulls and the page says so, it does not invent a "100%".
+const evidenceCache = new Map();
+const readEvidence = async (file, ttlMs = 60000) => {
+  const cached = evidenceCache.get(file);
+  if (cached && Date.now() - cached.at < ttlMs) return cached.value;
+  try {
+    const value = JSON.parse(await fs.readFile(path.join(publicDir, "..", file), "utf8"));
+    evidenceCache.set(file, { at: Date.now(), value });
+    return value;
+  } catch {
+    evidenceCache.set(file, { at: Date.now(), value: null });
+    return null;
+  }
+};
+const sloMeasurement = (m) => m ? {
+  id: m.id,
+  target: m.target,
+  value: m.value ?? null,
+  unit: m.unit,
+  status: m.status ?? "unknown",
+  breached: Boolean(m.breached),
+  sampleSize: m.sampleSize ?? null,
+  coverageDays: m.coverageDays ?? null,
+  windowDays: m.windowDays ?? null,
+  partialWindow: m.partialWindow ?? null,
+  measuredAt: m.measuredAt ?? null,
+  source: m.source ?? null,
+} : null;
+app.get("/api/status", async (req, res) => {
+  const startedAt = process.hrtime.bigint();
+  // The page fetches this once; caching it for 60s keeps a surge of curious
+  // reads from re-parsing the evidence on every hit. The live probe is
+  // labelled as what it is: one database round trip, 3s timeout.
+  const shallow = isConfigured.supabase
+    ? await probe(async () => { await supabaseRequest("products?select=id&limit=1"); return "up"; }, "database")
+    : "skipped";
+  const slo = await readEvidence("metrics-slo.json");
+  const postmortems = await readEvidence("metrics-postmortem.json");
+  res.set("Cache-Control", "no-store");
+  res.json({
+    checkedAt: new Date().toISOString(),
+    uptimeSec: Math.round(process.uptime()),
+    commit: DEPLOYED_COMMIT || null,
+    probe: { check: "database", state: typeof shallow === "string" && shallow.startsWith("!") ? "down" : shallow },
+    elapsedMs: Math.round(Number(process.hrtime.bigint() - startedAt) / 1e6),
+    slo: slo ? {
+      windowDays: 30,
+      measuredAt: slo.generatedAt ?? null,
+      availability: sloMeasurement(slo.measurements?.availability),
+      errorRate: sloMeasurement(slo.measurements?.errorRate),
+      latencyP95: sloMeasurement(slo.measurements?.latencyP95),
+    } : null,
+    incidents: postmortems ? {
+      recordedPostmortems: postmortems.totalPostmortems ?? null,
+      openIncidents: postmortems.openIncidents ?? null,
+      resolvedWithoutRootCause: postmortems.resolvedWithoutRootCause ?? null,
+    } : null,
   });
 });
 

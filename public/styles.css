@@ -904,3 +904,24 @@ body.modal-open{overflow:hidden}
 .ai-badge { display: inline-block; margin-top: .35rem; font-size: .72rem; text-transform: uppercase; letter-spacing: .08em; color: #f97316; border: 1px solid rgba(249, 115, 22, .35); border-radius: 999px; padding: .15rem .55rem; white-space: nowrap; }
 .ai-summary p { margin: .55rem 0 0; max-width: none; text-align: left; hyphens: manual; }
 .ai-summary .ai-disclaimer { font-size: .82rem; opacity: .72; margin-top: .65rem; text-align: left; }
+
+/* Public status page (/status). Same design language as the storefront cards:
+   paper surfaces, one accent green, honesty over polish. */
+.status-main{max-width:880px}
+.status-live{display:flex;align-items:center;gap:10px;background:#fff;border:1px solid var(--line);border-radius:12px;padding:14px 16px;margin:18px 0 22px}
+.status-dot{width:14px;height:14px;border-radius:50%;background:#c9b13f;flex:none}
+.status-dot.ok{background:var(--green)}
+.status-dot.bad{background:var(--coral-ink)}
+.status-dot.unknown{background:#c9b13f}
+.status-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:14px;margin-bottom:26px}
+.status-card{background:#fff;border:1px solid var(--line);border-radius:12px;padding:18px}
+.status-card h2{font:600 12px 'Space Grotesk';letter-spacing:.06em;text-transform:uppercase;margin:0 0 10px;color:#1f2d36}
+.status-big{font:600 32px 'Space Grotesk';letter-spacing:-.06em;margin:0;color:var(--dark)}
+.status-big.breached{color:var(--coral-ink)}
+.status-note{margin:10px 0 0;color:var(--muted);font-size:11px;line-height:1.6}
+.status-detail{list-style:none;margin:0 0 22px;padding:0;display:grid;gap:8px}
+.status-detail li{display:flex;justify-content:space-between;gap:16px;border-bottom:1px solid var(--line);padding:10px 2px;font-size:13px}
+.status-detail span{color:var(--muted)}
+.status-detail b{color:var(--dark);font-weight:600}
+.status-honesty{font-size:11px;color:#8b9893;line-height:1.7;border-left:2px solid var(--line);padding-left:12px;margin:0}
+@media(max-width:700px){.status-grid{grid-template-columns:1fr}.status-big{font-size:28px}}

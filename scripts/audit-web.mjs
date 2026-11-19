@@ -1305,9 +1305,19 @@ const routePaths = routeMatches.flatMap((m) => (m[2] ? [...m[2].matchAll(/"([^"]
 // LOCALE_CODES, not by literal app.get strings, so the literal regex above
 // cannot see them. Read the same registry the router reads - a new locale can
 // never drift past this check by being invisible to it.
+// The static localized pages are registered by a loop over an explicit file
+// list inside src/app.js (see the ["about.html", ...] literal there). Read that
+// same list here so a new localized page is never invisible to this check.
+// If the literal moves or is renamed, this fails loudly instead of passing
+// silently with a stale hand-written list.
+const localizedStaticMatch = serverSource.match(/\["about\.html",[^\]]*\]/);
+const localizedStatic = localizedStaticMatch
+  ? [...localizedStaticMatch[0].matchAll(/"([^"]+)\.html"/g)].map((m) => `/${m[1]}`)
+  : [];
+if (!localizedStaticMatch) fail("route list unreadable", "src/app.js", "không tìm thấy mảng trang tĩnh được bản địa hóa (ví dụ [\"about.html\", ...]) — check này sẽ không kiểm được route con");
 for (const code of LOCALE_CODES) {
   if (code === "vi") continue;
-  routePaths.push(`/${code}`, `/${code}/`, `/${code}/about`, `/${code}/terms`, `/${code}/privacy`, `/${code}/refund`, `/${code}/contact`);
+  routePaths.push(`/${code}`, `/${code}/`, ...localizedStatic.map((p) => `/${code}${p}`));
 }
 const toRouteRegex = (route) => new RegExp(`^${route.split("/").map((part) => (part.startsWith(":") ? "[^/]+" : part.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"))).join("\\/")}/?$`);
 const answers = (target) => isRealTarget(target) || routePaths.some((route) => toRouteRegex(route).test(target));

@@ -7,7 +7,7 @@
 // `npm publish` and `npm run build` produced different artifacts). One module,
 // two importers — a third copy is one too many.
 export const ARTIFACT_DIRECTORIES = ['src', 'public', 'scripts', 'supabase', 'cloudflare', 'deploy'];
-export const ARTIFACT_FILES = ['package.json', 'package-lock.json', '.env.example', 'README.md', 'render.yaml', 'Dockerfile'];
+export const ARTIFACT_FILES = ['package.json', 'package-lock.json', '.env.example', 'README.md', 'render.yaml', 'Dockerfile', 'metrics-slo.json', 'metrics-postmortem.json'];
 
 // Where the artifact is written, in one place.
 //

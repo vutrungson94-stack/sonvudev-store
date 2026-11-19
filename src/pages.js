@@ -939,6 +939,7 @@ const FOOTER_LINKS = [
   { href: "/about", route: "/about", key: "nav.about", copy: "about", vi: "Về chúng tôi", page: true },
   { href: "/lookup", route: "/lookup", key: "nav.lookup", copy: "lookup", vi: "Tra cứu đơn", page: true },
   { href: "/contact", route: "/contact", key: "nav.contact", copy: "contact", vi: "Liên hệ", page: true },
+  { href: "/status", route: "/status", key: "nav.status", copy: "status", vi: "Trạng thái", page: true },
   { mail: true, route: null, key: "nav.contactEmail", copy: "contactEmail", vi: "Email hỗ trợ" },
 ];
 
@@ -1693,6 +1694,7 @@ export const COPY_VI = {
   // not carry the last two links the shop has.
   lookup: "Tra cứu đơn",
   contact: "Liên hệ",
+  status: "Trạng thái",
   breadcrumbLabel: "Đường dẫn",
   software: "Phần mềm",
   // Category and badge are free-text columns, so a Vietnamese product carries
@@ -1747,6 +1749,7 @@ export const COPY_EN = {
   about: "About",
   lookup: "Order lookup",
   contact: "Contact",
+  status: "Status",
   breadcrumbLabel: "Breadcrumb",
   software: "Software",
   // The Vietnamese values, translated. See the note on COPY_VI: the category and

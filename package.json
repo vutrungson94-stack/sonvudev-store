@@ -101,6 +101,8 @@
     "deploy",
     "render.yaml",
     "Dockerfile",
+    "metrics-slo.json",
+    "metrics-postmortem.json",
     ".env.example",
     "README.md"
   ],
