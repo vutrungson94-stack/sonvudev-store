@@ -324,6 +324,15 @@ Log Caddy và log ứng dụng nằm ngoài `ReadWritePaths`, hãy kiểm tra `d
   GitHub); trên GitHub — `RENDER_API_KEY`, `RENDER_SERVICE_ID`,
   `ROTATION_SIGNING_KEY`, `RESEND_API_KEY`, `EMAIL_FROM`, `SUPPORT_EMAIL`,
   `APP_URL`, `CLOUDFLARE_ZONE_ID`.
+- **Nơi đặt từng token** (để không đặt nhầm chỗ):
+
+  | Token | Đặt ở đâu | Dùng cho |
+  |---|---|---|
+  | `CLOUDFLARE_API_TOKEN` (CI) | **Render env** — nguồn sự thật; CI đọc lúc chạy | purge cache, analytics, SLO; rotation cập nhật chính nó |
+  | `CLOUDFLARE_MASTER_TOKEN` | **Render env** | tạo/xoá token con trong rotation; không đưa cho CI |
+  | `FLY_API_TOKEN` | **GitHub Actions secret** của repo | workflow auto-deploy Fly (`flyctl deploy`) |
+  | `RENDER_API_KEY`, `RENDER_SERVICE_ID` | **GitHub Actions secret** | đọc env và trigger deploy Render |
+  | Origin CA key | **không cần** | TLS do Cloudflare proxy tới `fly.dev`/`onrender.com`; origin không dùng chứng chỉ riêng |
 - Token đang dùng đã lộ trong chat (id `40654ef8bb09066fa93bbf49af6ecda7`,
   hạn `2027-02-15`): **sau khi setup xong, bấm link xoay một lần rồi revoke token
   cũ**. Tách quyền tối thiểu: purge chỉ cần `Zone:Zone:Read` +
@@ -333,15 +342,16 @@ Log Caddy và log ứng dụng nằm ngoài `ReadWritePaths`, hãy kiểm tra `d
 
 ### Purge edge cache sau deploy
 
-- `checks.yml` có bước **"purge edge cache after verified deploy"** trong job
-  `deployed-site`, chạy `npm run cache:purge` **sau** khi `/api/health` báo đúng sha
-  và **trước** `seo:check` — để SEO audit không đo bản HTML cũ.
-- Cần secret repo `CLOUDFLARE_API_TOKEN` (đã thêm 17/11/2026). Quyền tối thiểu:
-  `Zone:Zone:Read` + `Zone:Cache Purge:Purge`, scope đúng zone `sonvudev.com`.
-  Token hiện tại là token debug (có thêm Zone Settings/Cache Rules) — nên thay bằng
-  token riêng chỉ 2 quyền trên khi ổn định edge cache.
-- Khi chưa có secret, bước purge **no-op xanh** (cố tình): thiết bị lỗi secret không
-  được làm đỏ một deploy tốt. Origin cache + single-flight vẫn là lớp chịu tải chính.
+- `checks.yml` chạy `npm run cache:purge` **sau** khi `/api/health` báo đúng sha
+  và **trước** `seo:check`. Token được đọc từ Render env qua
+  `scripts/gha-read-cf-token.mjs`, nên không cần GitHub Secret
+  `CLOUDFLARE_API_TOKEN` nữa (secret cũ có thể xoá). Quyền tối thiểu cho purge:
+  `Zone:Zone:Read` + `Zone:Cache Purge:Purge`, scope đúng zone `sonvudev.com`;
+  SLO ingest cần thêm `Account Analytics:Read` + `Zone Analytics:Read`.
+- Khi Render env còn trống (hiện tại `CLOUDFLARE_API_TOKEN` và
+  `CLOUDFLARE_MASTER_TOKEN` đang rỗng), bước purge **no-op xanh** (cố tình): thiếu
+  token không được làm đỏ một deploy tốt. Origin cache + single-flight vẫn là lớp
+  chịu tải chính.
 - Kiểm tra: `gh secret list --repo vutrungson94-stack/sonvudev-store` phải thấy cả
   `CLOUDFLARE_API_TOKEN` và `APP_URL`.
 
