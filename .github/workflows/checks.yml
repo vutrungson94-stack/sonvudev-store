@@ -136,9 +136,25 @@ jobs:
         run: |
           set -euo pipefail
           CHROME_BIN=/usr/bin/google-chrome-stable
-          CHROME_VERSION="$("$CHROME_BIN" --version | sed -n 's/.* \([0-9][0-9.]*\)$/\1/p')"
+          # Ask the package database instead of running Chrome: a broken browser
+          # would make `chrome --version` fail, and with pipefail that aborted the
+          # whole step before any diagnostic was printed.
+          CHROME_PACKAGE=""
+          if ! CHROME_PACKAGE="$(dpkg-query -W -f='${Package} ${Version}' google-chrome-stable 2>/dev/null)"; then
+            CHROME_PACKAGE=""
+          fi
+          echo "installed package: ${CHROME_PACKAGE:-none}"
+          CHROME_VERSION="$(printf '%s' "$CHROME_PACKAGE" | sed -n 's/^[^ ]* \([0-9][0-9.]*\)-[0-9][0-9.]*$/\1/p')"
+          if [ -z "$CHROME_VERSION" ] && [ -x "$CHROME_BIN" ]; then
+            CHROME_RAW=""
+            if ! CHROME_RAW="$("$CHROME_BIN" --version 2>&1)"; then
+              CHROME_RAW=""
+            fi
+            echo "chrome --version: ${CHROME_RAW:-none}"
+            CHROME_VERSION="$(printf '%s' "$CHROME_RAW" | sed -n 's/.* \([0-9][0-9.]*\)$/\1/p')"
+          fi
+          echo "runner Chrome version: ${CHROME_VERSION:-unknown}"
           test -n "$CHROME_VERSION"
-          echo "runner Chrome $CHROME_VERSION"
           npx --yes @puppeteer/browsers@3.2.7 install "chromedriver@$CHROME_VERSION" --path "$RUNNER_TEMP/browsers"
           DRIVER_BIN="$(find "$RUNNER_TEMP/browsers/chromedriver" -type f -name chromedriver | head -1)"
           test -x "$DRIVER_BIN"
