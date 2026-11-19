@@ -11,6 +11,7 @@ import {
   isDown, markDown, markUp,
   pickOrigin, orderOrigins,
   isCacheable, isSuspension, staleKey,
+  clientAddress, apexRedirect,
 } from '../cloudflare/origin-balancer/worker.js';
 
 const ORIGINS = ['https://alpha.example', 'https://beta.example', 'https://gamma.example'];
@@ -62,6 +63,34 @@ test('cache policy: GET pages cached, API/admin never', () => {
   assert.equal(isCacheable('GET', '/api/health'), false);
   assert.equal(isCacheable('GET', '/admin'), false);
   assert.equal(isCacheable('POST', '/'), false);
+});
+
+test('www redirects to the apex before the upstream host is rewritten', () => {
+  const apex = process.env.APP_URL.replace(/\/$/, '');
+  const host = new URL(apex).hostname;
+  const www = `https://www.${host}`;
+  assert.equal(apexRedirect(`${www}/product/pc-cleanup?buy=1`), `${apex}/product/pc-cleanup?buy=1`);
+  assert.equal(apexRedirect(`${apex}/`), null);
+  assert.equal(apexRedirect(`${www}:443/`), `${apex}/`);
+  // Cloudflare may rewrite the URL to the apex before the Worker runs; the
+  // original Host header is then the only signal that the buyer typed www.
+  assert.equal(apexRedirect(`${apex}/`, `www.${host}`), `${apex}/`);
+  assert.equal(apexRedirect(`${apex}/`, 'www.evil.example'), null, 'a spoofed Host must not redirect');
+  assert.equal(apexRedirect(`${apex}/`, host), null);
+});
+
+test('the routing identity uses the edge header, never a forged forwarded chain', () => {
+  const incoming = new Headers({
+    'cf-connecting-ip': '203.0.113.9',
+    'x-forwarded-for': '10.0.0.1, 10.0.0.2',
+    'cf-ray': 'a5ccfabdcdc95ddc-HKG',
+  });
+  assert.equal(clientAddress(incoming), '203.0.113.9');
+});
+
+test('client address falls back honestly when the edge sent none', () => {
+  assert.equal(clientAddress(new Headers()), 'anon');
+  assert.equal(clientAddress(new Headers({ 'x-forwarded-for': '198.51.100.7, 10.0.0.1' })), '198.51.100.7');
 });
 
 test('suspension detection covers 5xx and the provider page, not a normal 404', () => {

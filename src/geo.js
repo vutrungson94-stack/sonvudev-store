@@ -1,4 +1,5 @@
 import { env } from "./config.js";
+import { clientIp } from "./client-ip.js";
 
 // Best-effort country lookup for the visitor. It is used only to order and
 // explain the payment options, never to gate one: a buyer in Vietnam can still
@@ -60,7 +61,7 @@ export function createGeoResolver({ fetchImpl = fetch, timeoutMs = 1500 } = {}) 
 
   return async function resolveCountry(req) {
     if (env.geo.lookup === "off") return null;
-    const ip = String(req?.ip || "").trim();
+    const ip = clientIp(req);
     if (!isRoutable(ip)) return null;
     const now = Date.now();
     const hit = cache.get(ip);

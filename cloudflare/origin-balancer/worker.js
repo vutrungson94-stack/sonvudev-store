@@ -81,16 +81,42 @@ const withHeader = (response, name, value) => {
   });
 };
 
+/** www → apex, decided before the upstream Host is rewritten.
+ *
+ *  The app has the same redirect (src/app.js), but by the time it runs the
+ *  Worker has fetched the origin by its own hostname; the app sees fly.dev and
+ *  cannot know the buyer typed www. Redirecting here keeps one canonical address
+ *  and stops the cached homepage being served twice. */
+export const apexRedirect = (value, host = "") => {
+  const url = new URL(value);
+  const hostname = String(host || url.hostname).split(":")[0].toLowerCase();
+  if (!hostname.startsWith("www.")) return null;
+  const apex = hostname.slice(4);
+  // Only redirect when one of the two names is this request's own host. A
+  // spoofed Host header must not turn the Worker into an open redirect.
+  if (url.hostname !== apex && url.hostname !== hostname) return null;
+  url.hostname = apex;
+  return url.toString();
+};
+
+/** The visitor's address, taken from the edge header the client cannot forge. */
+export const clientAddress = (headers) => String(
+  headers.get("cf-connecting-ip")
+    || headers.get("x-forwarded-for")
+    || headers.get("cf-ray")
+    || "anon",
+).split(",")[0].trim();
+
 export default {
   async fetch(request, env, ctx) {
+    const redirect = apexRedirect(request.url, request.headers.get("host"));
+    if (redirect) return Response.redirect(redirect, 308);
+
     const origins = parseOrigins(env.ORIGINS);
     if (!origins.length) return new Response("No origins configured", { status: 503 });
 
     const url = new URL(request.url);
-    const client = request.headers.get("cf-connecting-ip")
-      || request.headers.get("x-forwarded-for")
-      || request.headers.get("cf-ray")
-      || "anon";
+    const client = clientAddress(request.headers);
     const identity = `${client}|${url.pathname}`;
     const cooldown = Number(env.COOLDOWN_MS) || DEFAULT_COOLDOWN_MS;
     const cacheable = isCacheable(request.method, url.pathname);

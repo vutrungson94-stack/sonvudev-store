@@ -5,6 +5,7 @@
 // and is used unless RATE_LIMIT_STORE=supabase with Supabase configured.
 import { env, isConfigured } from "./config.js";
 import { supabaseRequest } from "./supabase-http.js";
+import { clientIp } from "./client-ip.js";
 
 const WINDOW_MS = 15 * 60 * 1000;
 const MAX_KEYS = 20000;
@@ -78,11 +79,12 @@ export function createRateLimiter({ windowMs = WINDOW_MS, maxKeys = MAX_KEYS, st
 
 const limiter = createRateLimiter();
 const tooMany = (key, limit) => limiter.tooMany(key, limit);
-export const downloadThrottled = (req) => tooMany(`download-ip:${req.ip || 'unknown'}`, 20);
-export const tooManyAttempts = (req) => tooMany(`ip:${req.ip || 'unknown'}`, 10);
-export const adminThrottled = (req) => tooMany(`admin:${req.ip || 'unknown'}`, 30);
-export const healthThrottled = (req) => tooMany(`health:${req.ip || 'unknown'}`, 10000);
+const ipOf = (req) => clientIp(req) || 'unknown';
+export const downloadThrottled = (req) => tooMany(`download-ip:${ipOf(req)}`, 20);
+export const tooManyAttempts = (req) => tooMany(`ip:${ipOf(req)}`, 10);
+export const adminThrottled = (req) => tooMany(`admin:${ipOf(req)}`, 30);
+export const healthThrottled = (req) => tooMany(`health:${ipOf(req)}`, 10000);
 export async function checkoutThrottled(req, email) {
-  return await tooMany(`checkout-ip:${req.ip || 'unknown'}`, 30)
+  return await tooMany(`checkout-ip:${ipOf(req)}`, 30)
     || (Boolean(email) && await tooMany(`checkout-email:${email}`, 12));
 }

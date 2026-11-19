@@ -121,6 +121,19 @@ test('the resolver returns null instead of failing when no provider answers', as
   assert.equal(await failing({ ip: '8.8.8.8' }), null);
 });
 
+test('the resolver reads the address the edge preserved, not the proxy req.ip', async () => {
+  const calls = [];
+  const resolver = createGeoResolver({
+    fetchImpl: async (url) => {
+      calls.push(url);
+      return { ok: true, text: async () => 'VN' };
+    },
+  });
+  assert.equal(await resolver({ headers: { 'cf-connecting-ip': '8.8.8.8' }, ip: '10.0.0.1' }), 'VN');
+  assert.ok(calls.length > 0, 'the resolver must ask a provider');
+  assert.ok(calls.every((url) => url.includes('8.8.8.8')), calls.join(', '));
+});
+
 test('the resolver falls through to the second provider and caches the answer', async () => {
   const calls = [];
   const resolver = createGeoResolver({

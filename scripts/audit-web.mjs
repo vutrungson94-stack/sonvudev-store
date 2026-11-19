@@ -683,6 +683,12 @@ const DOMAIN_EXEMPT = new Map([
   // without a real domain. The fixture is necessarily hardcoded here and is the
   // value the audit itself runs against.
   [".github/workflows/checks.yml", "fixture APP_URL cho CI, audit chạy chính với giá trị này"],
+  // Wrangler reads `pattern` and `zone_name` from this file at deploy time and
+  // does not interpolate environment variables, so a zone route is a literal by
+  // platform contract. It is also not a copy of APP_URL that can drift silently:
+  // changing the domain already means changing the zone, the DNS record and this
+  // route together. The Worker's own origins come from the ORIGINS secret.
+  ["cloudflare/origin-balancer/wrangler.jsonc", "route/zone_name là literal Wrangler bắt buộc, không nội suy được"],
 ]);
 
 for (const relative of infraFiles) {

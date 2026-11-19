@@ -19,6 +19,7 @@ import { renderBlogPost, renderBlogIndex, renderBlogFeed, loadBlogPosts, getBlog
 import { hasPayment, isClosed, isUnpaid, markOrderDelivered, markOrderPaid, paymentDeadline, sweeperRunning, voidPayment } from "./orders.js";
 import { notifyOrder, notifyMode } from "./notify.js";
 import { resolveCountry } from "./geo.js";
+import { clientIp } from "./client-ip.js";
 import { pingIndexNow, isIndexNowConfigured } from "./indexnow.js";
 import { vndPerUsd } from "./rates.js";
 import { createReview, listReviewsForProduct, reviewLimits } from "./reviews.js";
@@ -1402,7 +1403,7 @@ app.post("/api/checkout", json, async (req, res) => {
       // policy they were shown. Four separate facts because a dispute argues about
       // all four separately: that they consented, that it was before the money
       // moved, that it was this person, and that the text is the one still quoted.
-      policyAcceptedAt: now, policyAcceptedIp: req.ip || null, policyAcceptedVersion: REFUND_POLICY_UPDATED,
+      policyAcceptedAt: now, policyAcceptedIp: clientIp(req) || null, policyAcceptedVersion: REFUND_POLICY_UPDATED,
       items: [{ productId: product.id, name: product.name, version: product.version, price: product.price, currency: product.currency, fileKey: product.fileKey || "", paypalAmount: paypalCharge?.amount ?? null, paypalCurrency: paypalCharge?.currency ?? null, paypalRate: paypalQuote?.rate?.vndPerUsd ?? null }],
       createdAt: now, updatedAt: now,
     };

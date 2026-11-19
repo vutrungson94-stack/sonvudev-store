@@ -7,6 +7,18 @@
   // Path is resolved relative to THIS config file's directory, not the cwd.
   "main": "worker.js",
   "compatibility_date": "2026-11-18",
+  // The shop is reached through the two routes below. Leaving the workers.dev
+  // hostname live would publish a second address for the same pages, outside the
+  // zone's WAF/cache/redirect rules — a duplicate shop nothing in the repo links to.
+  "workers_dev": false,
+  // A Worker route runs before the zone's DNS origin, so these two patterns are
+  // what actually send sonvudev.com to the balancer. www is included because this
+  // Worker redirects it to the apex before choosing an origin; leaving it unrouted
+  // would send it back to whichever origin the DNS record names.
+  "routes": [
+    { "pattern": "sonvudev.com/*", "zone_name": "sonvudev.com" },
+    { "pattern": "www.sonvudev.com/*", "zone_name": "sonvudev.com" }
+  ],
   "vars": {
     // A dead origin is skipped for two minutes, then probed once more.
     "COOLDOWN_MS": "120000"
