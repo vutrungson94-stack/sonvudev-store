@@ -126,6 +126,23 @@ jobs:
       - name: e2e purchase flow
         run: npm run e2e:check
 
+      # The runner image can ship Chrome 157 with ChromeDriver 158 — or the other
+      # way around — and @axe-core/cli refuses to start on a mismatched pair.
+      # Installing both from Chrome for Testing keeps the gate measuring the
+      # page instead of the image's update schedule.
+      - name: install matched Chrome + ChromeDriver
+        if: matrix.node-version == '22'
+        run: |
+          set -euo pipefail
+          npx --yes @puppeteer/browsers@3.2.7 install chrome@stable --path "$RUNNER_TEMP/browsers"
+          npx --yes @puppeteer/browsers@3.2.7 install chromedriver@stable --path "$RUNNER_TEMP/browsers"
+          CHROME_BIN="$(find "$RUNNER_TEMP/browsers/chrome" -type f -name chrome | head -1)"
+          DRIVER_BIN="$(find "$RUNNER_TEMP/browsers/chromedriver" -type f -name chromedriver | head -1)"
+          test -x "$CHROME_BIN"
+          test -x "$DRIVER_BIN"
+          echo "CHROME_PATH=$CHROME_BIN" >> "$GITHUB_ENV"
+          echo "CHROMEDRIVER_PATH=$DRIVER_BIN" >> "$GITHUB_ENV"
+
       # axe-core against the rendered fixture shop. One Node leg is enough: the
       # page does not change between Node 22 and 24, and a second identical scan
       # only doubles the wall clock. AXE_REQUIRE_CHROME makes a missing browser a
@@ -134,7 +151,6 @@ jobs:
       - name: axe accessibility
         if: matrix.node-version == '22'
         env:
-          CHROME_PATH: /usr/bin/google-chrome-stable
           AXE_REQUIRE_CHROME: '1'
         run: npm run axe:check
 

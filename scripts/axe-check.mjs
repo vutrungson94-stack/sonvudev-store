@@ -43,6 +43,15 @@ const findChrome = () => {
   return candidates.find((candidate) => candidate && existsSync(candidate)) || null;
 };
 
+// @axe-core/cli bundles a chromedriver from its own dependency tree, which can
+// be newer than the browser on the machine. CI downloads a matched pair from
+// Chrome for Testing and points both variables at it; locally the defaults are
+// used. Passing a driver the CLI did not choose is the only way to make the
+// pair agree when the runner image is mid-update.
+const CHROMEDRIVER_PATH = process.env.CHROMEDRIVER_PATH && existsSync(process.env.CHROMEDRIVER_PATH)
+  ? process.env.CHROMEDRIVER_PATH
+  : null;
+
 const runAxe = (url, chromePath) => new Promise((resolve) => {
   const npmCli = path.join(path.dirname(process.execPath), 'node_modules', 'npm', 'bin', 'npm-cli.js');
   const useNpmCli = existsSync(npmCli);
@@ -58,6 +67,7 @@ const runAxe = (url, chromePath) => new Promise((resolve) => {
     '--timeout', '60',
   ];
   if (chromePath) args.push('--chrome-path', chromePath);
+  if (CHROMEDRIVER_PATH) args.push('--chromedriver-path', CHROMEDRIVER_PATH);
   const child = spawn(command, args, { stdio: ['ignore', 'pipe', 'pipe'] });
   let stdout = '';
   let stderr = '';
