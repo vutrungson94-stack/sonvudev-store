@@ -377,7 +377,9 @@ host free (Render + Fly/Koyeb...) và tự bỏ qua host đang suspend. Đây l�
   rồi `fly auth login`. Trong repo: `fly launch --no-deploy --config cloudflare/origin-balancer/../Dockerfile`
   sẽ hỏi app name/region — hoặc tạo `fly.toml` với `[build] dockerfile = "Dockerfile"`
   và `[[services]] internal_port = 3000, http_check = "/api/health"`. Deploy:
-  `fly deploy`. Copy env vars từ Render sang: `fly secrets set APP_URL=... SUPABASE_URL=... SUPABASE_SERVICE_ROLE_KEY=... ADMIN_API_TOKEN=... RESEND_API_KEY=... SUPPORT_EMAIL=... R2_ACCOUNT_ID=... R2_ACCESS_KEY_ID=... R2_SECRET_ACCESS_KEY=... R2_BUCKET_NAME=... PAYPAL_ENVIRONMENT=... PAYPAL_CLIENT_ID=... PAYPAL_CLIENT_SECRET=...` (đúng giá trị với Render để đơn hàng/CSP/R2 nhất quán). Lấy URL `https://<app>.fly.dev`.
+  `fly deploy --build-arg GIT_COMMIT=$(git rev-parse HEAD)` (image không có
+  `.git`, nên sha phải đi qua build arg để `/api/health` báo đúng commit cho
+  gate `deployed-site`). Copy env vars từ Render sang: `fly secrets set APP_URL=... SUPABASE_URL=... SUPABASE_SERVICE_ROLE_KEY=... ADMIN_API_TOKEN=... RESEND_API_KEY=... SUPPORT_EMAIL=... R2_ACCOUNT_ID=... R2_ACCESS_KEY_ID=... R2_SECRET_ACCESS_KEY=... R2_BUCKET_NAME=... PAYPAL_ENVIRONMENT=... PAYPAL_CLIENT_ID=... PAYPAL_CLIENT_SECRET=...` (đúng giá trị với Render để đơn hàng/CSP/R2 nhất quán). Lấy URL `https://<app>.fly.dev`.
 - **Koyeb** (nếu Fly không đăng ký được): đăng ký tại `koyeb.com` (không cần
   thẻ), New Service → GitHub repo → builder **Dockerfile** → port 3000 →
   health check `/api/health` → thêm cùng bộ env vars → deploy. URL dạng
@@ -388,12 +390,14 @@ host free (Render + Fly/Koyeb...) và tự bỏ qua host đang suspend. Đây l�
 ```bash
 # ORIGINS là secret — không gõ domain vào repo.
 wrangler secret put ORIGINS --config cloudflare/origin-balancer/wrangler.jsonc
-# dán: "https://sonvudev-store.onrender.com https://<app>.fly.dev"
+# dán: "https://sonvudev-store.fly.dev"
+# thêm https://sonvudev-store.onrender.com khi Render hết suspend
 wrangler deploy --config cloudflare/origin-balancer/wrangler.jsonc
 ```
 
-Sau đó trong Cloudflare Dashboard → Workers & Pages → worker `sonvudev-origin-balancer`
-→ Settings → Triggers → add Route: `sonvudev.com/*` (zone của bạn).
+Routes `sonvudev.com/*` và `www.sonvudev.com/*` nằm trong `wrangler.jsonc`
+(`workers_dev:false`), nên `wrangler deploy` gắn trigger luôn — không thêm tay
+trong dashboard.
 
 **Hoạt động:** visitor được băm theo `cf-connecting-ip + path` vào một origin
 còn sống → phân đều, cùng visitor giữ cùng host (ấm instance). Host trả 5xx hoặc
@@ -401,8 +405,18 @@ trang "suspended" bị bỏ qua 2 phút rồi thử lại. HTML cache theo URL g
 nhân bản theo origin); nếu mọi host cùng chết, bản stale được trả kèm
 `Warning: 110` (chỉ đọc). Header `X-SVD-Origin` cho biết host đã trả lời.
 
+- `www.sonvudev.com/*` được Worker trả **308** về apex trước khi đổi Host sang
+  origin. App chỉ thấy hostname của origin (fly.dev), nên tự nó không biết người
+  mua đã gõ www.
+- IP khách cho geo và rate-limit đọc từ `CF-Connecting-IP` (`src/client-ip.js`).
+  Cloudflare bỏ `X-Forwarded-For`/`X-Real-IP` do Worker tự đặt khi ra origin, nên
+  `req.ip` một mình sẽ là IP của Worker/edge. `TRUST_PROXY` giữ nguyên `1`.
+- Keep-awake: `SHOP_URL` là **gốc domain** (`https://sonvudev.com`); worker tự
+  thêm `/api/health`. Đặt cả `/api/health` sẽ thành `/api/health/api/health`.
+
 **Verify sau deploy:** `curl -sI https://sonvudev.com/ | grep -i x-svd-origin`
-từ vài IP khác nhau → thấy host khác nhau; `cf-cache-status` trên HTML vẫn HIT.
+và `curl -sI https://www.sonvudev.com/ | grep -i location` → 308 về apex;
+`cf-cache-status` trên HTML vẫn HIT.
 
 ## 10. Checklist trực ca
 

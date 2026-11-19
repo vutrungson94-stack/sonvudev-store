@@ -38,11 +38,14 @@ const app = express();
 const publicDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "public");
 const json = express.json({ limit: "1mb" });
 // The commit a deploy is supposed to be serving. Render injects RENDER_GIT_COMMIT;
+// Fly images have no .git, so the deploy command passes GIT_COMMIT as a build arg;
 // everywhere else we ask git once at boot. /api/health reports it so the CI
 // deployed-site gate can prove it is auditing THIS release and not the previous
 // one - before this, the gate raced the deploy and audited whatever happened to
 // be live.
-const DEPLOYED_COMMIT = String(process.env.RENDER_GIT_COMMIT || gitCommand(["rev-parse", "HEAD"]) || "").trim();
+const DEPLOYED_COMMIT = String(
+  process.env.RENDER_GIT_COMMIT || process.env.GIT_COMMIT || gitCommand(["rev-parse", "HEAD"]) || "",
+).trim();
 
 // Language negotiation for first-time visitors.
 //

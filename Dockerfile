@@ -19,7 +19,13 @@ RUN npm run build
 
 FROM node:22-alpine AS runner
 WORKDIR /app
+# The build context intentionally has no .git (.dockerignore), so the deploy
+# command passes the commit it is shipping: `fly deploy --build-arg
+# GIT_COMMIT=$(git rev-parse HEAD)`. /api/health reports it, and the CI
+# deployed-site gate refuses to certify a release it cannot identify.
+ARG GIT_COMMIT=""
 ENV NODE_ENV=production
+ENV GIT_COMMIT=$GIT_COMMIT
 RUN addgroup -S app && adduser -S app -G app
 # Chỉ artifact được đưa vào image: cùng thứ render.yaml startCommand dùng.
 COPY --from=build --chown=app:app /app/publish-output/node/ ./

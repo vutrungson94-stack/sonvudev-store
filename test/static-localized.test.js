@@ -24,6 +24,9 @@ process.env.R2_SECRET_ACCESS_KEY = 'test-secret-key';
 process.env.R2_BUCKET_NAME = 'test-private-bucket';
 process.env.RESEND_API_KEY = '';
 process.env.INDEXNOW_KEY = '';
+// Fly builds carry the release sha as a build arg because the image has no .git.
+// Set it before app.js is imported: DEPLOYED_COMMIT is read once at load.
+process.env.GIT_COMMIT = '0123456789abcdef0123456789abcdef01234567';
 
 const { createApp } = await import('../src/app.js');
 const APP = TEST_ENV.APP_URL.replace(/\/$/, '');
@@ -142,5 +145,5 @@ test('/api/health reports the deployed commit', async () => {
   const { status, body } = await get('/api/health');
   assert.equal(status, 200);
   const json = JSON.parse(body);
-  assert.ok(json.commit === null || /^[0-9a-f]{7,40}$/.test(json.commit), `commit must be a sha or null, got: ${String(json.commit)}`);
+  assert.equal(json.commit, process.env.GIT_COMMIT, 'the CI gate matches github.sha against this field');
 });
