@@ -97,7 +97,7 @@ function sleep(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
-export function isConfigured() {
+export function isTranslationConfigured() {
   // Free providers need no API key, so the service is always available.
   return true;
 }

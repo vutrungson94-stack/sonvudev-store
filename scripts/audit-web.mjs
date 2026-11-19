@@ -18,6 +18,7 @@ import { fileURLToPath } from "node:url";
 import { corsDiff, isFixtureHost } from "./lib/cors.mjs";
 import { walkProjectFiles } from "./lib/files.mjs";
 import { stripComments } from "./lib/source.mjs";
+import { structuralFindings } from "./lib/structural.mjs";
 
 import { env } from "../src/config.js";
 import { LOCALE_CODES } from "../src/i18n-registry.mjs";
@@ -1464,6 +1465,7 @@ const DECLARED = [
   "khoá i18n trùng", "nút đổi ngữ không có từ điển", "dịch thiếu", "dịch lệch",
   "domain gõ tay", "email gõ tay", "R2 CORS lệch", "R2 CORS thừa origin", "biến CSS chưa khai báo",
   "nút đổi ngữ lặp hoặc thiếu", "trang chủ mất từ điển",
+  "security-audit", "structural",
   "thương hiệu khai báo hai lần", "placeholder lạ",
   "schema chặn", "tiếng Việt không dấu", "tiếng Việt ở phía máy chủ", "token chưa nối",
   "trang chưa render", "hreflang chết", "thương hiệu gõ cứng", "trang mồ côi",
@@ -1492,6 +1494,44 @@ if (unusedLabels.length) {
   console.error(`[audit] Nhóm kiểm tra khai báo nhưng không có call site nào: ${unusedLabels.join(", ")}`);
   process.exitCode = 1;
 }
+// ---------------------------------------------------------
+// New structural + security-audit gates (C2/C9)
+// ---------------------------------------------------------
+// Structural: cross-module name collisions (C9). Shared via scripts/lib/structural.mjs.
+if (process.argv.includes("--structural")) {
+  const structFindings = await structuralFindings();
+  for (const item of structFindings) fail("structural", item.file, item.detail);
+}
+// Security: dependency CVE scan. Without this, a new critical CVE in an
+// already-shipped dependency would pass CI for as long as nobody clicked the
+// "bump dependency" task, and nothing says that's actually the case.
+if (process.argv.includes("--security-audit")) {
+  const { spawnSync } = await import("node:child_process");
+  // npm audit --json exits non-zero on its own internal errors (e.g. projects
+  // that still need postinstall scripts) even when there are no findings, so
+  // we parse the JSON on stdout and only fail on real high/critical findings.
+  // --omit=dev is avoided: npm --omit=dev makes npm audit itself exit 1 here.
+  // npm.cmd is not directly spawnable on Windows without a shell, and the old
+  // `shell: true` form produced a deprecation warning on every run; `cmd /c`
+  // finds it portably without that. On non-Windows npm is in PATH directly.
+  const args = ["audit", "--json", "--audit-level=high"];
+  const result = process.platform === "win32"
+    ? spawnSync("cmd", ["/c", "npm", ...args], { encoding: "utf8", cwd: root })
+    : spawnSync("npm", args, { encoding: "utf8", cwd: root });
+  let audit = null;
+  try { audit = JSON.parse(result.stdout); } catch { audit = null; }
+  const report = audit && (audit.vulnerabilities || audit.advisories);
+  const reportValues = Array.isArray(report) ? report : Object.values(report || {}).flat();
+  for (const item of reportValues) {
+    const severity = item && item.severity;
+    if (severity !== "critical" && severity !== "high") continue;
+    const pkg = item.from && item.from[0] || item.module || item.name || item.package || "(thư viện)";
+    const id = item.id || item.cve || item.name || item.package || "(không có id)";
+    const detail = item.title || item.url || "";
+    fail("security-audit", "[" + id + "] " + pkg, "thư viện đang bị " + severity + " nghiêm trọng: " + detail);
+  }
+}
+
 const unknown = [...REGISTERED].filter((label) => !DECLARED.includes(label));
 if (unknown.length) {
   console.error(`[audit] Nhóm kiểm tra chưa khai báo trong danh sách cuối file: ${unknown.join(", ")}`);

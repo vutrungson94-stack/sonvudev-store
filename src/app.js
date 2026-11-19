@@ -9,7 +9,7 @@ import { supabaseRequest } from "./supabase-http.js";
 import { slugify } from "./format.js";
 import { paypalEnvironmentIsSet } from "./config.js";
 import { createDownloadUrl, createUploadUrl } from "./r2.js";
-import { captureOrder, createOrder as createPayPalOrder, hashToken, newOrderId, newToken, paypalChargeForProduct, paymentMatchesOrder, readOrder, verifyWebhook } from "./paypal.js";
+import { captureOrder, createPayPalOrder, hashToken, newOrderId, newToken, paypalChargeForProduct, paymentMatchesOrder, readOrder, verifyWebhook } from "./paypal.js";
 import { paymentInstructions, paymentOptions } from "./payments.js";
 import { analyticsMeta, brandMeta, esc, fillCopy, fillPageTokens, localizeStaticHtml, pageTokenValues, renderFeed, renderIndexCount, renderIndexFilters, renderIndexGrid, renderLlmsTxt, renderMerchantFeed, renderOgImage, renderProductPage, renderStats, tokenMeta, verificationFile, verificationMeta, REFUND_POLICY_UPDATED } from "./pages.js";
 import { isVersionedRequest } from "./lib/assets.mjs";
@@ -25,7 +25,7 @@ import { createReview, listReviewsForProduct, reviewLimits } from "./reviews.js"
 import { refuse } from "./refuse.js";
 import { renderRobotsTxt } from "./robots.js";
 import { adminThrottled, downloadThrottled, healthThrottled, tooManyAttempts, checkoutThrottled } from "./rate-limit.js";
-import { isConfigured as tIsConfigured, translateText, translateMissingKeys } from "./translate-service.mjs";
+import { isTranslationConfigured as tIsConfigured, translateText, translateMissingKeys } from "./translate-service.mjs";
 import { LOCALE_CODES, DEFAULT_LOCALE, normalizeLocale, isSupportedLocale } from "./i18n-registry.mjs";
 import { adminEntries, matchAdminToken } from "./admin-auth.js";
 import { isEnabled } from "./feature-flags.js";

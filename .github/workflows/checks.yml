@@ -88,8 +88,11 @@ jobs:
       - name: lint
         run: npm run lint
 
-      - name: audit
-        run: npm run audit
+      - name: audit (static + structural name collisions + security audit)
+        # Invoked via node, not via npm-run-with-args: the audit gate holds the
+        # forbidden shape of an npm-run-flag form, and the args go to the script
+        # directly, which is unambiguous on every supported npm.
+        run: node scripts/audit-web.mjs --security-audit --structural
 
       # Case-sensitive imports: Windows không thấy, Linux (CI/deploy) mới chết.
       - name: case

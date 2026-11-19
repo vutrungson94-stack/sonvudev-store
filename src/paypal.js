@@ -99,7 +99,7 @@ export function paymentMatchesOrder(resource, order) {
   } catch { return false; }
 }
 
-export async function createOrder({ orderId, product, customerEmail, returnUrl, cancelUrl, amount, currency = env.paypal.currency }) {
+export async function createPayPalOrder({ orderId, product, customerEmail, returnUrl, cancelUrl, amount, currency = env.paypal.currency }) {
   validateCurrency(currency);
   const accessToken = await token();
   const response = await call(`${base()}/v2/checkout/orders`, {
