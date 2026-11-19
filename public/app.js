@@ -535,13 +535,17 @@ function openCheckout(p) {
         <small>${esc(T('product.priceOnce'))}</small>
         <strong>${priceFor(p)}</strong>
       </div>
-      <p class="cart-terms">${esc(T('cart.conversion'))}</p>
-      <p class="cart-terms">${esc(T('cart.deliveryDigital'))}</p>
-      <p class="cart-terms">${esc(T('cart.refundWindow'))}</p>
+      <ul class="checkout-facts">
+        <li>${esc(T('cart.conversion'))}</li>
+        <li>${esc(T('cart.deliveryDigital'))}</li>
+        <li>${esc(T('cart.refundWindow'))}</li>
+      </ul>
     </div>
     <form id="checkout-form" class="checkout-form">
-      <label>${esc(T('cart.name'))}<input name="customerName" required maxlength="100" placeholder="${esc(T('cart.namePlaceholder'))}" autocomplete="name"></label>
-      <label>${esc(T('cart.email'))}<input name="email" type="email" required placeholder="${esc(T('cart.emailPlaceholder'))}" autocomplete="email"></label>
+      <div class="checkout-contact">
+        <label>${esc(T('cart.name'))}<input name="customerName" required maxlength="100" placeholder="${esc(T('cart.namePlaceholder'))}" autocomplete="name"></label>
+        <label>${esc(T('cart.email'))}<input name="email" type="email" required placeholder="${esc(T('cart.emailPlaceholder'))}" autocomplete="email"></label>
+      </div>
       ${geoNote()}
       <fieldset><legend>${esc(T('cart.methodLabel'))}</legend>${renderPaymentOptions()}</fieldset>
       ${expiryNote()}
