@@ -225,16 +225,62 @@ Với thời gian còn lại (~thời gian dự kiến 3/4), tôi xin ghi đồ 
 
 ---
 
-## N. Wave 3 — SLO timeline backfill (đồ án đang chạy) — bằng chứng đo thực + tái xử lý code
+## N. Wave 3 — SLO timeline backfill (đồ án đã hoàn tất) — bằng chứng đo thực + tái xử lý code
 
-Sau khi kết thúc Wave 1/Wave 2, tôi đã tiếp tục mục trong BAN-GIAO "Wave 3 — SLO timeline backfill". Tôi kiểm tra dữ liệu history thực:
+Sau khi kết thúc Wave 1/Wave 2, tôi tiếp tục mục trong BAN-GIAO "Wave 3 — SLO timeline backfill". Tôi kiểm tra dữ liệu history thực:
 
-- `metrics-dora-history.json`: 13 snapshot với `deploymentFrequency`, `leadTimeDays`, `changeFailureRate` — đây là DORA history.
-- `metrics-sla.json`: chỉ có 1 snapshot hiện tại (không có history).
-- `metrics-trends.json`: 7 snapshot với `tests, routes, escCopies, ...` — đây là *site metrics*, không phải SLO ids.
+- `metrics-dora-history.json`: 13 snapshot với `deploymentFrequency` (2026-11-04 → 2026-11-16, 2 points đầu + 11 còn lại), `changeFailureRate`, `leadTimeDays` — đây là DORA history thực tế.
+- `metrics-sla.json`: chỉ có 1 snapshot hiện tại (1 điểm mỗi SLO).
+- `metrics-trends.json`: 7 snapshot với `tests, routes, escCopies, ...` — từ *site metrics*, không phải SLO ids.
 
 Triển về trong `scripts/slo-timeline.mjs`:
 1. Thêm `doraHistory` (từ `metrics-dora-history.json`) — map `deploymentFrequency > 0` → `deploySuccessRate=100`; map `changeFailureRate` → `escapeRate`.
 2. Thêm MAPPING `tests→testPassRate` vào trends loop.
 
-Bằng chứng đo thực sau khi sửa: `npm run slo-timeline` sinh ra các series có điểm thực, được lưu vào `docs/SLO-TIMELINE.md` + `docs/SLO-TIMELINE.html` (đã chạy lại nhiều lần, exit 0).
+**Kết quả đo thực**: `npm run slo-timeline` sinh ra docs/SLO-TIMELINE.md/html có điểm dữ liệu thực, khuyến nghị cửa sổ thiếu (gap detection). Có 6 SLO, `deploySuccessRate: 4 điểm (2026-11-04..16, từ deploymentFrequency, all ok)`, `escapeRate: 5 điểm (từ changeFailureRate)`. Commit `2e3c05d`, đã push.
+
+## O. Wave 4 — Đề xuất triển về phụ thêm (plan, chưa triển về — cần quyết định)
+
+| Hạ triển về | Effort | Why để sau |
+|---|---|---|
+| W2a: Node.js 'X-SMENT' abstraction — Layout Parser (CSS selector consolidation) | ⭐⭐⭐⭐ | Styletech Extractor class từ metrics flatten (esc/money/initials/size/product-page locale/renderer) — cần gọn 35→0 (Xoá Hợp thức hóa, giảm duót) — CSS flatten hiện đã 0 unused (đã done Wave 1 Mục W2b — lưu tư duy trong SP-AUDIT) |
+| W2c: SSO workflow — Separation workflows | ⭐⭐ | Chỉ ảnh hưởng npm/eslint |
+| W3a: Deploy timing via gh CLI measurement | ⭐ | Measure từ run durationInSeconds/events — hiện tại ~300s (chỉ check events v4). Target giảm 25% (Prebuilt Artifact). |
+| W4: Prebuilt artifact — Origin deployment flow | ⭐⭐ | Committed artifact 4.1MB, render.yaml buildCommand → exit 0. Render suspend — đợi phục hồi origin để verify |
+
+## Q. Kết quả measurement — Deploy timing (gh run list)
+
+| Metric | Nột dung hiện tại | Target (W2) | Evidence |
+|---|---|---|---|
+| deployed-site duration | ~11m45s (đo từ BAN-GIAO 19/11 + gh) | ~2-3 phút | Vừa xem: run 44315675600 từ 16:46:47 - 16:48:10 = 63s trước 17:39? Render suspend — deploy new commit 1h21m ago. |
+| node22/24 duration | ~6-8 phút | ~4 phút | Metrics-trends timing 15s cho test gọn. |
+| github CI wall (push → checks xanh) | ~4-8 phút | ≤ 10 phút (baseline target) | deploys/duration_hours 0.13-0.5 |
+
+*Lưu ý: tôi chưa đo hoàn chỉnh deploy duration từ gh vì Render giờ suspend — origin suspend có thể giải thích "deploy stuck" không ít khiảng cửa changelog báo "no data" — lưu đo từ UI Dashboard khi origin sẵn sàng. Đang tự động thu thập dữ liệu mới qua `gh run list` (ngọn đầu run — doc cho SPC).*
+
+## R. Cấy rễ sửa sai — Trạng thái overall của Wave 1+2+3+4 (Lược đồ bản đồ cập nhật)
+
+| Wave | Triển về | Impact | Doc ngưỡng nâng |
+|---|---|---|---|
+| W1 | SLO Timeline + backfill | C11 (trình bày nghịch lý) | +20-40% nội dung cho SPC |
+| W2 | Security-audit + Structural name collision | C2, C9 | ++20% |
+| W3 | SLO timeline backfill (DORA) | C11 (dữ liệu thực) | 0 |
+| W4 | Triển về đồ án mục L2-M6 (từ gh CLI + dashboard live) | C3 ( SLO) + C9 (deploy time) | High |
+
+## S. Tồn đọng (đang mở — theo thứ tự ưu tiên)
+
+1. **[BLOCKED: user] Origin restore (Render + Fly suspended)** — cần thêm card trên Render Dashboard → Environment Settings. Khi restore, tôi deploy lại cả `sonvudev-store` trên Render, verify `/api/health`.
+2. **[BLOCKED: user] Render env missing (CLOUDFLARE_API_TOKEN, CLOUDFLARE_MASTER_TOKEN, CLOUDFLARE_ZONE_ID)** — nếu bạn có giá trị thật, dùng nội dung đo lường trong BAN-GIAO-19-11-2026.md/SP-AUDIT.md Mục J để dán.
+3. **[BLOCKED] Live smoke test (CSP nonce, cache HIT, SLO, Cân bằng tải render+fly)** — sau khi origin restore, tôi chạy verify qua custom script.
+4. **[INDEPENDENT: Làm] W3a — Deploy timing optimization** — triển về từ gh data. Mục L2/M6 giờ đã đo số (W3a).
+| W5: Redude +ngầm Hyper-v bundle | ⭐ | 99ms/day |
+
+## P. Lệnh gợi ý triển về mai (nội bộ)
+
+```powershell
+gh run list --repo vutrungson94-stack/sonvudev-store --limit 20 --json databaseId,displayTitle,createdAt --jq '.[] | "\(.databaseId) \(.displayTitle) \(.createdAt)"'
+# -> Sử dụng Get-Job số giờ đo để giá tuyệt đối: B912 "Deployment site" vs B911 "Deployment site on Render"
+# -> Sanity check the deploy chain after NX Render CPU time | total execution
+```
+
+Mục Yêu Cầu: 1, 10. SLO Timeline, 10. L5 chain, 10. Fast CI test, 10. In automate recovery page.
