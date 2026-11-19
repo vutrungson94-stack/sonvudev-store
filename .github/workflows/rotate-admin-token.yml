@@ -31,7 +31,7 @@ concurrency:
 jobs:
   rotate:
     name: rotate token
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 20
     env:
       RENDER_API_KEY: ${{ secrets.RENDER_API_KEY }}
