@@ -319,8 +319,8 @@ Log Caddy và log ứng dụng nằm ngoài `ReadWritePaths`, hãy kiểm tra `d
   bị xóa và token cũ vẫn nguyên; nếu chỉ revoke cuối thất bại, mail báo token id
   cần thu hồi tay.
 - **Secrets cần có:** trên Render — `CLOUDFLARE_API_TOKEN` (token đang dùng),
-  `CLOUDFLARE_MASTER_TOKEN` (quyền **API Tokens:Read + Write** để tạo/xóa token
-  con), `ROTATION_SIGNING_KEY` (chuỗi ngẫu nhiên ≥32 byte, cùng giá trị với
+  `CLOUDFLARE_MASTER_TOKEN` (quyền **User: API Tokens: Read + Edit/Write** để
+  tạo/xoá token con), `ROTATION_SIGNING_KEY` (chuỗi ngẫu nhiên ≥32 byte, cùng giá trị với
   GitHub); trên GitHub — `RENDER_API_KEY`, `RENDER_SERVICE_ID`,
   `ROTATION_SIGNING_KEY`, `RESEND_API_KEY`, `EMAIL_FROM`, `SUPPORT_EMAIL`,
   `APP_URL`, `CLOUDFLARE_ZONE_ID`.
@@ -333,6 +333,29 @@ Log Caddy và log ứng dụng nằm ngoài `ReadWritePaths`, hãy kiểm tra `d
   | `FLY_API_TOKEN` | **GitHub Actions secret** của repo | workflow auto-deploy Fly (`flyctl deploy`) |
   | `RENDER_API_KEY`, `RENDER_SERVICE_ID` | **GitHub Actions secret** | đọc env và trigger deploy Render |
   | Origin CA key | **không cần** | TLS do Cloudflare proxy tới `fly.dev`/`onrender.com`; origin không dùng chứng chỉ riêng |
+
+  Không có token tên **"Origin Create Token"** trong kiến trúc hiện tại — đó không
+  phải token thứ ba cần tạo. Nếu nguồn gốc của tên này là nút *Create Token*:
+  - muốn tạo được **token Cloudflare mới khi rotation** → đó là
+    `CLOUDFLARE_MASTER_TOKEN` (Render env);
+  - muốn **deploy Fly** từ GitHub Actions → đó là `FLY_API_TOKEN` (secret
+    của repo), tạo bằng `flyctl tokens create deploy -a sonvudev-store --name github-actions`.
+  Render không bao giờ đọc `FLY_API_TOKEN`, nên đừng đặt nó bên Render env; ngược
+  lại, đừng đặt Cloudflare token bên GitHub — GitHub secret
+  `CLOUDFLARE_API_TOKEN` cũ có thể xoá vì CI đã đọc token từ Render.
+
+- **Tạo 2 token Cloudflare** (dashboard → avatar → **My Profile → API Tokens → Create Token → Custom token**):
+  1. `CLOUDFLARE_API_TOKEN` (token cho CI): quyền `Zone → Cache Purge → Purge`,
+     `Zone → Zone → Read`, `Zone → Analytics → Read`, `Account → Account Analytics → Read`;
+     *Zone Resources*: Include → Specific zone → `sonvudev.com`; *Account Resources*:
+     Include → Specific account (tài khoản chứa `sonvudev.com`); TTL 90 ngày.
+  2. `CLOUDFLARE_MASTER_TOKEN` (token cho rotation): quyền `User → API Tokens → Read`
+     và `User → API Tokens → Edit` (dashboard một số bản ghi `Write`); không giới
+     hạn zone/account vì phạm vi là user; TTL tuỳ ý (không đặt thời hạn hoặc 1 năm).
+  3. Sau khi tạo, Cloudflare chỉ hiện giá trị **một lần** — copy ngay vào password
+     manager, rồi dán vào đúng chỗ trong bảng trên. Kiểm tra cả hai bằng
+     `curl -s -H "Authorization: Bearer <token>" https://api.cloudflare.com/client/v4/user/tokens/verify`
+     (phải trả `status: active`).
 - Token đang dùng đã lộ trong chat (id `40654ef8bb09066fa93bbf49af6ecda7`,
   hạn `2027-02-15`): **sau khi setup xong, bấm link xoay một lần rồi revoke token
   cũ**. Tách quyền tối thiểu: purge chỉ cần `Zone:Zone:Read` +
