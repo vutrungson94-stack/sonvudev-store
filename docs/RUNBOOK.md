@@ -360,6 +360,9 @@ Log Caddy và log ứng dụng nằm ngoài `ReadWritePaths`, hãy kiểm tra `d
   cũ: `checks.yml` purge ngay sau khi sha khớp, trước `seo:check`.
 - `cloudflare/keep-awake` ping mỗi **5 phút** (`*/5 * * * *`), vẫn dưới ngưỡng ngủ
   15 phút của Render nhưng cắt request origin từ 43.200 xuống 8.640/tháng.
+- Xác nhận keeper còn sống: `npx wrangler tail sonvudev-keep-awake` phải in
+  `[keep-awake] https://sonvudev.com -> ok (HTTP 200)` mỗi 5 phút. Không có dòng
+  đó nghĩa là trigger hoặc secret `SHOP_URL` đã hỏng — im lặng không phải là khỏe.
 - Giới hạn: đây là failover **chỉ đọc**. Muốn đặt hàng khi origin suspend cần
   origin thứ 2 (xem `docs/CHANGE-PLAN-2026-11-18-EDGE-FAILOVER.md`); Cloudflare
   Load Balancer (failover DNS thật) là tính phí, không dùng được trên free plan.

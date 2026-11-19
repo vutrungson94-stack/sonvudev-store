@@ -160,10 +160,13 @@ export default {
     }
 
     const result = await ping(shopUrl);
-    // Only the unhappy path is logged. A ping every five minutes for 19 hours is
-    // 228 lines a day, and a log that is always full is a log nobody opens.
+    // One line per five minutes is 228 a day: small enough to keep, and the only
+    // evidence that the trigger fires and the origin answered. Without it a keeper
+    // that silently stopped pinging looks exactly like one that works.
     if (!result.ok) {
       console.error(`[keep-awake] ${shopUrl} -> ${result.detail} (HTTP ${result.status})`);
+    } else {
+      console.log(`[keep-awake] ${shopUrl} -> ok (HTTP ${result.status})`);
     }
     return result;
   },
