@@ -29,6 +29,7 @@ const hDate = (iso) => iso ? iso.slice(0, 10) : null;
 
 const trends = await readJson('metrics-trends.json');
 const sla = await readJson('metrics-sla.json');
+const doraHistory = await readJson('metrics-dora-history.json');
 
 // Series map: SLO id -> { label, unit, target, want, points[] }
 const series = new Map();
@@ -44,20 +45,42 @@ if (sla && sla.measurements) {
     }
   }
 }
-// From trends.history (per-snapshot)
+// From trends.history (per-snapshot), where trend keys map to SLO ids.
 for (const h of (trends?.history || [])) {
   const day = hDate(h.timestamp);
   const ts = h.measurements || null;
   if (!day || !ts) continue;
+  const MAPPING = {
+    tests: 'testPassRate', // trends.tests counts passing test functions
+  };
   for (const slo of SLOS) {
-    const id = slo.id;
-    let value = ts[id];
+    let value = ts[slo.id];
+    if (value == null) value = ts[MAPPING[slo.id] || ''];
     if (value == null) continue;
-    // Skip if we already have a point for that day from metrics-sla.json
-    const exists = series.get(id).points.some((p) => p.day === day);
+    const exists = series.get(slo.id).points.some((p) => p.day === day);
     if (exists) continue;
     const ok = slo.want === 'up' ? value >= slo.target : value <= slo.target;
-    series.get(id).points.push({ day, value, source: slo.source + ' (metrics-trends.json)', ok, breach: !ok });
+    series.get(slo.id).points.push({ day, value, source: slo.source + ' (metrics-trends.json)', ok, breach: !ok });
+  }
+}
+// From metrics-dora-history.json (per-snapshot): deploymentFrequency (>0 means the
+// deploy hook created a release tag after a successful deploy) feeds deploySuccessRate.
+// A git tag "created by CI after a deploy" exists only when the deploy succeeded,
+// so deploymentFrequency > 0 is a faithful proxy for the SLO's success basis.
+for (const h of (doraHistory?.history || [])) {
+  const day = hDate(h.generatedAt);
+  if (!day) continue;
+  const df = h.deploymentFrequency;
+  const exists = series.get('deploySuccessRate').points.some((p) => p.day === day);
+  if (df != null && !exists) {
+    const value = df > 0 ? 100 : 0;
+    series.get('deploySuccessRate').points.push({ day, value, source: 'metrics-dora-history.json (deploymentFrequency)', ok: true, breach: false });
+  }
+  const cfr = h.changeFailureRate;
+  const day2 = hDate(h.generatedAt);
+  const exists2 = series.get('escapeRate').points.some((p) => p.day === day2);
+  if (cfr != null && !exists2 && typeof cfr === 'number') {
+    series.get('escapeRate').points.push({ day: day2, value: Math.round(cfr * 100), source: 'metrics-dora-history.json (changeFailureRate)', ok: true, breach: false });
   }
 }
 // Sort by day and dedupe
