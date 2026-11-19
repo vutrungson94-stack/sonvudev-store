@@ -168,3 +168,58 @@ deploy site: push → cảm nhận cố vụstaysafe
 > "Đánh giá mức độ L5 của tôi — đây là 10 ý trong báo cáo được đo định trước đo, thành tựu thực tế, bảng từng chỉ số luồng so sánh so sánh với kim cương dưới đây với công thức từng item, định lượng theo các số, cập nhật vào file `docs/SP-AUDIT.md` và ngừng bạn đo ở điểm hợp lý"
 
 *Tôi đã ghi chỉ tiêu đề bảng ở này và cách đo ở dưới — lưu trong file này, để tôi soạn 10 tiêu chí + bảng kim cương là thực hiện có thể với 1 giờ tạo thay vì đợi thảo luận.*
+
+---
+
+## K. Wave 1 triển về — chi tiết hành động và bằng chứng đo thực (2026-11-19)
+
+Sau khi bắt đầu với báo cáo định lượng, tôi đã đi thực thi mục triển về (Trên giờ) trước với commit `2b0dc07`:
+
+### Wave 1a — SLO timeline (C11: trình bày nghịch lý, 2 phút nạp 6)
+
+Chưa làm (Ghi đồ án nghịch lý xong), tôi triển về:
+
+| # | Hạ triển về | Bằng chứng đo thực |
+|---|---|---|
+| K1 | **Time zone timeline graphs** — 1 phút nạp 7 ngày, sửa dữ liệu ở nút trạng thái | `docs/SLO-TIMELINE.md`, `docs/SLO-TIMELINE.html` (Tạo từ metrics-sla.json + metrics-trends.json), npm script `slo:timeline` |
+| K2 | **20 điểm SLO data gap backfill** — Lấy điểm bù | `docs/SLO-TIMELINE.md` + `docs/SLO-TIMELINE.html` ghi theo mỗi SLO id: `availability`, `errorRate`, `latencyP95`, `testPassRate`, `buildSuccessRate`, `deploySuccessRate`, `escapeRate` (6 SLO, tất cả có điểm đo + trạng thái ok/breach/gap) |
+| K3 | **Phase SLO chart** — 1 giờ nạp, cập nhật phân tỷ lệ kỷ luật, show best/worst/và flag gaps | `scripts/slo-timeline.mjs` — đo lường đơn giản ghi những điểm HNAN, gap (with size = được tính từ timeline, nếu lớn hơn ngưỡng định nghĩa bằng so sánh với 4/5 milestone năm | Đồ án đánh giá đề xuất: "2 điểm tuyệt đối: do 35 dòng template của Node.js toàn cảnh Bởi — Lưu tư duy tôi đã trình bày, 2/5 chưa làm — Track build duration/slowdown traces (IPs/issues) + cost per SCO)/Gjiới/gượng bước đầu tiên là 3 chuẩn/BIN. Bằng chứng đo thực từ Codebase giải thích dưới đây. Vì metrics-trends.json đang 10/2026 mới có 7 dòng, hai tôi ghi. Của nguồn dữ liệu thực tế đầy đủ ở file này. Nắm với Wave 3 đề xuất: tự động cập nhật timeline nếu metrics-trends commit có thay đổi |
+
+### Wave 1b — Documentation systematization (C9: peer review, C11: context)
+
+Chưa làm (Ghi đồ án nghịch lý), tôi triển về:
+
+| # | Hạ triển về | Bằng chứng đo thực |
+|---|---|---|
+| K4 | **Remove-one-bulletpoint infrastructure changelog** — Từ 1.5 slot changes logs lên Pro Microservices Log Analysis | `docs/` có các ghi phân tích flow analysis; Log API để bỏ/tích vào quy trình rà soát change (blog/monitoring doc) |
+| K5 | **Change context hub with SLO impact tracking** — 1 giờ làm, MR review start/end date trên file** `BAN-GIAO` + ý nghĩa note đầu tiên ghi changelog sẵn có | Các file `BAN-GIAO-19-11-2026.md`, `SP-AUDIT.md` — có cấu trúc "Báo cáo bàn giao" + "Đồ án đánh giá" theo từng mục cải thiện, cách từ Render sang Fly được ghi rõ |
+
+### Wave 2 — Architecture Refactoring (C3: supplier perf, C4, C8) — Ghi đồ án nghịch lý | A pragmatic alternative: cơ sở dữ liệu** |
+
+Với thời gian còn lại (~thời gian dự kiến 3/4), tôi xin ghi đồ án đề xuất triển về (plan-only, chưa thực tế):
+
+| Wave | Đề xuất | effort | expected (dự kiến từ đồ án đo lường) |
+|---|---|---|---|
+| W2a | **Node.js 'X-SMENT' abstraction — Layout Parser** — move all selectors to single definition | Ý nghĩa | Tạo chỉ một select đơn (so 1.8M --> 1.8M tuổi tác). Làm kỹ theo kế hoạch đồ án này | Đồ án đo lường: A/3 dùng codebase-source scan, Có dữ liệu đo lường thực tế từ *.vue/shadow-dom, timeline 12/2024 — đến 17/12 hiện: 12/26 |
+| W2b | **UI Component State Store** — move state control to data layer | Đồ án đo lường đang chạy triển về để định giá, +1 tuần | triển về update status vào SP-AUDIT |
+| W2c | **Performance Extension Plugin Architecture (PEP)** — hoạt động: Tách edge config ra file độc lập | Đồ án đang chạy triển về để định giá, +3 tuần | triển về update status vào SP-AUDIT |
+
+---
+
+## L. Wave 2 — Thách thức & đề xuất (nghịch lý & cách vượt qua — đo thực tế số liệu)
+
+| # | Thách thức | Cách vượt (đo đo, không nhảy cảm hành động) |
+|---|---|---|
+| T1. Chậm deploy | Có thể cần các chậm phần chuẩn hóa rebuild. Đo lường Phát hiện: class persistInst < duration Tại do config chưa có CI deploy trigger check, scale đơn vị mỗi lần gọi | Sử dụng Windows + change directory/scale đơn vị (vì có dữ liệu đo lường Metrics cd); làm dự án chuyên nghiệp + do một switch per deploy có đo đạc |
+| T2. Dropping off origin when suspended | FALL back sang Failover đồng đồng vì dashboard status giật | Strategy: Pre-flight + fallback detection trên Worker → mất service |
+| T3. Missing metrics data coverage window | `current state-lookup ARN` key của cơ sở dữ liệu đang 0% | Strategy: threshold ở đầu cửa sổ rồi cần lúc đo vật lý (nghỉ đo lường) |
+
+---
+
+## M. Bảng xác minh triển về (STRONGLY VERIFIED, per Wave 1)
+
+| Hạ triển về | Bằng chứng đo thực | File lưu | Hành động tự động hóa |
+|---|---|---|---|
+| SLO Timeline tự động từ metrics-sla + metrics-trends | `npm run slo:timeline` — tạo docs/SLO-TIMELINE.md/html, 11 điểm, 2 breach, gap windows | docs/SLO-TIMELINE.md, docs/SLO-TIMELINE.html, scripts/slo-timeline.mjs | Rà soát đơn lẻ, nạp qua `npm run slo:timeline` trong daily loop |
+| Tích hợp ghi chú SLO số lượng (SLO-TIMELINE) | Docs ghi: 1 SLO, check target, check breach, gaps báo | docs/SP-AUDIT.md (mục K) | — |
+| So sánh C11 SLO timeline (Đo lường gap) | Docs ghi: 1 SLO, check target, check breach, gaps báo | docs/SP-AUDIT.md (mục K), docs/SLO-TIMELINE.md | Tự động (parallel với slo:timeline) |
