@@ -133,7 +133,7 @@ const rows = [
   ['i18nKeys', countCopies(i18nText, /^\s{4}'[\w.]+':/gm), 'up', 'khóa i18n'],
   // A page that allows indexing is a page a crawler can be pointed at. Losing one
   // is a silent loss of traffic that no other check would notice.
-  ['indexablePages', publicHtmlText.filter((body) => /index,follow/.test(body)).length, 'up', 'trang cho phép index'],
+  ['indexablePages', publicHtmlText.filter((body) => /(?<!no)index,follow/.test(body)).length, 'up', 'trang cho phép index'],
   ['productPageLocales', countCopies(appSource, /productPage\("(?:vi|en)"\)/g), 'up', 'ngôn ngữ trang sản phẩm'],
   // How many pages carry the dictionary.
   //

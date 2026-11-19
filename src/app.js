@@ -874,7 +874,6 @@ app.get("/sitemap.xml", async (_req, res, next) => {
     { file: "refund.html", path: "/refund", priority: "0.3", changefreq: "monthly" },
     { file: "about.html", path: "/about", priority: "0.3", changefreq: "monthly" },
     { file: "contact.html", path: "/contact", priority: "0.3", changefreq: "monthly" },
-    { file: "status.html", path: "/status", priority: "0.3", changefreq: "hourly" },
   ];
   // The five static pages exist in every supported language under their locale
   // prefix - a German reader must find a German terms page, and the sitemap is

@@ -590,7 +590,6 @@
   "products.didYouMean": "¿Quisiste decir:",
   "title.contact": "Contacto — {brand}",
   "title.status": "Estado del servicio - {brand}",
-  "nav.status": "Estado",
   "status.eyebrow": "Estado del sistema",
   "status.title": "Estado del servicio",
   "status.lead": "El estado real de la tienda, medido desde fuentes reales. Sin redondeo, sin prometer 100%.",
@@ -615,5 +614,6 @@
   "status.honesty": "Medido desde Cloudflare Analytics (httpRequestsAdaptiveGroups) y el registro del servidor. Sin redondeo, sin green-washing, sin ventanas parciales ocultas — si los datos están incompletos, la página lo dice en lugar de mostrar un número bonito.",
   "status.error": "No se pudieron obtener los datos — el servidor está fallando o inalcanzable.",
   "status.incidents.title": "Incidencias registradas",
-  "status.incidents.note": "{total} postmortem(s) en total · {without} resueltas sin causa raíz"
+  "status.incidents.note": "{total} postmortem(s) en total · {without} resueltas sin causa raíz",
+  "status.measuredLabel": "Medición actualizada"
 }

@@ -616,7 +616,6 @@ const DICT = {
     'legal.refund.p10': 'Mọi yêu cầu hoàn tiền gửi tới <a href="mailto:{{support}}">{{support}}</a>. Vui lòng nêu mã đơn hàng để chúng tôi tra cứu nhanh. Chúng tôi không giải quyết khiếu nại qua mạng xã hội, vì không thể xác minh danh tính người gửi trên các kênh đó.',
     // Trang trạng thái công khai — mọi số trên trang này đều là số đã đo.
     'title.status': 'Trạng thái dịch vụ - {brand}',
-    'nav.status': 'Trạng thái',
     'status.eyebrow': 'Trạng thái hệ thống',
     'status.title': 'Trạng thái dịch vụ',
     'status.lead': 'Trạng thái thật của cửa hàng, đo từ nguồn thật. Không làm tròn, không hứa 100%.',
@@ -635,6 +634,7 @@ const DICT = {
     'status.coverage.unknown': 'Chưa rõ phạm vi đo',
     'status.coverage.partial': 'còn thiếu dữ liệu',
     'status.updated': 'Cập nhật: {when}',
+    'status.measuredLabel': 'Số liệu cập nhật',
     'status.detail.title': 'Chi tiết đo lường',
     'status.commit': 'Commit đang phục vụ',
     'status.uptime': 'Uptime của tiến trình',
@@ -1134,7 +1134,6 @@ const DICT = {
     'legal.refund.p10': 'Send all refund requests to <a href="mailto:{{support}}">{{support}}</a>. Please include the order id so we can look it up quickly. We do not handle complaints via social media, because we cannot verify the identity of the sender on those channels.',
     // The public status page — every number on it is measured, not written.
     'title.status': 'Service status - {brand}',
-    'nav.status': 'Status',
     'status.eyebrow': 'System status',
     'status.title': 'Service status',
     'status.lead': 'The shop\'s real status, measured from real sources. No rounding, no promised 100%.',
@@ -1153,6 +1152,7 @@ const DICT = {
     'status.coverage.unknown': 'Measurement coverage unknown',
     'status.coverage.partial': 'partial window',
     'status.updated': 'Updated: {when}',
+    'status.measuredLabel': 'Measurement updated',
     'status.detail.title': 'Measurement details',
     'status.commit': 'Commit serving this page',
     'status.uptime': 'Process uptime',

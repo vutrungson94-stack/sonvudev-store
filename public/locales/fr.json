@@ -590,7 +590,6 @@
   "products.didYouMean": "Vouliez-vous dire :",
   "title.contact": "Contact — {brand}",
   "title.status": "État du service - {brand}",
-  "nav.status": "État",
   "status.eyebrow": "État du système",
   "status.title": "État du service",
   "status.lead": "L'état réel de la boutique, mesuré depuis des sources réelles. Aucun arrondi, pas de 100% promis.",
@@ -615,5 +614,6 @@
   "status.honesty": "Mesuré depuis Cloudflare Analytics (httpRequestsAdaptiveGroups) et le journal serveur. Aucun arrondi, pas de green-washing, pas de fenêtre partielle cachée — si les données sont incomplètes, la page le dit au lieu d'afficher un joli chiffre.",
   "status.error": "Données impossibles à récupérer — le serveur est en erreur ou injoignable.",
   "status.incidents.title": "Incidents enregistrés",
-  "status.incidents.note": "{total} postmortem(s) au total · {without} résolus sans cause racine"
+  "status.incidents.note": "{total} postmortem(s) au total · {without} résolus sans cause racine",
+  "status.measuredLabel": "Mesure mise à jour"
 }

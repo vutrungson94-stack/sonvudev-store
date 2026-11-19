@@ -939,7 +939,6 @@ const FOOTER_LINKS = [
   { href: "/about", route: "/about", key: "nav.about", copy: "about", vi: "Về chúng tôi", page: true },
   { href: "/lookup", route: "/lookup", key: "nav.lookup", copy: "lookup", vi: "Tra cứu đơn", page: true },
   { href: "/contact", route: "/contact", key: "nav.contact", copy: "contact", vi: "Liên hệ", page: true },
-  { href: "/status", route: "/status", key: "nav.status", copy: "status", vi: "Trạng thái", page: true },
   { mail: true, route: null, key: "nav.contactEmail", copy: "contactEmail", vi: "Email hỗ trợ" },
 ];
 

@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title data-i18n="title.status">Trạng thái dịch vụ - {{brandName}}</title>
 <meta name="description" content="Trạng thái thật của {{brandName}}: khả dụng, tỉ lệ lỗi và độ trễ đã đo từ nguồn thật. Số liệu thay đổi theo lần deploy gần nhất và nhịp đo hằng ngày.">
-<meta name="robots" content="index,follow">
+<meta name="robots" content="noindex,follow">
 <link rel="canonical" href="{{site}}/status">
 <meta property="og:type" content="website">
 <meta property="og:locale" content="vi_VN">
@@ -16,14 +16,6 @@
 <meta property="og:image:width" content="1200">
 <meta property="og:image:height" content="630">
 <meta name="twitter:card" content="summary_large_image">
-<link rel="alternate" hreflang="vi" href="{{site}}/status">
-<link rel="alternate" hreflang="en" href="{{site}}/en/status">
-<link rel="alternate" hreflang="de" href="{{site}}/de/status">
-<link rel="alternate" hreflang="es" href="{{site}}/es/status">
-<link rel="alternate" hreflang="fr" href="{{site}}/fr/status">
-<link rel="alternate" hreflang="ja" href="{{site}}/ja/status">
-<link rel="alternate" hreflang="zh-CN" href="{{site}}/zh-CN/status">
-<link rel="alternate" hreflang="x-default" href="{{site}}/status">
 {{iconLinks}}
 
 <link rel="preload" as="font" type="font/woff2" href="/fonts/be-vietnam-pro-latin.woff2" crossorigin>
@@ -72,7 +64,7 @@
 <ul class="status-detail">
   <li><span data-i18n="status.commit">Commit đang phục vụ</span><b id="status-commit">—</b></li>
   <li><span data-i18n="status.uptime">Uptime của tiến trình</span><b id="status-uptime">—</b></li>
-  <li><span data-i18n="status.updated">Số liệu cập nhật</span><b id="status-measured">—</b></li>
+  <li><span data-i18n="status.measuredLabel">Số liệu cập nhật</span><b id="status-measured">—</b></li>
 </ul>
 <p class="status-honesty" data-i18n="status.honesty">Số liệu đo từ Cloudflare Analytics (httpRequestsAdaptiveGroups) và log máy chủ. Không làm tròn, không làm hồng, không che partial window. Nếu dữ liệu chưa đủ, trang sẽ nói rõ thay vì hiện số đẹp.</p>
 </article>

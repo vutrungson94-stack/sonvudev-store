@@ -590,7 +590,6 @@
   "products.didYouMean": "您是否想查:",
   "title.contact": "联系我们 — {brand}",
   "title.status": "服务状态 - {brand}",
-  "nav.status": "状态",
   "status.eyebrow": "系统状态",
   "status.title": "服务状态",
   "status.lead": "来自真实数据源的店铺真实状态。不做四舍五入，不承诺 100%。",
@@ -615,5 +614,6 @@
   "status.honesty": "从 Cloudflare Analytics (httpRequestsAdaptiveGroups) 和服务器日志测量。不做四舍五入，不做绿色粉饰，不隐藏部分窗口 — 数据不完整时，页面会直接说明，而不是显示好看的数字。",
   "status.error": "无法获取数据 — 服务器正在出错或无法到达。",
   "status.incidents.title": "已记录的事故",
-  "status.incidents.note": "共 {total} 次事后分析 · {without} 次未找到根本原因"
+  "status.incidents.note": "共 {total} 次事后分析 · {without} 次未找到根本原因",
+  "status.measuredLabel": "测量数据已更新"
 }

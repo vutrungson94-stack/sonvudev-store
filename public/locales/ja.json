@@ -590,7 +590,6 @@
   "products.didYouMean": "もしかして:",
   "title.contact": "お問い合わせ — {brand}",
   "title.status": "サービスの状態 - {brand}",
-  "nav.status": "ステータス",
   "status.eyebrow": "システムステータス",
   "status.title": "サービスの状態",
   "status.lead": "実際のデータソースから測定したショップの本当の状態です。丸めなし、100%の約束なし。",
@@ -615,5 +614,6 @@
   "status.honesty": "Cloudflare Analytics (httpRequestsAdaptiveGroups) とサーバーログから測定。丸めなし、ごまかしなし、部分ウィンドウを隠さない — データが不足している場合は、きれいな数字の代わりにページがその旨を表示します。",
   "status.error": "データを取得できませんでした — サーバーにエラーがあるか、到達できない状態です。",
   "status.incidents.title": "記録されたインシデント",
-  "status.incidents.note": "合計 {total} 件のポストモーテム · 根本原因なしで解決したもの {without} 件"
+  "status.incidents.note": "合計 {total} 件のポストモーテム · 根本原因なしで解決したもの {without} 件",
+  "status.measuredLabel": "測定データの更新"
 }

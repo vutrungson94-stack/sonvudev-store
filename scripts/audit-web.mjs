@@ -81,7 +81,10 @@ const dynamicRoute = /^(?:\/$|\/en(?:\/product\/[^/]+)?$|\/product\/[^/]+$|\/ord
 // Pages that are entry points rather than link targets: the buyer reaches them
 // from an email or a PayPal redirect, and robots.txt deliberately keeps crawlers
 // away from all three.
-const entryPages = new Set(["order.html", "paypal-return.html", "admin.html", "lookup.html", "404.html"]);
+// Pages that intentionally have no public link. status.html is the operational
+// page kept for the owner (probe + committed SLO evidence); customers never see
+// it, and it is deliberately unlinked + noindex + absent from the sitemap.
+const entryPages = new Set(["order.html", "paypal-return.html", "admin.html", "lookup.html", "404.html", "status.html"]);
 
 const isRealTarget = (href) => {
   const clean = href.split("#")[0].split("?")[0];
