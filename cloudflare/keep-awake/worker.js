@@ -128,8 +128,8 @@ export async function ping(shopUrl, timeoutMs = 10_000) {
 
 export default {
   /**
-   * Runs once a minute. Returns the outcome so it appears in Workers Logs without
-   * needing console.log — a log nobody reads is the same as no log.
+   * Runs every five minutes. Returns the outcome so it appears in Workers Logs
+   * without needing console.log — a log nobody reads is the same as no log.
    *
    * `event.scheduledTime` is used rather than Date.now() because it is the time
    * the trigger was due, which is what makes the log line line up with the cron
@@ -160,8 +160,8 @@ export default {
     }
 
     const result = await ping(shopUrl);
-    // Only the unhappy path is logged. A ping every minute for 17 hours is about a
-    // thousand lines a day, and a log that is always full is a log nobody opens.
+    // Only the unhappy path is logged. A ping every five minutes for 19 hours is
+    // 228 lines a day, and a log that is always full is a log nobody opens.
     if (!result.ok) {
       console.error(`[keep-awake] ${shopUrl} -> ${result.detail} (HTTP ${result.status})`);
     }

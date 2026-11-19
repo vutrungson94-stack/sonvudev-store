@@ -32,10 +32,6 @@
 //   closed. Registering the subdomain does not require publishing to it.
 "workers_dev": false,
 
-  // Once a minute. Free on the Workers free tier, and one invocation is one
-  // request against the 100,000/day allowance — 1,020 calls on a 19-hour window
-  // is about one percent of it.
-  //
   // Five minutes, not one: Render sleeps a free service after 15 minutes, so
   // 5 still keeps it awake but cuts origin requests (and the bandwidth they
   // consume on the Hobby workspace) by 80% — from 43,200 to 8,640 pings/month.

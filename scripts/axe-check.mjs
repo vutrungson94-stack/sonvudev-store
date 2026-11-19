@@ -44,10 +44,10 @@ const findChrome = () => {
 };
 
 // @axe-core/cli bundles a chromedriver from its own dependency tree, which can
-// be newer than the browser on the machine. CI downloads a matched pair from
-// Chrome for Testing and points both variables at it; locally the defaults are
-// used. Passing a driver the CLI did not choose is the only way to make the
-// pair agree when the runner image is mid-update.
+// be newer than the browser on the machine. CI installs the driver that matches
+// the runner's Chrome exactly and points both variables at it; locally the
+// defaults are used. Passing a driver the CLI did not choose is the only way to
+// make the pair agree when the runner image is mid-update.
 const CHROMEDRIVER_PATH = process.env.CHROMEDRIVER_PATH && existsSync(process.env.CHROMEDRIVER_PATH)
   ? process.env.CHROMEDRIVER_PATH
   : null;
