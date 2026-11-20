@@ -262,13 +262,55 @@ jobs:
         if: steps.render.outputs.suspended == 'true'
         run: flyctl deploy --remote-only --build-arg "GIT_COMMIT=${{ github.sha }}" -a sonvudev-store
 
+  # Deploy the edge balancer from the SAME commit the checks just certified.
+  # Until 20/11 this was a manual `wrangler deploy` from a developer laptop, so
+  # a correct source fix could be pushed and still leave the old Worker serving
+  # the zone — cached gzip bytes without Content-Encoding, and 1101 on a miss.
+  # The token is already in Render and the reader below is the one the SLO ingest
+  # and the cache purge use; wiring the deploy into the job graph is what was
+  # missing. ORIGINS stays a Worker secret in Cloudflare and survives deploys.
+  deploy-worker:
+    needs: checks
+    if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    # A later push must not cancel a deploy halfway through. The workflow-level
+    # group is cancel-in-progress for checks; this job overrides it deliberately.
+    concurrency:
+      group: deploy-worker-${{ github.ref }}
+      cancel-in-progress: false
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: '22'
+          cache: npm
+
+      - run: npm ci
+
+      - name: read Cloudflare token from Render
+        # Render is the one source of truth. --required makes a missing token a
+        # hard failure: a deploy that silently skips is how the site drifted.
+        env:
+          RENDER_API_KEY: ${{ secrets.RENDER_API_KEY }}
+          RENDER_SERVICE_ID: ${{ secrets.RENDER_SERVICE_ID }}
+        run: node scripts/gha-read-cf-token.mjs --required
+
+      - name: deploy origin-balancer Worker
+        # Pinned like flyctl in deploy-fly: an unpinned npx can change between
+        # two runs of the same commit. The routes in wrangler.jsonc attach on
+        # deploy, so nothing has to be clicked in the dashboard.
+        run: npx --yes wrangler@4.165.0 deploy --config cloudflare/origin-balancer/wrangler.jsonc
+
   # The live site, checked the way a crawler sees it. Runs after the checks so it
   # never audits a commit that cannot build, and it waits for the deploy to serve
   # this exact commit before scoring anything - before, this job raced the Render
   # deploy and audited the previous release, which is how a correct fix was
-  # reported as a failure against it.
+  # reported as a failure against it. The Worker is in the dependency chain too:
+  # without it the purge and the SEO audit would measure a stale edge script.
   deployed-site:
-    needs: [checks, deploy-fly]
+    needs: [checks, deploy-fly, deploy-worker]
     runs-on: ubuntu-24.04
     timeout-minutes: 12
     # Only on the branch that is live. Every other run would report against a URL
