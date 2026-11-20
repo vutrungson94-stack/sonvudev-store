@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFile, readdir, stat } from 'node:fs/promises';
 import { spawnSync } from 'node:child_process';
+import vm from 'node:vm';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import './helpers/env.mjs';
@@ -68,6 +69,49 @@ test('manifest được chèn sau khi tải, không nằm trên critical request
   const markup = iconLinkMarkup();
   assert.ok(!markup.some((line) => line.includes('rel="manifest"')),
     'manifest không được nằm trong <head> — nó nằm trên critical request chain');
+});
+
+// A deferred script still runs before `load`, so on a slow connection a link
+// appended at that point starts fetching inside the initial navigation.
+// Lighthouse then charts /site.webmanifest as a child of the document (509 ms)
+// in "Network dependency tree". The registration has to wait for `load` itself.
+test('manifest chỉ được chèn sau load event, không phải khi script defer chạy', async () => {
+  const quality = await read('public/quality.js');
+
+  function run(readyState) {
+    const appended = [];
+    let onLoad = null;
+    const window = {
+      location: { hostname: 'localhost' },
+      addEventListener(type, handler) {
+        if (type === 'load') onLoad = handler;
+      },
+    };
+    const document = {
+      readyState,
+      createElement(tag) { return { tag, rel: null, href: null }; },
+      head: { appendChild(node) { appended.push(node); } },
+    };
+    vm.runInNewContext(quality, { window, document });
+    return { appended, onLoad };
+  }
+
+  const loading = run('interactive');
+  assert.equal(loading.appended.length, 0,
+    'manifest không được chèn trước load event');
+  assert.equal(typeof loading.onLoad, 'function',
+    'quality.js phải đăng ký load event');
+  loading.onLoad();
+  assert.equal(loading.appended.length, 1,
+    'manifest phải được chèn khi load event chạy');
+  assert.equal(loading.appended[0].rel, 'manifest');
+  assert.equal(loading.appended[0].href, '/site.webmanifest');
+
+  // If quality.js is loaded after `load` (a late injection, a cached script),
+  // the event will never fire again; readyState is the fallback.
+  const complete = run('complete');
+  assert.equal(complete.appended.length, 1,
+    'quality.js chạy sau load vẫn phải đăng ký manifest');
 });
 
 // The header brand mark is an <img> on every page. It has to be requested from the

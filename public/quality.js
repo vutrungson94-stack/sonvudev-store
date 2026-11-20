@@ -9,18 +9,24 @@
 //
 // Kept external so the site's CSP does not need unsafe-inline scripts.
 (function () {
-  // The web app manifest, added after the page has loaded.
+  // The web app manifest, added after the load event.
   //
   // It used to be a <link rel="manifest"> in the head, which the browser
   // discovers while parsing the HTML and fetches as a high-priority request.
   // That put it on the critical request chain: Lighthouse reported a 781 ms
-  // chain for a 1 KiB file ("Network dependency tree"). Adding it from this
-  // deferred script keeps it off the chain. The install prompt still finds it,
-  // a few hundred milliseconds later.
-  var manifestLink = document.createElement('link');
-  manifestLink.rel = 'manifest';
-  manifestLink.href = '/site.webmanifest';
-  document.head.appendChild(manifestLink);
+  // chain for a 1 KiB file ("Network dependency tree"). A deferred script is
+  // not enough: it runs before `load`, so on a slow connection the manifest
+  // fetch still landed inside the initial navigation (509 ms, charted as a
+  // child of the document). Wait for `load`; the install prompt still finds
+  // it, just outside the initial navigation.
+  function addManifest() {
+    var manifestLink = document.createElement('link');
+    manifestLink.rel = 'manifest';
+    manifestLink.href = '/site.webmanifest';
+    document.head.appendChild(manifestLink);
+  }
+  if (document.readyState === 'complete') addManifest();
+  else window.addEventListener('load', addManifest, { once: true });
 
   var host = window.location && window.location.hostname;
   if (!host) return;
