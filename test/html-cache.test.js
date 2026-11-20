@@ -6,8 +6,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { promises as fs } from 'node:fs';
-import http from 'node:http';
-import { gunzipSync } from 'node:zlib';
 import os from 'node:os';
 import path from 'node:path';
 import './helpers/env.mjs';
@@ -52,39 +50,6 @@ test('public HTML is cacheable for a day and survives an origin error via stale-
     assert.match(cc, /stale-if-error=2592000/, `${route} must serve cached HTML when the origin is suspended`);
     assert.match(cc, /no-transform/, `${route} must stop Cloudflare from injecting its JavaScript Detection script`);
   }
-});
-
-// Node's fetch() auto-decompresses and hides Content-Encoding, so the wire
-// format has to be inspected with raw HTTP — that is what the edge actually sees.
-const rawGet = (url, headers = {}) => new Promise((resolve, reject) => {
-  const request = http.get(url, { headers }, (response) => {
-    const chunks = [];
-    response.on('data', (chunk) => chunks.push(chunk));
-    response.on('end', () => resolve({
-      status: response.statusCode,
-      headers: response.headers,
-      body: Buffer.concat(chunks),
-    }));
-  });
-  request.on('error', reject);
-});
-
-test('public HTML is gzipped with Vary for gzip clients and plain for identity clients', async () => {
-  const gz = await rawGet(`${base}/`, { 'Accept-Encoding': 'gzip' });
-  assert.equal(gz.status, 200);
-  assert.equal(gz.headers['content-encoding'], 'gzip', 'the wire must actually carry gzip bytes');
-  assert.match(String(gz.headers['vary'] || ''), /accept-encoding/i, 'caches must keep the two variants apart');
-  const decoded = gunzipSync(gz.body).toString('utf8');
-  assert.match(decoded, /<html/i, 'gunzip must yield the server-rendered page');
-  assert.doesNotMatch(decoded, /\{\{brandWordmark\}\}/, 'the rendered page must not leak raw tokens');
-
-  const plain = await rawGet(`${base}/`, { 'Accept-Encoding': 'identity' });
-  assert.equal(plain.status, 200);
-  assert.equal(plain.headers['content-encoding'], undefined, 'identity clients must not receive gzip bytes');
-  const text = plain.body.toString('utf8');
-  assert.match(text, /<html/i);
-  assert.match(String(plain.headers['cache-control'] || ''), /no-transform/, 'the JSD fix must survive the gzip change');
-  assert.ok(gz.body.length < plain.body.length / 2, `gzip ${gz.body.length}B must be far smaller than ${plain.body.length}B plain`);
 });
 
 test('API responses stay no-store even though HTML is now long-cached', async () => {

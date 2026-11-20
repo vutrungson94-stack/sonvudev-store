@@ -3,7 +3,6 @@ import path from "node:path";
 import { promises as fs } from "node:fs";
 import { fileURLToPath } from "node:url";
 import crypto from "node:crypto";
-import { gzipSync } from "node:zlib";
 import { env, isConfigured } from "./config.js";
 import { ORDER_STATUSES, countOrders, countOrdersForProduct, dataDir, ensureSeed, findOrderByIdempotencyKey, getOrder, getProduct, getProductBySlug, isOrderOwner, isSellable, latestOrder, listOpenOrders, listOrders, listOrdersForRevenue, listProducts, listProductsWithLocaleCopy, listRefundedEmails, createOrder, updateOrder, createProduct, updateProduct, deleteProduct, persistenceMode } from "./store.js";
 import { supabaseRequest } from "./supabase-http.js";
@@ -607,25 +606,9 @@ async function renderPage(file, lang = DEFAULT_LOCALE) {
 // Only HTML uses this constant; CSS/JS/images keep their own immutable cache.
 const PUBLIC_PAGE_CACHE = "public, max-age=86400, stale-while-revalidate=604800, stale-if-error=2592000, no-transform";
 
-// Public HTML is byte-identical for every visitor, so it can be compressed once
-// per request without touching any per-visitor data. `Vary` is mandatory: without
-// it the edge could serve the gzipped bytes to a client that cannot decode them.
-// The origin balancer asks for `identity` and compresses at the edge itself, but
-// direct-origin callers (health checks, failover tests) get the same benefit here.
-const acceptsGzip = (req) => /\bgzip\b/i.test(req.get("accept-encoding") || "");
-const sendHtml = (req, res, html, status = 200) => {
-  res.status(status).type("html").set("Vary", "Accept-Encoding");
-  if (acceptsGzip(req)) {
-    res.set("Content-Encoding", "gzip").send(gzipSync(Buffer.from(html, "utf8")));
-  } else {
-    res.send(html);
-  }
-};
-
-const sendPage = (file, lang = DEFAULT_LOCALE) => async (req, res) => {
+const sendPage = (file, lang = DEFAULT_LOCALE) => async (_req, res) => {
   try {
-    res.set("Cache-Control", PUBLIC_PAGE_CACHE);
-    sendHtml(req, res, await renderPage(file, lang));
+    res.set("Cache-Control", PUBLIC_PAGE_CACHE).type("html").send(await renderPage(file, lang));
   } catch (error) {
     console.error(error);
     // A broken template must not take the storefront down with it.
@@ -637,10 +620,9 @@ const sendPage = (file, lang = DEFAULT_LOCALE) => async (req, res) => {
 // them does: /404.html is a real file in public/, so express.static answers it
 // before the catch-all ever runs and hands back the raw template. The one URL
 // where someone is already lost is not the place to show them "© {{year}}".
-const notFound = async (req, res) => {
+const notFound = async (_req, res) => {
   try {
-    res.set("Cache-Control", PUBLIC_PAGE_CACHE);
-    sendHtml(req, res, await renderPage("404.html"), 404);
+    res.status(404).set("Cache-Control", PUBLIC_PAGE_CACHE).type("html").send(await renderPage("404.html"));
   } catch (error) {
     console.error(error);
     res.status(404).sendFile(path.join(publicDir, "404.html"));
@@ -806,12 +788,11 @@ const productPage = (lang) => async (req, res) => {
       return renderProductPage(product, lang, reviews, related);
     });
     if (html == null) return notFound(req, res);
-    res.set("Cache-Control", PUBLIC_PAGE_CACHE);
-    sendHtml(req, res, html);
+    res.set("Cache-Control", PUBLIC_PAGE_CACHE).type("html").send(html);
   } catch (error) {
     console.error(error);
     try {
-      sendHtml(req, res, await renderPage("404.html"), 500);
+      res.status(500).type("html").send(await renderPage("404.html"));
     } catch {
       res.status(500).sendFile(path.join(publicDir, "404.html"));
     }
@@ -836,18 +817,16 @@ const blogPage = (lang) => async (req, res) => {
       return renderBlogPost(post, lang);
     }, 300000);
     if (html == null) return notFound(req, res);
-    res.set("Cache-Control", PUBLIC_PAGE_CACHE);
-    sendHtml(req, res, html);
+    res.set("Cache-Control", PUBLIC_PAGE_CACHE).type("html").send(html);
   } catch (error) {
     console.error(error);
     res.status(500).sendFile(path.join(publicDir, "404.html"));
   }
 };
-const blogIndexPage = (lang) => async (req, res) => {
+const blogIndexPage = (lang) => async (_req, res) => {
   try {
     const html = await cachedHtml(`blog-index:${lang}`, () => renderBlogIndex(loadBlogPosts(), lang), 300000);
-    res.set("Cache-Control", PUBLIC_PAGE_CACHE);
-    return sendHtml(req, res, html);
+    return res.set("Cache-Control", PUBLIC_PAGE_CACHE).type("html").send(html);
   } catch (error) {
     console.error(error);
     return res.status(500).sendFile(path.join(publicDir, "404.html"));
