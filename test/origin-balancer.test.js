@@ -5,6 +5,7 @@
 // on one free host and burns its 5 GB.
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { gunzipSync } from 'node:zlib';
 import './helpers/env.mjs';
 import {
   parseOrigins,
@@ -12,6 +13,7 @@ import {
   pickOrigin, orderOrigins,
   isCacheable, isSuspension, staleKey,
   clientAddress, apexRedirect,
+  withHeader, upstreamHeaders, acceptsGzip, gzipHtmlResponse, isCurrentCache,
 } from '../cloudflare/origin-balancer/worker.js';
 
 const ORIGINS = ['https://alpha.example', 'https://beta.example', 'https://gamma.example'];
@@ -98,6 +100,55 @@ test('suspension detection covers 5xx and the provider page, not a normal 404', 
   assert.equal(isSuspension(200, 'This service has been suspended by its owner'), true);
   assert.equal(isSuspension(404, 'page not found'), false);
   assert.equal(isSuspension(200, 'Welcome'), false);
+});
+
+test('the worker asks the origin for identity bytes so it cannot decompress them', () => {
+  const headers = upstreamHeaders(new Headers({
+    'accept-encoding': 'gzip, deflate, br',
+    'x-visitor': 'kept',
+  }));
+  assert.equal(headers.get('accept-encoding'), 'identity');
+  assert.equal(headers.get('x-visitor'), 'kept');
+  assert.equal(acceptsGzip(new Headers({ 'accept-encoding': 'gzip, deflate, br' })), true);
+  assert.equal(acceptsGzip(new Headers({ 'accept-encoding': 'br' })), false);
+  assert.equal(acceptsGzip(new Headers()), false);
+});
+
+test('a cache entry from before the gzip change is ignored', () => {
+  const old = new Response('plain', { headers: { 'x-svd-origin': 'edge-cache' } });
+  const current = withHeader(old, 'X-SVD-Cache-V', 'gzip-20261120');
+  assert.equal(isCurrentCache(old), false, 'unversioned entries must be refetched');
+  assert.equal(isCurrentCache(current), true);
+  assert.equal(isCurrentCache(null), false);
+});
+
+test('the worker gzips HTML once and advertises the variant', async () => {
+  const html = '<html><body>SonVuDev</body></html>'.repeat(50);
+  const source = new Response(html, {
+    status: 200,
+    headers: { 'content-type': 'text/html; charset=utf-8' },
+  });
+  const gz = gzipHtmlResponse(source);
+  assert.equal(gz.status, 200);
+  assert.equal(gz.headers.get('content-encoding'), 'gzip');
+  assert.match(gz.headers.get('vary') || '', /accept-encoding/i);
+  const wire = Buffer.from(await gz.arrayBuffer());
+  assert.equal(gunzipSync(wire).toString('utf8'), html, 'exactly one layer of gzip');
+  assert.ok(wire.length < Buffer.byteLength(html) / 2, `${wire.length}B must be smaller than ${Buffer.byteLength(html)}B`);
+});
+
+test('tagging an encoded response keeps its body and the manual encoding contract', async () => {
+  const source = new Response('<html>encoded</html>', {
+    status: 201,
+    headers: { 'content-type': 'text/html', 'x-existing': 'yes' },
+  });
+  const encoded = gzipHtmlResponse(source);
+  const tagged = withHeader(encoded, 'X-SVD-Origin', 'alpha.example');
+  assert.equal(tagged.status, 201);
+  assert.equal(tagged.headers.get('content-encoding'), 'gzip');
+  assert.equal(tagged.headers.get('x-existing'), 'yes');
+  assert.equal(tagged.headers.get('x-svd-origin'), 'alpha.example');
+  assert.equal(gunzipSync(Buffer.from(await tagged.arrayBuffer())).toString('utf8'), '<html>encoded</html>');
 });
 
 test('stale key is distinct from the live key and stable', () => {

@@ -17,6 +17,10 @@
 // that is the read-only failover when all free hosts are suspended at once.
 
 const DEFAULT_COOLDOWN_MS = 120_000;
+// Cache entries created before the gzip change carry plain HTML and no version
+// marker. Tagging every new entry lets this version ignore them instead of
+// serving an uncompressed page for the rest of the origin's one-day TTL.
+const CACHE_VERSION = "gzip-20261120";
 
 /** FNV-1a, small, fast, deterministic in Workers and in Node tests. */
 const hash32 = (text) => {
@@ -71,13 +75,42 @@ export const staleKey = (url) => {
   return parsed.toString();
 };
 
-const withHeader = (response, name, value) => {
+// workerd's `encodeBody: "manual"` flag is write-only and is silently dropped
+// when a Response is rebuilt from a plain object init (workerd#7066). With a
+// Content-Encoding header still present the runtime then encodes the body a
+// SECOND time and the browser receives garbage. Passing the original Response
+// as the init preserves the flag, and headers.set() still lets us tag it.
+export const withHeader = (response, name, value) => {
+  const out = new Response(response.body, response);
+  out.headers.set(name, value);
+  return out;
+};
+
+/** Workers fetch() transparently decompresses gzip from an upstream. Asking the
+ *  origin for identity bytes makes decompression impossible here — the edge does
+ *  its own gzip below, so the compressed representation is chosen exactly once. */
+export const upstreamHeaders = (headers) => {
+  const result = new Headers(headers);
+  result.set("Accept-Encoding", "identity");
+  return result;
+};
+
+export const acceptsGzip = (headers) => /\bgzip\b/i.test(String(headers.get("accept-encoding") || ""));
+
+export const isCurrentCache = (response) => Boolean(response && response.headers.get("x-svd-cache-v") === CACHE_VERSION);
+
+/** Return pre-compressed HTML. `encodeBody: "manual"` is what keeps workerd from
+ *  encoding these bytes again; Vary keeps gzip and identity cache entries apart. */
+export const gzipHtmlResponse = (response) => {
+  const body = response.body.pipeThrough(new CompressionStream("gzip"));
   const headers = new Headers(response.headers);
-  headers.set(name, value);
-  return new Response(response.body, {
+  headers.set("Content-Encoding", "gzip");
+  headers.set("Vary", "Accept-Encoding");
+  return new Response(body, {
     status: response.status,
     statusText: response.statusText,
     headers,
+    encodeBody: "manual",
   });
 };
 
@@ -123,37 +156,44 @@ export default {
 
     if (cacheable) {
       const cached = await caches.default.match(request);
-      if (cached) return withHeader(cached, "X-SVD-Origin", "edge-cache");
+      if (isCurrentCache(cached)) {
+        return withHeader(cached, "X-SVD-Origin", "edge-cache");
+      }
     }
 
     let lastStatus = 502;
     for (const origin of orderOrigins(origins, identity)) {
       try {
         const upstream = new URL(url.pathname + url.search, `${origin}/`);
-        const response = await fetch(upstream, {
+        const upstreamResponse = await fetch(upstream, {
           method: request.method,
-          headers: request.headers,
+          headers: upstreamHeaders(request.headers),
           body: ["GET", "HEAD"].includes(request.method) ? undefined : request.body,
           redirect: "manual",
         });
-        const looksHtml = (response.headers.get("content-type") || "").includes("text/html");
-        const bodyHead = response.status >= 500 || looksHtml
-          ? (await response.clone().text()).slice(0, 2000)
+        const looksHtml = (upstreamResponse.headers.get("content-type") || "").includes("text/html");
+        const bodyHead = upstreamResponse.status >= 500 || looksHtml
+          ? (await upstreamResponse.clone().text()).slice(0, 2000)
           : "";
-        if (isSuspension(response.status, bodyHead)) {
+        if (isSuspension(upstreamResponse.status, bodyHead)) {
           markDown(origin, cooldown);
-          lastStatus = response.status >= 500 ? response.status : 502;
+          lastStatus = upstreamResponse.status >= 500 ? upstreamResponse.status : 502;
           continue;
         }
         markUp(origin);
+        // The origin answered identity bytes, so this is the only place HTML is
+        // compressed. Non-HTML and clients without gzip keep the raw body.
+        const response = looksHtml && acceptsGzip(request.headers)
+          ? gzipHtmlResponse(upstreamResponse)
+          : upstreamResponse;
         const tagged = withHeader(response, "X-SVD-Origin", origin.replace(/^https?:\/\//, ""));
         if (cacheable) {
-          ctx.waitUntil(caches.default.put(request, tagged.clone()));
-          const staleHeaders = Object.fromEntries(tagged.headers);
-          staleHeaders["Cache-Control"] = "public, max-age=2592000";
-          ctx.waitUntil(caches.default.put(staleKey(request.url), new Response(tagged.clone().body, {
-            status: 200, headers: staleHeaders,
-          })));
+          const versioned = withHeader(tagged, "X-SVD-Cache-V", CACHE_VERSION);
+          ctx.waitUntil(caches.default.put(request, versioned.clone()));
+          // Build the stale copy with the same safe helper — a plain object init
+          // would drop the manual encoding flag and double-encode the fallback.
+          const stale = withHeader(versioned, "Cache-Control", "public, max-age=2592000");
+          ctx.waitUntil(caches.default.put(staleKey(request.url), stale.clone()));
         }
         return tagged;
       } catch (error) {
@@ -164,7 +204,7 @@ export default {
 
     if (cacheable) {
       const stale = await caches.default.match(staleKey(request.url));
-      if (stale) {
+      if (isCurrentCache(stale)) {
         return withHeader(withHeader(stale, "Warning", '110 - "Response is stale"'), "Cache-Control", "no-store");
       }
     }

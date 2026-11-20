@@ -47,7 +47,7 @@ live_lighthouse_after:  { performance: 99,  best_practices: 100 }
 deprecations_audit: "score=1, 0 warnings (trước: score=0, 2 warnings từ jsd/main.js)"
 live_html: "GET / → 200, cache-control=...stale-if-error=2592000, no-transform; cf-cache-status=HIT sau khi ấm; content-encoding=null; jsd_present=false"
 health_commit: ae8507c7ab4ad8add8e8e3d4c67029bfd6023698
-decision: "Không cần gzip origin — Perf 99 vẫn dư 14 điểm so với ngưỡng 85. Edge HIT ổn định nên origin không nhận thêm tải; lưu lượng lớn vẫn do Cloudflare gánh."
+decision: "Không cần gzip origin để giữ gate — Perf 99 vẫn dư 14 điểm so với ngưỡng 85. Edge HIT ổn định nên origin không nhận thêm tải. Tuy nhiên chủ cửa hàng yêu cầu triệt để insight 'No compression applied'; xem CHANGE-PLAN-2026-11-20-ORIGIN-GZIP.md cho bước nén bổ sung (không đổi no-transform)."
 known_tooling_issue: "gbuild.ps1 đỏ ở Preflight: fly.toml bị heuristic TOML trong _Build/Modules/SharedUtils.psm1:1044 đánh là 'suspicious TOML (no section header)' vì file bắt đầu bằng comment + khóa top-level trước section đầu tiên. fly.toml có từ các commit Fly trước đó, lỗi có sẵn, không do change này; không sửa tool/gate để làm xanh."
 ```
 
