@@ -98,3 +98,18 @@ verification:
 rollback: "PUT /zones/{zone}/bot_management {enable_js:true} then git revert this commit; no other zone setting or secret changes"
 ```
 
+## Kết quả đo rev 2 (2026-11-20)
+
+```yaml
+commit_deployed: c1416ee
+ci_run: 44765166133   # xanh: node 22/24, lighthouse, deploy-fly, deploy-worker, deployed-site, release-tag
+zone_change: "PUT /zones/{zone}/bot_management {enable_js:false} → HTTP 200; before/after diff: only enable_js changed; fight_mode=false unchanged"
+live_html: "GET / → 200, cache-control=public, max-age=86400, stale-while-revalidate=604800, stale-if-error=2592000 (không còn no-transform), vary=accept-encoding, jsd_present=false, 1 title / 1 h1 / 1 canonical"
+transfer_bytes: { identity: 115035, br: 34878, gzip: 25341 }  # đo bằng curl, mỗi biến thể một URL ?probe= riêng
+live_lighthouse: { performance: 99, accessibility: 100, best_practices: 100, seo: 100, lcp_ms: 729, cls: 0, tbt_ms: 13 }
+seo_check: "212/212"
+health_commit: c1416eed6d247c49869bd98668042af774c693b9
+report: build-reports/lighthouse-2026-11-20T15-46-41-146Z.json
+decision: "Giữ. JSD tắt không mất enforcement nào đang bật; HTML nén được ở edge và Best Practices vẫn 100."
+```
+
