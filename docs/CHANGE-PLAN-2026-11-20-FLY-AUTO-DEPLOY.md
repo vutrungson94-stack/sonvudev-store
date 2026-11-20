@@ -66,8 +66,10 @@ verified:
   - cmd: _Sync/gsync.ps1 -Project <repo> -DryRun
     result: "PASS exit 0 — no changes made at dry-run stage"
   - external: "FLY_API_TOKEN (deploy scope, 1 year) created with flyctl tokens create deploy -a sonvudev-store -n github-actions -x 8760h, piped to gh secret set — value never printed; gh secret list shows FLY_API_TOKEN"
-  - cmd: push CI run
-    result: "pending — verify deploy-fly job runs (Render is suspended), deployed-site green, live /api/health commit == new github.sha"
+  - cmd: node scripts/render-suspended.mjs against the real Render API (RENDER_* from .env)
+    result: "exit 0, stdout `suspended=true` — matches the suspended state reported by GET /v1/services/{id}"
+  - cmd: push CI run 44676323181
+    result: "PASS — deploy-fly job ran automatically (✓ deploy to Fly), deployed-site (1m25s) and release-tag (23s) green, no manual flyctl call; watch exit 0"
 ```
 
 Revisions: rev 1 — initial plan. Stop and write rev 2 if a file outside scope is needed.
