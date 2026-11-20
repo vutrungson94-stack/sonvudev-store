@@ -147,12 +147,21 @@ export async function measureSLOs(root, slos = SLOS) {
     const coverageOf = (report) => {
       if (!report || report.coverageDays == null) return null;
       const coverageDays = Number(report.coverageDays);
+      const windowDays = Number(report.windowDays) || null;
       return {
         coverageDays,
-        windowDays: Number(report.windowDays) || null,
+        windowDays,
         observedFrom: report.observedFrom || null,
         observedTo: report.observedTo || null,
-        partialWindow: Number.isFinite(coverageDays) && coverageDays < 1,
+        // Partial is relative to the DECLARED window, not to one day. A 3-day
+        // Cloudflare sample of a 30-day objective (edge switched on 17/11) is
+        // still a partial window. 95% allows a few missing trailing buckets in
+        // an otherwise complete window — measured spans end at the last real
+        // request, never exactly at the requested boundary.
+        partialWindow: Number.isFinite(coverageDays) && (
+          (windowDays != null && coverageDays < windowDays * 0.95)
+          || (windowDays == null && coverageDays < 1)
+        ),
       };
     };
 
@@ -253,15 +262,18 @@ export async function measureSLOs(root, slos = SLOS) {
       breached = !meets;
     }
 
-    // A window objective measured from a short sample is evidence, not a pass.
-    // On 17/11 a 20-minute availability sample printed "100%" with only a
-    // partialWindow note beside it, which is how a self-certifying metric looks
-    // when it is dressed up with metadata: the number still passes the gate.
-    // Keep the value visible (a reader can see what was sampled), but withdraw
-    // the "ok" status until a full window is measured. Nothing here turns an
-    // unmeasured value into 0/100 and no target is changed.
-    if (slo.basis === 'window' && coverage?.partialWindow === true && status === 'ok') {
+    // A window objective measured from a short sample is evidence, not a pass
+    // — and not a breach either. On 17/11 a 20-minute sample printed "100%"
+    // with only a partialWindow note beside it; on 20/11 a 3-day Cloudflare
+    // sample was called a 30-day breach for 1,850 5xx. Both are the same
+    // mistake: a number measured over less than the declared window cannot
+    // certify the objective in either direction. Keep the value visible (a
+    // reader can see what was sampled) and withdraw BOTH statuses until the
+    // full window is measured. No target is changed; a full window with a bad
+    // value still breaches and still fails the gate.
+    if (slo.basis === 'window' && coverage?.partialWindow === true) {
       status = 'unknown';
+      breached = false;
     }
 
     measurements[slo.id] = {
