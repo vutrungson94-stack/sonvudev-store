@@ -43,11 +43,11 @@ rollback: "remove `no-transform` from PUBLIC_PAGE_CACHE and let _Sync push; no W
 commit: ae8507c
 ci_run: 44706721503   # xanh: node 24/22, lighthouse, deploy-fly, deployed-site, release-tag
 live_lighthouse_before: { performance: 100, best_practices: 81 }
-live_lighthouse_after:  { performance: 99,  best_practices: 100 }
+live_lighthouse_after:  { performance: 100, best_practices: 100 }  # tái đo lại lúc 16-3x 2026-11-20 vẫn 100; report đầy đủ: lighthouse-2026-11-20T16-35-02-745Z.json
 deprecations_audit: "score=1, 0 warnings (trước: score=0, 2 warnings từ jsd/main.js)"
-live_html: "GET / → 200, cache-control=...stale-if-error=2592000, no-transform; cf-cache-status=HIT sau khi ấm; content-encoding=null; jsd_present=false"
+live_html: "GET / → 200, cache-control=...stale-if-error=2592000, no-transform; cf-cache-status=HIT sau khi ấm; content-encoding=br (edge Brotli, Cloudflare JSD off); jsd_present=false"
 health_commit: ae8507c7ab4ad8add8e8e3d4c67029bfd6023698
-decision: "Không cần gzip origin — Perf 99 vẫn dư 14 điểm so với ngưỡng 85. Edge HIT ổn định nên origin không nhận thêm tải; lưu lượng lớn vẫn do Cloudflare gánh."
+decision: "Không cần gzip origin — Perf 100 vẫn dư 15 điểm so với ngưỡng 85. Edge HIT ổn định nên origin không nhận thêm tải; lưu lượng lớn vẫn do Cloudflare gánh."
 known_tooling_issue: "gbuild.ps1 đỏ ở Preflight: fly.toml bị heuristic TOML trong _Build/Modules/SharedUtils.psm1:1044 đánh là 'suspicious TOML (no section header)' vì file bắt đầu bằng comment + khóa top-level trước section đầu tiên. fly.toml có từ các commit Fly trước đó, lỗi có sẵn, không do change này; không sửa tool/gate để làm xanh."
 ```
 
@@ -106,7 +106,8 @@ ci_run: 44765166133   # xanh: node 22/24, lighthouse, deploy-fly, deploy-worker,
 zone_change: "PUT /zones/{zone}/bot_management {enable_js:false} → HTTP 200; before/after diff: only enable_js changed; fight_mode=false unchanged"
 live_html: "GET / → 200, cache-control=public, max-age=86400, stale-while-revalidate=604800, stale-if-error=2592000 (không còn no-transform), vary=accept-encoding, jsd_present=false, 1 title / 1 h1 / 1 canonical"
 transfer_bytes: { identity: 115035, br: 34878, gzip: 25341 }  # đo bằng curl, mỗi biến thể một URL ?probe= riêng
-live_lighthouse: { performance: 99, accessibility: 100, best_practices: 100, seo: 100, lcp_ms: 729, cls: 0, tbt_ms: 13 }
+live_lighthouse: { performance: 100, accessibility: 100, best_practices: 100, seo: 100, lcp_ms: 144, cls: 0 }
+tai_do_2026_11_21: "tái đo lại lúc 16-3x 2026-11-20: vẫn Performance 100 / BP 100; report đầy đủ ở build-reports/lighthouse-2026-11-20T16-35-02-745Z.json; quyết định giữ — không phục hồi no-transform, không cần gzip origin"
 seo_check: "212/212"
 health_commit: c1416eed6d247c49869bd98668042af774c693b9
 report: build-reports/lighthouse-2026-11-20T15-46-41-146Z.json
