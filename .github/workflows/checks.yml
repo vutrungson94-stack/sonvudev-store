@@ -297,6 +297,15 @@ jobs:
           RENDER_SERVICE_ID: ${{ secrets.RENDER_SERVICE_ID }}
         run: node scripts/gha-read-cf-token.mjs --required
 
+      - name: resolve Cloudflare account id from the zone
+        # The Render-held token can read zones but cannot list accounts, so
+        # wrangler otherwise stops before uploading the script. Deriving the id
+        # from the zone already in secrets avoids widening the token or adding
+        # a second stored copy of the account id.
+        env:
+          CLOUDFLARE_ZONE_ID: ${{ secrets.CLOUDFLARE_ZONE_ID }}
+        run: node scripts/gha-cf-account-id.mjs
+
       - name: deploy origin-balancer Worker
         # Pinned like flyctl in deploy-fly: an unpinned npx can change between
         # two runs of the same commit. The routes in wrangler.jsonc attach on

@@ -451,8 +451,10 @@ Từ 20/11/2026 lệnh deploy **không còn là báp thủ công trong release p
 `deploy-worker` trong `.github/workflows/checks.yml` chạy sau `checks` trên `main`,
 đọc `CLOUDFLARE_API_TOKEN` từ Render (giống SLO ingest/cache purge), deploy bằng
 `wrangler@4.165.0`, và `deployed-site` đợi job này trước khi purge + `seo:check`.
-`ORIGINS` là Worker secret trên Cloudflare, được giữ lại qua mỗi deploy. Giữ các
-lệnh trên làm phương án dự phòng (khi cần deploy ngoài CI); token cần quyền
+`ORIGINS` là Worker secret trên Cloudflare, được giữ lại qua mỗi deploy. Vì token
+từ Render không có quyền liệt kê account, job lấy `CLOUDFLARE_ACCOUNT_ID` từ
+`CLOUDFLARE_ZONE_ID` (`scripts/gha-cf-account-id.mjs`) rồi mới gọi wrangler. Giữ
+các lệnh trên làm phương án dự phòng (khi cần deploy ngoài CI); token cần quyền
 **Account → Workers Scripts:Edit**, nếu thiếu job `deploy-worker` sẽ đỏ ngay.
 
 Routes `sonvudev.com/*` và `www.sonvudev.com/*` nằm trong `wrangler.jsonc`
