@@ -87,13 +87,16 @@ test('structured data merchant listing: Offer có applicableCountry + digital sh
   assert.ok(!('aggregateRating' in merchant), 'không tự thêm AggregateRating (không đủ điều kiện rich result)');
   assert.ok(Array.isArray(merchant.offers.hasMerchantReturnPolicy.applicableCountry), 'return policy phải có applicableCountry');
   assert.ok(merchant.offers.hasMerchantReturnPolicy.applicableCountry.includes('VN'), 'return policy áp dụng VN');
-  // GMC requires returnMethod on every MerchantReturnPolicy. Digital goods
-  // return the download itself, so the value is ReturnDownload, not
-  // ReturnByMail (that is for physical goods). The first draft asserted its
-  // absence and Merchant Center flagged "Trường returnMethod bị thiếu" on all
-  // 8 products — the test and the doc were both wrong together.
-  assert.equal(merchant.offers.hasMerchantReturnPolicy.returnMethod, 'https://schema.org/ReturnDownload',
-    'sản phẩm số: returnMethod phải là ReturnDownload, không được bỏ trống');
+  // Google accepts only ReturnAtKiosk / ReturnByMail / ReturnInStore here.
+  // ReturnDownload is a real schema.org term but is NOT a supported value — it
+  // made Merchant Center flag "'returnMethod' không hợp lệ" on 7 items on
+  // 2026-11-20. ADR 0003 had ReturnByMail from the start; an intermediate change
+  // to ReturnDownload was wrong, proven by running this test against the fixed
+  // src/pages.js before this edit (actual ReturnByMail, expected ReturnDownload).
+  assert.equal(merchant.offers.hasMerchantReturnPolicy.returnMethod, 'https://schema.org/ReturnByMail',
+    'returnMethod phải là giá trị Google hỗ trợ, không được bỏ trống');
+  assert.notEqual(merchant.offers.hasMerchantReturnPolicy.returnMethod, 'https://schema.org/ReturnDownload',
+    'ReturnDownload bị GMC từ chối — không được phát lại');
   // Digital products: shippingDetails present with a zero-value deliveryTime —
   // Merchant Center flags "deliveryTime bị thiếu (nằm trong offers.shippingDetails)".
   assert.ok(merchant.offers.shippingDetails, 'sản phẩm số: phải có shippingDetails với deliveryTime');

@@ -549,23 +549,20 @@ const productSchema = (product, lang = "vi") => ({
  // The published policy at /refund is a 14-day, free-return policy under
  // Vietnamese jurisdiction, so those are the values a crawler is given. Digital
  // delivery has no carrier and no shipping cost, so the shipping rate is zero.
-const merchantReturnPolicy = (isDigital = true) => {
+const merchantReturnPolicy = () => {
     const policy = {
       "@type": "MerchantReturnPolicy",
       applicableCountry: ["VN"],
       returnPolicyCategory: "https://schema.org/MerchantReturnFiniteReturnWindow",
       merchantReturnDays: 14,
       returnFees: "https://schema.org/FreeReturn",
+      // Google supports only ReturnAtKiosk, ReturnByMail and ReturnInStore here.
+      // ReturnDownload is a real schema.org term but is NOT a supported value —
+      // emitting it made Merchant Center report "'returnMethod' không hợp lệ"
+      // on 7 items and blocked rich-result validation. The remote return of a
+      // downloaded file is expressed with the supported remote method.
+      returnMethod: "https://schema.org/ReturnByMail",
     };
-    // GMC requires returnMethod on every MerchantReturnPolicy. Digital goods
-    // return the download itself; physical goods would return by mail. The
-    // first draft omitted it for digital products and Merchant Center flagged
-    // "Trường returnMethod bị thiếu" on every product — the remediation doc
-    // said "không returnMethod cho sản phẩm số" and the test asserted its
-    // absence, so both were wrong at the same time.
-    policy.returnMethod = isDigital
-      ? "https://schema.org/ReturnDownload"
-      : "https://schema.org/ReturnByMail";
     return policy;
   };
 
@@ -593,9 +590,9 @@ const merchantReturnPolicy = (isDigital = true) => {
 // the Product carried itemCondition and hasMerchantReturnPolicy, the
 // SoftwareApplication carried neither — so a crawler that read the app node
 // reported the merchant fields as missing even though the page published them.
-// Digital goods use ReturnDownload (the buyer gets the file back); shippingDetails
-// IS present with a zero-value digital deliveryTime because Merchant Center
-// flags its absence (see digitalShippingDetails).
+// The Offer carries a Google-supported returnMethod (ReturnByMail — see
+// merchantReturnPolicy); shippingDetails IS present with a zero-value digital
+// deliveryTime because Merchant Center flags its absence (see digitalShippingDetails).
 const productOffer = (product, lang = DEFAULT_LOCALE) => {
   const isDigital = true; // All products are digital downloads
   const shippingDetails = digitalShippingDetails(isDigital, String(product.currency || "VND").toUpperCase());
@@ -607,7 +604,7 @@ const productOffer = (product, lang = DEFAULT_LOCALE) => {
     itemCondition: "https://schema.org/NewCondition",
     url: absolute(productUrl(product.slug, lang)),
     seller: { "@id": `${site()}/#organization` },
-    hasMerchantReturnPolicy: merchantReturnPolicy(isDigital),
+    hasMerchantReturnPolicy: merchantReturnPolicy(),
     ...(shippingDetails ? { shippingDetails } : {}),
   };
 };

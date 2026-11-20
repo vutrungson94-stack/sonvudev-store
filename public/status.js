@@ -43,7 +43,10 @@
       setNote(`status-${prefix}-note`, T('status.honesty'));
       return;
     }
-    if (availability.value == null) {
+    // A partial window is evidence, not a pass: measureSLOs() withdraws "ok"
+    // when coverageDays < 1, so a 20-minute 100% must not be printed as a
+    // 30-day SLO on a page a buyer reads. The value stays in /api/status.
+    if (availability.value == null || availability.status === 'unknown') {
       el.textContent = T('status.unknownMeasured');
     } else {
       el.textContent = `${fmtNumber(availability.value)}${availability.unit ? '%' : ''}`;

@@ -11,8 +11,8 @@ Tài liệu này tổng hợp **hành động trong codebase/website** và **hà
 - **Cấu hình minh bạch (không mặc định giả)**: `src/config.js`, `.env.example` hỗ trợ `BRAND_LEGAL_ENTITY`, `BRAND_ADDRESS`, `BRAND_PHONE` (tùy chọn, chỉ dùng khi đúng và nhất quán với GMC/cửa hàng/pháp lý).
 - **Làm sạch claim quảng cáo/khan hiếm không kiểm chứng** trong `data/products.json` (ví dụ SEO title “Giảm giá đặc biệt”, “chỉ 100 bản/100 khách đầu tiên”) cho `ramcleaner-earlybird`; thay bằng mô tả trung thực theo trang sản phẩm. **(Đợt 2026-11-14: mở rộng quét toàn bộ sản phẩm — PC Cleanup “tăng tốc”, MouseWheel “duy nhất”/“21/21 PASS”, Personal “tăng tốc”, Early Bird; seed trong `src/store.js`; `src/blog-posts/ramcleaner-earlybird.json`; locales vi/en/de/es/fr/ja/zh-CN; `products.onlyOne` → `products.noRelated`.)**
 - **Merchant listing structured data** (`Product`/`Offer`): `hasMerchantReturnPolicy` (`applicableCountry`, `returnFees`, `merchantReturnDays=14`,
-  **`returnMethod` bắt buộc trên mọi sản phẩm** — sản phẩm số dùng
-  `ReturnDownload`, hàng vật lý dùng `ReturnByMail`) và `shippingDetails` với
+  **`returnMethod` bắt buộc trên mọi sản phẩm** — dùng `https://schema.org/ReturnByMail`, giá trị được Google hỗ trợ cho cả hàng số lẫn hàng vật lý;
+  `ReturnDownload` không nằm trong 3 giá trị Google chấp nhận nên bị GMC báo "không hợp lệ" ngày 20/11) và `shippingDetails` với
   `shippingRate: 0 VND` + **`deliveryTime` 0 ngày** (GMC “deliveryTime bị thiếu
   (nằm trong offers.shippingDetails)” — 6 mục). **Một Offer duy nhất** (`Product`); `SoftwareApplication` không còn mang `offers` (tránh trùng/hai Offer lệch). **Không** thêm `AggregateRating`/review sao tự thu thập.
 - **Luồng mua/khám phá**: CTA mua dùng `/?buy=<id>` + form mua; liên kết khám phá/sản phẩm liên quan đi tới trang sản phẩm. Tránh điều hướng gây hiểu nhầm.

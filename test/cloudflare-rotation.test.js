@@ -24,7 +24,7 @@ const reply = (body, { ok = true, status = 200 } = {}) => ({
   ok, status, text: async () => (typeof body === 'string' ? body : JSON.stringify(body)),
 });
 
-function mockFetch({ renderFail = false } = {}) {
+function mockFetch({ renderFail = false, flyFail = false } = {}) {
   const calls = [];
   const fetchImpl = async (url, options = {}) => {
     const method = options.method || 'GET';
@@ -46,6 +46,14 @@ function mockFetch({ renderFail = false } = {}) {
     if (url.endsWith('/deploys') && method === 'POST') return reply({});
     if (url.endsWith('/user/tokens/new-token-id') && method === 'DELETE') return reply({ success: true, result: {} });
     if (url.endsWith(`/user/tokens/${TOKEN_ID}`) && method === 'DELETE') return reply({ success: true, result: {} });
+    if (url.includes('/env-vars') && method === 'GET') {
+      return reply([{ envVar: { key: 'CLOUDFLARE_API_TOKEN', value: 'cfut_old_value' } }]);
+    }
+    if (url === 'https://api.fly.io/graphql') {
+      return flyFail
+        ? reply({ errors: [{ message: 'fly secrets unavailable' }] })
+        : reply({ data: { setSecrets: { release: { id: 'release-1', version: 1 } } } });
+    }
     if (url.includes('api.resend.com')) return reply({});
     throw new Error(`unexpected fetch ${method} ${url}`);
   };
@@ -155,4 +163,44 @@ test('a failed Render update keeps the old token and deletes the replacement', a
   await assert.rejects(() => rotateCloudflareToken(config, { tokenId: TOKEN_ID, fetchImpl, now: NOW }), /HTTP 500/);
   assert.ok(calls.some((c) => c.method === 'DELETE' && c.url.endsWith('/user/tokens/new-token-id')), 'replacement must be rolled back');
   assert.ok(!calls.some((c) => c.method === 'DELETE' && c.url.endsWith(`/user/tokens/${TOKEN_ID}`)), 'old token must survive a failed roll');
+});
+
+const flyConfig = () => ({
+  masterToken: 'master', renderApiKey: 'render', serviceId: 'svc', resendKey: 'resend',
+  emailFrom: 'from@example.com', supportEmail: 'to@example.com', appUrl: APP_URL, signingKey: SECRET,
+  flyApiToken: 'fly-token', flyAppName: 'sonvudev-store',
+});
+
+test('Fly configured: secret is set after Render, before the old token is revoked', async () => {
+  const { calls, fetchImpl } = mockFetch();
+  const steps = [];
+  const summary = await rotateCloudflareToken(flyConfig(), {
+    tokenId: TOKEN_ID, fetchImpl, now: NOW, onStep: (s) => steps.push(s),
+  });
+  assert.deepEqual(steps, [
+    'read-old-policy', 'create-replacement', 'verify-replacement',
+    'update-render-env', 'deploy-render', 'update-fly-secret', 'mail-success', 'revoke-old',
+  ]);
+  assert.deepEqual(summary, { oldId: TOKEN_ID, newId: 'new-token-id', expiresOn: '2027-02-15T12:00:00.000Z', revoked: true });
+  const flyCalls = calls.filter((c) => c.url === 'https://api.fly.io/graphql');
+  assert.equal(flyCalls.length, 1);
+  assert.equal(flyCalls[0].body.variables.input.appId, 'sonvudev-store');
+  assert.deepEqual(flyCalls[0].body.variables.input.secrets, [
+    { key: 'CLOUDFLARE_API_TOKEN', value: 'cfut_new_value' },
+  ]);
+  assert.ok(!steps.some((s) => s.includes('cfut_new_value')), 'no step log may contain the token value');
+});
+
+test('Fly failure restores Fly and Render, deletes the replacement, keeps the old token', async () => {
+  const { calls, fetchImpl } = mockFetch({ flyFail: true });
+  await assert.rejects(
+    () => rotateCloudflareToken(flyConfig(), { tokenId: TOKEN_ID, fetchImpl, now: NOW }),
+    /fly secrets unavailable/,
+  );
+  const flyCalls = calls.filter((c) => c.url === 'https://api.fly.io/graphql');
+  assert.equal(flyCalls.length, 1, 'the failed attempt is the only Fly call — Fly was never changed, so no restore is needed');
+  assert.ok(calls.some((c) => c.method === 'PUT' && c.body.value === 'cfut_old_value'), 'Render env restored to old value');
+  assert.ok(calls.some((c) => c.method === 'POST' && c.url.endsWith('/deploys')), 'Render redeployed after restore');
+  assert.ok(calls.some((c) => c.method === 'DELETE' && c.url.endsWith('/user/tokens/new-token-id')), 'replacement deleted');
+  assert.ok(!calls.some((c) => c.method === 'DELETE' && c.url.endsWith(`/user/tokens/${TOKEN_ID}`)), 'old token must survive');
 });

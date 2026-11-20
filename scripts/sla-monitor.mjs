@@ -32,7 +32,11 @@ await writeFile(slaFile, JSON.stringify(result, null, 2) + '\n', 'utf8');
 
 let exitCode = 0;
 const breached = Object.values(measurements).filter((m) => m.breached);
-const unknown = Object.values(measurements).filter((m) => m.value === null || m.value === undefined);
+// Same rule as slo-monitor: a partial-window SLO carries a value but its
+// status is unknown, so it is a gap in the report, not a measurement.
+const unknown = Object.values(measurements).filter(
+  (m) => m.status === 'unknown' || m.value === null || m.value === undefined,
+);
 if (breached.length > 0) {
   console.log(`[sla] BREACH: ${breached.length} SLA breached: ${breached.map((m) => m.id).join(', ')}`);
   exitCode = 1;

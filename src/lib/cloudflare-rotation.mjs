@@ -16,6 +16,7 @@ import { esc } from "../format.js";
 export const CF_TOKEN_ENV_KEY = "CLOUDFLARE_API_TOKEN";
 const CF_API = "https://api.cloudflare.com/client/v4";
 const RENDER_API = "https://api.render.com/v1";
+const FLY_GRAPHQL = "https://api.fly.io/graphql";
 const DEFAULT_TTL_HOURS = 72;
 const DEFAULT_LIFETIME_DAYS = 90;
 
@@ -150,6 +151,32 @@ export const updateRenderEnvValue = (fetchImpl, apiKey, serviceId, key, value) =
 export const triggerRenderDeploy = (fetchImpl, apiKey, serviceId) =>
   renderCall(fetchImpl, apiKey, serviceId, "POST", "/deploys", {});
 
+/**
+ * Set one Fly secret through the Apps GraphQL API. Introspected 2026-11-20:
+ * setSecrets(input: SetSecretsInput!) with { appId, secrets: [{ key, value }] }.
+ * The value is only ever sent to Fly — never returned, logged or mailed.
+ */
+export const setFlySecret = (fetchImpl, { apiToken, appName, key, value }) =>
+  httpJson(fetchImpl, FLY_GRAPHQL, {
+    method: "POST",
+    token: apiToken,
+    body: {
+      query: "mutation($input: SetSecretsInput!){ setSecrets(input: $input){ release { id version } } }",
+      variables: {
+        input: {
+          appId: String(appName),
+          secrets: [{ key: String(key), value: String(value) }],
+        },
+      },
+    },
+  }).then((body) => {
+    if (body?.errors?.length) {
+      throw new Error(`Fly setSecrets: ${body.errors.map((e) => e.message).join("; ")}`);
+    }
+    if (!body?.data?.setSecrets) throw new Error("Fly setSecrets trả về kết quả rỗng");
+    return body.data.setSecrets;
+  });
+
 export async function sendRotationMail(fetchImpl, { apiKey, from, to, subject, html }) {
   const response = await fetchImpl("https://api.resend.com/emails", {
     method: "POST",
@@ -177,6 +204,10 @@ export function rotationConfig(env = process.env) {
     supportEmail: String(env.SUPPORT_EMAIL || "").trim(),
     appUrl: String(env.APP_URL || "").trim().replace(/\/+$/, ""),
     signingKey: String(env.ROTATION_SIGNING_KEY || "").trim(),
+    // Optional second consumer. Both must be set to update Fly; without them
+    // the roll stays Render-only, exactly as before this change.
+    flyApiToken: String(env.FLY_API_TOKEN || "").trim(),
+    flyAppName: String(env.FLY_APP_NAME || "").trim(),
   };
 }
 
@@ -233,24 +264,66 @@ export async function rotateCloudflareToken(config, { tokenId, fetchImpl = fetch
   onStep("create-replacement");
 
   let revoked = false;
+  let renderUpdated = false;
+  let flyUpdated = false;
+  const flyEnabled = Boolean(config.flyApiToken && config.flyAppName);
+  let previousValue = null;
   try {
     const status = await verifyCloudflareToken(created.value, fetchImpl);
     if (status !== "active") throw new Error(`Token mới không active (${status || "unknown"})`);
     onStep("verify-replacement");
 
+    // Read the value every consumer uses today. It is needed only when Fly is
+    // configured: if the Fly update fails after Render moved, both hosts must
+    // be put back before the replacement token is deleted.
+    if (flyEnabled) {
+      previousValue = await readRenderEnvValue(fetchImpl, config.renderApiKey, config.serviceId, CF_TOKEN_ENV_KEY);
+      if (!previousValue) throw new Error("Không đọc được CLOUDFLARE_API_TOKEN cũ từ Render — từ chối xoay khi có Fly");
+    }
+
     await updateRenderEnvValue(fetchImpl, config.renderApiKey, config.serviceId, CF_TOKEN_ENV_KEY, created.value);
+    renderUpdated = true;
     onStep("update-render-env");
     await triggerRenderDeploy(fetchImpl, config.renderApiKey, config.serviceId);
     onStep("deploy-render");
+
+    if (flyEnabled) {
+      await setFlySecret(fetchImpl, {
+        apiToken: config.flyApiToken, appName: config.flyAppName,
+        key: CF_TOKEN_ENV_KEY, value: created.value,
+      });
+      flyUpdated = true;
+      onStep("update-fly-secret");
+    }
 
     const mail = rotationMail.success({ oldId: tokenId, newId: created.id, host: config.appUrl, expiresOn: nextExpiry(now) });
     await sendRotationMail(fetchImpl, { apiKey: config.resendKey, from: config.emailFrom, to: config.supportEmail, ...mail });
     onStep("mail-success");
   } catch (error) {
+    // Restore in reverse order, then remove the replacement. Step names are
+    // deliberately generic: a provider's error body must never be logged with
+    // a token value in it.
+    if (flyUpdated && previousValue) {
+      try {
+        await setFlySecret(fetchImpl, {
+          apiToken: config.flyApiToken, appName: config.flyAppName,
+          key: CF_TOKEN_ENV_KEY, value: previousValue,
+        });
+        onStep("rollback-restore-fly");
+      } catch { onStep("rollback-restore-fly-failed"); }
+    }
+    if (flyEnabled && renderUpdated && previousValue) {
+      try {
+        await updateRenderEnvValue(fetchImpl, config.renderApiKey, config.serviceId, CF_TOKEN_ENV_KEY, previousValue);
+        onStep("rollback-render-env");
+        await triggerRenderDeploy(fetchImpl, config.renderApiKey, config.serviceId);
+        onStep("rollback-redeploy-render");
+      } catch { onStep("rollback-render-failed"); }
+    }
     // The old token is still valid: remove the replacement so there is exactly
     // one live credential, and leave the operator with the known-good original.
     try { await deleteCloudflareToken(config.masterToken, created.id, fetchImpl); onStep("rollback-delete-replacement"); }
-    catch (rollbackError) { onStep(`rollback-failed: ${text(rollbackError)}`); }
+    catch { onStep("rollback-failed"); }
     const mail = rotationMail.failure({ error: text(error), note: "Token cũ vẫn còn hạn; token mới (nếu có) đã được xóa." });
     try {
       await sendRotationMail(fetchImpl, { apiKey: config.resendKey, from: config.emailFrom, to: config.supportEmail, ...mail });

@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-11-17T03:14:21.823Z",
+  "generatedAt": "2026-11-20T02:37:55.812Z",
   "overall": "ok",
   "measurements": {
     "availability": {
@@ -10,14 +10,19 @@
       "want": "up",
       "unit": "%",
       "basis": "window",
-      "source": "logs/last-availability.json — 30-day window from the edge access log",
+      "source": "logs/last-availability.json — edge request window from the configured source (windowDays/coverageDays recorded in the file)",
       "owner": "platform-team",
       "remediation": "Check the deploy history and the incident log; runbook at docs/RUNBOOK.md",
       "value": 100,
-      "status": "ok",
+      "status": "unknown",
       "breached": false,
-      "sampleSize": 1989,
-      "measuredAt": "2026-11-17T03:14:21.824Z"
+      "sampleSize": 20,
+      "coverageDays": 0.013888888888888888,
+      "windowDays": 30,
+      "observedFrom": "2026-11-17T10:25:00.000Z",
+      "observedTo": "2026-11-17T10:45:00.000Z",
+      "partialWindow": true,
+      "measuredAt": "2026-11-20T02:37:55.813Z"
     },
     "errorRate": {
       "id": "errorRate",
@@ -31,10 +36,15 @@
       "owner": "backend-team",
       "remediation": "Check /api/health failures; roll back if the rate holds for 15 minutes",
       "value": 0,
-      "status": "ok",
+      "status": "unknown",
       "breached": false,
-      "sampleSize": 1989,
-      "measuredAt": "2026-11-17T03:14:21.825Z"
+      "sampleSize": 20,
+      "coverageDays": 0.013888888888888888,
+      "windowDays": 30,
+      "observedFrom": "2026-11-17T10:25:00.000Z",
+      "observedTo": "2026-11-17T10:45:00.000Z",
+      "partialWindow": true,
+      "measuredAt": "2026-11-20T02:37:55.813Z"
     },
     "latencyP95": {
       "id": "latencyP95",
@@ -47,11 +57,11 @@
       "source": "logs/last-latency.json (p95Seconds, converted to milliseconds)",
       "owner": "backend-team",
       "remediation": "Profile the slow endpoints; add caching or scale the instances",
-      "value": 238,
-      "status": "ok",
+      "value": null,
+      "status": "unknown",
       "breached": false,
-      "sampleSize": 1989,
-      "measuredAt": "2026-11-17T03:14:21.825Z"
+      "sampleSize": 0,
+      "measuredAt": "2026-11-20T02:37:55.813Z"
     },
     "testPassRate": {
       "id": "testPassRate",
@@ -68,7 +78,7 @@
       "status": "ok",
       "breached": false,
       "sampleSize": 513,
-      "measuredAt": "2026-11-17T03:14:21.826Z"
+      "measuredAt": "2026-11-20T02:37:55.814Z"
     },
     "buildSuccessRate": {
       "id": "buildSuccessRate",
@@ -85,7 +95,7 @@
       "status": "ok",
       "breached": false,
       "sampleSize": 1,
-      "measuredAt": "2026-11-17T03:14:21.826Z"
+      "measuredAt": "2026-11-20T02:37:55.814Z"
     },
     "deploySuccessRate": {
       "id": "deploySuccessRate",
@@ -102,7 +112,7 @@
       "status": "unknown",
       "breached": false,
       "sampleSize": 0,
-      "measuredAt": "2026-11-17T03:14:21.826Z"
+      "measuredAt": "2026-11-20T02:37:55.814Z"
     },
     "escapeRate": {
       "id": "escapeRate",
@@ -119,7 +129,7 @@
       "status": "unknown",
       "breached": false,
       "sampleSize": 0,
-      "measuredAt": "2026-11-17T03:14:21.826Z"
+      "measuredAt": "2026-11-20T02:37:55.814Z"
     }
   }
 }

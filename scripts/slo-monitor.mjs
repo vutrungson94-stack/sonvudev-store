@@ -60,7 +60,13 @@ if (unresolvedBreaches.length > 0) {
   );
   exitCode = 1;
 } else {
-  const unknown = Object.values(measurements).filter((m) => m.value === null || m.value === undefined);
+  // A partial window has a value but no "ok" status (see measureSLOs). Counting
+  // gaps by value alone would still report "4/7 measured" while the evidence
+  // file says two of those four are unknown — the same false confidence this
+  // change exists to remove.
+  const unknown = Object.values(measurements).filter(
+    (m) => m.status === 'unknown' || m.value === null || m.value === undefined,
+  );
   if (unknown.length > 0) {
     console.log(
       `[slo] OK with gaps: ${SLOS.length - unknown.length}/${SLOS.length} SLOs measured and within target; ${unknown.length} unknown: ${unknown.map((m) => m.id).join(', ')}`,

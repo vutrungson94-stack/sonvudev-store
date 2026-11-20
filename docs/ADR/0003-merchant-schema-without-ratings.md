@@ -25,6 +25,11 @@ GSC "Cải thiện giao diện của mục" báo `Offer` thiếu `applicableCoun
 
 - GSC hết cảnh báo merchant listing (cần bấm "Xác thực kết quả khắc phục" để
   Google quét lại).
+- **Xác nhận lại 2026-11-20:** một đợt sửa sau đó đã đổi `returnMethod` sang
+  `ReturnDownload` và bị GMC báo "không hợp lệ" trên 7 mục. Đã khôi phục về
+  `ReturnByMail` như quyết định gốc, sau khi đối chiếu tài liệu Google (chỉ
+  hỗ trợ `ReturnAtKiosk`/`ReturnByMail`/`ReturnInStore`). Xem RCA
+  `docs/rca/2026-11-20-gmc-return-method.md`.
 - `aggregateRating`/`review` vẫn hiện trong GSC nhưng là **tùy chọn**; đó là
   lựa chọn có ý thức, không phải lỗi. Không được thêm vào sau này nếu chưa có
   nguồn review đủ điều kiện.

@@ -314,10 +314,12 @@ Log Caddy và log ứng dụng nằm ngoài `ReadWritePaths`, hãy kiểm tra `d
   sau khi xoay **không cần sửa GitHub Secret** (Secret `CLOUDFLARE_API_TOKEN` cũ
   có thể xóa để tránh nhầm). Quy trình xoay theo thứ tự: đọc policy token cũ →
   tạo token thay thế (hạn +90 ngày, cùng permissions) → verify token mới →
-  `PUT /env-vars/CLOUDFLARE_API_TOKEN` + deploy trên Render → gửi mail xác nhận →
-  **cuối cùng mới revoke token cũ**. Nếu bước nào trước mail thất bại, token mới
-  bị xóa và token cũ vẫn nguyên; nếu chỉ revoke cuối thất bại, mail báo token id
-  cần thu hồi tay.
+  `PUT /env-vars/CLOUDFLARE_API_TOKEN` + deploy trên Render → (nếu có
+  `FLY_API_TOKEN` + `FLY_APP_NAME`) cập nhật Fly secret qua GraphQL → gửi mail
+  xác nhận → **cuối cùng mới revoke token cũ**. Nếu bước nào trước mail thất bại,
+  các consumer đã đổi được khôi phục về giá trị cũ (Fly, Render env, deploy lại
+  Render), token mới bị xóa và token cũ vẫn nguyên; nếu chỉ revoke cuối thất bại,
+  mail báo token id cần thu hồi tay.
 - **Secrets cần có:** trên Render — `CLOUDFLARE_API_TOKEN` (token đang dùng),
   `CLOUDFLARE_MASTER_TOKEN` (quyền **User: API Tokens: Read + Edit/Write** để
   tạo/xoá token con), `ROTATION_SIGNING_KEY` (chuỗi ngẫu nhiên ≥32 byte, cùng giá trị với
@@ -330,7 +332,8 @@ Log Caddy và log ứng dụng nằm ngoài `ReadWritePaths`, hãy kiểm tra `d
   |---|---|---|
   | `CLOUDFLARE_API_TOKEN` (CI) | **Render env** — nguồn sự thật; CI đọc lúc chạy | purge cache, analytics, SLO; rotation cập nhật chính nó |
   | `CLOUDFLARE_MASTER_TOKEN` | **Render env** | tạo/xoá token con trong rotation; không đưa cho CI |
-  | `FLY_API_TOKEN` | **GitHub Actions secret** của repo | workflow auto-deploy Fly (`flyctl deploy`) |
+  | `FLY_API_TOKEN` | **Render env** (để rotation cập nhật Fly) và/hoặc **GitHub Actions secret** (để auto-deploy Fly) | set Fly secret `CLOUDFLARE_API_TOKEN` trong rotation; workflow auto-deploy Fly (`flyctl deploy`) |
+  | `FLY_APP_NAME` | **Render env** | tên app Fly cho mutation `setSecrets` (vd `sonvudev-store`); bắt buộc cùng có với `FLY_API_TOKEN` |
   | `RENDER_API_KEY`, `RENDER_SERVICE_ID` | **GitHub Actions secret** | đọc env và trigger deploy Render |
   | Origin CA key | **không cần** | TLS do Cloudflare proxy tới `fly.dev`/`onrender.com`; origin không dùng chứng chỉ riêng |
 
@@ -340,9 +343,11 @@ Log Caddy và log ứng dụng nằm ngoài `ReadWritePaths`, hãy kiểm tra `d
     `CLOUDFLARE_MASTER_TOKEN` (Render env);
   - muốn **deploy Fly** từ GitHub Actions → đó là `FLY_API_TOKEN` (secret
     của repo), tạo bằng `flyctl tokens create deploy -a sonvudev-store --name github-actions`.
-  Render không bao giờ đọc `FLY_API_TOKEN`, nên đừng đặt nó bên Render env; ngược
-  lại, đừng đặt Cloudflare token bên GitHub — GitHub secret
-  `CLOUDFLARE_API_TOKEN` cũ có thể xoá vì CI đã đọc token từ Render.
+  Từ 20/11/2026 rotation đọc `FLY_API_TOKEN`/`FLY_APP_NAME` trên **Render env** để
+  cập nhật Fly secret (đây là "khoảng trống" Render↔Fly đã được lấp). GitHub vẫn
+  cần `FLY_API_TOKEN` riêng nếu bật auto-deploy Fly. Ngược lại, đừng đặt Cloudflare
+  token bên GitHub — GitHub secret `CLOUDFLARE_API_TOKEN` cũ **có thể xoá** vì CI
+  đã đọc token từ Render.
 
 - **Tạo 2 token Cloudflare** (dashboard → avatar → **My Profile → API Tokens → Create Token → Custom token**):
   1. `CLOUDFLARE_API_TOKEN` (token cho CI): quyền `Zone → Cache Purge → Purge`,
@@ -375,8 +380,11 @@ Log Caddy và log ứng dụng nằm ngoài `ReadWritePaths`, hãy kiểm tra `d
   `CLOUDFLARE_MASTER_TOKEN` đang rỗng), bước purge **no-op xanh** (cố tình): thiếu
   token không được làm đỏ một deploy tốt. Origin cache + single-flight vẫn là lớp
   chịu tải chính.
-- Kiểm tra: `gh secret list --repo vutrungson94-stack/sonvudev-store` phải thấy cả
-  `CLOUDFLARE_API_TOKEN` và `APP_URL`.
+- Kiểm tra: `gh secret list --repo vutrungson94-stack/sonvudev-store` phải thấy
+  `APP_URL`, `RENDER_API_KEY`, `RENDER_SERVICE_ID`, `CLOUDFLARE_ZONE_ID`,
+  `ROTATION_SIGNING_KEY`, `RESEND_API_KEY`, `EMAIL_FROM`, `SUPPORT_EMAIL`.
+  **`CLOUDFLARE_API_TOKEN` không còn được kỳ vọng ở đây** (đã chuyển sang Render
+  env từ 17/11); nếu còn, xoá bằng `gh secret delete CLOUDFLARE_API_TOKEN --repo vutrungson94-stack/sonvudev-store`.
 
 ### Edge failover khi origin suspend (18/11/2026)
 

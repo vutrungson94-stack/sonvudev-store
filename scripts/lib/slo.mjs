@@ -253,6 +253,17 @@ export async function measureSLOs(root, slos = SLOS) {
       breached = !meets;
     }
 
+    // A window objective measured from a short sample is evidence, not a pass.
+    // On 17/11 a 20-minute availability sample printed "100%" with only a
+    // partialWindow note beside it, which is how a self-certifying metric looks
+    // when it is dressed up with metadata: the number still passes the gate.
+    // Keep the value visible (a reader can see what was sampled), but withdraw
+    // the "ok" status until a full window is measured. Nothing here turns an
+    // unmeasured value into 0/100 and no target is changed.
+    if (slo.basis === 'window' && coverage?.partialWindow === true && status === 'ok') {
+      status = 'unknown';
+    }
+
     measurements[slo.id] = {
       ...slo,
       value,
