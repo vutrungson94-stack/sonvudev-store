@@ -332,7 +332,7 @@ Log Caddy và log ứng dụng nằm ngoài `ReadWritePaths`, hãy kiểm tra `d
   |---|---|---|
   | `CLOUDFLARE_API_TOKEN` (CI) | **Render env** — nguồn sự thật; CI đọc lúc chạy | purge cache, analytics, SLO; rotation cập nhật chính nó |
   | `CLOUDFLARE_MASTER_TOKEN` | **Render env** | tạo/xoá token con trong rotation; không đưa cho CI |
-  | `FLY_API_TOKEN` | **Render env** (để rotation cập nhật Fly) và **GitHub Actions secret** (bắt buộc để auto-deploy Fly) | set Fly secret `CLOUDFLARE_API_TOKEN` trong rotation; job `deploy-fly` trong `checks.yml` deploy Fly khi Render suspended |
+  | `FLY_API_TOKEN` | **GitHub Actions secret** (bắt buộc để auto-deploy Fly). **Hiện chưa có trong Render env hay Fly secrets** nên rotation chưa cập nhật được Fly secret | job `deploy-fly` deploy Fly khi Render suspended; để rotation cập nhật Fly secret cần đặt thêm token này + `FLY_APP_NAME` vào Render env |
   | `FLY_APP_NAME` | **Render env** | tên app Fly cho mutation `setSecrets` (vd `sonvudev-store`); bắt buộc cùng có với `FLY_API_TOKEN` |
   | `RENDER_API_KEY`, `RENDER_SERVICE_ID` | **GitHub Actions secret** | đọc env và trigger deploy Render |
   | Origin CA key | **không cần** | TLS do Cloudflare proxy tới `fly.dev`/`onrender.com`; origin không dùng chứng chỉ riêng |
@@ -343,14 +343,16 @@ Log Caddy và log ứng dụng nằm ngoài `ReadWritePaths`, hãy kiểm tra `d
     `CLOUDFLARE_MASTER_TOKEN` (Render env);
   - muốn **deploy Fly** từ GitHub Actions → đó là `FLY_API_TOKEN` (secret
     của repo), tạo bằng `flyctl tokens create deploy -a sonvudev-store --name github-actions`.
-  Từ 20/11/2026 rotation đọc `FLY_API_TOKEN`/`FLY_APP_NAME` trên **Render env** để
-  cập nhật Fly secret. GitHub **có `FLY_API_TOKEN` riêng** (deploy scope): job
-  `deploy-fly` trong `checks.yml` gọi Render API, và nếu service `suspended` thì
-  cài flyctl rồi `flyctl deploy --remote-only --build-arg GIT_COMMIT=<sha>`.
-  `deployed-site` chờ job này xong trước khi chờ live sha. Khi Render khoẻ, job
-  Fly bị skip và Render auto-deploy như cũ. Ngược lại, đừng đặt Cloudflare token
-  bên GitHub — GitHub secret `CLOUDFLARE_API_TOKEN` cũ **có thể xoá** vì CI đã đọc
-  token từ Render.
+  `FLY_API_TOKEN` hiện **chỉ nằm ở GitHub Actions secret** (deploy scope, hạn 1
+  năm từ 20/11/2026), dùng cho job `deploy-fly`: job gọi Render API, nếu service
+  `suspended` thì cài flyctl rồi `flyctl deploy --remote-only --build-arg
+  GIT_COMMIT=<sha>`. `deployed-site` chờ job này xong trước khi chờ live sha;
+  khi Render khoẻ, job Fly bị skip. Token này **không nằm trong chu kỳ xoay**
+  của `cf-token-reminder` (chu kỳ đó chỉ xoay `CLOUDFLARE_API_TOKEN`). Vì
+  `FLY_API_TOKEN`/`FLY_APP_NAME` **chưa có trong Render env**, nhánh cập nhật Fly
+  secret của rotation hiện không kích hoạt — cần đặt 2 biến đó trên Render nếu
+  muốn đồng bộ. GitHub secret `CLOUDFLARE_API_TOKEN` cũ **đã bị xoá 20/11**: CI
+  đọc token từ Render, không còn phụ thuộc vào secret này.
 
 - **Tạo 2 token Cloudflare** (dashboard → avatar → **My Profile → API Tokens → Create Token → Custom token**):
   1. `CLOUDFLARE_API_TOKEN` (token cho CI): quyền `Zone → Cache Purge → Purge`,
