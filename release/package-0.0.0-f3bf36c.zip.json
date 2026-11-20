@@ -1,0 +1,15 @@
+{
+  "project": "package",
+  "version": "0.0.0",
+  "commit": "f3bf36c",
+  "dirty": true,
+  "builtAtUtc": "2026-11-20T14:10:06.8031990Z",
+  "archive": "package-0.0.0-f3bf36c.zip",
+  "sizeBytes": 2607310,
+  "sha256": "b8c51df1874906c49d101a6c1c4b7024002712f096cb70a9034be673c8650bcc",
+  "signed": false,
+  "signedFiles": 0,
+  "checkedFiles": 0,
+  "signer": "",
+  "machine": "DESKTOP-STDIDSN"
+}
