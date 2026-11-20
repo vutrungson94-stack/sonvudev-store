@@ -38,3 +38,24 @@ verification:
 
 rollback: "git revert this commit; the manifest returns to being registered before load, no data/zone change to undo"
 ```
+
+## Kết quả đo sau deploy (2026-11-20)
+
+```yaml
+commit_deployed: 788b97e
+ci_run: 44773013541   # xanh: node 22/24, lighthouse, deploy-fly, deploy-worker, deployed-site, release-tag
+live_quality_js: "GET /quality.js → 200; có addEventListener('load', addManifest); append không còn chạy ngay khi script defer chạy"
+live_lighthouse:
+  - report: build-reports/lighthouse-2026-11-20T16-34-31-376Z.json
+    scores: { performance: 100, accessibility: 100, best_practices: 100, seo: 100 }
+    network_dependency_tree: "longest chain 93 ms, only the document; /site.webmanifest không còn là con của document"
+    manifest_request: "878 ms (sau observedLoad 129 ms), ngoài initial navigation"
+  - report: build-reports/lighthouse-2026-11-20T16-35-02-745Z.json
+    scores: { performance: 100, accessibility: 100, best_practices: 100, seo: 100 }
+    network_dependency_tree: "longest chain 108 ms, only the document; /site.webmanifest không còn trong cây"
+    manifest_request: "605 ms (sau observedLoad 177 ms), ngoài initial navigation"
+seo_check: "212/212"
+live_html: "GET /?manifest-check=788b97e → 200, content-encoding br, 1 title / 1 h1 / 1 canonical, jsd=false"
+health_commit: 788b97ef2d60c8d1619263bc3956f8509e1dfcea
+decision: "Giữ. Manifest vẫn được đăng ký cho PWA nhưng chỉ sau load, nên không còn trên initial navigation; điểm số không đổi."
+```
