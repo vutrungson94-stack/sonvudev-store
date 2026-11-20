@@ -48,10 +48,15 @@ export function createTokenInput({ name, orgId, appName, expiryHours = DEFAULT_L
   };
 }
 
-/** deleteLimitedAccessToken accepts the token value itself — no id lookup needed. */
-export function revokeInput(token) {
-  if (!token) throw new Error('Thiếu token Fly cần thu hồi');
-  return { input: { token } };
+/**
+ * deleteLimitedAccessToken accepts `token` or `id`. The `token` form did not
+ * revoke in practice (verified 2026-11-20: the value incl. "FlyV1 " prefix left
+ * the token active), and GraphQL cannot list limited tokens to recover an id.
+ * So the current token id is stored next to the token in Render as FLY_TOKEN_ID.
+ */
+export function revokeInput(id) {
+  if (!id) throw new Error('Thiếu id token Fly cần thu hồi');
+  return { input: { id } };
 }
 
 export function parseNewToken(body) {
@@ -112,6 +117,8 @@ export async function rotateFlyToken(config, { fetchImpl = fetch, now = new Date
 
   const oldToken = await readRenderEnvValue(fetchImpl, config.renderApiKey, config.serviceId, FLY_TOKEN_KEY);
   if (!oldToken) throw new Error('Không đọc được FLY_API_TOKEN hiện tại từ Render');
+  const oldTokenId = await readRenderEnvValue(fetchImpl, config.renderApiKey, config.serviceId, 'FLY_TOKEN_ID');
+  if (!oldTokenId) throw new Error('Không đọc được FLY_TOKEN_ID hiện tại từ Render');
   onStep('read-old-token');
 
   const created = parseNewToken(await gql(fetchImpl, config.adminToken,
@@ -126,6 +133,7 @@ export async function rotateFlyToken(config, { fetchImpl = fetch, now = new Date
     onStep('verify-replacement');
 
     await updateRenderSecret(fetchImpl, config.renderApiKey, config.serviceId, FLY_TOKEN_KEY, created.tokenHeader);
+    await updateRenderSecret(fetchImpl, config.renderApiKey, config.serviceId, 'FLY_TOKEN_ID', created.id);
     renderUpdated = true;
     onStep('update-render-env');
 
@@ -134,13 +142,16 @@ export async function rotateFlyToken(config, { fetchImpl = fetch, now = new Date
     onStep('mail-success');
   } catch (error) {
     if (renderUpdated) {
-      try { await updateRenderSecret(fetchImpl, config.renderApiKey, config.serviceId, FLY_TOKEN_KEY, oldToken); onStep('rollback-render-env'); }
-      catch { onStep('rollback-render-env-failed'); }
+      try {
+        await updateRenderSecret(fetchImpl, config.renderApiKey, config.serviceId, FLY_TOKEN_KEY, oldToken);
+        await updateRenderSecret(fetchImpl, config.renderApiKey, config.serviceId, 'FLY_TOKEN_ID', oldTokenId);
+        onStep('rollback-render-env');
+      } catch { onStep('rollback-render-env-failed'); }
     }
     try {
       await gql(fetchImpl, config.adminToken,
         'mutation($input: DeleteLimitedAccessTokenInput!){ deleteLimitedAccessToken(input:$input){ token } }',
-        revokeInput(created.tokenHeader));
+        revokeInput(created.id));
       onStep('rollback-revoke-replacement');
     } catch { onStep('rollback-revoke-failed'); }
     const bad = mail.failure({ appName: config.appName, error: text(error) });
@@ -152,7 +163,7 @@ export async function rotateFlyToken(config, { fetchImpl = fetch, now = new Date
   try {
     await gql(fetchImpl, config.adminToken,
       'mutation($input: DeleteLimitedAccessTokenInput!){ deleteLimitedAccessToken(input:$input){ token } }',
-      revokeInput(oldToken));
+      revokeInput(oldTokenId));
     onStep('revoke-old');
   } catch (error) {
     onStep(`revoke-old-failed: ${text(error)}`);

@@ -334,6 +334,7 @@ Log Caddy và log ứng dụng nằm ngoài `ReadWritePaths`, hãy kiểm tra `d
   | `CLOUDFLARE_MASTER_TOKEN` | **Render env** | tạo/xoá token con trong rotation; không đưa cho CI |
   | `FLY_API_TOKEN` | **Render env** — nguồn sự thật; CI đọc lúc chạy qua `gha-read-render-secret.mjs` | job `deploy-fly` deploy Fly khi Render suspended; `fly-token-rotate.yml` xoay token này hằng tháng |
   | `FLY_ADMIN_TOKEN` | **Render env** — token cá nhân của chủ sở hữu (quyền tạo/xoá token Fly; deploy token và org token đều KHÔNG có quyền này, đã kiểm chứng) | tạo token deploy mới + thu hồi token cũ trong rotation; không đưa cho job deploy |
+  | `FLY_TOKEN_ID` | **Render env** — id của token hiện tại | bắt buộc để thu hồi token cũ: `deleteLimitedAccessToken` theo giá trị token không hoạt động, GraphQL không liệt kê được limited token |
   | `FLY_ORG_ID`, `FLY_APP_NAME` | **Render env** | org/app dùng trong `createLimitedAccessToken` (profile `deploy`, `profileParams.app_id`) |
   | `RENDER_API_KEY`, `RENDER_SERVICE_ID` | **GitHub Actions secret** | đọc env và trigger deploy Render |
   | Origin CA key | **không cần** | TLS do Cloudflare proxy tới `fly.dev`/`onrender.com`; origin không dùng chứng chỉ riêng |

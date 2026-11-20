@@ -1,8 +1,11 @@
 # Change plan — 2026-11-20 rotate FLY_API_TOKEN automatically
 
 ```yaml
-rev: 2
+rev: 3
 task: "Put FLY_API_TOKEN on the same rotation footing as the Cloudflare token: Render is the source of truth, a monthly CI job rolls it and revokes the old value"
+
+rev_changes:
+  - "rev 3: first live dispatch went green but left the old token active — deleteLimitedAccessToken with the token value (incl. FlyV1 prefix) did not revoke; verified revoke by id works and GraphQL cannot list limited tokens. Store FLY_TOKEN_ID next to FLY_API_TOKEN in Render env and revoke by id; rollback restores both values."
 
 rev_changes:
   - "rev 2: added scripts/fly-rotate-cli.mjs as the npm script entrypoint (dotenv + summary-only console output); added FLY_ADMIN_TOKEN/FLY_ORG_ID/FLY_APP_NAME to Render env via the existing Render API using the owner's personal Fly token, because both deploy and org tokens were verified UNAUTHORIZED for createLimitedAccessToken."
