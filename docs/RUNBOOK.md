@@ -332,8 +332,9 @@ Log Caddy và log ứng dụng nằm ngoài `ReadWritePaths`, hãy kiểm tra `d
   |---|---|---|
   | `CLOUDFLARE_API_TOKEN` (CI) | **Render env** — nguồn sự thật; CI đọc lúc chạy | purge cache, analytics, SLO; rotation cập nhật chính nó |
   | `CLOUDFLARE_MASTER_TOKEN` | **Render env** | tạo/xoá token con trong rotation; không đưa cho CI |
-  | `FLY_API_TOKEN` | **GitHub Actions secret** (bắt buộc để auto-deploy Fly). **Hiện chưa có trong Render env hay Fly secrets** nên rotation chưa cập nhật được Fly secret | job `deploy-fly` deploy Fly khi Render suspended; để rotation cập nhật Fly secret cần đặt thêm token này + `FLY_APP_NAME` vào Render env |
-  | `FLY_APP_NAME` | **Render env** | tên app Fly cho mutation `setSecrets` (vd `sonvudev-store`); bắt buộc cùng có với `FLY_API_TOKEN` |
+  | `FLY_API_TOKEN` | **Render env** — nguồn sự thật; CI đọc lúc chạy qua `gha-read-render-secret.mjs` | job `deploy-fly` deploy Fly khi Render suspended; `fly-token-rotate.yml` xoay token này hằng tháng |
+  | `FLY_ADMIN_TOKEN` | **Render env** — token cá nhân của chủ sở hữu (quyền tạo/xoá token Fly; deploy token và org token đều KHÔNG có quyền này, đã kiểm chứng) | tạo token deploy mới + thu hồi token cũ trong rotation; không đưa cho job deploy |
+  | `FLY_ORG_ID`, `FLY_APP_NAME` | **Render env** | org/app dùng trong `createLimitedAccessToken` (profile `deploy`, `profileParams.app_id`) |
   | `RENDER_API_KEY`, `RENDER_SERVICE_ID` | **GitHub Actions secret** | đọc env và trigger deploy Render |
   | Origin CA key | **không cần** | TLS do Cloudflare proxy tới `fly.dev`/`onrender.com`; origin không dùng chứng chỉ riêng |
 
@@ -341,18 +342,19 @@ Log Caddy và log ứng dụng nằm ngoài `ReadWritePaths`, hãy kiểm tra `d
   phải token thứ ba cần tạo. Nếu nguồn gốc của tên này là nút *Create Token*:
   - muốn tạo được **token Cloudflare mới khi rotation** → đó là
     `CLOUDFLARE_MASTER_TOKEN` (Render env);
-  - muốn **deploy Fly** từ GitHub Actions → đó là `FLY_API_TOKEN` (secret
-    của repo), tạo bằng `flyctl tokens create deploy -a sonvudev-store --name github-actions`.
-  `FLY_API_TOKEN` hiện **chỉ nằm ở GitHub Actions secret** (deploy scope, hạn 1
-  năm từ 20/11/2026), dùng cho job `deploy-fly`: job gọi Render API, nếu service
-  `suspended` thì cài flyctl rồi `flyctl deploy --remote-only --build-arg
-  GIT_COMMIT=<sha>`. `deployed-site` chờ job này xong trước khi chờ live sha;
-  khi Render khoẻ, job Fly bị skip. Token này **không nằm trong chu kỳ xoay**
-  của `cf-token-reminder` (chu kỳ đó chỉ xoay `CLOUDFLARE_API_TOKEN`). Vì
-  `FLY_API_TOKEN`/`FLY_APP_NAME` **chưa có trong Render env**, nhánh cập nhật Fly
-  secret của rotation hiện không kích hoạt — cần đặt 2 biến đó trên Render nếu
-  muốn đồng bộ. GitHub secret `CLOUDFLARE_API_TOKEN` cũ **đã bị xoá 20/11**: CI
-  đọc token từ Render, không còn phụ thuộc vào secret này.
+  - muốn **deploy Fly** từ GitHub Actions → đó là `FLY_API_TOKEN` trên **Render
+    env**, tạo bằng `flyctl tokens create deploy -a sonvudev-store --name github-actions`.
+  `FLY_API_TOKEN` có scope deploy cho app `sonvudev-store`, hạn 1 năm. Job
+  `deploy-fly` gọi Render API, nếu service `suspended` thì đọc token từ Render,
+  cài flyctl rồi `flyctl deploy --remote-only --build-arg GIT_COMMIT=<sha>`.
+  `deployed-site` chờ job này xong trước khi chờ live sha; khi Render khoẻ, job
+  Fly bị skip. Workflow `fly-token-rotate.yml` chạy hằng tháng (và có thể bấm
+  `workflow_dispatch`): tạo token mới → verify → ghi Render env → gửi mail →
+  thu hồi token cũ; nếu lỗi trước khi thu hồi, token mới bị xoá và Render env
+  được khôi phục. **Lưu ý:** `FLY_ADMIN_TOKEN` là token cá nhân của chủ sở hữu
+  (deploy token và org token đều bị từ chối khi gọi `createLimitedAccessToken`);
+  nếu đổi tài khoản Fly phải cập nhật biến này trên Render. GitHub secret
+  `CLOUDFLARE_API_TOKEN` cũ **đã bị xoá 20/11** — CI đọc token từ Render.
 
 - **Tạo 2 token Cloudflare** (dashboard → avatar → **My Profile → API Tokens → Create Token → Custom token**):
   1. `CLOUDFLARE_API_TOKEN` (token cho CI): quyền `Zone → Cache Purge → Purge`,

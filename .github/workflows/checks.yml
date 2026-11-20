@@ -249,10 +249,17 @@ jobs:
         with:
           version: '0.5.12'
 
-      - name: deploy to Fly
+      - name: read Fly token from Render
         if: steps.render.outputs.suspended == 'true'
         env:
-          FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
+          KEY: FLY_API_TOKEN
+          OUTPUT_NAME: FLY_API_TOKEN
+          RENDER_API_KEY: ${{ secrets.RENDER_API_KEY }}
+          RENDER_SERVICE_ID: ${{ secrets.RENDER_SERVICE_ID }}
+        run: node scripts/gha-read-render-secret.mjs --required
+
+      - name: deploy to Fly
+        if: steps.render.outputs.suspended == 'true'
         run: flyctl deploy --remote-only --build-arg "GIT_COMMIT=${{ github.sha }}" -a sonvudev-store
 
   # The live site, checked the way a crawler sees it. Runs after the checks so it

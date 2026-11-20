@@ -1,0 +1,61 @@
+name: fly-token-rotate
+
+# Fly deploy tokens expire; CI would silently lose the ability to deploy when
+# Render is suspended. Roll the token monthly with the same safety rules as the
+# Cloudflare roll: create + verify + move consumers, then revoke the old value.
+# Render is the source of truth, so no GitHub secret-write PAT is needed.
+on:
+  schedule:
+    - cron: "0 5 1 * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  rotate:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: '22'
+          cache: npm
+
+      - run: npm ci
+
+      - name: read Fly rotation config from Render
+        env:
+          KEY: FLY_ADMIN_TOKEN
+          OUTPUT_NAME: FLY_ADMIN_TOKEN
+          RENDER_API_KEY: ${{ secrets.RENDER_API_KEY }}
+          RENDER_SERVICE_ID: ${{ secrets.RENDER_SERVICE_ID }}
+        run: node scripts/gha-read-render-secret.mjs --required
+
+      - name: read Fly org id from Render
+        env:
+          KEY: FLY_ORG_ID
+          OUTPUT_NAME: FLY_ORG_ID
+          RENDER_API_KEY: ${{ secrets.RENDER_API_KEY }}
+          RENDER_SERVICE_ID: ${{ secrets.RENDER_SERVICE_ID }}
+        run: node scripts/gha-read-render-secret.mjs --required
+
+      - name: read Fly app name from Render
+        env:
+          KEY: FLY_APP_NAME
+          OUTPUT_NAME: FLY_APP_NAME
+          RENDER_API_KEY: ${{ secrets.RENDER_API_KEY }}
+          RENDER_SERVICE_ID: ${{ secrets.RENDER_SERVICE_ID }}
+        run: node scripts/gha-read-render-secret.mjs --required
+
+      - name: rotate Fly deploy token
+        env:
+          RENDER_API_KEY: ${{ secrets.RENDER_API_KEY }}
+          RENDER_SERVICE_ID: ${{ secrets.RENDER_SERVICE_ID }}
+          RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
+          EMAIL_FROM: ${{ secrets.EMAIL_FROM }}
+          SUPPORT_EMAIL: ${{ secrets.SUPPORT_EMAIL }}
+          APP_URL: ${{ secrets.APP_URL }}
+        run: npm run fly:rotate

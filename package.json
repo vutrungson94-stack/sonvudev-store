@@ -46,6 +46,7 @@
     "cf:token:check": "node scripts/cloudflare-token-check.mjs",
     "cf:token:check:30": "node scripts/cloudflare-token-check.mjs --min-days=30",
     "cf:rotation:remind": "node scripts/cf-token-remind.mjs",
+    "fly:rotate": "node scripts/fly-rotate-cli.mjs",
     "spc:check": "node scripts/spc-control-chart.mjs",
     "defect:escape": "node scripts/defect-escape.mjs",
     "defect:check": "node scripts/defect-escape.mjs",
