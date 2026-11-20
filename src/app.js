@@ -597,13 +597,14 @@ async function renderPage(file, lang = DEFAULT_LOCALE) {
 // failover — when the origin is suspended (503) Cloudflare serves the last good
 // HTML instead of the provider's suspension page. A verified deploy still purges
 // the edge (checks.yml), so a long TTL never pins a stale release.
-// This constant is for public HTML only; CSS/JS/images keep their own immutable
-// cache. 20/11 trial: `no-transform` used to stop Cloudflare injecting its JSD
-// script (/cdn-cgi/challenge-platform/scripts/jsd/main.js) but also disabled edge
-// br/gzip compression. It was removed so the edge can negotiate Brotli/gzip from
-// Accept-Encoding again. If the JSD script reappears in the HTML, restore
-// `no-transform` — see docs/CHANGE-PLAN-2026-11-20-EDGE-BROTLI-GZIP.md.
-const PUBLIC_PAGE_CACHE = "public, max-age=86400, stale-while-revalidate=604800, stale-if-error=2592000";
+// `no-transform` stops Cloudflare's edge from injecting its JavaScript Detection
+// script (/cdn-cgi/challenge-platform/scripts/jsd/main.js) into public HTML. That
+// script calls Chrome APIs that are deprecated (deprecations audit, weight 5), and
+// this zone does not use cf.bot_management.js_detection.passed in any WAF rule.
+// Trade-off: Cloudflare no longer brotli-compresses HTML — the 116 KB page used to
+// travel as ~26 KB, so keep an eye on live Lighthouse performance (gate: 0.85).
+// Only HTML uses this constant; CSS/JS/images keep their own immutable cache.
+const PUBLIC_PAGE_CACHE = "public, max-age=86400, stale-while-revalidate=604800, stale-if-error=2592000, no-transform";
 
 const sendPage = (file, lang = DEFAULT_LOCALE) => async (_req, res) => {
   try {
