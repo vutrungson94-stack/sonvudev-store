@@ -55,11 +55,16 @@ invariants_checked:
 
 verified:
   - cmd: node --test test/fly-rotation.test.js
-    result: "pending"
+    result: "PASS 5/5 (create input, revoke by id, config, happy path, rollback)"
   - cmd: npm run lint / audit / case / workflow / metrics / test / coverage / build
-    result: "pending"
-  - cmd: CI run with fly-token-rotate workflow + deploy-fly reading Render
-    result: "pending"
+    result: "PASS all exit 0 — 714/714 tests, 105 files"
+  - cmd: _Tests/gtest.ps1 -Project <repo> -NonInteractive
+    result: "PASS exit 0"
+  - cmd: workflow_dispatch fly-token-rotate (44681773802) after seeding Render env
+    result: "PASS but old token stayed active: deleteLimitedAccessToken by token value did not revoke; fixed in rev 3 to use FLY_TOKEN_ID"
+  - cmd: workflow_dispatch fly-token-rotate (44683227548) after rev 3
+    result: "PASS exit 0; flyctl tokens list shows exactly one active token (X1Dv...) and the previous one (3KZ2...) revoked at the same timestamp"
+  - external: "GitHub secrets CLOUDFLARE_API_TOKEN and FLY_API_TOKEN deleted; CI reads both from Render env"
 ```
 
 Revisions: rev 1 — initial plan.
