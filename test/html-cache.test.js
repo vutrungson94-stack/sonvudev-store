@@ -48,7 +48,10 @@ test('public HTML is cacheable for a day and survives an origin error via stale-
     assert.match(cc, /max-age=86400/, `${route} must cache for one day, not five minutes`);
     assert.match(cc, /stale-while-revalidate/, `${route} must refresh in the background`);
     assert.match(cc, /stale-if-error=2592000/, `${route} must serve cached HTML when the origin is suspended`);
-    assert.match(cc, /no-transform/, `${route} must stop Cloudflare from injecting its JavaScript Detection script`);
+    // JSD is disabled at the zone, so the edge is allowed to Brotli-compress this
+    // HTML. `no-transform` would block that (115 KB instead of ~27 KB); if JSD is
+    // ever re-enabled, BP falls and the header has to come back.
+    assert.doesNotMatch(cc, /no-transform/, `${route} must stay compressible at the edge`);
   }
 });
 

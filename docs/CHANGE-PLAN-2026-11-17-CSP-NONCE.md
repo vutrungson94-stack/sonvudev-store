@@ -62,3 +62,12 @@ an injection path because no inline content is user-controlled.
 - baseline before change: `npm test` 660/660, `npm run lint/audit/case/workflow`
   and `npm run build` green on this tree (recorded earlier in the session).
 - after change: gates re-run below, plus live browser smoke after deploy.
+
+## Update 2026-11-20 — JSD is not immutable
+
+The note above that JavaScript Detections "cannot be disabled" was wrong for this
+zone. JSD is the `enable_js` field of `GET/PUT /zones/{zone_id}/bot_management`,
+not a `/settings/*` value, and the Free plan accepts `enable_js: false`. It was
+turned off on 2026-11-20 after confirming that `fight_mode` is off and no WAF rule
+uses `cf.bot_management.js_detection.passed`; only that field changed. The nonce
+stays in the CSP header as defence in depth.

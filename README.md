@@ -108,7 +108,7 @@ Cổng chặn cứng: chỉ người **đã thanh toán và đã nhận file** m
 
 Server gửi `script-src 'self'` kèm **một nonce mới cho mỗi response**, không `unsafe-inline`. Điều đó có nghĩa là **không trang nào được tự viết `<script>` inline** — trước đây trang sản phẩm và trang 404 đều viết loader bằng script inline, trình duyệt từ chối âm thầm và phần "Sản phẩm khác" đứng nguyên ở chữ *Đang tải…* vĩnh viễn. `test/ai-discovery.test.js` kiểm tra đúng điều đó, kể cả thân trang 404 vì nó được phục vụ bằng `sendFile` nằm ngoài mọi kiểm tra khác.
 
-Giờ cả hai dùng `public/related.js`. Nonce trong header tồn tại để Cloudflare Bot Fight Mode tự đóng dấu vào loader JavaScript Detection mà nó chèn vào HTML (hash của loader đổi theo ray id, không cho phép whitelist được). Cloudflare đọc nonce từ header CSP — không cần sửa HTML, và không được nới CSP bằng `unsafe-inline`.
+Giờ cả hai dùng `public/related.js`. Nonce trong header tồn tại để Cloudflare tự đóng dấu vào loader JavaScript Detection nếu nó chèn vào HTML (hash của loader đổi theo ray id, không cho phép whitelist được). Trên zone này JSD đã được tắt (`bot_management.enable_js=false`) nên HTML công khai không còn bị chèn loader và vẫn nén được Brotli; nonce được giữ như lớp phòng thủ. Cloudflare đọc nonce từ header CSP — không cần sửa HTML, và không được nới CSP bằng `unsafe-inline`.
 
 **Sau khi đổi code có đụng tới cột database, chạy lại `supabase/schema.sql` trong Supabase SQL editor trước khi deploy.** Thiếu cột làm server lỗi ngay khi tạo đơn, chứ không phải lỗi im lặng.
 

@@ -301,12 +301,14 @@ app.use((req, res, next) => {
   // Analytics are both gone (the reasons are written down in src/pages.js,
   // analyticsMeta), and a host that is allowed but never used is a hole with
   // nothing behind it.
-  // Cloudflare Bot Fight Mode injects an inline JavaScript Detection loader into
-  // HTML responses. Its hash embeds the ray id, so it changes every request and
-  // cannot be allowlisted, and 'unsafe-inline' is not an option here. Cloudflare
-  // parses the CSP *header* and stamps its nonce onto injected scripts, so a
-  // fresh nonce per response keeps script-src strict without breaking the bot
-  // check. Our own scripts stay external and load through 'self'.
+  // Cloudflare can inject an inline JavaScript Detection loader into HTML when
+  // Bot Management's JavaScript Detections are on. JSD is off for this zone (see
+  // PUBLIC_PAGE_CACHE), but the nonce stays as defence in depth: the loader's
+  // hash embeds the ray id, so it changes every request and cannot be
+  // allowlisted, and 'unsafe-inline' is not an option here. Cloudflare parses the
+  // CSP *header* and stamps its nonce onto injected scripts, so a fresh nonce per
+  // response keeps script-src strict without breaking the check. Our own scripts
+  // stay external and load through 'self'.
   const cspNonce = crypto.randomBytes(16).toString("base64url");
   const scriptSrc = ["'self'", `'nonce-${cspNonce}'`];
   const connectSrc = ["'self'", "https://*.r2.cloudflarestorage.com"];
@@ -597,14 +599,15 @@ async function renderPage(file, lang = DEFAULT_LOCALE) {
 // failover — when the origin is suspended (503) Cloudflare serves the last good
 // HTML instead of the provider's suspension page. A verified deploy still purges
 // the edge (checks.yml), so a long TTL never pins a stale release.
-// `no-transform` stops Cloudflare's edge from injecting its JavaScript Detection
-// script (/cdn-cgi/challenge-platform/scripts/jsd/main.js) into public HTML. That
-// script calls Chrome APIs that are deprecated (deprecations audit, weight 5), and
-// this zone does not use cf.bot_management.js_detection.passed in any WAF rule.
-// Trade-off: Cloudflare no longer brotli-compresses HTML — the 116 KB page used to
-// travel as ~26 KB, so keep an eye on live Lighthouse performance (gate: 0.85).
-// Only HTML uses this constant; CSS/JS/images keep their own immutable cache.
-const PUBLIC_PAGE_CACHE = "public, max-age=86400, stale-while-revalidate=604800, stale-if-error=2592000, no-transform";
+// Do NOT add `no-transform`. It stopped Cloudflare from injecting the JavaScript
+// Detection loader (/cdn-cgi/challenge-platform/scripts/jsd/main.js), but it also
+// stopped Brotli: the 116 KB page travelled uncompressed. Since 2026-11-20 JSD is
+// disabled at the zone (bot_management.enable_js=false), so there is no loader to
+// block and the edge compresses this HTML to ~27 KB. Check that zone setting
+// before re-adding it: if JSD is ever turned back on, its deprecated Chrome APIs
+// drop live Best Practices to 81 again (gate: 0.90), and `no-transform` is the
+// fallback. Only HTML uses this constant; CSS/JS/images keep their own cache.
+const PUBLIC_PAGE_CACHE = "public, max-age=86400, stale-while-revalidate=604800, stale-if-error=2592000";
 
 const sendPage = (file, lang = DEFAULT_LOCALE) => async (_req, res) => {
   try {

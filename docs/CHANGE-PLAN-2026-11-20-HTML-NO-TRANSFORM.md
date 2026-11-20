@@ -51,3 +51,50 @@ decision: "Không cần gzip origin — Perf 99 vẫn dư 14 điểm so với ng
 known_tooling_issue: "gbuild.ps1 đỏ ở Preflight: fly.toml bị heuristic TOML trong _Build/Modules/SharedUtils.psm1:1044 đánh là 'suspicious TOML (no section header)' vì file bắt đầu bằng comment + khóa top-level trước section đầu tiên. fly.toml có từ các commit Fly trước đó, lỗi có sẵn, không do change này; không sửa tool/gate để làm xanh."
 ```
 
+## Revision 2 — 2026-11-20: bỏ `no-transform` sau khi tắt JavaScript Detections
+
+```yaml
+rev: 2
+task: "Remove no-transform from public HTML so Cloudflare can Brotli-compress it, after disabling JavaScript Detections (enable_js=false) at the zone"
+
+scope:
+  - file: src/app.js
+    region: "PUBLIC_PAGE_CACHE constant and the comment above it; CSP nonce comment"
+  - file: test/html-cache.test.js
+    region: "cache-control assertion: no-transform must be absent"
+  - file: WORKFLOW.md
+    region: "Cache bullet and CSP bullet"
+  - file: README.md
+    region: "CSP paragraph"
+  - file: docs/CHANGE-PLAN-2026-11-20-HTML-NO-TRANSFORM.md
+    region: "this revision record"
+
+why: |
+  Rev 1 needed `no-transform` because this zone had JavaScript Detections on
+  (`bot_management.enable_js=true`) and Cloudflare injected
+  /cdn-cgi/challenge-platform/scripts/jsd/main.js into public HTML. That script
+  calls deprecated Chrome APIs, scored 0 on the Lighthouse `deprecations` audit,
+  and dropped live Best Practices to 81. The trial in c898a6e proved the other
+  half: removing `no-transform` restores Brotli (26.8 KB vs 115 KB) but BP stayed
+  81 because JSD was still on. JSD is not a zone setting (`/settings/js_detection`
+  returns 1003); it is `enable_js` on PUT /zones/{zone}/bot_management. It is now
+  false, and that PUT changed no other field. `fight_mode` is off, no WAF rule
+  uses `cf.bot_management.js_detection.passed`, so no active enforcement depended
+  on the signal. With the injection gone, `no-transform` only blocks compression.
+
+design:
+  - "set enable_js=false at the zone first (done; before/after diff: only enable_js changed)"
+  - "drop no-transform from PUBLIC_PAGE_CACHE; max-age, SWR and stale-if-error stay unchanged"
+  - "test asserts the header does NOT carry no-transform — absence is the regression guard"
+  - "update the docs that described no-transform as permanent"
+  - "reuse the existing edge cache and deploy pipeline; no Worker change, no new dependency"
+
+verification:
+  - "npm run lint/audit/case/workflow/test/build + _Tests gtest + _Build gbuild"
+  - "_Sync -Yes; CI deploy-fly + deploy-worker + deployed-site + lighthouse must be green"
+  - "purge edge; GET / must be 200 with 1 title/h1/canonical, no jsd script, content-encoding br or gzip"
+  - "live Lighthouse best-practices >= 90 and performance >= 85; SEO 212/212"
+
+rollback: "PUT /zones/{zone}/bot_management {enable_js:true} then git revert this commit; no other zone setting or secret changes"
+```
+
