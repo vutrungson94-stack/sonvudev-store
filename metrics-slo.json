@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-11-20T02:37:55.585Z",
+  "generatedAt": "2026-11-21T10:30:56.631Z",
   "overall": "ok",
   "measurements": {
     "availability": {
@@ -13,16 +13,16 @@
       "source": "logs/last-availability.json — edge request window from the configured source (windowDays/coverageDays recorded in the file)",
       "owner": "platform-team",
       "remediation": "Check the deploy history and the incident log; runbook at docs/RUNBOOK.md",
-      "value": 100,
+      "value": 87.3248,
       "status": "unknown",
       "breached": false,
-      "sampleSize": 20,
-      "coverageDays": 0.013888888888888888,
+      "sampleSize": 16410,
+      "coverageDays": 4,
       "windowDays": 30,
       "observedFrom": "2026-11-17T10:25:00.000Z",
-      "observedTo": "2026-11-17T10:45:00.000Z",
+      "observedTo": "2026-11-21T10:25:00.000Z",
       "partialWindow": true,
-      "measuredAt": "2026-11-20T02:37:55.586Z"
+      "measuredAt": "2026-11-21T10:30:56.632Z"
     },
     "errorRate": {
       "id": "errorRate",
@@ -35,16 +35,16 @@
       "source": "logs/last-error-report.json",
       "owner": "backend-team",
       "remediation": "Check /api/health failures; roll back if the rate holds for 15 minutes",
-      "value": 0,
+      "value": 12.6752,
       "status": "unknown",
       "breached": false,
-      "sampleSize": 20,
-      "coverageDays": 0.013888888888888888,
+      "sampleSize": 16410,
+      "coverageDays": 4,
       "windowDays": 30,
       "observedFrom": "2026-11-17T10:25:00.000Z",
-      "observedTo": "2026-11-17T10:45:00.000Z",
+      "observedTo": "2026-11-21T10:25:00.000Z",
       "partialWindow": true,
-      "measuredAt": "2026-11-20T02:37:55.586Z"
+      "measuredAt": "2026-11-21T10:30:56.632Z"
     },
     "latencyP95": {
       "id": "latencyP95",
@@ -61,7 +61,7 @@
       "status": "unknown",
       "breached": false,
       "sampleSize": 0,
-      "measuredAt": "2026-11-20T02:37:55.586Z"
+      "measuredAt": "2026-11-21T10:30:56.633Z"
     },
     "testPassRate": {
       "id": "testPassRate",
@@ -74,11 +74,11 @@
       "source": "test_output.log",
       "owner": "engineering-team",
       "remediation": "A red test must block the merge; fix it before the next deploy",
-      "value": 100,
-      "status": "ok",
+      "value": null,
+      "status": "unknown",
       "breached": false,
-      "sampleSize": 513,
-      "measuredAt": "2026-11-20T02:37:55.587Z"
+      "sampleSize": 0,
+      "measuredAt": "2026-11-21T10:30:56.633Z"
     },
     "buildSuccessRate": {
       "id": "buildSuccessRate",
@@ -91,11 +91,11 @@
       "source": "build-reports/web-build.json — the outcome of the last build, not a rate",
       "owner": "platform-team",
       "remediation": "A failed build blocks the deploy; read the CI log",
-      "value": 100,
-      "status": "ok",
+      "value": null,
+      "status": "unknown",
       "breached": false,
-      "sampleSize": 1,
-      "measuredAt": "2026-11-20T02:37:55.587Z"
+      "sampleSize": 0,
+      "measuredAt": "2026-11-21T10:30:56.633Z"
     },
     "deploySuccessRate": {
       "id": "deploySuccessRate",
@@ -112,7 +112,7 @@
       "status": "unknown",
       "breached": false,
       "sampleSize": 0,
-      "measuredAt": "2026-11-20T02:37:55.587Z"
+      "measuredAt": "2026-11-21T10:30:56.633Z"
     },
     "escapeRate": {
       "id": "escapeRate",
@@ -129,7 +129,7 @@
       "status": "unknown",
       "breached": false,
       "sampleSize": 0,
-      "measuredAt": "2026-11-20T02:37:55.587Z"
+      "measuredAt": "2026-11-21T10:30:56.633Z"
     }
   },
   "unresolvedBreachCount": 0

@@ -1,8 +1,8 @@
 {
-  "generatedAt": "2026-11-17T10:54:48.217Z",
+  "generatedAt": "2026-11-21T10:30:54.268Z",
   "origin": "https://sonvudev.com",
-  "hitRate": 1,
-  "hits": 8,
+  "hitRate": 0.875,
+  "hits": 7,
   "total": 8,
   "steadyStateHitRate": 1,
   "steadyStateHits": 4,
@@ -13,16 +13,16 @@
       "readings": [
         {
           "cache": "HIT",
-          "age": "245",
-          "cacheControl": "public, max-age=300",
-          "ray": "a5be330c881cc896-HKG",
+          "age": "62072",
+          "cacheControl": "public, max-age=86400, stale-while-revalidate=604800, stale-if-error=2592000",
+          "ray": "a5df055f2a67c895-PDX",
           "status": 200
         },
         {
           "cache": "HIT",
-          "age": "245",
-          "cacheControl": "public, max-age=300",
-          "ray": "a5be330d0941c896-HKG",
+          "age": "62072",
+          "cacheControl": "public, max-age=86400, stale-while-revalidate=604800, stale-if-error=2592000",
+          "ray": "a5df055f7b61c895-PDX",
           "status": 200
         }
       ]
@@ -32,16 +32,16 @@
       "readings": [
         {
           "cache": "HIT",
-          "age": "244",
-          "cacheControl": "public, max-age=300",
-          "ray": "a5be330d49f6c896-HKG",
+          "age": "62070",
+          "cacheControl": "public, max-age=86400, stale-while-revalidate=604800, stale-if-error=2592000",
+          "ray": "a5df055fbbc6c895-PDX",
           "status": 200
         },
         {
           "cache": "HIT",
-          "age": "245",
-          "cacheControl": "public, max-age=300",
-          "ray": "a5be330dab0fc896-HKG",
+          "age": "62070",
+          "cacheControl": "public, max-age=86400, stale-while-revalidate=604800, stale-if-error=2592000",
+          "ray": "a5df05600c3ec895-PDX",
           "status": 200
         }
       ]
@@ -50,17 +50,17 @@
       "path": "/styles.min.css",
       "readings": [
         {
-          "cache": "HIT",
-          "age": "244",
+          "cache": "MISS",
+          "age": null,
           "cacheControl": "public, max-age=31536000",
-          "ray": "a5be330e0c17c896-HKG",
+          "ray": "a5df05603c9cc895-PDX",
           "status": 200
         },
         {
           "cache": "HIT",
-          "age": "244",
+          "age": "0",
           "cacheControl": "public, max-age=31536000",
-          "ray": "a5be330e5d15c896-HKG",
+          "ray": "a5df058c994bc895-PDX",
           "status": 200
         }
       ]
@@ -70,16 +70,16 @@
       "readings": [
         {
           "cache": "HIT",
-          "age": "244",
-          "cacheControl": "public, max-age=600",
-          "ray": "a5be330eae01c896-HKG",
+          "age": "62058",
+          "cacheControl": "public, max-age=86400, stale-while-revalidate=604800, stale-if-error=2592000",
+          "ray": "a5df058cd9bdc895-PDX",
           "status": 200
         },
         {
           "cache": "HIT",
-          "age": "244",
-          "cacheControl": "public, max-age=600",
-          "ray": "a5be330f0efbc896-HKG",
+          "age": "62058",
+          "cacheControl": "public, max-age=86400, stale-while-revalidate=604800, stale-if-error=2592000",
+          "ray": "a5df058d0a12c895-PDX",
           "status": 200
         }
       ]
