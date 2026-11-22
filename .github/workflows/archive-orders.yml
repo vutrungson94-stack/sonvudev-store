@@ -43,27 +43,22 @@ jobs:
         id: fetch
         run: |
           set -e
-          body="$(mktemp)"
-          code="$(curl -s -o "$body" -w '%{http_code}' --max-time 60 \
-            -H "Authorization: Bearer ${ADMIN_API_TOKEN}" \
+          body="/tmp/orders-raw.json"
+          code="$(curl -s -o "$body" -w '%{http_code}' --max-time 60 \\
+            -H "Authorization: Bearer ${ADMIN_API_TOKEN}" \\
             "${ORDERS_URL}" || echo 000)"
           echo "HTTP $code"
           if [ "$code" != "200" ]; then
             cat "$body" 2>/dev/null || echo "(không có nội dung)"
-            rm -f "$body"
             exit 1
           fi
-          echo "orders_json<<EOF" >> "$GITHUB_OUTPUT"
-          cat "$body" >> "$GITHUB_OUTPUT"
-          echo "EOF" >> "$GITHUB_OUTPUT"
-          rm -f "$body"
+          echo "file=$body" >> "$GITHUB_OUTPUT"
 
       - name: Lọc đơn hàng cũ (>30 ngày, đã giao/hủy) và lưu file
         id: filter
         run: |
           set -e
-          echo "${{ steps.fetch.outputs.orders_json }}" > /tmp/orders.json
-          jq '[.[] | select(.status == "delivered" or .status == "refunded" or .status == "cancelled") | select(.paidAt and ((now - (.paidAt | fromdateiso8601)) > 2592000))]' /tmp/orders.json > /tmp/archived-orders.json
+          jq '[.[] | select(.status == "delivered" or .status == "refunded" or .status == "cancelled") | select(.paidAt and ((now - (.paidAt | fromdateiso8601)) > 2592000))]' "${{ steps.fetch.outputs.file }}" > /tmp/archived-orders.json
           count="$(jq 'length' /tmp/archived-orders.json)"
           echo "Đơn hàng cũ cần lưu trữ: $count"
           echo "count=$count" >> "$GITHUB_OUTPUT"
