@@ -835,7 +835,9 @@ for (const name of htmlFiles) {
   for (const name of htmlFiles) {
     const source = await read(path.join("public", name));
     // Accept absolute (/i18n.js) or relative (i18n.js); locale-prefixed pages require absolute.
-    const hasDictionary = /src="\/?i18n\.js"/.test(source);
+    // The dictionary may arrive through a normal <script src> tag or through the deferred
+    // loader in public/index.html — either way i18n.js runs on the page.
+    const hasDictionary = /(?:src="\/?i18n\.js"|\/i18n\.js)/.test(source);
     const hasSwitch = /data-lang-switch|data-lang-toggle/.test(source);
     if (hasDictionary) withDictionary.push(name);
     if (hasSwitch) {

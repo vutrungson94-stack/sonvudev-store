@@ -39,7 +39,7 @@ const targetDir = dirFlag !== -1
 // order-client.js is small but loaded on every page, so minify it too.
 // related.js, format.js and the rest are smaller and are not on the critical path
 // of a storefront visit.
-const TARGETS = ["app.js", "i18n.js", "admin.js", "order-client.js"];
+const TARGETS = ["app.js", "i18n.js", "admin.js", "order-client.js", "hydrate-storefront.js"];
 
 let saved = 0;
 for (const name of TARGETS) {
