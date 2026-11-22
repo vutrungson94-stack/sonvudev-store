@@ -1,0 +1,94 @@
+# Lưu đơn hàng cũ (>30 ngày, đã giao/hủy) ra file JSON và đăng lên GitHub Releases.
+# Mục đích: giảm dung lượng Supabase (free 500MB), giữ DB chỉ chứa dữ liệu hiện tại.
+#
+# Chạy vào lúc 00:00 UTC hằng ngày. Cần repo variable:
+#   SHOP_URL = https://<domain>/api/admin/orders
+# Cần repo secret:
+#   ADMIN_API_TOKEN = token admin gọi API (xem docs/PURCHASE-LINK-RULES.md nếu cần)
+
+name: archive đơn hàng cũ
+
+on:
+  schedule:
+    - cron: '0 0 * * *'   # 00:00 UTC = 07:00 ICT
+  workflow_dispatch:
+
+concurrency:
+  group: archive-orders
+  cancel-in-progress: false
+
+jobs:
+  archive:
+    permissions:
+      contents: write    # cần để tạo GitHub Release
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    env:
+      SHOP_URL: ${{ vars.SHOP_URL }}
+      ADMIN_API_TOKEN: ${{ secrets.ADMIN_API_TOKEN }}
+    steps:
+      - name: Kiểm tra biến/bí mật bắt buộc
+        run: |
+          if [ -z "${SHOP_URL:-}" ]; then
+            echo "!! SHOP_URL chưa được đặt (Settings > Secrets and variables > Actions > Variables)"
+            exit 1
+          fi
+          if [ -z "${ADMIN_API_TOKEN:-}" ]; then
+            echo "!! ADMIN_API_TOKEN chưa được đặt (Settings > Secrets and variables > Actions > Secrets)"
+            exit 1
+          fi
+
+      - name: Lấy danh sách đơn hàng từ shop
+        id: fetch
+        run: |
+          set -e
+          body="$(mktemp)"
+          code="$(curl -s -o "$body" -w '%{http_code}' --max-time 60 \
+            -H "Authorization: Bearer ${ADMIN_API_TOKEN}" \
+            "${SHOP_URL}" || echo 000)"
+          echo "HTTP $code"
+          if [ "$code" != "200" ]; then
+            cat "$body" 2>/dev/null || echo "(không có nội dung)"
+            rm -f "$body"
+            exit 1
+          fi
+          echo "orders_json<<EOF" >> "$GITHUB_OUTPUT"
+          cat "$body" >> "$GITHUB_OUTPUT"
+          echo "EOF" >> "$GITHUB_OUTPUT"
+          rm -f "$body"
+
+      - name: Lọc đơn hàng cũ (>30 ngày, đã giao/hủy) và lưu file
+        id: filter
+        run: |
+          set -e
+          echo "${{ steps.fetch.outputs.orders_json }}" > /tmp/orders.json
+          jq '[.[] | select(.status == "delivered" or .status == "refunded" or .status == "cancelled") | select(.paidAt and ((now - (.paidAt | fromdateiso8601)) > 2592000))]' /tmp/orders.json > /tmp/archived-orders.json
+          count="$(jq 'length' /tmp/archived-orders.json)"
+          echo "Đơn hàng cũ cần lưu trữ: $count"
+          echo "count=$count" >> "$GITHUB_OUTPUT"
+          echo "file=/tmp/archived-orders.json" >> "$GITHUB_OUTPUT"
+
+      - name: Bỏ qua nếu không có đơn cũ
+        if: steps.filter.outputs.count == '0'
+        run: echo "Không có đơn hàng cũ cần lưu trữ."
+
+      - name: Tạo GitHub Release cho bản lưu trữ
+        if: steps.filter.outputs.count != '0'
+        run: |
+          set -e
+          today="$(date +%Y%m%d)"
+          release_name="archive-orders-${today}"
+          tag="archive/${today}"
+          # Xóa release cũ cùng ngày nếu đã có (idempotent)
+          existing="$(gh release list --json tagName -q ".[] | select(.tagName == \"${tag}\") | .tagName" || true)"
+          if [ -n "${existing}" ]; then
+            gh release delete "${tag}" --yes || true
+          fi
+          gh release create "${tag}" \
+            --title "${release_name}" \
+            --notes "Đơn hàng đã giao/hủy hơn 30 ngày, lưu trữ vào ${today}. Tổng số: ${{ steps.filter.outputs.count }} đơn." \
+            "${{ steps.filter.outputs.file }}"
+
+      - name: Báo cáo kết quả
+        run: |
+          echo "Lưu trữ đơn hàng cũ hoàn tất vào $(date -u +%Y-%m-%dT%H:%M:%SZ)."
