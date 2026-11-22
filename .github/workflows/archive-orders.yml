@@ -44,8 +44,8 @@ jobs:
         run: |
           set -e
           body="/tmp/orders-raw.json"
-          code="$(curl -s -o "$body" -w '%{http_code}' --max-time 60 \\
-            -H "Authorization: Bearer ${ADMIN_API_TOKEN}" \\
+          code="$(curl -s -o "$body" -w '%{http_code}' --max-time 60 \
+            -H "Authorization: Bearer ${ADMIN_API_TOKEN}" \
             "${ORDERS_URL}" || echo 000)"
           echo "HTTP $code"
           if [ "$code" != "200" ]; then
