@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-11-21T10:30:56.631Z",
+  "generatedAt": "2026-11-22T10:35:43.969Z",
   "overall": "ok",
   "measurements": {
     "availability": {
@@ -13,16 +13,16 @@
       "source": "logs/last-availability.json — edge request window from the configured source (windowDays/coverageDays recorded in the file)",
       "owner": "platform-team",
       "remediation": "Check the deploy history and the incident log; runbook at docs/RUNBOOK.md",
-      "value": 87.3248,
+      "value": 90.6264,
       "status": "unknown",
       "breached": false,
-      "sampleSize": 16410,
-      "coverageDays": 4,
+      "sampleSize": 22190,
+      "coverageDays": 4.996527777777778,
       "windowDays": 30,
       "observedFrom": "2026-11-17T10:25:00.000Z",
-      "observedTo": "2026-11-21T10:25:00.000Z",
+      "observedTo": "2026-11-22T10:20:00.000Z",
       "partialWindow": true,
-      "measuredAt": "2026-11-21T10:30:56.632Z"
+      "measuredAt": "2026-11-22T10:35:43.970Z"
     },
     "errorRate": {
       "id": "errorRate",
@@ -35,16 +35,16 @@
       "source": "logs/last-error-report.json",
       "owner": "backend-team",
       "remediation": "Check /api/health failures; roll back if the rate holds for 15 minutes",
-      "value": 12.6752,
+      "value": 9.3736,
       "status": "unknown",
       "breached": false,
-      "sampleSize": 16410,
-      "coverageDays": 4,
+      "sampleSize": 22190,
+      "coverageDays": 4.996527777777778,
       "windowDays": 30,
       "observedFrom": "2026-11-17T10:25:00.000Z",
-      "observedTo": "2026-11-21T10:25:00.000Z",
+      "observedTo": "2026-11-22T10:20:00.000Z",
       "partialWindow": true,
-      "measuredAt": "2026-11-21T10:30:56.632Z"
+      "measuredAt": "2026-11-22T10:35:43.970Z"
     },
     "latencyP95": {
       "id": "latencyP95",
@@ -61,7 +61,7 @@
       "status": "unknown",
       "breached": false,
       "sampleSize": 0,
-      "measuredAt": "2026-11-21T10:30:56.633Z"
+      "measuredAt": "2026-11-22T10:35:43.971Z"
     },
     "testPassRate": {
       "id": "testPassRate",
@@ -78,7 +78,7 @@
       "status": "unknown",
       "breached": false,
       "sampleSize": 0,
-      "measuredAt": "2026-11-21T10:30:56.633Z"
+      "measuredAt": "2026-11-22T10:35:43.971Z"
     },
     "buildSuccessRate": {
       "id": "buildSuccessRate",
@@ -95,7 +95,7 @@
       "status": "unknown",
       "breached": false,
       "sampleSize": 0,
-      "measuredAt": "2026-11-21T10:30:56.633Z"
+      "measuredAt": "2026-11-22T10:35:43.971Z"
     },
     "deploySuccessRate": {
       "id": "deploySuccessRate",
@@ -112,7 +112,7 @@
       "status": "unknown",
       "breached": false,
       "sampleSize": 0,
-      "measuredAt": "2026-11-21T10:30:56.633Z"
+      "measuredAt": "2026-11-22T10:35:43.971Z"
     },
     "escapeRate": {
       "id": "escapeRate",
@@ -129,7 +129,7 @@
       "status": "unknown",
       "breached": false,
       "sampleSize": 0,
-      "measuredAt": "2026-11-21T10:30:56.633Z"
+      "measuredAt": "2026-11-22T10:35:43.971Z"
     }
   },
   "unresolvedBreachCount": 0

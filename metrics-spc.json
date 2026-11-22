@@ -1,48 +1,48 @@
 {
-  "generatedAt": "2026-11-21T10:30:44.050Z",
+  "generatedAt": "2026-11-22T10:35:37.395Z",
   "metrics": {
     "tests": {
-      "mean": 544.25,
-      "stdev": 73.0047,
-      "ucl": 763.2641,
-      "lcl": 325.2359,
+      "mean": 561.3333,
+      "stdev": 84.0965,
+      "ucl": 813.6228,
+      "lcl": 309.0438,
       "latest": 698,
       "inControl": true,
       "signals": [],
-      "n": 8,
+      "n": 9,
       "sufficient": false
     },
     "testFiles": {
-      "mean": 74.125,
-      "stdev": 15.1694,
-      "ucl": 119.6331,
-      "lcl": 28.6169,
+      "mean": 77.6667,
+      "stdev": 17.4611,
+      "ucl": 130.0499,
+      "lcl": 25.2835,
       "latest": 106,
       "inControl": true,
       "signals": [],
-      "n": 8,
+      "n": 9,
       "sufficient": false
     },
     "routes": {
-      "mean": 36.25,
-      "stdev": 5.5396,
-      "ucl": 52.8689,
-      "lcl": 19.6311,
+      "mean": 37.2222,
+      "stdev": 5.9025,
+      "ucl": 54.9297,
+      "lcl": 19.5147,
       "latest": 45,
       "inControl": true,
       "signals": [],
-      "n": 8,
+      "n": 9,
       "sufficient": false
     },
     "dependencies": {
-      "mean": 6.25,
-      "stdev": 0.433,
-      "ucl": 7.549,
-      "lcl": 4.951,
+      "mean": 6.3333,
+      "stdev": 0.4714,
+      "ucl": 7.7475,
+      "lcl": 4.9191,
       "latest": 7,
       "inControl": true,
       "signals": [],
-      "n": 8,
+      "n": 9,
       "sufficient": false
     },
     "escCopies": {
@@ -53,7 +53,7 @@
       "latest": 2,
       "inControl": true,
       "signals": [],
-      "n": 8,
+      "n": 9,
       "sufficient": false
     },
     "moneyCopies": {
@@ -64,7 +64,7 @@
       "latest": 2,
       "inControl": true,
       "signals": [],
-      "n": 8,
+      "n": 9,
       "sufficient": false
     },
     "initialsCopies": {
@@ -75,7 +75,7 @@
       "latest": 2,
       "inControl": true,
       "signals": [],
-      "n": 8,
+      "n": 9,
       "sufficient": false
     },
     "sizeCopies": {
@@ -86,29 +86,29 @@
       "latest": 2,
       "inControl": true,
       "signals": [],
-      "n": 8,
+      "n": 9,
       "sufficient": false
     },
     "i18nKeys": {
-      "mean": 867.25,
-      "stdev": 49.7286,
-      "ucl": 1016.4359,
-      "lcl": 718.0641,
+      "mean": 879.1111,
+      "stdev": 57.6511,
+      "ucl": 1052.0645,
+      "lcl": 706.1577,
       "latest": 974,
       "inControl": true,
       "signals": [],
-      "n": 8,
+      "n": 9,
       "sufficient": false
     },
     "indexablePages": {
-      "mean": 7,
-      "stdev": 0.5,
-      "ucl": 8.5,
-      "lcl": 5.5,
+      "mean": 6.8889,
+      "stdev": 0.5666,
+      "ucl": 8.5886,
+      "lcl": 5.1892,
       "latest": 6,
       "inControl": true,
       "signals": [],
-      "n": 8,
+      "n": 9,
       "sufficient": false
     },
     "productPageLocales": {
@@ -119,18 +119,18 @@
       "latest": 2,
       "inControl": true,
       "signals": [],
-      "n": 8,
+      "n": 9,
       "sufficient": false
     },
     "localizedPages": {
-      "mean": 9.375,
-      "stdev": 0.696,
-      "ucl": 11.4629,
-      "lcl": 7.2871,
+      "mean": 9.5556,
+      "stdev": 0.8315,
+      "ucl": 12.05,
+      "lcl": 7.0611,
       "latest": 11,
       "inControl": true,
       "signals": [],
-      "n": 8,
+      "n": 9,
       "sufficient": false
     },
     "productPageRenderers": {
@@ -141,40 +141,40 @@
       "latest": 1,
       "inControl": true,
       "signals": [],
-      "n": 8,
+      "n": 9,
       "sufficient": false
     },
     "deploymentFrequency": {
-      "mean": 1.92,
-      "stdev": 1.3576,
-      "ucl": 5.9929,
-      "lcl": -2.1529,
+      "mean": 2.16,
+      "stdev": 1.2471,
+      "ucl": 5.9012,
+      "lcl": -1.5812,
       "latest": 2.88,
       "inControl": true,
       "signals": [],
-      "n": 3,
+      "n": 4,
       "sufficient": false
     },
     "leadTimeDays": {
-      "mean": 0.0067,
-      "stdev": 0.0047,
-      "ucl": 0.0208,
-      "lcl": -0.0075,
+      "mean": 0.0075,
+      "stdev": 0.0043,
+      "ucl": 0.0205,
+      "lcl": -0.0055,
       "latest": 0.01,
       "inControl": true,
       "signals": [],
-      "n": 3,
+      "n": 4,
       "sufficient": false
     },
     "changeFailureRate": {
-      "mean": 0.1081,
-      "stdev": 0.0765,
-      "ucl": 0.3375,
-      "lcl": -0.1213,
+      "mean": 0.1217,
+      "stdev": 0.0702,
+      "ucl": 0.3324,
+      "lcl": -0.0891,
       "latest": 0.1622,
       "inControl": true,
       "signals": [],
-      "n": 3,
+      "n": 4,
       "sufficient": false
     },
     "sloBreachCount": {
@@ -185,7 +185,7 @@
       "latest": 0,
       "inControl": true,
       "signals": [],
-      "n": 3,
+      "n": 4,
       "sufficient": false
     }
   },
