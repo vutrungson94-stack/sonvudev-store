@@ -58,7 +58,7 @@ jobs:
         id: filter
         run: |
           set -e
-          jq '[.[] | select(.status == "delivered" or .status == "refunded" or .status == "cancelled") | select(.paidAt and ((now - (.paidAt | fromdateiso8601)) > 2592000))]' "${{ steps.fetch.outputs.file }}" > /tmp/archived-orders.json
+          jq '[.orders[] | select(.status == "delivered" or .status == "refunded" or .status == "cancelled") | select(.paidAt and ((now - (.paidAt | fromdateiso8601)) > 2592000))]' "${{ steps.fetch.outputs.file }}" > /tmp/archived-orders.json
           count="$(jq 'length' /tmp/archived-orders.json)"
           echo "Đơn hàng cũ cần lưu trữ: $count"
           echo "count=$count" >> "$GITHUB_OUTPUT"
