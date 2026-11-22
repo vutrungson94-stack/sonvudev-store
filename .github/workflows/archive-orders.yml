@@ -2,7 +2,8 @@
 # Mục đích: giảm dung lượng Supabase (free 500MB), giữ DB chỉ chứa dữ liệu hiện tại.
 #
 # Chạy vào lúc 00:00 UTC hằng ngày. Cần repo variable:
-#   SHOP_URL = https://<domain>/api/admin/orders
+#   SHOP_URL     = https://<domain>/api/health        (dùng bởi keep-awake)
+#   ORDERS_URL   = https://<domain>/api/admin/orders  (dùng bởi workflow này)
 # Cần repo secret:
 #   ADMIN_API_TOKEN = token admin gọi API (xem docs/PURCHASE-LINK-RULES.md nếu cần)
 
@@ -24,13 +25,13 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 10
     env:
-      SHOP_URL: ${{ vars.SHOP_URL }}
+      ORDERS_URL: ${{ vars.ORDERS_URL }}
       ADMIN_API_TOKEN: ${{ secrets.ADMIN_API_TOKEN }}
     steps:
       - name: Kiểm tra biến/bí mật bắt buộc
         run: |
-          if [ -z "${SHOP_URL:-}" ]; then
-            echo "!! SHOP_URL chưa được đặt (Settings > Secrets and variables > Actions > Variables)"
+          if [ -z "${ORDERS_URL:-}" ]; then
+            echo "!! ORDERS_URL chưa được đặt (Settings > Secrets and variables > Actions > Variables)"
             exit 1
           fi
           if [ -z "${ADMIN_API_TOKEN:-}" ]; then
@@ -45,7 +46,7 @@ jobs:
           body="$(mktemp)"
           code="$(curl -s -o "$body" -w '%{http_code}' --max-time 60 \
             -H "Authorization: Bearer ${ADMIN_API_TOKEN}" \
-            "${SHOP_URL}" || echo 000)"
+            "${ORDERS_URL}" || echo 000)"
           echo "HTTP $code"
           if [ "$code" != "200" ]; then
             cat "$body" 2>/dev/null || echo "(không có nội dung)"
