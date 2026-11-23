@@ -33,7 +33,7 @@ Both were invisible to a single "it works on my machine" pass. Both were caught 
 
 ## 4. Invariants — breaking these is a regression, not a feature
 
-- **`src/app.js`** — the homepage `/` and all content paths are Vietnamese routes. `/en/` must exist as a 200 English homepage. Non-vi locale prefixes serve real localized routes (product pages, blog, legal).
+- **`src/app.js`** — the homepage `/` and all content paths are Vietnamese routes. `/en/` must exist as a 200 English homepage. Non-vi locale prefixes serve real routes (product pages, blog, homepage, legal pages, about, contact, status and lookup). Every internal link the server puts in localized chrome must resolve to one of those routes: `/en/lookup` must answer 200 and be rendered in English, not fall through to the 404 page or to Vietnamese bytes. A static page whose bytes must match its URL's language has to be registered in `STATIC_PAGES` and `STATIC_META` as well (see `WORKFLOW.md` §7.5).
 - **`public/i18n.js`** — the URL prefix wins. Never rewrite a URL the server already renders in the locale the URL names.
 - **`public/index.html` & static legal pages** — the stylesheet link must be absolute (`/styles.css`), never relative (`styles.css`), because prefixes exist.
 - **`src/store.js`** — seed products are development data only; production must not ship phantom catalogue entries.

@@ -2,7 +2,7 @@
 
 Cửa hàng phần mềm SonVuDev: catalog, đơn hàng, PayPal/chuyển khoản và link tải Cloudflare R2 riêng tư có thời hạn.
 
-Production dùng domain `https://sonvudev.com`. Toàn bộ cấu hình thật nằm trong `D:\SonVuDev-Upload\.env`; `.env.example` chỉ là mẫu và không chứa secret.
+Production dùng domain `https://sonvudev.com`. Toàn bộ cấu hình thật nằm trong tệp `.env` tại gốc dự án (được gitignore); `.env.example` chỉ là mẫu và không chứa secret.
 
 ## Tài liệu vận hành
 
@@ -10,13 +10,16 @@ Production dùng domain `https://sonvudev.com`. Toàn bộ cấu hình thật n�
 - `docs/SLO.md` — chỉ số, mục tiêu 30 ngày, ngân sách lỗi, cách đo bằng log và benchmark.
 - `docs/INCIDENT-TEMPLATE.md` — mẫu incident/RCA, điền trong 48 giờ sau sự cố.
 - `deploy/canary.sh` — canary trên VPS: `start`, `split`, `promote`, `rollback`, `status`.
-- `public/locales/` — từ điển tiếng Nhật và tiếng Trung, tải theo yêu cầu; thêm ngôn ngữ
-  mới chỉ cần thêm tệp JSON và một mục trong `window.SVD_LOCALES`. Tệp này còn chứa
-  **bản dịch nội dung sản phẩm** cho JA/ZH (`product.copy.<slug>.*` cho tên, mô tả,
-  tính năng, yêu cầu hệ thống; `product.label.category.*` / `product.label.badge.*` cho
-  nhãn danh mục và badge) — vì bảng `products` chỉ có cột tiếng Việt và tiếng Anh.
-  Tên, mô tả ngắn và tính năng nên viết tay để giữ chất lượng; `npm run i18n:products`
-  dịch phần mô tả dài còn thiếu, không bao giờ ghi đè khoá đã có.
+- `public/locales/` — từ điển cho cả 7 locale (`vi`, `en`, `de`, `es`, `fr`, `ja`, `zh-CN`),
+  tải theo yêu cầu. Danh sách locale có một nguồn duy nhất là `src/i18n-registry.mjs`,
+  phát ra `window.SVD_LOCALES`; thêm ngôn ngữ mới cần thêm một mục ở registry **và** một
+  tệp JSON dịch đủ các khoá (audit chặn lệch khoá). `en.json` được sinh từ DICT của
+  `public/i18n.js`, không sửa tay. Các tệp này còn chứa **bản dịch nội dung sản phẩm** cho
+  các locale không phải vi/en (`product.copy.<slug>.*` cho tên, mô tả, tính năng, yêu cầu
+  hệ thống; `product.label.category.*` / `product.label.badge.*` cho nhãn danh mục và
+  badge) — vì bảng `products` chỉ có cột tiếng Việt và tiếng Anh. Tên, mô tả ngắn và tính
+  năng nên viết tay để giữ chất lượng; `npm run i18n:products` dịch phần mô tả dài còn
+  thiếu, không bao giờ ghi đè khoá đã có.
 - `npm run benchmark` — đo p50/p95/p99 trên một instance đang chạy và ghi baseline vào
   `build-reports/perf-baseline.json`.
 
@@ -86,7 +89,7 @@ Bốn thứ đã làm, theo thứ tự lợi ích trên chi phí:
 
 **1. `og:image` là PNG.** Đây là thay đổi đáng giá nhất và đã xong. Facebook, Zalo, Telegram, Slack, LinkedIn và phần lớn trợ lý **không render SVG** trong `og:image` và hiện ô trống. Giờ mọi link chia sẻ đều có ảnh. Ảnh nằm ở `public/og.png`, commit sẵn nên build và server không cần thư viện ảnh nào; sinh lại bằng `npm run assets:og` khi đổi màu thương hiệu.
 
-**2. Hai ngôn ngữ, hai URL.** `descriptionEn`, `shortDescriptionEn` và `featuresEn` đã nằm trong database từ lâu và trình duyệt đã dùng, nhưng server chỉ render tiếng Việt — nên trợ lý hỏi bằng tiếng Anh tìm thấy trang rồi không trích được gì. Giờ có `/en/product/:slug`, hai bản trỏ qua lại bằng `hreflang` và `og:locale:alternate`, và cả hai xuất hiện trong sitemap.
+**2. Mỗi ngôn ngữ một URL.** `descriptionEn`, `shortDescriptionEn` và `featuresEn` đã nằm trong database từ lâu và trình duyệt đã dùng, nhưng server chỉ render tiếng Việt — nên trợ lý hỏi bằng tiếng Anh tìm thấy trang rồi không trích được gì. Giờ có `/en/product/:slug` (từ cột DB) và `/de/…`, `/es/…`, `/fr/…`, `/ja/…`, `/zh-CN/…` (từ `public/locales/<lang>.json`); mọi bản đều trỏ qua lại bằng `hreflang` và `og:locale:alternate`. URL locale chỉ vào sitemap khi thực sự có bản dịch.
 
 **3. `sameAs` và một con người có tên.** `BRAND_SOCIAL_LINKS` và `BRAND_FOUNDER_NAME` đổ vào schema `Organization`. Đây là thứ nối cửa hàng với phần còn lại của web trong một knowledge graph; `sameAs` rỗng thì thương hiệu là một hòn đảo không gì xác nhận được.
 
@@ -213,7 +216,9 @@ Script chỉ đẩy danh sách biến của ứng dụng (`ALLOWED`), không đ�
 - `public/lookup.html` + `public/order.html`: tra cứu đơn và trang đơn hàng. Cả hai, cùng
   `paypal-return.html`, đọc chữ từ `i18n.js` như trang chủ — đây là ba trang khách
   nước ngoài dùng sau khi trả tiền bằng PayPal, nên chúng phải theo ngôn ngữ khách
-  đang dùng chứ không phải tiếng Việt viết cứng.
+  đang dùng chứ không phải tiếng Việt viết cứng. Riêng tra cứu đơn còn có route theo
+  từng locale (`/lookup`, `/en/lookup`, `/de/lookup`, …) và được server render sẵn bằng
+  ngôn ngữ của URL; mọi footer đã localized đều dẫn tới `/<lang>/lookup`.
 - `src/reviews.js`: đánh giá của khách, lưu trên chính dòng đơn vì đó là nơi bằng chứng đã mua tồn tại sẵn.
 - `public/related.js`: loader dùng chung cho trang sản phẩm và trang 404. Nằm ngoài file vì CSP cấm script inline.
 - `public/og.png`: ảnh share raster, sinh một lần bởi `scripts/make-og-image.mjs`.
@@ -568,8 +573,11 @@ tìm kiếm đọc, vì kết quả tìm kiếm hiện giá tuần trước tệ
 `invalidatePages()` xoá luôn cache của trang chủ, `/llms.txt` và `/feed.json` — trước đây
 ba thứ đó có thể mô tả sản phẩm với giá không còn tồn tại.
 
-`sitemap.xml` sinh tự động từ danh mục sống, và mỗi sản phẩm cho ra hai URL (`/product/…`
-và `/en/product/…`) nối với nhau bằng `hreflang`. `/lookup` và `/admin.html` cố tình không có trong đó.
+`sitemap.xml` sinh tự động từ danh mục sống: mỗi trang tĩnh có một URL cho mỗi locale, còn
+mỗi sản phẩm có URL cho từng locale (tiếng Việt luôn có; tiếng Anh khi có bản dịch, các
+locale khác khi `public/locales/<lang>.json` có `product.copy` của sản phẩm đó) và tất cả
+được nối bằng `hreflang`. `/admin.html` và `/lookup` vẫn không nằm trong sitemap —
+`/lookup` mang `noindex,follow` dù đã có route riêng theo ngôn ngữ.
 
 ## Search Console
 

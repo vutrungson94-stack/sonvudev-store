@@ -129,9 +129,16 @@ npm run health:check
 
 ## 7. Internationalization (i18n) Process
 
-1. **Add key**: Edit `public/i18n.js` (vi + en in same PR)
-2. **Use key**: `data-i18n="key.path"` in HTML or `T('key.path', ...)` in JS
-3. **Verify**: `npm run audit` catches orphan keys, missing translations
+1. **Add key**: Edit `public/i18n.js` (vi + en DICT in the same PR), then add the same key
+   with a real translation to all five on-demand files `public/locales/{de,es,fr,ja,zh-CN}.json`.
+   `en.json` is generated from the DICT — never hand-edit it.
+2. **Use key**: `data-i18n="key.path"` in HTML or `T('key.path', ...)` in JS. A static page
+   linked from localized chrome must also be added to `STATIC_PAGES` **and** `STATIC_META`
+   in `src/pages.js` and registered under `/<lang>/…` in `src/app.js`; otherwise the
+   localized URL either 404s or ships Vietnamese bytes for the browser to replace.
+3. **Verify**: `npm run audit` catches orphan keys, missing translations; `npm test`
+   (`static-localized.test.js`, `footer-contact-i18n.test.js`) catches untranslated
+   chrome and dead localized links.
 4. **Fill static text**: `npm run i18n:fill` (AI-assisted, cached, review required)
 5. **Metrics**: `i18nKeys` and `localizedPages` tracked in baseline
 

@@ -27,6 +27,7 @@ ghi thẳng khi chưa có test.
 | 18 | Release artifact kèm provenance/SBOM; hash ổn định giữa các build (`PROCESS.md` §5, `CMMI-L5-ROADMAP §7`) | `test/provenance.test.js`, `scripts/provenance.mjs`, verify build ×2 | — |
 | 19 | Backup khôi phục được (`CMMI-L5-ROADMAP §7`) | `scripts/backup.mjs`, `scripts/backup-drill.mjs` (mới 2026-11-14) | Drill hằng tháng, xem RUNBOOK §8 |
 | 20 | RCA/postmortem sau mỗi sự cố production (`PROCESS.md` §3, `§10`) | `test/workflow-gate.test.js`? (gate CI) | Quy trình bắt buộc; bằng chứng: `docs/rca/*`, `postmortems/*` |
+| 21 | Mọi link trong chrome đã localized phải có route `/<lang>/…` trả 200 và render đúng ngôn ngữ từ server, kể cả khối liên hệ trong footer/about (`AGENTS.md` §4, `WORKFLOW.md` §7.5) | `test/static-localized.test.js`, `test/footer-contact-i18n.test.js`, `test/contact-i18n.test.js` | Bao gồm `/en/lookup` (từng 404) và đoạn `about.contactNote` (từng là tiếng Việt trên trang Anh) |
 
 ## Vòng phản hồi lỗi → phòng ngừa
 
