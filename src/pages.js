@@ -965,7 +965,15 @@ const chromeLink = (link, route, copy, prefix = "") => {
   const href = link.mail
     ? `mailto:${esc(env.email.supportEmail)}`
     : (prefix && raw.startsWith("/") && !raw.startsWith("//") ? `${prefix}${raw}` : raw);
-  const label = copy ? copy[link.copy] : link.vi;
+  // The on-demand locales keep their contact prose in a nested object, so the
+  // nav word lives in contact.h1 and the mail word in nav.contactEmail. Reading
+  // those fields as scalars put "[object Object]" in the footer's Contact link
+  // and left the mail link with no text at all.
+  const label = copy
+    ? (link.copy === "contact" && typeof copy.contact === "object"
+        ? copy.contact.h1
+        : (copy[link.copy] ?? copy.nav?.[link.copy]))
+    : link.vi;
   const current = link.page && link.route === route ? ' aria-current="page"' : "";
   // The dictionary form keeps the switch working on a page that loads i18n.js;
   // the copy form is the product page, which is written in one language already.
@@ -998,9 +1006,14 @@ export const footerLinks = (route, copy = null, prefix = "") =>
  * template. The template pages get their <footer> from their own file so the brand
  * wordmark and the tagline stay in the markup; this is the same bar without the
  * two strings that live only in the dictionary.
+ *
+ * `lang` is passed separately from `copy`: the caller knows which locale it is
+ * rendering, while `copy` only carries that locale's words. Deriving the language
+ * from `copy` used to pin the contact block to Vietnamese on every product page —
+ * the tagline and links were English, the four identity labels were not.
  */
-export const footerBar = (route, copy, prefix = "") => {
-  const contactHtml = businessContactHtml(copy ? 'vi' : 'vi');
+export const footerBar = (route, copy, prefix = "", lang = DEFAULT_LOCALE) => {
+  const contactHtml = businessContactHtml(lang);
   return `<footer class="site-footer wrap"><div class="brand">${brandWordmark()}</div>` +
     `<p>${esc(copy.tagline || "")}</p>` +
     (contactHtml ? `<div class="footer-contact">${contactHtml}</div>` : '') +
@@ -1457,10 +1470,20 @@ const legalEntityLine = (className = 'legal-entity') => {
 // explicitly configured are rendered; missing optional fields are omitted rather
 // than fabricated (fabricated identity details increase misrepresentation risk).
 const businessContactHtml = (lang = DEFAULT_LOCALE) => {
+  // One row per supported locale. The address/phone/email wording mirrors the
+  // contact.* keys in public/i18n.js and public/locales/*.json so the footer says
+  // the same thing as the contact page; a locale not listed here falls back to
+  // English rather than silently printing Vietnamese on an English page.
+  const EN_LABELS = { legal: 'Legal entity', address: 'Address', phone: 'Phone', email: 'Support email' };
   const labels = {
     vi: { legal: 'Pháp nhân/đơn vị', address: 'Địa chỉ', phone: 'Điện thoại', email: 'Email hỗ trợ' },
-    en: { legal: 'Legal entity', address: 'Address', phone: 'Phone', email: 'Support email' },
-  }[lang] || { legal: 'Legal entity', address: 'Address', phone: 'Phone', email: 'Support email' };
+    en: EN_LABELS,
+    de: { legal: 'Rechtsträger', address: 'Adresse', phone: 'Telefon', email: 'Support-E-Mail' },
+    es: { legal: 'Entidad legal', address: 'Dirección', phone: 'Teléfono', email: 'Email de soporte' },
+    fr: { legal: 'Entité légale', address: 'Adresse', phone: 'Téléphone', email: 'Email de support' },
+    ja: { legal: '法的主体', address: '住所', phone: '電話', email: 'サポートメール' },
+    'zh-CN': { legal: '法律实体', address: '地址', phone: '电话', email: '支持邮箱' },
+  }[lang] || EN_LABELS;
   const lines = [];
   const legal = String(env.brand.legalEntity || '').trim();
   const address = String(env.brand.address || '').trim();
@@ -1690,6 +1713,7 @@ export const COPY_VI = {
   // not carry the last two links the shop has.
   lookup: "Tra cứu đơn",
   contact: "Liên hệ",
+  nav: { contactEmail: "Email hỗ trợ" },
   status: "Trạng thái",
   breadcrumbLabel: "Đường dẫn",
   software: "Phần mềm",
@@ -1745,6 +1769,7 @@ export const COPY_EN = {
   about: "About",
   lookup: "Order lookup",
   contact: "Contact",
+  nav: { contactEmail: "Support email" },
   status: "Status",
   breadcrumbLabel: "Breadcrumb",
   software: "Software",
@@ -2423,7 +2448,7 @@ ${reviews.length ? `<section class="detail-block reviews"><h2>${esc(copy.reviews
 </article>
 ${related && related.length ? `<section class="related"><h2>${esc(copy.related)}</h2><div id="related" class="related-grid">${related.map((entry) => `<a class="related-card" href="${esc(absolute(productUrl(entry.slug, lang)))}"><b>${esc(entry.name)}</b><span>v${esc(entry.version)} · ${esc(entry.platform || "Windows")}</span><span>${esc(money(entry.price, entry.currency))}</span></a>`).join("")}</div></section>` : `<section class="related"><h2>${esc(copy.related)}</h2><div id="related" class="related-grid">${esc(copy.loading)}</div></section>`}
 </main>
-${footerBar("", copy, homePrefix)}
+${footerBar("", copy, homePrefix, lang)}
 <!-- related-loader: client fallback only; the server renders real cards above -->
 <script src="${assetUrl('/format.js')}"></script>
 <script src="${assetUrl('/related.js')}" data-self="${esc(product.id)}" data-lang="${esc(lang)}" data-prefix="${esc(homePrefix)}"></script>
