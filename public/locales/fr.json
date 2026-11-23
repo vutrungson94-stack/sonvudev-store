@@ -12,6 +12,7 @@
   "about.p4": "Si le fichier est défectueux, nous le renvoyons ou le remboursons selon la politique de remboursement. Un produit qui ne fait pas son travail n'est pas quelque chose que vous devriez payer.",
   "about.p5": "Votre commande peut également être consultée",
   "about.p6": "avec le code de commande et l'email utilisé lors de l'achat.",
+  "about.contactNote": "Nous fournissons des logiciels numériques (téléchargement après confirmation du paiement). Pour toute question sur une commande, un remboursement ou avant l'achat, contactez-nous via les canaux publiés.",
   "announce.cta": "Explorez maintenant",
   "announce.text": "{brand} est ouvert aux nouvelles versions",
   "api.err.catalogLoad": "Impossible de charger le catalogue",

@@ -471,6 +471,7 @@ const DICT = {
     'about.ask2': '. Chúng tôi không có chatbot, nên câu trả lời đến từ đúng người đã viết phần mềm.',
     'about.p5': 'Đơn hàng của bạn cũng tra cứu được tại',
     'about.p6': 'bằng mã đơn và email đã dùng khi mua.',
+    'about.contactNote': 'Chúng tôi cung cấp sản phẩm phần mềm số (tải xuống sau khi thanh toán được xác nhận). Để được hỗ trợ đơn hàng, hoàn tiền hoặc câu hỏi trước mua, vui lòng liên hệ qua các kênh đã công bố.',
 
     // ---- terms ----
     'legal.terms.h1': 'Điều khoản sử dụng',
@@ -997,6 +998,7 @@ const DICT = {
     'about.ask2': '. There is no chatbot here, so the answer comes from the person who wrote the software.',
     'about.p5': 'You can also look up your order at',
     'about.p6': 'with the order code and the email you paid with.',
+    'about.contactNote': 'We provide digital software products (download after payment is confirmed). For order support, refunds or pre-purchase questions, please contact us through the published channels.',
 
     // ---- terms ----
     'legal.terms.h1': 'Terms of Use',

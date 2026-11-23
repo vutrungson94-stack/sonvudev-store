@@ -12,6 +12,7 @@
   "about.p4": "Wenn die Datei defekt ist, senden wir sie zurück oder erstatten gemäß der Rückerstattungsrichtlinie. Ein Produkt, das seine Aufgabe nicht erfüllt, ist kein Produkt, für das Sie bezahlen sollten.",
   "about.p5": "Ihre Bestellung kann auch eingesehen werden",
   "about.p6": "mit dem Bestellcode und der E-Mail-Adresse, die Sie beim Kauf verwendet haben.",
+  "about.contactNote": "Wir liefern digitale Softwareprodukte (Download nach Bestätigung der Zahlung). Für Bestellungen, Erstattungen oder Fragen vor dem Kauf kontaktieren Sie uns bitte über die veröffentlichten Kanäle.",
   "announce.cta": "Entdecken Sie jetzt",
   "announce.text": "{brand} ist offen für Neuerscheinungen",
   "api.err.catalogLoad": "Der Katalog konnte nicht geladen werden",

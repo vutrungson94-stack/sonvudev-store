@@ -131,6 +131,31 @@ test('chrome links on a localized legal page stay in the language', async () => 
   assert.ok(!body.includes('Điều khoản'), 'the German terms page must not ship Vietnamese chrome');
 });
 
+test('the about page contact block speaks the language of the URL', async () => {
+  // This block used to be the one part of /en/about still in Vietnamese: its
+  // heading and paragraph had no data-i18n keys, so the server-localized page
+  // ended with Vietnamese prose above an English contact block.
+  const about = [
+    ['/about', 'vi', 'Thông tin liên hệ', 'Chúng tôi cung cấp sản phẩm phần mềm số'],
+    ['/en/about', 'en', 'Contact information', 'We provide digital software products'],
+    ['/de/about', 'de', 'Kontaktinformationen', 'Wir liefern digitale Softwareprodukte'],
+    ['/es/about', 'es', 'Información de contacto', 'Ofrecemos productos de software digital'],
+    ['/fr/about', 'fr', 'Informations de contact', 'Nous fournissons des logiciels numériques'],
+    ['/ja/about', 'ja', '連絡先情報', 'デジタルソフトウェア製品を提供しています'],
+    ['/zh-CN/about', 'zh-CN', '联系信息', '我们提供数字软件产品'],
+  ];
+  const vietnamese = 'Chúng tôi cung cấp sản phẩm phần mềm số';
+  for (const [pathname, lang, heading, paragraph] of about) {
+    const { status, body } = await get(pathname);
+    assert.equal(status, 200, `GET ${pathname} must answer 200`);
+    assert.ok(body.includes(heading), `GET ${pathname} must localize the contact heading`);
+    assert.ok(body.includes(paragraph), `GET ${pathname} must localize the contact paragraph`);
+    if (lang !== 'vi') {
+      assert.ok(!body.includes(vietnamese), `GET ${pathname} must not ship the Vietnamese paragraph`);
+    }
+  }
+});
+
 test('the sitemap lists every locale homepage and legal page with hreflang', async () => {
   const { status, body } = await get('/sitemap.xml');
   assert.equal(status, 200);
