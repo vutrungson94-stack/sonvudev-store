@@ -673,6 +673,12 @@ for (const file of Object.keys(served)) {
 // for the dictionary to resolve to a literal. This is the page a PayPal buyer
 // reaches after losing their session.
 app.get(["/lookup", "/lookup.html"], sendPage("lookup.html"));
+// Localized footers link to /<lang>/lookup; registering only the bare route
+// turned that link into the 404 page a buyer sees after losing their session.
+for (const lang of LOCALE_CODES.filter((code) => code !== "vi")) {
+  app.get(`/${lang}/lookup`, sendPage("lookup.html", lang));
+  app.get(`/${lang}/lookup.html`, sendPage("lookup.html", lang));
+}
 app.get("/404.html", notFound);
 // The order page is reached as /order/<id> — the lookup form and the PayPal
 // return both link that shape. Registering only /order and /order.html left the

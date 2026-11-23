@@ -1195,6 +1195,10 @@ const STATIC_PAGES = {
   // after load — a 0.204 layout shift on a phone, and a crawlable English URL
   // that returned Vietnamese bytes.
   "contact.html": { slug: "/contact", key: "contact" },
+  // Every localized footer links to /<lang>/lookup, so the recovery page needs
+  // its own localized route and has to be rendered in the URL's language — not
+  // served as Vietnamese bytes and translated by the browser after load.
+  "lookup.html": { slug: "/lookup", key: "lookup" },
 };
 
 /**
@@ -1258,6 +1262,15 @@ export const STATIC_META = {
     fr: { title: "Contact - {{brandName}}", description: "Contactez {{brandName}} pour l'aide sur les commandes, les remboursements ou les questions avant achat. Nous répondons par e-mail et par téléphone." },
     ja: { title: "お問い合わせ - {{brandName}}", description: "ご注文のサポート、返金、購入前のご質問は {{brandName}} まで。メールと電話でお答えします。" },
     "zh-CN": { title: "联系我们 - {{brandName}}", description: "如需订单支持、退款或购买前咨询，请联系 {{brandName}}。我们通过电子邮件和电话回复。" },
+  },
+  lookup: {
+    vi: { title: "Tra cứu đơn hàng - {{brandName}}", description: "Tra cứu đơn hàng {{brandName}} bằng mã đơn và email đã dùng khi thanh toán." },
+    en: { title: "Order lookup - {{brandName}}", description: "Look up your {{brandName}} order with the code and email you paid with." },
+    de: { title: "Bestellung nachschlagen - {{brandName}}", description: "Schlagen Sie Ihre {{brandName}}-Bestellung mit dem Code und der E-Mail-Adresse nach, die Sie beim Kauf verwendet haben." },
+    es: { title: "Consultar pedido - {{brandName}}", description: "Consulta tu pedido de {{brandName}} con el código y el correo electrónico utilizados en la compra." },
+    fr: { title: "Suivi de commande - {{brandName}}", description: "Suivez votre commande {{brandName}} avec le code et l'email utilisés lors du paiement." },
+    ja: { title: "注文の照会 - {{brandName}}", description: "注文コードと購入時のメールアドレスで {{brandName}} の注文を照会します。" },
+    "zh-CN": { title: "订单查询 - {{brandName}}", description: "使用订单代码和付款时使用的电子邮件查询您的 {{brandName}} 订单。" },
   },
 };
 

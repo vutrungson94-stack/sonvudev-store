@@ -156,6 +156,30 @@ test('the about page contact block speaks the language of the URL', async () => 
   }
 });
 
+test('localized lookup routes answer and are rendered in their own language', async () => {
+  // Every localized footer links to /<lang>/lookup. Only the bare /lookup route
+  // existed, so "Order lookup" on an English page landed on the 404 page.
+  const cases = [
+    ['/lookup', 'vi', 'Tra cứu đơn hàng'],
+    ['/en/lookup', 'en', 'Order lookup'],
+    ['/de/lookup', 'de', 'Suchen Sie nach Bestellungen'],
+    ['/es/lookup', 'es', 'buscar pedidos'],
+    ['/fr/lookup', 'fr', 'Rechercher des commandes'],
+    ['/ja/lookup', 'ja', '注文照会'],
+    ['/zh-CN/lookup', 'zh-CN', '订单查询'],
+  ];
+  for (const [pathname, lang, heading] of cases) {
+    const { status, body } = await get(pathname);
+    assert.equal(status, 200, `GET ${pathname} must answer 200, not the 404 page`);
+    assert.match(body, new RegExp(`<html lang="${escapeRe(lang)}">`), `GET ${pathname} html lang`);
+    assert.match(body, new RegExp(`<h1[^>]*>[\\s\\S]*?${escapeRe(heading)}`),
+      `GET ${pathname} must carry the ${lang} heading in the server bytes`);
+  }
+  const en = (await get('/en/lookup')).body;
+  assert.ok(!en.includes('>Tra cứu đơn hàng</h1>'), 'the English route must not ship the Vietnamese heading');
+  assert.match(en, /<title[^>]*>Order lookup/, 'the title must be localized too');
+});
+
 test('the sitemap lists every locale homepage and legal page with hreflang', async () => {
   const { status, body } = await get('/sitemap.xml');
   assert.equal(status, 200);
