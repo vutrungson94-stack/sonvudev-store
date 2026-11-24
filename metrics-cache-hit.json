@@ -1,8 +1,8 @@
 {
-  "generatedAt": "2026-11-23T11:36:24.537Z",
+  "generatedAt": "2026-11-24T13:09:50.113Z",
   "origin": "https://sonvudev.com",
-  "hitRate": 0.625,
-  "hits": 5,
+  "hitRate": 0.75,
+  "hits": 6,
   "total": 8,
   "steadyStateHitRate": 1,
   "steadyStateHits": 4,
@@ -12,17 +12,17 @@
       "path": "/",
       "readings": [
         {
-          "cache": "MISS",
-          "age": null,
+          "cache": "HIT",
+          "age": "18806",
           "cacheControl": "public, max-age=86400, stale-while-revalidate=604800, stale-if-error=2592000",
-          "ray": "a5efe00a7882cce5-SJC",
+          "ray": "a5f8a64c88c4db62-LAX",
           "status": 200
         },
         {
           "cache": "HIT",
-          "age": "0",
+          "age": "18806",
           "cacheControl": "public, max-age=86400, stale-while-revalidate=604800, stale-if-error=2592000",
-          "ray": "a5efe036cdabcce5-SJC",
+          "ray": "a5f8a64d0960db62-LAX",
           "status": 200
         }
       ]
@@ -32,16 +32,16 @@
       "readings": [
         {
           "cache": "HIT",
-          "age": "8890",
+          "age": "18843",
           "cacheControl": "public, max-age=86400, stale-while-revalidate=604800, stale-if-error=2592000",
-          "ray": "a5efe0371e01cce5-SJC",
+          "ray": "a5f8a64d59cedb62-LAX",
           "status": 200
         },
         {
           "cache": "HIT",
-          "age": "8890",
+          "age": "18843",
           "cacheControl": "public, max-age=86400, stale-while-revalidate=604800, stale-if-error=2592000",
-          "ray": "a5efe0375e4fcce5-SJC",
+          "ray": "a5f8a64daa45db62-LAX",
           "status": 200
         }
       ]
@@ -53,14 +53,14 @@
           "cache": "MISS",
           "age": null,
           "cacheControl": "public, max-age=31536000",
-          "ray": "a5efe0377e6dcce5-SJC",
+          "ray": "a5f8a64e1ac2db62-LAX",
           "status": 200
         },
         {
           "cache": "HIT",
           "age": "0",
           "cacheControl": "public, max-age=31536000",
-          "ray": "a5efe03bbb09cce5-SJC",
+          "ray": "a5f8a677bef7db62-LAX",
           "status": 200
         }
       ]
@@ -72,14 +72,14 @@
           "cache": "MISS",
           "age": null,
           "cacheControl": "public, max-age=86400, stale-while-revalidate=604800, stale-if-error=2592000",
-          "ray": "a5efe03bfb53cce5-SJC",
+          "ray": "a5f8a677ef2cdb62-LAX",
           "status": 200
         },
         {
           "cache": "HIT",
           "age": "0",
           "cacheControl": "public, max-age=86400, stale-while-revalidate=604800, stale-if-error=2592000",
-          "ray": "a5efe0411950cce5-SJC",
+          "ray": "a5f8a67bfc3adb62-LAX",
           "status": 200
         }
       ]

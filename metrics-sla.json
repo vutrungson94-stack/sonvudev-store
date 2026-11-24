@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-11-23T11:36:15.221Z",
+  "generatedAt": "2026-11-24T13:09:41.952Z",
   "overall": "ok",
   "measurements": {
     "availability": {
@@ -17,7 +17,7 @@
       "status": "unknown",
       "breached": false,
       "sampleSize": 0,
-      "measuredAt": "2026-11-23T11:36:15.222Z"
+      "measuredAt": "2026-11-24T13:09:41.953Z"
     },
     "errorRate": {
       "id": "errorRate",
@@ -34,7 +34,7 @@
       "status": "unknown",
       "breached": false,
       "sampleSize": 0,
-      "measuredAt": "2026-11-23T11:36:15.222Z"
+      "measuredAt": "2026-11-24T13:09:41.953Z"
     },
     "latencyP95": {
       "id": "latencyP95",
@@ -51,7 +51,7 @@
       "status": "unknown",
       "breached": false,
       "sampleSize": 0,
-      "measuredAt": "2026-11-23T11:36:15.222Z"
+      "measuredAt": "2026-11-24T13:09:41.953Z"
     },
     "testPassRate": {
       "id": "testPassRate",
@@ -68,7 +68,7 @@
       "status": "unknown",
       "breached": false,
       "sampleSize": 0,
-      "measuredAt": "2026-11-23T11:36:15.222Z"
+      "measuredAt": "2026-11-24T13:09:41.954Z"
     },
     "buildSuccessRate": {
       "id": "buildSuccessRate",
@@ -85,7 +85,7 @@
       "status": "unknown",
       "breached": false,
       "sampleSize": 0,
-      "measuredAt": "2026-11-23T11:36:15.222Z"
+      "measuredAt": "2026-11-24T13:09:41.954Z"
     },
     "deploySuccessRate": {
       "id": "deploySuccessRate",
@@ -102,7 +102,7 @@
       "status": "unknown",
       "breached": false,
       "sampleSize": 0,
-      "measuredAt": "2026-11-23T11:36:15.222Z"
+      "measuredAt": "2026-11-24T13:09:41.954Z"
     },
     "escapeRate": {
       "id": "escapeRate",
@@ -119,7 +119,7 @@
       "status": "unknown",
       "breached": false,
       "sampleSize": 0,
-      "measuredAt": "2026-11-23T11:36:15.223Z"
+      "measuredAt": "2026-11-24T13:09:41.954Z"
     }
   }
 }

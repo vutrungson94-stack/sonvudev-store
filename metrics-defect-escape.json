@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-11-23T11:36:14.803Z",
+  "generatedAt": "2026-11-24T13:09:41.632Z",
   "status": "unknown",
   "source": "no defect tracker; commit subjects are not a measurement",
   "productionDefects": null,
@@ -11,8 +11,8 @@
   "proxy": {
     "basis": "git commit subjects: ^(fix|hotfix|bug): vs ^test:",
     "productionDefects": 0,
-    "caughtDefects": 1,
-    "escapeRate": 0,
+    "caughtDefects": 0,
+    "escapeRate": null,
     "warning": "proxy only — a commit message is not a defect record"
   }
 }
