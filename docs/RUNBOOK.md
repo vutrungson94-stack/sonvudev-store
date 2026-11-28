@@ -208,7 +208,14 @@ trang đơn để lấy link mới. Nếu mọi link đều hỏng: kiểm tra k
 **429 hàng loạt**
 Rate limit dùng chung qua Supabase (`rate_limit_hits`). Kiểm tra bảng có tồn tại và
 `RATE_LIMIT_STORE` không bị đặt `memory` ngoài ý muốn. Nếu một IP xấu đang quấy phá,
-chặn ở Caddy/Cloudflare thay vì nâng hạn mức toàn hệ thống.
+chặn ở Caddy/Cloudflare thay vì nâng hạn mức toàn hệ thống. Worker đã tự thêm
+`Retry-After` và trả trang 429 thân thiện cho browser; API vẫn nhận JSON 429.
+Xem `docs/MAINTENANCE-MODE.md`.
+
+**Origin free vừa hồi sinh nhưng còn commit cũ**
+`auto-heal.yml` chạy mỗi 30 phút, so sánh `commit` trong `/api/health` của từng
+origin với HEAD và tự deploy origin đã khỏe nhưng stale. Không deploy vào service
+đang suspend. Xem `docs/MAINTENANCE-MODE.md`.
 
 **Caddy không cấp được chứng chỉ**
 `SITE_DOMAIN` chưa đúng trong môi trường của Caddy, hoặc DNS chưa trỏ về máy. Chạy

@@ -225,9 +225,10 @@ jobs:
             echo '```'
           } >> "$GITHUB_STEP_SUMMARY"
 
-  # Deploy Fly when Render cannot auto-deploy. The edge balancer already moves
-  # traffic to Fly, but a suspended Render never builds this push — without this
-  # job the deployed-site gate waits for a sha that can never land on live.
+  # Deploy Fly on every main push. Render auto-deploys from the same commit;
+  # this job used to run only when Render was suspended, which left Fly stale
+  # on ordinary pushes and made the deployed-site gate wait for a sha that
+  # could never land on the origin actually serving the apex.
   deploy-fly:
     needs: checks
     if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master'
@@ -244,13 +245,11 @@ jobs:
         run: node scripts/render-suspended.mjs
 
       - name: install flyctl
-        if: steps.render.outputs.suspended == 'true'
         uses: superfly/flyctl-actions/setup-flyctl@master
         with:
           version: '0.5.12'
 
       - name: read Fly token from Render
-        if: steps.render.outputs.suspended == 'true'
         env:
           KEY: FLY_API_TOKEN
           OUTPUT_NAME: FLY_API_TOKEN
@@ -259,7 +258,8 @@ jobs:
         run: node scripts/gha-read-render-secret.mjs --required
 
       - name: deploy to Fly
-        if: steps.render.outputs.suspended == 'true'
+        # Every main push lands on both origins: Render auto-deploys, Fly is
+        # deployed here. The deployed-site gate waits for this exact sha.
         run: flyctl deploy --remote-only --build-arg "GIT_COMMIT=${{ github.sha }}" -a sonvudev-store
 
   # Deploy the edge balancer from the SAME commit the checks just certified.

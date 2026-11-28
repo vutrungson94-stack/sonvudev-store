@@ -12,7 +12,10 @@ import {
   pickOrigin, orderOrigins,
   isCacheable, isSuspension, staleKey,
   clientAddress, apexRedirect,
+  localeOf, maintenanceUntil, retryAfterSeconds, formatReturnDate,
+  maintenancePage, rateLimitPage, isRateLimited, browserNavigation,
 } from '../cloudflare/origin-balancer/worker.js';
+import worker from '../cloudflare/origin-balancer/worker.js';
 
 const ORIGINS = ['https://alpha.example', 'https://beta.example', 'https://gamma.example'];
 
@@ -106,4 +109,54 @@ test('stale key is distinct from the live key and stable', () => {
   assert.notEqual(key, url);
   assert.equal(key, staleKey(url));
   assert.equal(new URL(key).searchParams.get('buy'), 'abc', 'original query preserved');
+});
+
+test('maintenance flag is parsed only when it is in the future', () => {
+  const now = 1_800_000_000_000;
+  assert.equal(maintenanceUntil({ MAINTENANCE_UNTIL: new Date(now + 60_000).toISOString() }, now), now + 60_000);
+  assert.ok(maintenanceUntil({ MAINTENANCE_UNTIL: new Date(now - 60_000).toISOString() }, now) <= now, 'expired flag must not degrade the shop');
+  assert.equal(maintenanceUntil({}, now), 0);
+  assert.equal(maintenanceUntil({ MAINTENANCE_UNTIL: 'not-a-date' }, now), 0);
+  assert.ok(retryAfterSeconds(now + 90_000, now) >= 90);
+});
+
+test('URL prefix picks the locale before Accept-Language', () => {
+  const base = process.env.APP_URL.replace(/\/$/, '');
+  const req = (path, language = 'en-US,en;q=0.9') => new Request(`${base}${path}`, { headers: { 'accept-language': language } });
+  assert.equal(localeOf(req('/de/product/x')), 'de');
+  assert.equal(localeOf(req('/', 'vi-VN,vi;q=0.9')), 'vi');
+  assert.equal(localeOf(req('/')), 'en', 'Accept-Language is the fallback when the URL has no prefix');
+});
+
+test('maintenance page is localized, dated and non-cacheable', async () => {
+  const until = Date.parse('2026-12-01T10:00:00+07:00');
+  const body = maintenancePage({ locale: 'vi', until, reason: 'nâng cấp hạ tầng' });
+  assert.match(body, /SonVuDev đang bảo trì/);
+  assert.match(body, /nâng cấp hạ tầng/);
+  assert.match(body, /noindex,follow/);
+  assert.match(body, /<html lang="vi">/);
+  assert.match(formatReturnDate('vi', until), /2026/);
+  assert.match(rateLimitPage({ locale: 'en' }), /A little too fast/);
+});
+
+test('only browser navigations get an HTML rate-limit page', () => {
+  assert.equal(isRateLimited(429), true);
+  assert.equal(isRateLimited(200), false);
+  assert.equal(browserNavigation(new Headers({ accept: 'text/html', 'sec-fetch-mode': 'navigate' })), true);
+  assert.equal(browserNavigation(new Headers({ accept: 'application/json' })), false);
+});
+
+test('an active maintenance flag short-circuits the Worker before any origin fetch', async () => {
+  const until = Date.now() + 600_000;
+  const request = new Request(`${process.env.APP_URL.replace(/\/$/, '')}/en/`, { headers: { accept: 'text/html', 'sec-fetch-mode': 'navigate' } });
+  const response = await worker.fetch(request, {
+    ORIGINS: 'https://unused.example',
+    MAINTENANCE_UNTIL: new Date(until).toISOString(),
+    MAINTENANCE_REASON: 'bảo trì định kỳ',
+  }, { waitUntil() {} });
+  assert.equal(response.status, 503);
+  assert.equal(response.headers.get('cache-control'), 'no-store');
+  assert.equal(response.headers.get('x-svd-origin'), 'maintenance');
+  assert.ok(Number(response.headers.get('retry-after')) > 0);
+  assert.match(await response.text(), /SonVuDev is under maintenance/);
 });

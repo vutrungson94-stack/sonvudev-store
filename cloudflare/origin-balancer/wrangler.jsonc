@@ -21,7 +21,11 @@
   ],
   "vars": {
     // A dead origin is skipped for two minutes, then probed once more.
-    "COOLDOWN_MS": "120000"
+    "COOLDOWN_MS": "120000",
+    // ETA shown on the friendly maintenance page when every origin is down.
+    "MAINTENANCE_ETA_MS": "1800000"
+    // MAINTENANCE_UNTIL / MAINTENANCE_REASON are Operator secrets (wrangler
+    // secret put ...), not committed values. Empty => automatic mode only.
   },
   // Bound via `wrangler secret put ORIGINS` — space/comma separated URLs.
   // No `triggers`: this Worker has only a fetch handler, no cron.

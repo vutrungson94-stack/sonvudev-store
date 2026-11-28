@@ -1,0 +1,76 @@
+name: auto-heal free origins
+
+# Free hosts suspend on quota/billing. When one comes back it often still
+# serves the OLD commit until a human pushes again. This job runs on a free
+# schedule, probes each origin's /api/health, and deploys the current sha ONLY
+# to a healthy origin that is stale. A suspended host is left alone: deploying
+# into a suspension cannot help and would burn CI minutes for nothing.
+on:
+  schedule:
+    - cron: '*/30 * * * *'
+  workflow_dispatch:
+
+concurrency:
+  group: auto-heal-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  heal:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: '22'
+          cache: npm
+
+      - run: npm ci
+
+      - name: probe origin commits
+        id: health
+        env:
+          FLY_HEALTH_URL: ${{ secrets.FLY_HEALTH_URL }}
+          RENDER_HEALTH_URL: ${{ secrets.RENDER_HEALTH_URL }}
+          EXPECTED_SHA: ${{ github.sha }}
+        run: node scripts/origin-commit.mjs
+
+      - name: Render suspension state
+        id: render
+        env:
+          RENDER_API_KEY: ${{ secrets.RENDER_API_KEY }}
+          RENDER_SERVICE_ID: ${{ secrets.RENDER_SERVICE_ID }}
+        run: node scripts/render-suspended.mjs
+
+      - name: deploy latest commit to recovered Render
+        if: steps.render.outputs.suspended == 'false' && steps.health.outputs.renderStale == 'true'
+        env:
+          RENDER_API_KEY: ${{ secrets.RENDER_API_KEY }}
+          RENDER_SERVICE_ID: ${{ secrets.RENDER_SERVICE_ID }}
+        run: npm run render:deploy
+
+      - name: install flyctl
+        if: steps.health.outputs.flyStale == 'true'
+        uses: superfly/flyctl-actions/setup-flyctl@master
+        with:
+          version: '0.5.12'
+
+      - name: read Fly token from Render
+        if: steps.health.outputs.flyStale == 'true'
+        env:
+          KEY: FLY_API_TOKEN
+          OUTPUT_NAME: FLY_API_TOKEN
+          RENDER_API_KEY: ${{ secrets.RENDER_API_KEY }}
+          RENDER_SERVICE_ID: ${{ secrets.RENDER_SERVICE_ID }}
+        run: node scripts/gha-read-render-secret.mjs --required
+
+      - name: deploy latest commit to recovered Fly
+        if: steps.health.outputs.flyStale == 'true'
+        run: flyctl deploy --remote-only --build-arg "GIT_COMMIT=${{ github.sha }}" -a sonvudev-store
+
+      - name: summary
+        run: |
+          echo "head=${{ steps.health.outputs.head }}"
+          echo "fly=${{ steps.health.outputs.flyStatus }} sha=${{ steps.health.outputs.flyCommit }} stale=${{ steps.health.outputs.flyStale }}"
+          echo "render=${{ steps.health.outputs.renderStatus }} sha=${{ steps.health.outputs.renderCommit }} stale=${{ steps.health.outputs.renderStale }} suspended=${{ steps.render.outputs.suspended }}"
