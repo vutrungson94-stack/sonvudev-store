@@ -53,6 +53,10 @@ with seven locale strings (vi/en/de/es/fr/ja/zh). URL prefix wins over
 Cost envelope: Cloudflare free Worker requests, GitHub free scheduled minutes,
 Render Hobby and Fly Free. No plan change is required for this mechanism.
 
+## Third origin (in progress)
+
+A GCP Always Free `e2-micro` is being prepared as an optional third origin. Billing was reopened and a $1 alerts-only budget exists, but **no VM is serving yet** — see `docs/THIRD-ORIGIN-GCP.md` for the exact remaining steps and stop condition. Until that document says the VM is live, `ORIGINS` contains Fly + Render only.
+
 ## Caveats
 
 - The ETA is an honest estimate from the circuit cooldown, not a guarantee.
